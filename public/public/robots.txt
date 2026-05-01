@@ -1,0 +1,6 @@
+# https://evglab.com/robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap (wird beim Build aktualisiert)
+Sitemap: https://evglab.com/sitemap.xml

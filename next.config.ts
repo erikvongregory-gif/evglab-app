@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  /* Supabase Auth benötigt Route Handler & Middleware — kein static export. */
 };
 
 export default nextConfig;
