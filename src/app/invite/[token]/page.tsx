@@ -94,7 +94,7 @@ export default async function InviteTokenPage({ params }: InvitePageProps) {
 
         <p className="mt-4 text-sm text-zinc-600">
           Du hast schon ein Konto?{" "}
-          <Link href="/?auth=signin" className="font-medium text-[#c65a20] hover:underline">
+          <Link href="/anmelden" className="font-medium text-[#c65a20] hover:underline">
             Jetzt anmelden
           </Link>
         </p>

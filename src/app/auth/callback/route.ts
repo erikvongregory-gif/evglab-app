@@ -1,4 +1,5 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { redirectWithAdminEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
 import { isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
@@ -14,10 +15,10 @@ export async function GET(request: Request) {
   const safeNext = normalizeNextPath(searchParams.get("next"));
 
   if (!isSupabaseConfigured()) {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=config`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=config`, requestId);
   }
   if (isInviteOnlyEnabled() && type === "signup") {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=invite_required`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=invite_required`, requestId);
   }
 
   if (tokenHash && type) {
@@ -28,7 +29,20 @@ export async function GET(request: Request) {
       6_000,
       "auth_callback_verify_timeout",
     );
-    if (!error) return redirectResponse;
+    if (!error) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const admin2fa = await redirectWithAdminEmail2FAIfNeeded(request, {
+        user,
+        requestId,
+        origin,
+        cookieSource: redirectResponse,
+        startedAt,
+      });
+      if (admin2fa) return admin2fa;
+      return redirectResponse;
+    }
   }
 
   if (code) {
@@ -40,7 +54,21 @@ export async function GET(request: Request) {
         6_000,
         "auth_callback_exchange_timeout",
       );
-      if (!error) return redirectResponse;
+      if (!error) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const admin2fa = await redirectWithAdminEmail2FAIfNeeded(request, {
+          user,
+          requestId,
+          origin,
+          cookieSource: redirectResponse,
+          startedAt,
+          logEvent: "oauth_admin_2fa_required",
+        });
+        if (admin2fa) return admin2fa;
+        return redirectResponse;
+      }
     } catch {
       logAuthEvent({
         event: "callback_timeout",
@@ -52,5 +80,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return createNoStoreRedirect(`${origin}/?auth=signin&error=auth`, requestId);
+  return createNoStoreRedirect(`${origin}/anmelden?error=auth`, requestId);
 }

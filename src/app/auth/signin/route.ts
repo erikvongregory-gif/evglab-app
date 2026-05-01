@@ -1,18 +1,9 @@
 import { NextResponse } from "next/server";
-import {
-  buildPending2FAToken,
-  createOneTimeCode,
-  getPendingCookieName,
-  sendAdmin2FACodeEmail,
-} from "@/lib/admin/emailTwoFactor";
+import { redirectWithAdminEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { logAuthEvent, getOrCreateRequestId } from "@/lib/security/authObservability";
-import {
-  createNoStoreRedirect,
-  normalizeNextPath,
-  secureCookieOptions,
-} from "@/lib/security/authResponses";
+import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
 import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
 export async function POST(request: Request) {
@@ -21,9 +12,8 @@ export async function POST(request: Request) {
   const { origin } = new URL(request.url);
   const originError = enforceSameOrigin(request);
   if (originError) return originError;
-  const cookieOptions = secureCookieOptions(request);
   if (!isSupabaseConfigured()) {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=config`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=config`, requestId);
   }
 
   const formData = await request.formData();
@@ -43,7 +33,7 @@ export async function POST(request: Request) {
   if (rateError) return rateError;
 
   if (!email || !password) {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=missing`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=missing`, requestId);
   }
 
   const redirectResponse = createNoStoreRedirect(`${origin}${next}`, requestId);
@@ -67,52 +57,20 @@ export async function POST(request: Request) {
       durationMs: Date.now() - startedAt,
       meta: { reason: "auth" },
     });
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=auth`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=auth`, requestId);
   }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const role =
-    typeof user?.user_metadata?.role === "string"
-      ? String(user.user_metadata.role).toLowerCase()
-      : "";
-  if (role === "admin" && user?.id && user.email) {
-    const code = createOneTimeCode();
-    try {
-      await sendAdmin2FACodeEmail({ to: user.email, code });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      const errorCode = message.includes("RESEND_API_KEY") || message.includes("ADMIN_2FA_FROM_EMAIL")
-        ? "admin_2fa_email_config"
-        : "admin_2fa_email_failed";
-      return createNoStoreRedirect(`${origin}/?auth=signin&error=${errorCode}`, requestId);
-    }
-    const pendingToken = buildPending2FAToken({
-      userId: user.id,
-      email: user.email,
-      code,
-      ttlSeconds: 600,
-    });
-    const response = createNoStoreRedirect(
-      `${origin}/?auth=signin&notice=admin_2fa_required`,
-      requestId,
-    );
-    response.cookies.set(getPendingCookieName(), pendingToken, {
-      httpOnly: true,
-      ...cookieOptions,
-      maxAge: 60 * 10,
-    });
-    logAuthEvent({
-      event: "signin_admin_2fa_required",
-      requestId,
-      userId: user.id,
-      email: user.email,
-      status: 303,
-      durationMs: Date.now() - startedAt,
-    });
-    return withAuthCookies(response);
-  }
+  const admin2fa = await redirectWithAdminEmail2FAIfNeeded(request, {
+    user,
+    requestId,
+    origin,
+    cookieSource: redirectResponse,
+    startedAt,
+  });
+  if (admin2fa) return admin2fa;
 
   logAuthEvent({
     event: "signin_success",

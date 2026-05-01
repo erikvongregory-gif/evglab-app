@@ -33,6 +33,7 @@ import { OnboardingDialog, type OnboardingStep } from "@/components/ui/onboardin
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { DEFAULT_HOPFEN_AGENTS, FloatingChatWidget } from "@/components/ui/floating-chat-widget-shadcnui";
 import { cn } from "@/lib/utils";
+import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { buildCampaignCreativePrompt } from "@/lib/kie/campaignImagePrompt";
 
 type OptionProps = {
@@ -424,7 +425,7 @@ const MobileTabBar = ({
           type="button"
           onClick={() => {
             if (typeof window === "undefined") return;
-            window.location.assign("/");
+            window.location.assign(MARKETING_SITE_URL);
           }}
           className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
           aria-label="Zur Startseite"
@@ -532,7 +533,7 @@ const TitleSection = ({ open, userEmail, planLabel }: { open: boolean; userEmail
 
   const handleBackToHomepage = () => {
     if (typeof window === "undefined") return;
-    window.location.assign("/");
+    window.location.assign(MARKETING_SITE_URL);
   };
 
   const handleRestartOnboarding = () => {
@@ -1420,7 +1421,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         body: JSON.stringify({ plan }),
       });
       if (res.status === 401) {
-        window.location.href = "/?auth=signin";
+        window.location.href = "/anmelden";
         return;
       }
       if (!res.ok) {
@@ -3084,7 +3085,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   return (
     <div
       className={cn(
-        "relative flex-1 overflow-auto px-3 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-3 sm:p-6",
+        "relative flex-1 overflow-auto px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-3 sm:p-6",
         isCreationTab ? "bg-[#070b13]" : "bg-gray-50 dark:bg-gray-950",
       )}
     >
@@ -3376,7 +3377,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
             type="button"
             onClick={() => {
               if (typeof window === "undefined") return;
-              window.location.assign("/");
+              window.location.assign(MARKETING_SITE_URL);
             }}
             className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-[#171a20] px-2.5 text-sm font-medium text-white shadow-[0_8px_20px_-14px_rgba(0,0,0,0.7)] transition hover:bg-[#1e232b]"
             title="Zur Startseite"
@@ -3751,10 +3752,10 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         onboardingAttr="hopfen-hugo"
       />
       <nav
-        className="fixed inset-x-3 bottom-[max(0.6rem,env(safe-area-inset-bottom))] z-[95] rounded-2xl border border-white/10 bg-[#10141d]/95 p-2 shadow-[0_20px_44px_-24px_rgba(0,0,0,0.9)] backdrop-blur md:hidden"
+        className="fixed inset-x-3 bottom-[max(0.6rem,env(safe-area-inset-bottom))] z-[95] rounded-2xl border border-white/10 bg-[#10141d]/95 px-2 pb-2 pt-1 shadow-[0_20px_44px_-24px_rgba(0,0,0,0.9)] backdrop-blur md:hidden"
         aria-label="Mobile Dashboard Navigation"
       >
-        <div className="grid grid-cols-4 items-end gap-1">
+        <div className="grid grid-cols-4 items-end gap-1 pt-8">
           <button
             type="button"
             onClick={() => {

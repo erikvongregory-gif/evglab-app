@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import nextDynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 
 const DashboardWithSidebar = nextDynamic(
   () => import("@/components/ui/dashboard-with-collapsible-sidebar").then((mod) => mod.Example),
@@ -40,9 +40,9 @@ export default async function DashboardPage() {
           <code className="rounded bg-zinc-100 px-1">NEXT_PUBLIC_SUPABASE_URL</code> und{" "}
           <code className="rounded bg-zinc-100 px-1">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> an.
         </p>
-        <Link href="/" className="mt-6 inline-block text-sm font-medium text-[#c65a20] hover:underline">
+        <a href={MARKETING_SITE_URL} className="mt-6 inline-block text-sm font-medium text-[#c65a20] hover:underline">
           Zur Startseite
-        </Link>
+        </a>
       </main>
     );
   }
@@ -53,7 +53,7 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/?auth=signin");
+    redirect("/anmelden");
   }
 
   const userName =

@@ -29,12 +29,12 @@ export async function getAdminSession(): Promise<AdminSession | null> {
 }
 
 export async function requireAdminPageAccess(options?: { allowWithout2FA?: boolean }) {
-  if (!isSupabaseConfigured()) redirect("/?auth=signin&error=config");
+  if (!isSupabaseConfigured()) redirect("/anmelden?error=config");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/?auth=signin");
+  if (!user) redirect("/anmelden");
   const role =
     typeof user.user_metadata?.role === "string"
       ? String(user.user_metadata.role).toLowerCase()

@@ -10,10 +10,10 @@ export async function GET(request: Request) {
   const safeNext = normalizeNextPath(searchParams.get("next"));
 
   if (!isSupabaseConfigured()) {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=config`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=config`, requestId);
   }
   if (isInviteOnlyEnabled()) {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=invite_only`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=invite_only`, requestId);
   }
 
   const cookieCarrier = NextResponse.next();
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   });
 
   if (error || !data.url) {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=google`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=google`, requestId);
   }
 
   const redirect = createNoStoreRedirect(data.url, requestId);

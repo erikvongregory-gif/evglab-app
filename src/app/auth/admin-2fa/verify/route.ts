@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       ? String(user.user_metadata.role).toLowerCase()
       : "";
   if (!user || role !== "admin" || !user.email) {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=auth`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=auth`, requestId);
   }
   const baseIdentifier = `admin2fa:${user.id}`;
   const baseRateError = await enforceRateLimitPersistent(request, {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   const pendingToken = request.cookies.get(getPendingCookieName())?.value ?? null;
   if (!pendingToken) {
-    return createNoStoreRedirect(`${origin}/?auth=signin&error=admin_2fa_session_expired`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?error=admin_2fa_session_expired`, requestId);
   }
 
   if (action === "resend") {
@@ -66,10 +66,7 @@ export async function POST(request: NextRequest) {
     try {
       await sendAdmin2FACodeEmail({ to: user.email, code: newCode });
     } catch {
-      return createNoStoreRedirect(
-        `${origin}/?auth=signin&notice=admin_2fa_required&error=email_failed`,
-        requestId,
-      );
+      return createNoStoreRedirect(`${origin}/dashboard/2fa-email?error=email_failed`, requestId);
     }
     const nextPending = buildPending2FAToken({
       userId: user.id,
@@ -77,10 +74,7 @@ export async function POST(request: NextRequest) {
       code: newCode,
       ttlSeconds: 600,
     });
-    const resendResponse = createNoStoreRedirect(
-      `${origin}/?auth=signin&notice=admin_2fa_resent`,
-      requestId,
-    );
+    const resendResponse = createNoStoreRedirect(`${origin}/dashboard/2fa-email?notice=resent`, requestId);
     resendResponse.cookies.set(getPendingCookieName(), nextPending, {
       httpOnly: true,
       ...cookieOptions,
@@ -98,10 +92,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!code) {
-    return createNoStoreRedirect(
-      `${origin}/?auth=signin&notice=admin_2fa_required&error=missing_code`,
-      requestId,
-    );
+    return createNoStoreRedirect(`${origin}/dashboard/2fa-email?error=missing_code`, requestId);
   }
   const verifyRateError = await enforceRateLimitPersistent(
     request,
@@ -124,10 +115,7 @@ export async function POST(request: NextRequest) {
       status: 303,
       durationMs: Date.now() - startedAt,
     });
-    return createNoStoreRedirect(
-      `${origin}/?auth=signin&notice=admin_2fa_required&error=admin_2fa_invalid`,
-      requestId,
-    );
+    return createNoStoreRedirect(`${origin}/dashboard/2fa-email?error=admin_2fa_invalid`, requestId);
   }
 
   const verifiedToken = buildVerified2FAToken({

@@ -113,7 +113,14 @@ export function FloatingChatWidget({
   if (!currentAgent) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[96] flex flex-col items-end gap-4">
+    <div
+      className={cn(
+        "fixed z-[96] flex flex-col items-end gap-4",
+        // Über der mobilen Tab-Leiste (fixed bottom, inkl. Safe Area + mittlerer Sparkle-Button)
+        "max-md:bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+6.85rem)] max-md:right-3",
+        "md:bottom-6 md:right-6",
+      )}
+    >
       <AnimatePresence>
         {isOpen ? (
           <motion.div

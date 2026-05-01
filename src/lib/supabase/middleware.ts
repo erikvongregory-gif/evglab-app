@@ -53,15 +53,15 @@ export async function updateSession(request: NextRequest) {
     return redirect;
   }
 
-  if (!user && pathname.startsWith("/dashboard")) {
-    const redirect = NextResponse.redirect(new URL("/?auth=signin", request.url));
+  if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/admin"))) {
+    const redirect = NextResponse.redirect(new URL("/anmelden", request.url));
     redirect.headers.set("x-request-id", requestId);
     redirect.headers.set("Cache-Control", "no-store, max-age=0");
     return redirect;
   }
 
   if (isInviteOnlyEnabled() && pathname === "/registrieren") {
-    const redirect = NextResponse.redirect(new URL("/?auth=signin&error=invite_required", request.url));
+    const redirect = NextResponse.redirect(new URL("/anmelden?error=invite_required", request.url));
     redirect.headers.set("x-request-id", requestId);
     redirect.headers.set("Cache-Control", "no-store, max-age=0");
     return redirect;

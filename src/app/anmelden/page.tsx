@@ -22,12 +22,17 @@ export default async function AnmeldenPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = (await searchParams) ?? {};
-  const raw = params.error ?? params.notice;
-  const urlError = Array.isArray(raw) ? raw[0] : raw;
+  const err = params.error;
+  const ntc = params.notice;
+  const urlError = Array.isArray(err) ? err[0] : err;
+  const urlNotice = Array.isArray(ntc) ? ntc[0] : ntc;
 
   return (
-    <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-950">
-      <LoginForm urlError={typeof urlError === "string" ? urlError : undefined} />
-    </main>
+    <div className="min-h-[100dvh] bg-background text-foreground antialiased">
+      <LoginForm
+        urlError={typeof urlError === "string" ? urlError : undefined}
+        urlNotice={typeof urlNotice === "string" ? urlNotice : undefined}
+      />
+    </div>
   );
 }
