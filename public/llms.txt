@@ -1,0 +1,13 @@
+# EvGlab App (Dashboard)
+
+> Dies ist die **Kunden-App** unter app.evglab.com: Anmeldung, Dashboard und Token-basierte **KI-Bilder** für Brauereien. Öffentliche Informationen zu Angeboten und Paketen stehen auf der **Marketing-Website**.
+
+## Marketing & Infos
+
+- https://www.evglab.com/ — Pakete, Abos, FAQ, Kontakt
+- https://www.evglab.com/ratgeber/marketing-inhalte-mit-ki — Anleitung Marketing mit KI
+- https://www.evglab.com/vergleich/premium-vs-dashboard-abo-brauerei — Premium vs. Abo
+
+## Diese App
+
+- /anmelden — Login (Seite ist per Meta-Tags nicht für die Google-Suche indexiert)

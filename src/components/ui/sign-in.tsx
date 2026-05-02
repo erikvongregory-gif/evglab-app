@@ -68,7 +68,11 @@ function TestimonialCard({ testimonial, delay }: { testimonial: Testimonial; del
       className={`animate-testimonial ${delay} flex w-64 items-start gap-3 rounded-3xl border border-white/10 bg-card/40 p-5 backdrop-blur-xl dark:bg-zinc-800/40`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- externe Demo-Avatare */}
-      <img src={testimonial.avatarSrc} className="h-10 w-10 rounded-2xl object-cover" alt="" />
+      <img
+        src={testimonial.avatarSrc}
+        className="h-10 w-10 rounded-2xl object-cover"
+        alt={`Portrait ${testimonial.name} (${testimonial.handle})`}
+      />
       <div className="text-sm leading-snug">
         <p className="flex items-center gap-1 font-medium">{testimonial.name}</p>
         <p className="text-muted-foreground">{testimonial.handle}</p>
@@ -296,6 +300,8 @@ export const SignInPage: React.FC<SignInPageProps> = ({
           <div
             className="animate-slide-right animate-delay-300 absolute inset-4 rounded-3xl bg-cover bg-center shadow-inner dark:shadow-black/40"
             style={{ backgroundImage: `url(${heroImageSrc})` }}
+            role="img"
+            aria-label="Stimmungsbild: moderne Brauerei- und Arbeitsumgebung für Marketing"
           />
           {testimonials.length > 0 ? (
             <div className="absolute bottom-8 left-1/2 flex w-full -translate-x-1/2 justify-center gap-4 px-8">
