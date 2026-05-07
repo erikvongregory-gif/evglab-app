@@ -20,6 +20,9 @@ export function getOrCreateRequestId(request: Request): string {
 export function withRequestHeaders(headers: HeadersInit | undefined, requestId: string): Headers {
   const next = new Headers(headers);
   next.set("x-request-id", requestId);
+  if (!next.has("Cache-Control")) {
+    next.set("Cache-Control", "no-store, max-age=0");
+  }
   return next;
 }
 

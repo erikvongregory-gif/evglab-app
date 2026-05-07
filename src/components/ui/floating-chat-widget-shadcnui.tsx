@@ -1,18 +1,25 @@
 "use client";
 
-import { type FormEvent, useCallback, useId, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useId, useMemo, useState } from "react";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
-import { MessageSquare, Send, X } from "lucide-react";
+import { Send, X } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { HopfenHugoAvatar } from "@/components/branding/HopfenHugoAvatar";
+import { HopfenHugoIcon } from "@/components/branding/HopfenHugoIcon";
 import { cn } from "@/lib/utils";
 
 type AssistantAgent = {
   id: string;
   name: string;
   role: string;
-  avatar: string;
+  avatar?: string;
+  /**
+   * Optionaler Custom-Renderer fuer den Avatar. Wenn gesetzt, wird er statt `avatar` (URL)
+   * verwendet — wir leiten den `thinking`-Zustand und die gewuenschte Pixel-Groesse durch.
+   */
+  renderAvatar?: (ctx: { thinking: boolean; size: number }) => ReactNode;
   status: "online" | "busy" | "offline";
   gradient: string;
 };
@@ -73,6 +80,36 @@ const messageVariants: Variants = {
   },
 };
 
+function AgentAvatar({
+  agent,
+  size,
+  thinking,
+  className,
+}: {
+  agent: AssistantAgent;
+  size: number;
+  thinking: boolean;
+  className?: string;
+}) {
+  if (agent.renderAvatar) {
+    return (
+      <div
+        className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-full", className)}
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        {agent.renderAvatar({ thinking, size })}
+      </div>
+    );
+  }
+  return (
+    <Avatar className={cn(className)} style={{ width: size, height: size }}>
+      <AvatarImage src={agent.avatar} alt={agent.name} />
+      <AvatarFallback>AI</AvatarFallback>
+    </Avatar>
+  );
+}
+
 export function FloatingChatWidget({
   isOpen,
   onToggle,
@@ -110,6 +147,8 @@ export function FloatingChatWidget({
     [onSubmit],
   );
 
+  const isThinking = loading || typingVisible;
+
   if (!currentAgent) return null;
 
   return (
@@ -142,10 +181,12 @@ export function FloatingChatWidget({
               <div className="relative z-10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
-                      <AvatarImage src={currentAgent.avatar} alt={currentAgent.name} />
-                      <AvatarFallback>AI</AvatarFallback>
-                    </Avatar>
+                    <AgentAvatar
+                      agent={currentAgent}
+                      size={40}
+                      thinking={isThinking}
+                      className="border-2 border-background shadow-sm"
+                    />
                     <span
                       className={cn(
                         "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
@@ -180,19 +221,19 @@ export function FloatingChatWidget({
                   animate="visible"
                   className={cn("flex gap-3", msg.role === "user" ? "flex-row-reverse self-end" : "")}
                 >
-                  <Avatar className="h-8 w-8 border border-border/40 shadow-sm">
-                    {msg.role === "assistant" ? (
-                      <>
-                        <AvatarImage src={currentAgent.avatar} />
-                        <AvatarFallback className="bg-primary/10 text-primary">AI</AvatarFallback>
-                      </>
-                    ) : (
-                      <>
-                        <AvatarImage src="https://api.dicebear.com/9.x/identicon/svg?seed=neutral-user&backgroundColor=e2e8f0,cbd5e1,f1f5f9" />
-                        <AvatarFallback className="bg-zinc-300 text-zinc-700 font-semibold">DU</AvatarFallback>
-                      </>
-                    )}
-                  </Avatar>
+                  {msg.role === "assistant" ? (
+                    <AgentAvatar
+                      agent={currentAgent}
+                      size={32}
+                      thinking={false}
+                      className="border border-border/40 shadow-sm"
+                    />
+                  ) : (
+                    <Avatar className="h-8 w-8 border border-border/40 shadow-sm">
+                      <AvatarImage src="https://api.dicebear.com/9.x/identicon/svg?seed=neutral-user&backgroundColor=e2e8f0,cbd5e1,f1f5f9" />
+                      <AvatarFallback className="bg-zinc-300 text-zinc-700 font-semibold">DU</AvatarFallback>
+                    </Avatar>
+                  )}
                   <div className={cn("flex max-w-[85%] flex-col gap-1", msg.role === "user" ? "items-end" : "")}>
                     {msg.role === "assistant" ? (
                       <span className="text-xs font-medium text-zinc-600">{currentAgent.name}</span>
@@ -211,16 +252,18 @@ export function FloatingChatWidget({
                 </motion.div>
               ))}
 
-              {loading || typingVisible ? (
+              {isThinking ? (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="flex gap-3"
                 >
-                  <Avatar className="h-8 w-8 border border-border/40 shadow-sm">
-                    <AvatarImage src={currentAgent.avatar} />
-                    <AvatarFallback className="bg-primary/10 text-primary">AI</AvatarFallback>
-                  </Avatar>
+                  <AgentAvatar
+                    agent={currentAgent}
+                    size={32}
+                    thinking={true}
+                    className="border border-border/40 shadow-sm"
+                  />
                   <div className="rounded-2xl rounded-tl-none border border-zinc-200 bg-white px-4 py-3 shadow-sm">
                     <div className="flex items-center justify-center gap-1">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-foreground/40 [animation-delay:-0.3s]" />
@@ -238,7 +281,7 @@ export function FloatingChatWidget({
                   type="text"
                   value={inputValue}
                   onChange={(e) => onInputChange(e.target.value)}
-                  placeholder={`Nachricht an ${currentAgent.name}...`}
+                  placeholder={`Frage zu Bild / Prompt (${currentAgent.name}) …`}
                   className="flex-1 rounded-full border border-zinc-300 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none transition-all placeholder:text-zinc-500 focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
                 />
                 <Button
@@ -260,7 +303,7 @@ export function FloatingChatWidget({
         onClick={onToggle}
         data-onboarding={onboardingAttr}
         className={cn(
-          "group relative flex h-15 w-15 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-2xl transition-all duration-300",
+          "group relative flex h-15 w-15 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-white shadow-2xl transition-all duration-300",
           isOpen
             ? "rotate-90 bg-zinc-900 text-white"
             : "bg-[#c8ff26] text-black hover:shadow-[#c8ff26]/40",
@@ -271,7 +314,7 @@ export function FloatingChatWidget({
         {isOpen ? (
           <X className="h-7 w-7 text-white" strokeWidth={2.5} />
         ) : (
-          <MessageSquare className="h-7 w-7 text-black" strokeWidth={2.5} />
+          <HopfenHugoIcon className="h-12 w-12" />
         )}
       </motion.button>
     </div>
@@ -282,8 +325,8 @@ export const DEFAULT_HOPFEN_AGENTS: AssistantAgent[] = [
   {
     id: "hopfen-hugo",
     name: "Hopfen Hugo",
-    role: "Brauerei Assistent",
-    avatar: "https://api.dicebear.com/9.x/fun-emoji/svg?seed=HopfenHugo&backgroundColor=ffe082,b39ddb,80deea",
+    role: "Assistent für KI-Werbebilder",
+    renderAvatar: ({ thinking, size }) => <HopfenHugoAvatar size={size} thinking={thinking} />,
     status: "online",
     gradient: "from-lime-500/20 to-emerald-500/20",
   },

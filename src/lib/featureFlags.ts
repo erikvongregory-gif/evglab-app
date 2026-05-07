@@ -1,0 +1,1 @@
+export const LOGIN_WAITLIST_ENABLED = process.env.NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED !== "0";

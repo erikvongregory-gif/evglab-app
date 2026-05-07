@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPendingCookieName, getVerifiedCookieName } from "@/lib/admin/emailTwoFactor";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { getAppBaseUrlOrigin, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { enforceSameOrigin } from "@/lib/security/requestGuards";
 import { createNoStoreRedirect, secureCookieOptions, withRequestIdJson } from "@/lib/security/authResponses";
@@ -8,7 +8,7 @@ import { getOrCreateRequestId } from "@/lib/security/authObservability";
 
 async function handleSignOut(request: Request) {
   const requestId = getOrCreateRequestId(request);
-  const { origin } = new URL(request.url);
+  const origin = getAppBaseUrlOrigin(new URL(request.url).origin);
   const cookieOptions = secureCookieOptions(request);
   const clearAdmin2FACookies = (response: NextResponse) => {
     response.cookies.set(getPendingCookieName(), "", {

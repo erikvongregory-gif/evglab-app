@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { redirectWithAdminEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { getAppBaseUrlOrigin, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { logAuthEvent, getOrCreateRequestId } from "@/lib/security/authObservability";
 import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
@@ -9,7 +9,7 @@ import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin
 export async function POST(request: Request) {
   const startedAt = Date.now();
   const requestId = getOrCreateRequestId(request);
-  const { origin } = new URL(request.url);
+  const origin = getAppBaseUrlOrigin(new URL(request.url).origin);
   const originError = enforceSameOrigin(request);
   if (originError) return originError;
   if (!isSupabaseConfigured()) {

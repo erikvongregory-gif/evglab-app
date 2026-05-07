@@ -14,10 +14,31 @@ export type BillingRow = {
   current_period_end: string | null;
 };
 
+type StripeEventClaimRow = {
+  event_id: string;
+  event_type: string;
+  status: "processing" | "processed";
+  processed_at?: string | null;
+};
+
+/**
+ * Wenn die Dedupe-Tabelle in Prod fehlt, wollen wir das laut hoeren statt still
+ * weiterzumachen. In Dev/Local ist Toleranz gegenueber `42P01` (table missing)
+ * praktisch fuer schnelle Iteration ohne Migration.
+ */
+function isUndefinedTableTolerated(): boolean {
+  return process.env.NODE_ENV !== "production";
+}
+
 function normalizeBillingStatus(status: string | null | undefined): BillingStatus {
   const allowed: BillingStatus[] = ["active", "trialing", "past_due", "canceled", "incomplete", "unpaid", "none"];
   if (status && allowed.includes(status as BillingStatus)) return status as BillingStatus;
   return "active";
+}
+
+function getBaseTokensForPlan(plan: SubscriptionPlanKey | null | undefined): number {
+  if (!plan) return 0;
+  return SUBSCRIPTION_PLAN_TOKENS[plan] ?? 0;
 }
 
 export async function ensureBillingRow(userId: string) {
@@ -64,14 +85,20 @@ export async function activatePlanForUser(args: {
   stripeCustomerId: string;
   stripeSubscriptionId: string;
   currentPeriodEnd: string | null;
+  preserveTokenBalance?: boolean;
 }) {
+  const current = args.preserveTokenBalance ? await getBillingRow(args.userId) : null;
+  const baseMonthly = SUBSCRIPTION_PLAN_TOKENS[args.plan];
+  const purchasedExtras = current ? Math.max(current.monthly_tokens - getBaseTokensForPlan(current.plan), 0) : 0;
+  const nextMonthlyTokens = current ? baseMonthly + purchasedExtras : baseMonthly;
+  const nextUsedTokens = current ? current.used_tokens : 0;
   const admin = createAdminClient();
   const { error } = await admin.from("billing_subscriptions").upsert(
     {
       user_id: args.userId,
       plan: args.plan,
-      monthly_tokens: SUBSCRIPTION_PLAN_TOKENS[args.plan],
-      used_tokens: 0,
+      monthly_tokens: nextMonthlyTokens,
+      used_tokens: nextUsedTokens,
       stripe_customer_id: args.stripeCustomerId,
       stripe_subscription_id: args.stripeSubscriptionId,
       subscription_status: normalizeBillingStatus(args.subscriptionStatus),
@@ -159,7 +186,34 @@ export async function refundTokens(userId: string, amount: number) {
 }
 
 export async function addMonthlyTokens(userId: string, amount: number) {
+  if (amount <= 0) {
+    return { ok: false as const, error: "Ungueltige Token-Anzahl." };
+  }
   const admin = createAdminClient();
+  // Atomare DB-Operation via RPC, falls vorhanden — verhindert Lost-Updates bei
+  // parallelen Buchungen (z. B. confirm-session + webhook).
+  const rpc = await admin.rpc("add_monthly_tokens_atomic", {
+    p_user_id: userId,
+    p_amount: amount,
+  });
+  if (!rpc.error) {
+    const next = Array.isArray(rpc.data) ? (rpc.data[0] as { monthly_tokens: number; used_tokens: number } | undefined) : undefined;
+    if (next) {
+      const row = await getBillingRow(userId);
+      if (!row) {
+        return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
+      }
+      return { ok: true as const, state: { ...row, monthly_tokens: next.monthly_tokens, used_tokens: next.used_tokens } };
+    }
+    return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
+  }
+  // Fallback fuer Umgebungen ohne RPC (z. B. lokal ohne Migration).
+  if (rpc.error.code !== "42883" && rpc.error.code !== "PGRST202") {
+    // 42883 = function does not exist; PGRST202 = supabase rpc not found
+    if (process.env.NODE_ENV === "production") {
+      return { ok: false as const, error: "Token-Kauf konnte nicht gespeichert werden (RPC)." };
+    }
+  }
   const row = await getBillingRow(userId);
   if (!row) {
     return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
@@ -173,5 +227,68 @@ export async function addMonthlyTokens(userId: string, amount: number) {
     return { ok: false as const, error: "Token-Kauf konnte nicht gespeichert werden." };
   }
   return { ok: true as const, state: { ...row, monthly_tokens: nextMonthly } };
+}
+
+/**
+ * Versucht, einen Token-Pack-Kauf anhand der Stripe-Checkout-`session_id` zu
+ * claimen. Gibt `true` zurueck, wenn dieser Aufrufer der erste ist und somit
+ * gutschreiben darf. Bei `false` wurde der Kauf bereits anderweitig verbucht.
+ */
+export async function claimTokenPackSession(args: {
+  sessionId: string;
+  userId: string;
+  packId: string;
+  tokens: number;
+  source: "confirm_session" | "webhook";
+}): Promise<boolean> {
+  const admin = createAdminClient();
+  const { error } = await admin.from("billing_token_pack_grants").insert({
+    session_id: args.sessionId,
+    user_id: args.userId,
+    pack_id: args.packId,
+    tokens: args.tokens,
+    source: args.source,
+  });
+  if (!error) return true;
+  if (error.code === "23505") return false; // bereits geclaimt
+  if (error.code === "42P01" && isUndefinedTableTolerated()) return true;
+  throw new Error(`claimTokenPackSession fehlgeschlagen: ${error.message}`);
+}
+
+export async function claimStripeWebhookEvent(eventId: string, eventType: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { error } = await admin.from("stripe_webhook_events").insert({
+    event_id: eventId,
+    event_type: eventType,
+    status: "processing",
+  } satisfies StripeEventClaimRow);
+  if (!error) return true;
+  // Fallback fuer Umgebungen ohne Migration der Dedupe-Tabelle - nur in Dev tolerieren.
+  if (error.code === "42P01" && isUndefinedTableTolerated()) return true;
+  if (error.code === "23505") return false;
+  throw new Error(`claimStripeWebhookEvent fehlgeschlagen: ${error.message}`);
+}
+
+export async function markStripeWebhookEventProcessed(eventId: string) {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("stripe_webhook_events")
+    .update({ status: "processed", processed_at: new Date().toISOString() })
+    .eq("event_id", eventId);
+  if (error && !(error.code === "42P01" && isUndefinedTableTolerated())) {
+    throw new Error(`markStripeWebhookEventProcessed fehlgeschlagen: ${error.message}`);
+  }
+}
+
+export async function releaseStripeWebhookEvent(eventId: string) {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("stripe_webhook_events")
+    .delete()
+    .eq("event_id", eventId)
+    .eq("status", "processing");
+  if (error && !(error.code === "42P01" && isUndefinedTableTolerated())) {
+    throw new Error(`releaseStripeWebhookEvent fehlgeschlagen: ${error.message}`);
+  }
 }
 

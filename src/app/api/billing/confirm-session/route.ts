@@ -3,25 +3,15 @@ import Stripe from "stripe";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { activatePlanForUser } from "@/lib/billing/store";
-import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import {
+  activatePlanForUser,
+  addMonthlyTokens,
+  claimTokenPackSession,
+  getBillingRow,
+} from "@/lib/billing/store";
+import { getStripeClient, mapPriceIdToPlan, syncBillingFromStripe } from "@/lib/billing/stripeSync";
 import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuards";
-
-function getStripeClient() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY fehlt.");
-  return new Stripe(key);
-}
-
-function mapPriceIdToPlan(priceId?: string | null): SubscriptionPlanKey | null {
-  const map: Record<SubscriptionPlanKey, string | undefined> = {
-    start: process.env.STRIPE_PRICE_START_MONTHLY,
-    growth: process.env.STRIPE_PRICE_GROWTH_MONTHLY,
-    pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
-  };
-  const entry = Object.entries(map).find(([, id]) => id && id === priceId);
-  return (entry?.[0] as SubscriptionPlanKey | undefined) ?? null;
-}
+import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
 export async function POST(req: Request) {
   try {
@@ -54,9 +44,6 @@ export async function POST(req: Request) {
     const session = await stripe.checkout.sessions.retrieve(body.data.sessionId, {
       expand: ["subscription"],
     });
-    if (session.mode !== "subscription") {
-      return NextResponse.json({ error: "Keine Subscription-Session." }, { status: 400 });
-    }
     if (session.payment_status !== "paid" && session.status !== "complete") {
       return NextResponse.json({ error: "Zahlung nicht abgeschlossen." }, { status: 400 });
     }
@@ -65,6 +52,51 @@ export async function POST(req: Request) {
     if (!userIdMeta || userIdMeta !== user.id) {
       return NextResponse.json({ error: "Session gehoert nicht zum User." }, { status: 403 });
     }
+
+    if (session.mode === "payment" && session.metadata?.kind === "token_pack") {
+      try {
+        const tokens = Number.parseInt(session.metadata?.tokens ?? "0", 10);
+        if (!Number.isFinite(tokens) || tokens <= 0) {
+          return NextResponse.json({ error: "Token-Metadaten ungueltig." }, { status: 400 });
+        }
+        const packId = (session.metadata?.pack_id ?? session.metadata?.pack ?? "tokens").toString();
+        const claimed = await claimTokenPackSession({
+          sessionId: session.id,
+          userId: user.id,
+          packId,
+          tokens,
+          source: "confirm_session",
+        });
+        if (claimed) {
+          const addResult = await addMonthlyTokens(user.id, tokens);
+          if (!addResult.ok) {
+            return NextResponse.json({ error: addResult.error }, { status: 500 });
+          }
+        }
+        const row = await getBillingRow(user.id);
+        return NextResponse.json({
+          ok: true,
+          alreadyGranted: !claimed,
+          state: row
+            ? {
+                plan: row.plan,
+                monthlyTokens: row.monthly_tokens,
+                usedTokens: row.used_tokens,
+                remainingTokens: Math.max(row.monthly_tokens - row.used_tokens, 0),
+                status: row.subscription_status,
+              }
+            : null,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Token-Session-Bestätigung fehlgeschlagen.";
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
+    }
+
+    if (session.mode !== "subscription") {
+      return NextResponse.json({ error: "Keine Subscription-Session." }, { status: 400 });
+    }
+
     const customerId =
       typeof session.customer === "string" ? session.customer : (session.customer?.id ?? null);
     const subscription =
@@ -92,11 +124,27 @@ export async function POST(req: Request) {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscription.id,
       currentPeriodEnd: currentPeriodEndUnix ? new Date(currentPeriodEndUnix * 1000).toISOString() : null,
+      preserveTokenBalance: true,
     });
 
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Session-Bestätigung fehlgeschlagen." }, { status: 500 });
+    await syncBillingFromStripe({ userId: user.id, userEmail: user.email });
+    const row = await getBillingRow(user.id);
+
+    return NextResponse.json({
+      ok: true,
+      state: row
+        ? {
+            plan: row.plan,
+            monthlyTokens: row.monthly_tokens,
+            usedTokens: row.used_tokens,
+            remainingTokens: Math.max(row.monthly_tokens - row.used_tokens, 0),
+            status: row.subscription_status,
+          }
+        : null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Session-Bestätigung fehlgeschlagen.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

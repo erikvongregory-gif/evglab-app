@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
+import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
@@ -7,13 +7,14 @@ import { getOrCreateRequestId } from "@/lib/security/authObservability";
 export async function GET(request: Request) {
   const requestId = getOrCreateRequestId(request);
   const { origin, searchParams } = new URL(request.url);
+  const appOrigin = getAppBaseUrlOrigin(origin);
   const safeNext = normalizeNextPath(searchParams.get("next"));
 
   if (!isSupabaseConfigured()) {
-    return createNoStoreRedirect(`${origin}/anmelden?error=config`, requestId);
+    return createNoStoreRedirect(`${appOrigin}/anmelden?error=config`, requestId);
   }
   if (isInviteOnlyEnabled()) {
-    return createNoStoreRedirect(`${origin}/anmelden?error=invite_only`, requestId);
+    return createNoStoreRedirect(`${appOrigin}/anmelden?error=invite_only`, requestId);
   }
 
   const cookieCarrier = NextResponse.next();
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+      redirectTo: `${appOrigin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
       queryParams: {
         access_type: "offline",
         prompt: "consent",
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
   });
 
   if (error || !data.url) {
-    return createNoStoreRedirect(`${origin}/anmelden?error=google`, requestId);
+    return createNoStoreRedirect(`${appOrigin}/anmelden?error=google`, requestId);
   }
 
   const redirect = createNoStoreRedirect(data.url, requestId);

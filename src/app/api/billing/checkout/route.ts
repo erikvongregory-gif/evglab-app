@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { getAppBaseUrlOrigin, isBillingCheckoutEnabled, isKleinunternehmerModeEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow, setStripeCustomerId } from "@/lib/billing/store";
 import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
@@ -28,6 +28,10 @@ function getPriceIdForPlan(plan: SubscriptionPlanKey) {
   return priceId;
 }
 
+function isAutomaticTaxEnabled() {
+  return process.env.STRIPE_ENABLE_AUTOMATIC_TAX !== "false";
+}
+
 export async function POST(req: Request) {
   try {
     const rateError = await enforceRateLimitPersistent(req, {
@@ -38,6 +42,10 @@ export async function POST(req: Request) {
     if (rateError) return rateError;
     const originError = enforceSameOrigin(req);
     if (originError) return originError;
+
+    if (!isBillingCheckoutEnabled()) {
+      return NextResponse.json({ error: "Checkout ist derzeit deaktiviert." }, { status: 403 });
+    }
 
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
@@ -75,13 +83,31 @@ export async function POST(req: Request) {
     }
 
     const priceId = getPriceIdForPlan(plan);
-    const { origin } = new URL(req.url);
+    const origin = getAppBaseUrlOrigin(new URL(req.url).origin);
+    const kleinunternehmerMode = isKleinunternehmerModeEnabled();
+    const automaticTaxEnabled = isAutomaticTaxEnabled() && !kleinunternehmerMode;
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${origin}/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/dashboard?billing=cancel`,
+      billing_address_collection: automaticTaxEnabled ? "required" : "auto",
+      tax_id_collection: { enabled: automaticTaxEnabled },
+      customer_update: automaticTaxEnabled
+        ? {
+            address: "auto",
+            name: "auto",
+          }
+        : undefined,
+      automatic_tax: { enabled: automaticTaxEnabled },
+      custom_text: kleinunternehmerMode
+        ? {
+            submit: {
+              message: "Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.",
+            },
+          }
+        : undefined,
       metadata: {
         user_id: user.id,
         plan,

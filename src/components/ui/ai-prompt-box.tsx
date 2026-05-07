@@ -10,6 +10,7 @@ import {
   Gem,
   Paperclip,
   RectangleHorizontal,
+  Sparkles,
   Square,
   X,
 } from "lucide-react";
@@ -390,6 +391,7 @@ interface PromptInputBoxProps {
   typingPhrases?: string[];
   modelLabel?: string;
   modelBadgeText?: string;
+  showModelBadge?: boolean;
   showAspectRatioBadge?: boolean;
   showResolutionBadge?: boolean;
   showImageUpload?: boolean;
@@ -397,6 +399,8 @@ interface PromptInputBoxProps {
   onAspectRatioChange?: (value: "1:1" | "3:4" | "4:5" | "16:9" | "9:16") => void;
   resolution?: "1K" | "2K" | "4K";
   onResolutionChange?: (value: "1K" | "2K" | "4K") => void;
+  presetButtonLabel?: string;
+  onPresetButtonClick?: () => void;
 }
 
 export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxProps>((props, ref) => {
@@ -417,6 +421,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     ],
     modelLabel = "Nano Banana Pro",
     modelBadgeText = "G",
+    showModelBadge = false,
     showAspectRatioBadge = true,
     showResolutionBadge = true,
     showImageUpload = true,
@@ -424,6 +429,8 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     onAspectRatioChange,
     resolution,
     onResolutionChange,
+    presetButtonLabel,
+    onPresetButtonClick,
   } = props;
 
   const [internalInput, setInternalInput] = React.useState("");
@@ -630,10 +637,12 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
 
         <PromptInputActions className="flex items-end justify-between gap-2 p-0 pt-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 transition-opacity duration-300 visible opacity-100">
-            <span className="inline-flex h-8 max-w-[9.5rem] items-center gap-1.5 rounded-xl border border-white/10 bg-[#232936] px-2 text-xs font-semibold text-zinc-100 sm:h-9 sm:max-w-none sm:gap-2 sm:px-3 sm:text-sm whitespace-nowrap">
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1b2314] text-[#c8ff26]">{modelBadgeText}</span>
-              <span className="truncate">{modelLabel}</span>
-            </span>
+            {showModelBadge ? (
+              <span className="inline-flex h-8 max-w-[9.5rem] items-center gap-1.5 rounded-xl border border-white/10 bg-[#232936] px-2 text-xs font-semibold text-zinc-100 sm:h-9 sm:max-w-none sm:gap-2 sm:px-3 sm:text-sm whitespace-nowrap">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1b2314] text-[#c8ff26]">{modelBadgeText}</span>
+                <span className="truncate">{modelLabel}</span>
+              </span>
+            ) : null}
             {showAspectRatioBadge ? (
               <div ref={aspectMenuRef} className="relative">
                 <button
@@ -676,6 +685,16 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                   </div>
                 ) : null}
               </div>
+            ) : null}
+            {presetButtonLabel && onPresetButtonClick ? (
+              <button
+                type="button"
+                onClick={onPresetButtonClick}
+                className="inline-flex h-8 items-center gap-1 rounded-xl border border-white/10 bg-[#232936] px-2.5 text-xs font-medium text-zinc-100 sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-zinc-300 sm:h-4 sm:w-4" />
+                <span className="max-w-[9rem] truncate sm:max-w-none">{presetButtonLabel}</span>
+              </button>
             ) : null}
             {showResolutionBadge ? (
               <div ref={resolutionMenuRef} className="relative">

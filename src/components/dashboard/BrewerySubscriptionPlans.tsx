@@ -9,6 +9,16 @@ import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billin
 
 export type { SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
+const KLEINUNTERNEHMER_MODE = process.env.NEXT_PUBLIC_BILLING_KLEINUNTERNEHMER === "true";
+const PRICE_SUBTEXT_DEFAULT = "pro Monat zzgl. MwSt.";
+const PRICE_SUBTEXT_KLEINUNTERNEHMER = "pro Monat · gemäß § 19 UStG ohne Umsatzsteuer";
+const PLAN_PRICE_SUBTEXT = KLEINUNTERNEHMER_MODE
+  ? PRICE_SUBTEXT_KLEINUNTERNEHMER
+  : PRICE_SUBTEXT_DEFAULT;
+const SECTION_VAT_NOTE = KLEINUNTERNEHMER_MODE
+  ? "Als Kleinunternehmer gemäß § 19 UStG wird derzeit keine Umsatzsteuer berechnet."
+  : "Alle Preise verstehen sich zzgl. gesetzlicher Mehrwertsteuer.";
+
 const DASHBOARD_PLAN_CARD_CLASS =
   "!rounded-xl !border !border-gray-200 !bg-white !shadow-sm !backdrop-blur-0 hover:!shadow-md " +
   "dark:!border-gray-700 dark:!bg-gray-900 " +
@@ -17,6 +27,8 @@ const DASHBOARD_PLAN_CARD_CLASS =
 
 const DASHBOARD_POPULAR_PLAN_CARD_CLASS =
   `${DASHBOARD_PLAN_CARD_CLASS} !ring-1 !ring-white/20`;
+const DASHBOARD_ACTIVE_PLAN_CARD_CLASS =
+  "!border-[#c65a20] !ring-2 !ring-[#c65a20]/35 !shadow-[0_16px_34px_-20px_rgba(198,90,32,0.28)]";
 
 const BREWERY_SUBSCRIPTION_PLANS: PricingCardProps[] = [
   {
@@ -25,7 +37,7 @@ const BREWERY_SUBSCRIPTION_PLANS: PricingCardProps[] = [
     description: "Für kleine Teams, die regelmäßig Content planen und posten.",
     price: "79 €",
     currencyPrefix: "",
-    priceSubtext: "pro Monat zzgl. MwSt.",
+    priceSubtext: PLAN_PRICE_SUBTEXT,
     buttonText: "Plan wählen",
     buttonVariant: "primary",
     className: DASHBOARD_PLAN_CARD_CLASS,
@@ -43,7 +55,7 @@ const BREWERY_SUBSCRIPTION_PLANS: PricingCardProps[] = [
     description: "Für aktive Brauereien mit regelmäßigen Kampagnen und Saisonaktionen.",
     price: "149 €",
     currencyPrefix: "",
-    priceSubtext: "pro Monat zzgl. MwSt.",
+    priceSubtext: PLAN_PRICE_SUBTEXT,
     buttonText: "Plan wählen",
     buttonVariant: "primary",
     className: DASHBOARD_PLAN_CARD_CLASS,
@@ -61,7 +73,7 @@ const BREWERY_SUBSCRIPTION_PLANS: PricingCardProps[] = [
     description: "Für Marken mit hohem Content-Bedarf und mehreren Kanälen.",
     price: "299 €",
     currencyPrefix: "",
-    priceSubtext: "pro Monat zzgl. MwSt.",
+    priceSubtext: PLAN_PRICE_SUBTEXT,
     buttonText: "Plan wählen",
     isPopular: true,
     popularLabel: "Beliebteste Wahl",
@@ -109,7 +121,7 @@ export function BrewerySubscriptionPlans({
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">Wähle deinen Preisplan</h2>
         <p className="max-w-2xl text-sm text-gray-600 dark:text-gray-400 sm:text-base">
           Nach dem Login startest du mit einem Plan. Tokens werden für Bild-Generierung
-          verbraucht und monatlich neu aufgefüllt. Alle Preise verstehen sich zzgl. gesetzlicher Mehrwertsteuer.
+          verbraucht und monatlich neu aufgefüllt. {SECTION_VAT_NOTE}
         </p>
       </div>
 
@@ -118,15 +130,21 @@ export function BrewerySubscriptionPlans({
           const key = planKeyByName[plan.planName];
           const isActive = activePlan === key;
           const isCurrentLoading = Boolean(isLoading && loadingPlan && key === loadingPlan);
+          const mergedClassName = isActive
+            ? `${plan.className ?? ""} ${DASHBOARD_ACTIVE_PLAN_CARD_CLASS}`.trim()
+            : plan.className;
           return (
             <PricingCard
               key={plan.planName}
               {...plan}
+              className={mergedClassName}
+              isPopular={isActive ? true : plan.isPopular}
+              popularLabel={isActive ? "Dein aktueller Plan" : plan.popularLabel}
               buttonText={
                 !checkoutEnabled
                   ? "Testphase aktiv"
                   : isActive
-                    ? "Aktiver Plan"
+                    ? "Aktueller Plan"
                     : isCurrentLoading
                       ? "Weiterleitung..."
                       : isLoading
@@ -134,7 +152,7 @@ export function BrewerySubscriptionPlans({
                         : plan.buttonText
               }
               buttonLoading={isCurrentLoading}
-              buttonDisabled={!checkoutEnabled}
+              buttonDisabled={!checkoutEnabled || isActive}
               onCtaClick={() => {
                 if (!checkoutEnabled) return;
                 if (isLoading) return;

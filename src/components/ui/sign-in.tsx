@@ -4,6 +4,12 @@ import Link from "next/link";
 import React, { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Eye, EyeOff } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { GridBackground } from "@/components/ui/grid-background";
+import { Icons } from "@/components/ui/icons";
+import { Input } from "@/components/ui/input";
+import { LOGIN_WAITLIST_ENABLED } from "@/lib/featureFlags";
 
 const GoogleIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 48 48" aria-hidden>
@@ -52,6 +58,7 @@ export interface SignInPageProps {
   onGoogleSignIn?: () => void;
   onResetPassword?: () => void;
   onCreateAccount?: () => void;
+  waitlistMode?: boolean;
 }
 
 function GlassInputWrapper({ children }: { children: React.ReactNode }) {
@@ -136,10 +143,60 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   onGoogleSignIn,
   onResetPassword,
   onCreateAccount,
+  waitlistMode = LOGIN_WAITLIST_ENABLED,
 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistJoined, setWaitlistJoined] = useState(false);
+  const [waitlistPending, setWaitlistPending] = useState(false);
+  const [waitlistError, setWaitlistError] = useState<string | null>(null);
+  const nextQuery = new URLSearchParams(nextPath.split("?")[1] ?? "");
+  const intentPlan = nextQuery.get("plan");
+  const intentCheckout = nextQuery.get("checkout");
+  const intentSource = nextQuery.get("source");
+  const hasHomepageCheckoutIntent =
+    (intentPlan === "start" || intentPlan === "growth" || intentPlan === "pro") &&
+    intentCheckout === "1" &&
+    intentSource === "homepage_pricing";
+  const appendIntentToHref = (href: string) => {
+    if (!hasHomepageCheckoutIntent) return href;
+    const sep = href.includes("?") ? "&" : "?";
+    return `${href}${sep}plan=${encodeURIComponent(intentPlan)}&checkout=1&source=homepage_pricing`;
+  };
+  const registerHrefWithIntent = appendIntentToHref(registerHref);
   const googleHref = `/auth/google?next=${encodeURIComponent(googleNextPath ?? nextPath)}`;
+  const googleRegisterHref = `/auth/google?next=${encodeURIComponent(googleNextPath ?? nextPath)}`;
   const postTarget = authPostAction ?? "/auth/signin";
+  const handleWaitlistSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const email = waitlistEmail.trim();
+    if (!email) {
+      setWaitlistError("Bitte gib eine E-Mail ein.");
+      return;
+    }
+    setWaitlistPending(true);
+    setWaitlistError(null);
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, source: "login_waitlist" }),
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { ok?: boolean; duplicate?: boolean; error?: string }
+        | null;
+      if (!res.ok) {
+        setWaitlistError(payload?.error || "Eintrag fehlgeschlagen. Bitte versuch es erneut.");
+        return;
+      }
+      setWaitlistJoined(true);
+      setWaitlistEmail("");
+    } catch {
+      setWaitlistError("Eintrag fehlgeschlagen. Bitte versuch es erneut.");
+    } finally {
+      setWaitlistPending(false);
+    }
+  };
 
   const formProps = onSignIn
     ? { onSubmit: onSignIn }
@@ -147,6 +204,92 @@ export const SignInPage: React.FC<SignInPageProps> = ({
         action: postTarget,
         method: "post" as const,
       };
+
+  if (waitlistMode) {
+    return (
+      <div className="relative min-h-screen">
+        <GridBackground />
+        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8">
+          <div className="w-full max-w-xl space-y-10 rounded-2xl border border-white/10 bg-black/40 p-8 text-white backdrop-blur-xl">
+            <div className="space-y-4 text-center">
+              <h2 className="bg-gradient-to-br from-gray-100 to-gray-400 bg-clip-text text-4xl font-extrabold text-transparent sm:text-5xl">
+                Login bald wieder offen
+              </h2>
+              <p className="mx-auto max-w-lg text-lg text-gray-300">
+                Trag dich in die Warteliste ein. Du bekommst als Erstes Bescheid, sobald Login und Registrierung
+                wieder freigeschaltet sind.
+              </p>
+            </div>
+
+            <form className="mx-auto flex max-w-md gap-2" onSubmit={handleWaitlistSubmit}>
+              <Input
+                type="email"
+                placeholder="Deine E-Mail"
+                value={waitlistEmail}
+                onChange={(event) => setWaitlistEmail(event.target.value)}
+                className="h-12 border-gray-700 bg-gray-950/60 text-white placeholder:text-gray-400"
+              />
+              <Button
+                type="submit"
+                disabled={waitlistPending}
+                className="h-12 bg-white px-6 text-black hover:bg-white/90 disabled:opacity-70"
+                variant="ghost"
+              >
+                {waitlistPending ? "..." : "Eintragen"}
+              </Button>
+            </form>
+
+            {waitlistJoined ? (
+              <p className="text-center text-sm text-emerald-300">Danke! Du stehst jetzt auf der Warteliste.</p>
+            ) : null}
+            {waitlistError ? (
+              <p className="text-center text-sm text-rose-300">{waitlistError}</p>
+            ) : null}
+
+            <div className="flex flex-col items-center gap-8">
+              <div className="flex items-center gap-4">
+                <div className="flex -space-x-3">
+                  <Avatar className="h-12 w-12 border-2 border-white/20">
+                    <AvatarFallback className="bg-purple-600 text-sm font-semibold">JD</AvatarFallback>
+                  </Avatar>
+                  <Avatar className="h-12 w-12 border-2 border-white/20">
+                    <AvatarFallback className="bg-blue-600 text-sm font-semibold">AS</AvatarFallback>
+                  </Avatar>
+                  <Avatar className="h-12 w-12 border-2 border-white/20">
+                    <AvatarFallback className="bg-blue-700 text-sm font-semibold">MK</AvatarFallback>
+                  </Avatar>
+                </div>
+                <span className="font-bold text-gray-100">100+ Personen auf der Warteliste</span>
+              </div>
+
+              <div className="flex justify-center gap-6">
+                <a
+                  href="https://wa.me/4915565602176"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="WhatsApp"
+                >
+                  <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-200">
+                    <Icons.whatsApp className="h-5 w-5 fill-current" />
+                  </Button>
+                </a>
+                <a
+                  href="https://www.linkedin.com/in/erik-freiherr-von-gregory-22852b329"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="LinkedIn"
+                >
+                  <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-200">
+                    <Icons.linkedIn className="h-5 w-5 fill-current" />
+                  </Button>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[100dvh] w-[100dvw] flex-col font-sans md:flex-row">
@@ -252,22 +395,40 @@ export const SignInPage: React.FC<SignInPageProps> = ({
                 </div>
 
                 {onGoogleSignIn ? (
-                  <button
-                    type="button"
-                    onClick={onGoogleSignIn}
-                    className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
-                  >
-                    <GoogleIcon />
-                    Google
-                  </button>
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={onGoogleSignIn}
+                      className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
+                    >
+                      <GoogleIcon />
+                      Mit Google anmelden
+                    </button>
+                    <Link
+                      href={googleRegisterHref}
+                      className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
+                    >
+                      <GoogleIcon />
+                      Mit Google registrieren
+                    </Link>
+                  </div>
                 ) : (
-                  <Link
-                    href={googleHref}
-                    className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
-                  >
-                    <GoogleIcon />
-                    Mit Google anmelden
-                  </Link>
+                  <div className="space-y-3">
+                    <Link
+                      href={googleHref}
+                      className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
+                    >
+                      <GoogleIcon />
+                      Mit Google anmelden
+                    </Link>
+                    <Link
+                      href={googleRegisterHref}
+                      className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
+                    >
+                      <GoogleIcon />
+                      Mit Google registrieren
+                    </Link>
+                  </div>
                 )}
               </>
             ) : null}
@@ -286,7 +447,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
                   Registrierung (Einladung)
                 </a>
               ) : (
-                <Link href={registerHref} className="text-[#c65a20] transition-colors hover:underline">
+                <Link href={registerHrefWithIntent} className="text-[#c65a20] transition-colors hover:underline">
                   Registrierung (Einladung)
                 </Link>
               )}

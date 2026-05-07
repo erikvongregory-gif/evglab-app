@@ -9,14 +9,30 @@ const requestSchema = z.object({
   assistantPersona: z.string().trim().max(80).optional(),
 });
 
+const HOPFEN_HUGO_SYSTEM = [
+  "Du bist Hopfen Hugo, der Chat-Assistent im EvGlab-Dashboard.",
+  "Du darfst ueber allgemeine, harmlose Alltagsthemen reden und auf Wunsch den Stil wechseln (z. B. Schweizerdeutsch, bayerisch, locker, freundlich).",
+  "Verweigere nur unzulaessige oder gefaehrliche Inhalte (illegale Handlungen, Gewaltanleitungen, Selbstverletzung, Hass, Betrug, Datenschutzverletzungen, sexualisierte Inhalte mit Minderjaehrigen).",
+  "Wenn es um EvGlab und KI-Bilder geht, gib praktische Hilfe zu Prompts, Motiven, Szenen, Licht, Stil und Markenkonsistenz.",
+  "Gib keine Optimierungs- oder Spartipps zu Token, Billing, Abo oder internen Dashboard-Kosten.",
+  "Antworte kurz, freundlich und natuerlich auf Deutsch; Dialekt nur wenn gewuenscht.",
+].join(" ");
+
 function fallbackAnswer(question: string): string {
-  if (/marke|brand|stil|look/i.test(question)) {
-    return "Fokussiere dich auf 3 Dinge: Brand-Lock auf Strict setzen, Referenzbeispiele sauber halten und die Bildbeschreibung konkret mit Umgebung, Licht und Produktdetails formulieren.";
+  const q = question.toLowerCase();
+  if (/schweizerdeutsch|schwiizerdutsch|schwiizerdütsch/.test(q)) {
+    return "Ja klar, ich cha au Schwiizerdutsch rede. Wenn du wotsch, antworte ich ab jetzt im Schwiizer Stil.";
   }
-  if (/token|abo|billing/i.test(question)) {
-    return "Unter Abo & Tokens siehst du Verbrauch und Restbudget. Bei knappen Credits zuerst Varianten reduzieren und nur noetige Aufloesung waehlen.";
+  if (/bayerisch|bayrisch|dialekt|mundart|freundlich|locker|duzen|siezen|tonfall|humor|witzig/i.test(q)) {
+    return "Klar, mach ich gern. Ich passe meinen Stil an und antworte dir freundlich und locker.";
   }
-  return "Ich helfe dir gern weiter. Beschreibe kurz dein Ziel (z. B. Kampagne, Stil, Plattform), dann gebe ich dir direkt den naechsten besten Schritt.";
+  if (/token|abo|billing|budget|credit|kosten sparen|spar|guenstig|günstig/i.test(q)) {
+    return "Zu Token-, Abo- oder Billing-Optimierung gebe ich keine Tipps. Bei Bildideen, Prompt und Stil helfe ich dir gern.";
+  }
+  if (/marke|brand|stil|look|prompt|bild|motiv|foto|render|kampagne/i.test(q)) {
+    return "Gern. Nenn mir Produkt, Stimmung und Format, dann formuliere ich dir direkt einen starken Prompt.";
+  }
+  return "Klar, ich bin da. Wenn du willst, antworte ich normal, locker, bayerisch oder Schweizerdeutsch.";
 }
 
 function getPreferredModel(): string {
@@ -25,7 +41,16 @@ function getPreferredModel(): string {
   return "claude-3-5-sonnet-latest";
 }
 
+function hasUsableAnthropicKey(value: string | undefined): value is string {
+  if (!value) return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+  if (/^paste[_-]?anthropic[_-]?api[_-]?key$/i.test(normalized)) return false;
+  return true;
+}
+
 export async function POST(req: Request) {
+  let questionForFallback = "";
   try {
     const rateError = await enforceRateLimitPersistent(req, {
       keyPrefix: "brauerei-assistant",
@@ -42,8 +67,9 @@ export async function POST(req: Request) {
     }
 
     const { question, currentTab, assistantPersona } = parsed.data;
+    questionForFallback = question;
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
+    if (!hasUsableAnthropicKey(apiKey)) {
       return NextResponse.json({ answer: fallbackAnswer(question) }, { status: 200 });
     }
 
@@ -51,16 +77,20 @@ export async function POST(req: Request) {
     const response = await anthropic.messages.create({
       model: getPreferredModel(),
       max_tokens: 350,
-      temperature: 0.4,
-      system:
-        "Du bist Hopfen-Hugo, ein hilfreicher Brauerei-Dashboard-Assistent. " +
-        "Antworte auf Deutsch, kurz, praktisch und freundlich. " +
-        "Gib konkrete naechste Schritte fuer Content-Erstellung, Markenkonsistenz und Dashboard-Nutzung. " +
-        "Keine langen Essays, keine Markdown-Listen wenn nicht noetig.",
+      temperature: 0.35,
+      system: HOPFEN_HUGO_SYSTEM,
       messages: [
         {
           role: "user",
-          content: `Aktiver Dashboard-Tab: ${currentTab ?? "unbekannt"}\nAktive Persona: ${assistantPersona ?? "hopfen-hugo"}\nFrage: ${question}`,
+          content: [
+            `Aktiver Dashboard-Tab: ${currentTab ?? "unbekannt"}`,
+            `Persona: ${assistantPersona ?? "hopfen-hugo"}`,
+            "",
+            "Nutzerfrage:",
+            question,
+            "",
+            "Folge den Systemregeln: allgemein harmlose Fragen sind okay, aber keine Hilfe zu illegalen/gefaehrlichen Themen und keine Token-/Billing-Spar-Tipps.",
+          ].join("\n"),
         },
       ],
     });
@@ -69,6 +99,6 @@ export async function POST(req: Request) {
     const answer = textBlock?.type === "text" ? textBlock.text.trim() : "";
     return NextResponse.json({ answer: answer || fallbackAnswer(question) }, { status: 200 });
   } catch {
-    return NextResponse.json({ error: "Assistent konnte nicht antworten." }, { status: 500 });
+    return NextResponse.json({ answer: fallbackAnswer(questionForFallback) }, { status: 200 });
   }
 }

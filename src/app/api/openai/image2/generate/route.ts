@@ -65,6 +65,16 @@ function parseOpenAiBase64(payload: unknown): string | null {
   return typeof b64 === "string" && b64.length > 0 ? b64 : null;
 }
 
+function base64DataUrlToFile(dataUrl: string, fileName: string): File {
+  const match = dataUrl.match(/^data:(.+?);base64,(.+)$/);
+  if (!match) {
+    throw new Error("Referenzbild ist kein gueltiges Base64-Data-URL.");
+  }
+  const mimeType = match[1] || "image/png";
+  const buffer = Buffer.from(match[2] || "", "base64");
+  return new File([buffer], fileName, { type: mimeType });
+}
+
 async function uploadBase64ToKie(apiKey: string, base64Data: string, format: "png" | "jpg"): Promise<string> {
   const uploadRes = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
     method: "POST",
@@ -118,18 +128,6 @@ export async function POST(req: Request) {
     const body = parsed.data as GenerateImageBody;
 
     const headline = (body.textImLabel ?? "").trim();
-    const isInstagramTextCase = body.plattform === "Instagram Post" && headline.length > 0;
-    if (!isInstagramTextCase) {
-      return NextResponse.json(
-        {
-          error:
-            body.campaignMode === true
-              ? "Fuer Kampagnenbilder bitte Plattform Instagram Post und eine Headline angeben."
-              : "ChatGPT Image 2 ist nur fuer textbasierte Instagram-Posts mit Headline freigegeben.",
-        },
-        { status: 400 },
-      );
-    }
 
     const openAiKey = process.env.OPENAI_API_KEY?.trim();
     if (!openAiKey) {
@@ -198,27 +196,52 @@ export async function POST(req: Request) {
       }
     }
 
-    const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1";
+    const model =
+      process.env.KIE_CHATGPT_IMAGE2_TEXT_MODEL?.trim() ||
+      process.env.OPENAI_IMAGE_MODEL?.trim() ||
+      "gpt-image-1";
     const scenePrompt = body.prompt.trim();
     const creativeCore =
       body.campaignMode === true
         ? buildCampaignCreativePrompt(scenePrompt, headline, body.subline ?? "", body.cta ?? "")
         : scenePrompt;
     const prompt = [creativeCore, "", brandContext].filter(Boolean).join("\n");
-    const openAiRes = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        prompt,
-        size: mapAspectRatioToOpenAiSize(body.aspectRatio),
-        output_format: toOpenAiOutputFormat(body.outputFormat),
-        response_format: "b64_json",
-      }),
-    });
+    const openAiRes = hasReferenceImage
+      ? await (async () => {
+          const firstReference = body.referenceImageUrls?.[0];
+          if (!firstReference) {
+            throw new Error("Referenzbild fehlt.");
+          }
+          const imageFile = base64DataUrlToFile(firstReference, "reference.png");
+          const formData = new FormData();
+          formData.append("model", model);
+          formData.append("image", imageFile);
+          formData.append("prompt", prompt);
+          formData.append("size", mapAspectRatioToOpenAiSize(body.aspectRatio));
+          formData.append("output_format", toOpenAiOutputFormat(body.outputFormat));
+          formData.append("response_format", "b64_json");
+          return fetch("https://api.openai.com/v1/images/edits", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${openAiKey}`,
+            },
+            body: formData,
+          });
+        })()
+      : await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openAiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            prompt,
+            size: mapAspectRatioToOpenAiSize(body.aspectRatio),
+            output_format: toOpenAiOutputFormat(body.outputFormat),
+            response_format: "b64_json",
+          }),
+        });
     const openAiPayload = (await openAiRes.json()) as Record<string, unknown>;
     if (!openAiRes.ok) {
       const errorMessage =

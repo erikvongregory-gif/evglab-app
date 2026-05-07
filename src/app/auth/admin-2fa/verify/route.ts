@@ -12,11 +12,12 @@ import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/re
 import { createNoStoreRedirect, secureCookieOptions } from "@/lib/security/authResponses";
 import { getOrCreateRequestId, logAuthEvent } from "@/lib/security/authObservability";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { getAppBaseUrlOrigin } from "@/lib/supabase/env";
 
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   const requestId = getOrCreateRequestId(request);
-  const { origin } = new URL(request.url);
+  const origin = getAppBaseUrlOrigin(new URL(request.url).origin);
   const originError = enforceSameOrigin(request);
   if (originError) return originError;
   const cookieOptions = secureCookieOptions(request);

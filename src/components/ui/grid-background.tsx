@@ -1,0 +1,23 @@
+"use client";
+
+export function GridBackground() {
+  return (
+    <div
+      className="pointer-events-none fixed inset-0"
+      style={{
+        background: "radial-gradient(circle at center, #1E40AF, #000000)",
+      }}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px)
+          `,
+          backgroundSize: "20px 20px",
+        }}
+      />
+    </div>
+  );
+}

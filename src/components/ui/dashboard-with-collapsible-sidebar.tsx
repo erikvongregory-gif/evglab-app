@@ -95,13 +95,141 @@ type HybridAnswer = {
   answer: string;
 };
 
+type ContentCreationPreset = "hyperreal" | "product_cutout" | "product_studio" | "campaign_social";
+type ContentEngine = "nano_banana" | "chatgpt_image2";
+
+const CONTENT_CREATION_PRESETS: Array<{
+  id: ContentCreationPreset;
+  title: string;
+  description: string;
+  mode: "standard" | "campaign";
+  engine: ContentEngine;
+  previewSrc: string;
+}> = [
+  {
+    id: "hyperreal",
+    title: "Hyperrealistisches Motiv",
+    description: "Normales Bild mit maximal realistischer Szene, Licht und Materialtiefe.",
+    mode: "standard",
+    engine: "nano_banana",
+    previewSrc: "/public/hyperreal-preview.png",
+  },
+  {
+    id: "product_cutout",
+    title: "Produkt freigestellt",
+    description: "Packshot/Freisteller ohne Hintergrund, z. B. für Shop, Website oder Anzeigen.",
+    mode: "standard",
+    engine: "chatgpt_image2",
+    previewSrc: "/public/product-cutout-preview.svg",
+  },
+  {
+    id: "product_studio",
+    title: "Produkt-Studio",
+    description: "Kontrollierte Studio-Optik mit neutralem Hintergrund und Hero-Licht.",
+    mode: "standard",
+    engine: "chatgpt_image2",
+    previewSrc: "/public/product-studio-preview.png",
+  },
+  {
+    id: "campaign_social",
+    title: "Kampagnenbild mit Text",
+    description: "Instagram-Motiv mit Headline, optional Subline und CTA.",
+    mode: "campaign",
+    engine: "chatgpt_image2",
+    previewSrc: "/public/ki-beispiel-4.svg",
+  },
+];
+
 const PLAN_LABELS: Record<SubscriptionPlanKey, string> = {
   start: "Brauerei Start",
   growth: "Brauerei Wachstum",
   pro: "Brauerei Pro",
 };
+const PLAN_BASE_TOKENS: Record<SubscriptionPlanKey, number> = {
+  start: 1200,
+  growth: 3000,
+  pro: 7500,
+};
 
-const BILLING_CHECKOUT_ENABLED = false;
+function resolveActivePlan(
+  plan: SubscriptionPlanKey | null | undefined,
+  monthlyTokens: number | null | undefined,
+  status?: string | null,
+): SubscriptionPlanKey | null {
+  if (plan) return plan;
+  // Heuristik nur als letzter Ausweg, und niemals bei explizit inaktivem/abgemeldetem Status.
+  // Sonst kann ein Start-Plan + viele Zusatz-Tokens faelschlich als Pro angezeigt werden.
+  if (status && (status === "none" || status === "canceled" || status === "incomplete")) {
+    return null;
+  }
+  if (typeof monthlyTokens !== "number") return null;
+  if (monthlyTokens >= PLAN_BASE_TOKENS.pro) return "pro";
+  if (monthlyTokens >= PLAN_BASE_TOKENS.growth) return "growth";
+  if (monthlyTokens >= PLAN_BASE_TOKENS.start) return "start";
+  return null;
+}
+
+function getHomepageCheckoutPlan(params: URLSearchParams): SubscriptionPlanKey | null {
+  const plan = params.get("plan");
+  const checkout = params.get("checkout");
+  const source = params.get("source");
+  const isValidPlan = plan === "start" || plan === "growth" || plan === "pro";
+  if (!isValidPlan || checkout !== "1" || source !== "homepage_pricing") return null;
+  return plan;
+}
+
+function applyContentPresetPrompt(basePrompt: string, preset: ContentCreationPreset): string {
+  const trimmed = basePrompt.trim();
+  if (!trimmed) return "";
+  if (preset === "product_cutout") {
+    return [
+      trimmed,
+      "",
+      "Preset lock:",
+      "- Generate a single centered product cutout.",
+      "- Background must be fully removed/transparent (alpha) with clean object edges and no halo/fringing.",
+      "- No environment, no people, no table, no decorative props, no text overlay, no shadows outside the product silhouette.",
+      "- Keep product label fully legible and undistorted.",
+      "- Output must look like an e-commerce ready PNG freisteller.",
+    ].join("\n");
+  }
+  if (preset === "product_studio") {
+    return [
+      trimmed,
+      "",
+      "Preset lock:",
+      "- Premium studio product photo with neutral seamless background and hero-lighting.",
+      "- Controlled key light with soft shadow and subtle reflection under the product; razor-sharp label readability is mandatory.",
+      "- Use tasteful brewery-related props (e.g. hop cones, barley, citrus slices, herbs) near the product, without clutter.",
+      "- If a reference image is uploaded, preserve the exact brand/label identity 1:1 from that reference.",
+      "- No people and no busy scene elements.",
+    ].join("\n");
+  }
+  if (preset === "hyperreal") {
+    return [
+      trimmed,
+      "",
+      "Preset lock:",
+      "- Hyper-realistic photography look with physically plausible light and material details.",
+      "- Use a real-world scene context (not a sterile packshot).",
+      "- No illustration/cartoon/3D-render look.",
+    ].join("\n");
+  }
+  if (preset === "campaign_social") {
+    return [
+      trimmed,
+      "",
+      "Preset lock:",
+      "- Must be an Instagram-ready campaign motif (attention-grabbing composition, social-ad style framing).",
+      "- Keep clear negative space for headline/subline/CTA overlays and avoid clutter around text zones.",
+      "- No print-flyer layout, no website banner layout, no generic stock composition.",
+    ].join("\n");
+  }
+  return trimmed;
+}
+
+const BILLING_CHECKOUT_ENABLED = process.env.NEXT_PUBLIC_BILLING_CHECKOUT_ENABLED !== "false";
+const BILLING_KLEINUNTERNEHMER_MODE = process.env.NEXT_PUBLIC_BILLING_KLEINUNTERNEHMER === "true";
 
 const BRAND_VISUAL_DNA_OPTIONS = [
   "Authentische Produktfotografie mit realistischer Textur",
@@ -232,7 +360,8 @@ const DASHBOARD_ONBOARDING_STEPS: OnboardingStep[] = [
     id: "assistant",
     targetSelector: '[data-onboarding="hopfen-hugo"]',
     title: "Hopfen Hugo Assistent",
-    description: "Hier ist Hopfen Hugo immer erreichbar und hilft dir direkt bei Fragen zu Content, Markenstil und Bedienung.",
+    description:
+      "Hier ist Hopfen Hugo erreichbar — nur für KI-Bilder: Prompt, Motiv, Markenlook, Varianten, Mediathek und Token fürs Generieren.",
   },
   {
     id: "billing",
@@ -255,22 +384,15 @@ const CONTENT_CREATION_TOUR_STEPS: OnboardingStep[] = [
     id: "content-tour-brief",
     tab: "Inhalte erstellen",
     targetSelector: '[data-onboarding="content-brief"]',
-    title: "Prompt eingeben",
-    description: "Beschreibe Szene, Stil und Ziel. Je klarer der Prompt, desto besser das Ergebnis.",
-  },
-  {
-    id: "content-tour-generate",
-    tab: "Inhalte erstellen",
-    targetSelector: '[data-onboarding="content-brief"]',
-    title: "Generierung starten",
-    description: "Wähle Varianten, Format und Auflösung und starte die Bildgenerierung.",
+    title: "Prompt eingeben & senden",
+    description: "Beschreibe Szene, Stil und Ziel und schicke deinen Prompt direkt über den Pfeil-Button ab.",
   },
   {
     id: "content-tour-preflight",
     tab: "Inhalte erstellen",
     targetSelector: '[data-onboarding="content-preflight"]',
     title: "Einstellungen prüfen",
-    description: "Kontrolliere die Optionen vor dem finalen Render, damit die Ausgabe passt.",
+    description: "Wähle Varianten, Format und Perspektive vor dem finalen Render, damit die Ausgabe passt.",
   },
   {
     id: "content-tour-result",
@@ -340,11 +462,12 @@ const Sidebar = ({
         const data = (await res.json()) as {
           state?: {
             plan: SubscriptionPlanKey | null;
+            monthlyTokens?: number;
             status?: string;
           };
         };
         if (!ignore && data.state) {
-          setActiveSubscription(data.state.plan);
+          setActiveSubscription(resolveActivePlan(data.state.plan, data.state.monthlyTokens, data.state.status));
           setBillingStatus(data.state.status ?? "none");
         }
       } catch {
@@ -377,7 +500,7 @@ const Sidebar = ({
         <Option Icon={Home} title="Dashboard" selected={selected} setSelected={setSelected} open={open} />
         <Option Icon={Wand2} title="Inhalte erstellen" selected={selected} setSelected={setSelected} open={open} />
         <Option Icon={Image} title="Mediathek" selected={selected} setSelected={setSelected} open={open} />
-        <Option Icon={Users} title="Team" selected={selected} setSelected={setSelected} open={open} notifs={1} />
+        <Option Icon={Users} title="Team" selected={selected} setSelected={setSelected} open={open} />
         {isAdmin ? <Option Icon={Settings} title="Admin Center" selected={selected} setSelected={setSelected} open={open} /> : null}
       </div>
 
@@ -663,6 +786,8 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState("");
+  const [deleteAccountConfirmation, setDeleteAccountConfirmation] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
   const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -682,6 +807,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [mediaCommentInput, setMediaCommentInput] = useState("");
   const [mediaImageDimensions, setMediaImageDimensions] = useState<Record<string, string>>({});
   const [globalErrorMessage, setGlobalErrorMessage] = useState("");
+  const [globalNoticeMessage, setGlobalNoticeMessage] = useState("");
   const [topNavMenuOpen, setTopNavMenuOpen] = useState(false);
   const [bellMenuOpen, setBellMenuOpen] = useState(false);
   const [bellReadIds, setBellReadIds] = useState<string[]>([]);
@@ -689,7 +815,6 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [hybridInitialInput, setHybridInitialInput] = useState("");
   const [hybridAnswers, setHybridAnswers] = useState<HybridAnswer[]>([]);
   const [hybridCurrentQuestion, setHybridCurrentQuestion] = useState<string | null>(null);
-  const [hybridFinalPrompt, setHybridFinalPrompt] = useState("");
   const [hybridIsLoading, setHybridIsLoading] = useState(false);
   const [hybridError, setHybridError] = useState("");
   const [contentPendingFiles, setContentPendingFiles] = useState<File[] | undefined>(undefined);
@@ -700,7 +825,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [assistantMessages, setAssistantMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
     {
       role: "assistant",
-      text: "Prost! Ich bin Hopfen Hugo, dein Brauerei-Assistent. Frag mich alles rund um Content, Markenstil und Dashboard.",
+      text: "Prost! Ich bin Hopfen Hugo — ich helfe nur bei KI-Bildern in EvGlab: Prompts, Stil, Markenlook, Formate, Mediathek und Token. Frag mich zu eurem nächsten Motiv.",
     },
   ]);
   const [contentDraftPrompt, setContentDraftPrompt] = useState("");
@@ -712,10 +837,13 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [contentUsePerspectiveSet, setContentUsePerspectiveSet] = useState(true);
   const [contentAspectRatio, setContentAspectRatio] = useState<"1:1" | "3:4" | "4:5" | "16:9" | "9:16">("3:4");
   const [contentResolution, setContentResolution] = useState<"1K" | "2K" | "4K">("1K");
+  const [contentCreationPreset, setContentCreationPreset] = useState<ContentCreationPreset>("hyperreal");
+  const [contentPresetPickerOpen, setContentPresetPickerOpen] = useState(false);
   const [contentImageMode, setContentImageMode] = useState<"standard" | "campaign">("standard");
   const [contentCampaignHeadline, setContentCampaignHeadline] = useState("");
   const [contentCampaignSubline, setContentCampaignSubline] = useState("");
   const [contentCampaignCta, setContentCampaignCta] = useState("");
+  const hasHomepageCheckoutIntentRef = useRef(false);
   const bellMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const profileButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -730,11 +858,13 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       Boolean(brandDonts.trim()));
   const tabTitle = selectedTab;
   const isCreationTab = selectedTab === "Inhalte erstellen";
+  const selectedContentPreset =
+    CONTENT_CREATION_PRESETS.find((preset) => preset.id === contentCreationPreset) ?? CONTENT_CREATION_PRESETS[0];
   const topTabs: Array<{ title: DashboardTab; Icon: LucideIcon; notifs?: number }> = [
     { title: "Dashboard", Icon: Home },
     { title: "Inhalte erstellen", Icon: Wand2 },
     { title: "Mediathek", Icon: Image },
-    { title: "Team", Icon: Users, notifs: 1 },
+    { title: "Team", Icon: Users },
     { title: "Einstellungen", Icon: Settings },
     { title: "Hilfe & Support", Icon: HelpCircle },
   ];
@@ -757,22 +887,28 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const submitContentFlowInput = async (message: string, files?: File[]) => {
     const trimmed = message.trim();
     if (!trimmed || contentIsGenerating) return;
+    const selectedPreset = CONTENT_CREATION_PRESETS.find((preset) => preset.id === contentCreationPreset);
+    const selectedEngine: ContentEngine = selectedPreset?.engine ?? "nano_banana";
 
     if (contentImageMode === "campaign") {
       if (hybridIsLoading) return;
-      const headline = contentCampaignHeadline.trim();
-      if (!headline) {
-        setContentGenerationError("Fuer Kampagnenbilder bitte die Headline ausfuellen.");
-        return;
-      }
       setContentGenerationError("");
       setHybridError("");
       setHybridCurrentQuestion(null);
       setHybridAnswers([]);
       setHybridInitialInput("");
-      setHybridFinalPrompt("");
       setContentPendingFiles(undefined);
-      await generateCampaignWithKie(trimmed, headline, contentCampaignSubline.trim(), contentCampaignCta.trim(), files);
+      if (selectedEngine === "chatgpt_image2") {
+        await generateCampaignWithOpenAiImage2(
+          trimmed,
+          contentCampaignHeadline.trim(),
+          contentCampaignSubline.trim(),
+          contentCampaignCta.trim(),
+          files,
+        );
+      } else {
+        await generateCampaignWithKie(trimmed, contentCampaignHeadline.trim(), contentCampaignSubline.trim(), contentCampaignCta.trim(), files);
+      }
       return;
     }
 
@@ -788,7 +924,6 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         effectiveInitialInput = trimmed;
         setHybridInitialInput(trimmed);
         setHybridAnswers([]);
-        setHybridFinalPrompt("");
         setContentPendingFiles(files);
       } else {
         nextAnswers = [...hybridAnswers, { question: hybridCurrentQuestion, answer: trimmed }];
@@ -814,10 +949,14 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
       const finalPrompt = (data.prompt ?? "").trim();
       if (!finalPrompt) throw new Error("Prompt konnte nicht aufgebaut werden.");
-      setHybridFinalPrompt(finalPrompt);
+      const presetPrompt = applyContentPresetPrompt(finalPrompt, contentCreationPreset);
       setHybridCurrentQuestion(null);
       const filesToUse = hybridCurrentQuestion ? contentPendingFiles : files;
-      await generateContentWithKie(finalPrompt, filesToUse);
+      if (selectedEngine === "chatgpt_image2") {
+        await generateContentWithOpenAiImage2(presetPrompt, filesToUse);
+      } else {
+        await generateContentWithKie(presetPrompt, filesToUse);
+      }
       setContentPendingFiles(undefined);
       setHybridAnswers([]);
       setHybridInitialInput("");
@@ -834,7 +973,18 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     setHybridInitialInput("");
     setHybridError("");
     setContentPendingFiles(undefined);
-  }, [contentImageMode]);
+  }, [contentImageMode, contentCreationPreset]);
+
+  useEffect(() => {
+    const selectedPreset = CONTENT_CREATION_PRESETS.find((preset) => preset.id === contentCreationPreset);
+    if (!selectedPreset) return;
+    setContentImageMode(selectedPreset.mode);
+    if (selectedPreset.id === "product_cutout") {
+      setContentAspectRatio("1:1");
+      setContentVariantCount(1);
+      setContentUsePerspectiveSet(false);
+    }
+  }, [contentCreationPreset]);
 
   const submitAssistantMessage = useCallback(async () => {
     const trimmed = assistantInput.trim();
@@ -872,6 +1022,11 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const intentPlan = getHomepageCheckoutPlan(new URLSearchParams(window.location.search));
+    if (intentPlan) {
+      hasHomepageCheckoutIntentRef.current = true;
+      return;
+    }
     try {
       const hasSeenOnboarding = window.localStorage.getItem(onboardingStorageKey);
       if (!hasSeenOnboarding) {
@@ -1096,7 +1251,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           };
         };
         if (!ignore && data.state) {
-          setActiveSubscription(data.state.plan);
+          setActiveSubscription(resolveActivePlan(data.state.plan, data.state.monthlyTokens, data.state.status));
           setMonthlyTokens(data.state.monthlyTokens);
           setUsedTokens(data.state.usedTokens);
           setBillingStatus(data.state.status ?? "none");
@@ -1152,8 +1307,58 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           window.history.replaceState({}, "", cleaned.toString());
         }
         if (billing === "success_tokens" || billing === "cancel_tokens") {
+          if (billing === "success_tokens" && sessionId) {
+            try {
+              await fetch("/api/billing/confirm-session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId }),
+              });
+            } catch {
+              // webhook remains as fallback
+            }
+            await refreshBillingState();
+            await refreshSummary();
+          }
+          if (billing === "cancel_tokens") {
+            setGlobalNoticeMessage("Token-Kauf abgebrochen. Es wurde nichts berechnet.");
+          }
           const cleaned = new URL(window.location.href);
           cleaned.searchParams.delete("billing");
+          cleaned.searchParams.delete("session_id");
+          window.history.replaceState({}, "", cleaned.toString());
+        }
+        if (billing === "cancel") {
+          setGlobalNoticeMessage("Vorgang abgebrochen. Es wurde kein Abo aktiviert.");
+          const cleaned = new URL(window.location.href);
+          cleaned.searchParams.delete("billing");
+          cleaned.searchParams.delete("session_id");
+          window.history.replaceState({}, "", cleaned.toString());
+        }
+
+        const homepageCheckoutPlan = getHomepageCheckoutPlan(params);
+        if (homepageCheckoutPlan) {
+          hasHomepageCheckoutIntentRef.current = true;
+          setShowOnboarding(false);
+          setShowCreditsOffer(false);
+          setShowBrandProfileChoice(false);
+          const currentState = await refreshBillingState();
+          const hasActivePlan =
+            Boolean(currentState?.plan) &&
+            currentState?.status !== "none" &&
+            currentState?.status !== "canceled";
+
+          if (!hasActivePlan) {
+            setSelectedTab("Abo & Tokens");
+            setCheckoutMessage("Weiterleitung zu Stripe...");
+            await handleSelectPlan(homepageCheckoutPlan);
+            return;
+          }
+
+          const cleaned = new URL(window.location.href);
+          cleaned.searchParams.delete("plan");
+          cleaned.searchParams.delete("checkout");
+          cleaned.searchParams.delete("source");
           window.history.replaceState({}, "", cleaned.toString());
         }
       }
@@ -1165,6 +1370,14 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           // ignore network errors
         }
         await refreshBillingState();
+      } else {
+        try {
+          await fetch("/api/billing/sync", { method: "POST", cache: "no-store" });
+          await refreshBillingState();
+          await refreshSummary();
+        } catch {
+          // ignore network errors
+        }
       }
     })();
     return () => {
@@ -1174,6 +1387,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
   const closeOnboarding = () => {
     setShowOnboarding(false);
+    if (hasHomepageCheckoutIntentRef.current) return;
     setSelectedTab("Dashboard");
     if (brandProfileMode === "undecided") {
       setGuidedBrandStep(0);
@@ -1363,6 +1577,9 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   };
   const remainingTokens = Math.max(monthlyTokens - usedTokens, 0);
   const hasActiveBilling = Boolean(activeSubscription) && billingStatus !== "none" && billingStatus !== "canceled";
+  const basePlanTokens = activeSubscription ? PLAN_BASE_TOKENS[activeSubscription] : 0;
+  const purchasedExtraTokens = hasActiveBilling ? Math.max(monthlyTokens - basePlanTokens, 0) : 0;
+  const availableTokensDisplay = Math.max(remainingTokens, dashboardSummary?.tokens.remaining ?? 0);
   const creditFillPercent =
     hasActiveBilling && monthlyTokens > 0
       ? Math.max(0, Math.min((remainingTokens / monthlyTokens) * 100, 100))
@@ -1380,7 +1597,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     {
       id: "credits-low",
       title: "Credits werden knapp",
-      description: `${remainingTokens.toLocaleString("de-DE")} Credits verfügbar.`,
+      description: `${availableTokensDisplay.toLocaleString("de-DE")} Tokens verfügbar.`,
       actionLabel: "Zu Pakete",
       onAction: () => setSelectedTab("Abo & Tokens"),
       tone: "warning" as const,
@@ -1466,7 +1683,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           };
         };
         if (data.state) {
-          setActiveSubscription(data.state.plan);
+          setActiveSubscription(resolveActivePlan(data.state.plan, data.state.monthlyTokens, data.state.status));
           setMonthlyTokens(data.state.monthlyTokens);
           setUsedTokens(data.state.usedTokens);
           setBillingStatus(data.state.status ?? "active");
@@ -1601,6 +1818,40 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       setProfileSaveMessage(error instanceof Error ? error.message : "Speichern fehlgeschlagen.");
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (isDeletingAccount) return;
+    if (deleteAccountConfirmation.trim() !== "KONTO LÖSCHEN") {
+      setGlobalErrorMessage("Bitte gib exakt „KONTO LÖSCHEN“ ein, um fortzufahren.");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Möchtest du dein Konto wirklich dauerhaft löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.",
+    );
+    if (!confirmed) return;
+
+    try {
+      setGlobalErrorMessage("");
+      setGlobalNoticeMessage("");
+      setIsDeletingAccount(true);
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: deleteAccountConfirmation.trim() }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setGlobalErrorMessage(payload.error ?? "Konto konnte nicht gelöscht werden.");
+        setIsDeletingAccount(false);
+        return;
+      }
+
+      window.location.assign("/auth/signout");
+    } catch (error) {
+      setGlobalErrorMessage(error instanceof Error ? error.message : "Konto konnte nicht gelöscht werden.");
+      setIsDeletingAccount(false);
     }
   };
 
@@ -1850,6 +2101,176 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     [brandProfileComplete, contentAspectRatio, contentResolution, contentUsePerspectiveSet, contentVariantCount, refreshSummary],
   );
 
+  const generateWithOpenAiImage2 = useCallback(
+    async ({
+      prompt,
+      files,
+      strictLabelMode,
+      campaignMode,
+      headline,
+      subline,
+      cta,
+    }: {
+      prompt: string;
+      files?: File[];
+      strictLabelMode?: boolean;
+      campaignMode?: boolean;
+      headline?: string;
+      subline?: string;
+      cta?: string;
+    }) => {
+      const referenceImageUrls = files?.length
+        ? await Promise.all(files.slice(0, 2).map((file) => fileToDataUrl(file)))
+        : undefined;
+      const res = await fetch("/api/openai/image2/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          aspectRatio: contentAspectRatio,
+          resolution: contentResolution,
+          outputFormat: "png",
+          referenceImageUrls,
+          strictLabelMode: Boolean(strictLabelMode),
+          plattform: campaignMode ? "Instagram Post" : "Website Hero",
+          textImLabel: headline ?? "",
+          campaignMode: Boolean(campaignMode),
+          subline: subline ?? "",
+          cta: cta ?? "",
+        }),
+      });
+      const data = (await res.json()) as {
+        generationId?: string;
+        imageUrl?: string;
+        usedModel?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.imageUrl) {
+        throw new Error(data.error ?? "ChatGPT Image 2 Generierung fehlgeschlagen.");
+      }
+      const id = data.generationId ?? `openai-${Date.now()}`;
+      const preview = `/api/kie/download?url=${encodeURIComponent(data.imageUrl)}&format=png&taskId=${encodeURIComponent(id)}`;
+      const createdItem: MediaLibraryItem = {
+        id,
+        imageUrl: data.imageUrl,
+        prompt: prompt.slice(0, 240),
+        createdAt: new Date().toISOString(),
+        aspectRatio: contentAspectRatio,
+        resolution: contentResolution,
+        outputFormat: "png",
+        model: data.usedModel ?? "chatgpt-image-2",
+        referenceImageUrl: referenceImageUrls?.[0],
+      };
+      return { preview, createdItem };
+    },
+    [contentAspectRatio, contentResolution],
+  );
+
+  const generateContentWithOpenAiImage2 = useCallback(
+    async (prompt: string, files?: File[]) => {
+      if (!brandProfileComplete) {
+        setContentGenerationError(
+          "Bitte zuerst in Einstellungen dein Markenprofil vervollstaendigen oder die Nutzung ohne Markenprofil auswaehlen.",
+        );
+        return;
+      }
+      const finalPrompt = prompt.trim();
+      if (!finalPrompt) return;
+      const normalizedPrompt = finalPrompt.toLowerCase();
+      const hasReferenceImages = Boolean(files?.length);
+      const requestsBrandFidelity =
+        /(label|etikett|logo|branding|brand|text on bottle|bottle text|wortmarke|marke)/i.test(normalizedPrompt);
+      const strictLabelMode = hasReferenceImages || requestsBrandFidelity || contentCreationPreset === "product_studio";
+      const modelReadyPrompt =
+        contentCreationPreset === "product_studio" && hasReferenceImages
+          ? `${finalPrompt}\n\nReference lock: Reproduce the uploaded label/brand exactly 1:1 with sharp readable text and unchanged layout.`
+          : finalPrompt;
+
+      setContentIsGenerating(true);
+      setContentGenerationProgress(10);
+      setContentGenerationError("");
+      setContentGeneratedPreviewUrls([]);
+      setContentDraftPrompt(modelReadyPrompt);
+      try {
+        const { preview, createdItem } = await generateWithOpenAiImage2({
+          prompt: modelReadyPrompt,
+          files,
+          strictLabelMode,
+        });
+        setContentGenerationProgress(100);
+        setContentGeneratedPreviewUrls([preview]);
+        setMediaItems((prev) => [createdItem, ...prev.filter((entry) => entry.id !== createdItem.id)].slice(0, 12));
+        try {
+          await fetch("/api/dashboard/media", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(createdItem),
+          });
+          await refreshSummary();
+        } catch {
+          setGlobalErrorMessage("Das Bild wurde erstellt, konnte aber nicht vollständig in der Mediathek gespeichert werden.");
+        }
+      } catch (error) {
+        setContentGenerationError(error instanceof Error ? error.message : "Bildgenerierung fehlgeschlagen.");
+      } finally {
+        setContentIsGenerating(false);
+        setContentGenerationProgress(0);
+      }
+    },
+    [brandProfileComplete, contentCreationPreset, generateWithOpenAiImage2, refreshSummary],
+  );
+
+  const generateCampaignWithOpenAiImage2 = useCallback(
+    async (scenePrompt: string, headline: string, subline: string, cta: string, files?: File[]) => {
+      if (!brandProfileComplete) {
+        setContentGenerationError(
+          "Bitte zuerst in Einstellungen dein Markenprofil vervollstaendigen oder die Nutzung ohne Markenprofil auswaehlen.",
+        );
+        return;
+      }
+      const scene = scenePrompt.trim();
+      if (!scene) return;
+      const campaignPrompt = applyContentPresetPrompt(buildCampaignCreativePrompt(scene, headline, subline, cta), "campaign_social");
+
+      setContentIsGenerating(true);
+      setContentGenerationProgress(8);
+      setContentGenerationError("");
+      setContentGeneratedPreviewUrls([]);
+      setContentDraftPrompt(campaignPrompt);
+
+      try {
+        const { preview, createdItem } = await generateWithOpenAiImage2({
+          prompt: campaignPrompt,
+          files,
+          strictLabelMode: true,
+          campaignMode: true,
+          headline,
+          subline,
+          cta,
+        });
+        setContentGenerationProgress(100);
+        setContentGeneratedPreviewUrls([preview]);
+        setMediaItems((prev) => [createdItem, ...prev.filter((entry) => entry.id !== createdItem.id)].slice(0, 12));
+        try {
+          await fetch("/api/dashboard/media", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(createdItem),
+          });
+          await refreshSummary();
+        } catch {
+          setGlobalErrorMessage("Das Bild wurde erstellt, konnte aber nicht vollständig in der Mediathek gespeichert werden.");
+        }
+      } catch (error) {
+        setContentGenerationError(error instanceof Error ? error.message : "Kampagnenbild fehlgeschlagen.");
+      } finally {
+        setContentIsGenerating(false);
+        setContentGenerationProgress(0);
+      }
+    },
+    [brandProfileComplete, generateWithOpenAiImage2, refreshSummary],
+  );
+
   const generateCampaignWithKie = useCallback(
     async (scenePrompt: string, headline: string, subline: string, cta: string, files?: File[]) => {
       if (!brandProfileComplete) {
@@ -1936,17 +2357,6 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
         const preview = `/api/kie/download?url=${encodeURIComponent(imageUrl)}&format=png&taskId=${encodeURIComponent(taskId)}`;
 
-        setHybridFinalPrompt(
-          [
-            "Kampagnenbild (Instagram Post mit Text)",
-            `Headline: ${headline}`,
-            subline ? `Subline: ${subline}` : "",
-            cta ? `CTA: ${cta}` : "",
-            `Szene: ${scene.slice(0, 400)}`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        );
 
         const createdItem: MediaLibraryItem = {
           id: taskId,
@@ -2044,11 +2454,10 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 <div className="rounded-lg border border-orange-400/20 bg-orange-500/10 p-2">
                   <Sparkles className="h-5 w-5 text-orange-300" />
                 </div>
-                <span className="text-xs font-medium text-emerald-300">+180</span>
               </div>
               <h3 className="mb-1 text-sm font-medium text-zinc-400">Verfügbare Tokens</h3>
               <p className="text-3xl font-bold text-white">
-                {(dashboardSummary?.tokens.remaining ?? remainingTokens).toLocaleString("de-DE")}
+                {availableTokensDisplay.toLocaleString("de-DE")}
               </p>
               <p className="mt-1 text-sm text-emerald-300">
                 {hasActiveBilling ? `${usedTokens.toLocaleString("de-DE")} verbraucht` : "kein Abo aktiv"}
@@ -2060,9 +2469,8 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/10 p-2">
                   <FileText className="h-5 w-5 text-emerald-300" />
                 </div>
-                <span className="text-xs font-medium text-emerald-300">+12%</span>
               </div>
-              <h3 className="mb-1 text-sm font-medium text-zinc-400">Posts im April</h3>
+              <h3 className="mb-1 text-sm font-medium text-zinc-400">Posts diesen Monat</h3>
               <p className="text-3xl font-bold text-white">{dashboardSummary?.postsThisMonth ?? 0}</p>
               <p className="mt-1 text-sm text-emerald-300">aus deiner Mediathek berechnet</p>
             </div>
@@ -2072,7 +2480,6 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 <div className="rounded-lg border border-violet-400/20 bg-violet-500/10 p-2">
                   <Beer className="h-5 w-5 text-violet-300" />
                 </div>
-                <span className="text-xs font-medium text-violet-300">Saisonaktion</span>
               </div>
               <h3 className="mb-1 text-sm font-medium text-zinc-400">Kampagnen aktiv</h3>
               <p className="text-3xl font-bold text-white">{dashboardSummary?.activeCampaigns ?? 0}</p>
@@ -2084,7 +2491,6 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 <div className="rounded-lg border border-orange-400/20 bg-orange-500/10 p-2">
                   <Users className="h-5 w-5 text-orange-300" />
                 </div>
-                <span className="text-xs font-medium text-orange-300">+1</span>
               </div>
               <h3 className="mb-1 text-sm font-medium text-zinc-400">Teammitglieder</h3>
               <p className="text-3xl font-bold text-white">{dashboardSummary?.teamMembers ?? teamMembers.length}</p>
@@ -2099,7 +2505,11 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
               <div className="rounded-xl border border-white/10 bg-[#171a20] p-6 shadow-sm">
                 <div className="mb-6 flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Letzte Aktivitäten</h3>
-                  <button className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTab("Mediathek")}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
                     Alle anzeigen
                   </button>
                 </div>
@@ -2176,8 +2586,13 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 <p className="text-sm text-gray-600 dark:text-gray-400">Du nutzt aktuell den Plan</p>
                 <p className="mt-1 text-xl font-semibold text-gray-900 dark:text-gray-100">{activePlanLabel}</p>
                 <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">
-                  {hasActiveBilling ? `${monthlyTokens.toLocaleString("de-DE")} Tokens / Monat` : "Bitte wähle einen Plan"}
+                  {hasActiveBilling ? `${basePlanTokens.toLocaleString("de-DE")} Tokens / Monat` : "Bitte wähle einen Plan"}
                 </p>
+                {hasActiveBilling && purchasedExtraTokens > 0 ? (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    +{purchasedExtraTokens.toLocaleString("de-DE")} Zusatz-Tokens verfügbar
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -2211,7 +2626,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           <div
             data-onboarding="content-workflow"
             className={cn(
-              "relative z-0 mx-auto flex min-h-[calc(100dvh-4.75rem)] max-w-5xl flex-col items-center justify-start px-4 pt-2 text-center sm:min-h-[calc(100vh-5.5rem)] sm:px-10 sm:pt-8",
+              "relative z-0 mx-auto flex min-h-[calc(100dvh-4.75rem)] max-w-5xl flex-col items-center justify-start px-4 pt-0 text-center sm:min-h-[calc(100vh-5.5rem)] sm:px-10 sm:pt-4",
               contentImageMode === "campaign" && contentGeneratedPreviewUrls.length === 0
                 ? "pb-[min(42rem,78vh)] sm:pb-[min(40rem,72vh)] sm:justify-start"
                 : "pb-32 sm:justify-center sm:pb-36",
@@ -2238,15 +2653,17 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                     ))}
                   </div>
                   <div className="mt-3 border-t border-white/10 px-1 pt-3 text-left">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#c8ff26]">Letzter Prompt</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-zinc-300">{hybridFinalPrompt || contentDraftPrompt}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#c8ff26]">Prompt-Status</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-zinc-300">
+                      Prompt wird intern verarbeitet und ist für Nutzer nicht sichtbar.
+                    </p>
                   </div>
                 </div>
               ) : null}
               {contentGeneratedPreviewUrls.length === 0 ? (
                 <>
-                  <div className="mb-5 flex -space-x-3">
-                    {["/ki-beispiel-hafen.webp", "/ki-beispiel-strand.webp", "/ki-beispiel-biergarten.webp"].map((src, i) => (
+                  <div className="-mt-16 mb-5 flex -space-x-3 sm:-mt-24">
+                    {["/public/ki-real-1.png", "/public/ki-real-2.png", "/public/ki-real-3.png"].map((src, i) => (
                       <div
                         key={src}
                         className={`h-20 w-20 overflow-hidden rounded-xl border border-white/20 shadow-[0_12px_28px_-18px_rgba(70,120,255,0.9)] sm:h-24 sm:w-24 ${
@@ -2259,14 +2676,12 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                   </div>
                   <h2 className="text-3xl font-extrabold uppercase tracking-tight text-white sm:text-4xl">
                     Inhalte erstellen mit
-                    <span className="mt-1 block normal-case text-[#c8ff26]" style={{ fontFamily: "var(--font-playfair)" }}>
-                      deinem KI-Studio.
-                    </span>
+                    <span className="mt-1 block text-white">deinem KI-Studio.</span>
                   </h2>
                   <p className="mt-3 max-w-xl text-sm text-zinc-300 sm:text-base">
                     {contentImageMode === "campaign"
                       ? "Szene und Stimmung unten beschreiben, Text im Bild über die Felder im Panel steuern."
-                      : "Beschreibe Szene, Stimmung und Stil - wir generieren daraus starke Motive für deine Brauerei."}
+                      : `${selectedContentPreset.title}: Beschreibe Szene, Stimmung und Stil - wir generieren daraus starke Motive für deine Brauerei.`}
                   </p>
                 </>
               ) : null}
@@ -2281,43 +2696,19 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
               </p>
             ) : null}
             <div className="mb-3 max-h-[min(70vh,32rem)] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#070b13]/95 p-3 text-left shadow-[0_12px_32px_-24px_rgba(0,0,0,0.85)] backdrop-blur-md sm:max-h-none sm:overflow-visible">
-              <p className="text-xs text-zinc-400">System waehlt automatisch das passende Modell.</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setContentImageMode("standard")}
-                  className={cn(
-                    "min-h-9 shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition",
-                    contentImageMode === "standard"
-                      ? "border-[#c8ff26]/45 bg-[#c8ff26]/15 text-[#c8ff26]"
-                      : "border-white/10 bg-black/25 text-zinc-300 hover:bg-white/10",
-                  )}
-                >
-                  Standardbild
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setContentImageMode("campaign")}
-                  className={cn(
-                    "min-h-9 shrink-0 rounded-full border px-4 py-2 text-left text-xs font-semibold leading-snug transition sm:text-center",
-                    contentImageMode === "campaign"
-                      ? "border-[#c8ff26]/45 bg-[#c8ff26]/15 text-[#c8ff26]"
-                      : "border-white/10 bg-black/25 text-zinc-300 hover:bg-white/10",
-                  )}
-                >
-                  <span className="hidden sm:inline">Kampagnenbild (Instagram + Text)</span>
-                  <span className="sm:hidden">Kampagnenbild</span>
-                </button>
-              </div>
+              <p className="text-xs text-zinc-400">Bildstil über den Auswahl-Button neben dem Format wählen.</p>
+              <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                Aktiv: <span className="font-semibold text-zinc-300">{selectedContentPreset.title}</span>
+              </p>
               {contentImageMode === "campaign" ? (
                 <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-                  Szene im grossen Feld beschreiben. Headline ist Pflicht; Subline und CTA optional.
+                  Szene im grossen Feld beschreiben. Headline, Subline und CTA sind optional.
                 </p>
               ) : null}
               {contentImageMode === "campaign" ? (
                 <div className="mt-3 grid gap-2 border-t border-white/10 pt-3 sm:grid-cols-3">
                   <label className="sm:col-span-3">
-                    <span className="mb-1 block text-xs font-medium text-[#c8ff26]">Headline (Pflicht)</span>
+                    <span className="mb-1 block text-xs font-medium text-[#c8ff26]">Headline (optional)</span>
                     <input
                       type="text"
                       value={contentCampaignHeadline}
@@ -2363,8 +2754,8 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
               onAspectRatioChange={setContentAspectRatio}
               resolution={contentResolution}
               onResolutionChange={setContentResolution}
-              modelLabel="GPT Image 2"
-              modelBadgeText="G"
+              presetButtonLabel={selectedContentPreset.title}
+              onPresetButtonClick={() => setContentPresetPickerOpen(true)}
               placeholder={
                 hybridCurrentQuestion ? "Kurz und konkret antworten..." : " "
               }
@@ -2376,6 +2767,18 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                       "Helles im Willibecher, Headline: Frisch gezapft, Subline: Nur bis Sonntag.",
                       "Abendstimmung am Wasser, Headline: Prost zur neuen Saison, CTA: Link in Bio.",
                     ]
+                  : contentCreationPreset === "product_cutout"
+                    ? [
+                        "Freigestelltes Produktbild einer Dose, transparent, saubere Kontur, frontale Perspektive.",
+                        "Flasche ohne Hintergrund als Shop-Packshot, Label gestochen scharf, neutral.",
+                        "Einzelnes Glas freigestellt auf transparentem Alpha, keine Deko, keine Szene.",
+                      ]
+                    : contentCreationPreset === "product_studio"
+                      ? [
+                          "Premium-Studiobild einer Dose auf neutralem Hintergrund, softes Hero-Licht, klare Reflexe.",
+                          "Flasche im kontrollierten Studio-Setup, sauberer Schatten, eCommerce-ready.",
+                          "Produkt-Studioaufnahme mit ruhigem Hintergrund und hoher Label-Lesbarkeit.",
+                        ]
                   : [
                       "Helles im Willibecher auf Holztisch, warmes Abendlicht, echte Biergarten-Stimmung.",
                       "Pils im schlanken Pilstulpen-Glas, klare Lichtkante, kuehler Premium-Werbe-Look.",
@@ -2390,13 +2793,60 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 void submitContentFlowInput(message, files);
               }}
             />
+            {contentPresetPickerOpen ? (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-3 py-6 backdrop-blur-sm">
+                <div className="w-full max-w-5xl rounded-3xl border border-white/15 bg-[#0a0f16] p-4 shadow-[0_35px_90px_-40px_rgba(0,0,0,0.9)] sm:p-6">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-2xl font-extrabold uppercase tracking-tight text-white sm:text-3xl">Bildtyp auswählen</p>
+                      <p className="mt-1 text-sm text-zinc-400">Wähle das Format, danach wird der Prompt passend aufgebaut.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setContentPresetPickerOpen(false)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-200 transition hover:bg-white/10"
+                      aria-label="Auswahl schließen"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {CONTENT_CREATION_PRESETS.map((preset) => {
+                      const active = preset.id === contentCreationPreset;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            setContentCreationPreset(preset.id);
+                            setContentPresetPickerOpen(false);
+                          }}
+                          className={cn(
+                            "rounded-2xl border p-3 text-left transition",
+                            active
+                              ? "border-[#c8ff26]/50 bg-[#c8ff26]/12"
+                              : "border-white/10 bg-black/25 hover:bg-white/10",
+                          )}
+                        >
+                          <div className="mb-3 aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 bg-[#0f172a] p-1">
+                            <img src={preset.previewSrc} alt={preset.title} className="h-full w-full object-contain" />
+                          </div>
+                          <p className={cn("text-sm font-semibold", active ? "text-[#d7ff6f]" : "text-zinc-100")}>{preset.title}</p>
+                          <p className="mt-1 text-xs leading-relaxed text-zinc-400">{preset.description}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {hybridCurrentQuestion && contentImageMode === "standard" ? (
               <div className="mt-2 rounded-lg border border-[#c8ff26]/35 bg-[#c8ff26]/10 px-3 py-2 text-xs text-[#e8ff9a]">
                 <p className="font-semibold uppercase tracking-wide">Rueckfrage</p>
                 <p className="mt-1 text-sm normal-case text-zinc-100">{hybridCurrentQuestion}</p>
               </div>
             ) : null}
-            {contentImageMode === "standard" ? (
+            {contentImageMode === "standard" && contentCreationPreset !== "product_cutout" ? (
             <div data-onboarding="content-preflight" className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-300">
               <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1">Varianten:</span>
               {[1, 2, 3].map((count) => (
@@ -2429,9 +2879,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
             </div>
             ) : (
               <p className="mt-2 text-xs text-zinc-500">
-                Kampagnenbilder laufen einzeln über Kie.ai: ohne Referenz{" "}
-                <strong className="text-zinc-400">gpt-image-2-text-to-image</strong>, mit Referenz{" "}
-                <strong className="text-zinc-400">gpt-image-2-image-to-image</strong>.
+                Kampagnenbilder laufen einzeln über ChatGPT Image 2 (bei Bedarf mit Referenzbild/Label-Lock).
               </p>
             )}
             {contentGenerationError ? (
@@ -2468,10 +2916,18 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 Testmodus aktiv: Abo-Abschlüsse und Token-Käufe sind aktuell deaktiviert.
               </div>
             ) : null}
+            {BILLING_KLEINUNTERNEHMER_MODE ? (
+              <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900/60 dark:bg-blue-900/20 dark:text-blue-200">
+                Kleinunternehmer-Modus aktiv: Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.
+              </div>
+            ) : null}
             <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300">
-              <p>Monatliche Tokens: {monthlyTokens.toLocaleString("de-DE")}</p>
+              <p>Tarif-Tokens pro Monat: {basePlanTokens.toLocaleString("de-DE")}</p>
+              {purchasedExtraTokens > 0 ? (
+                <p>Zusatz-Tokens (gekauft): {purchasedExtraTokens.toLocaleString("de-DE")}</p>
+              ) : null}
               <p>Verbraucht: {usedTokens.toLocaleString("de-DE")}</p>
-              <p className="font-semibold">Verfügbar: {remainingTokens.toLocaleString("de-DE")}</p>
+              <p className="font-semibold">Verfügbar: {availableTokensDisplay.toLocaleString("de-DE")}</p>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button
@@ -2532,7 +2988,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                   <input
                     value={mediaSearch}
                     onChange={(e) => setMediaSearch(e.target.value)}
-                    placeholder="Search"
+                    placeholder="Suchen"
                     className="w-full bg-transparent text-xs text-zinc-100 outline-none placeholder:text-zinc-500"
                   />
                 </div>
@@ -2566,7 +3022,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 </button>
               </div>
               <div className="mt-6 border-t border-white/10 pt-4">
-                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Tools</p>
+                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Werkzeuge</p>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left text-xs font-medium text-zinc-100"
@@ -2717,7 +3173,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
     if (selectedTab === "Einstellungen") {
       return (
-        <section data-onboarding="team-overview" className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <section data-onboarding="settings-overview" className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Profil-Einstellungen</h2>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
@@ -2897,6 +3353,31 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
             {profileSaveMessage ? (
               <span className="text-sm text-gray-600 dark:text-gray-300">{profileSaveMessage}</span>
             ) : null}
+          </div>
+          <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
+            <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">Konto dauerhaft löschen</h3>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-300">
+              Dieser Vorgang löscht dein Benutzerkonto endgültig. Bestehende Abos werden dabei beendet.
+            </p>
+            <label className="mt-3 block space-y-1 text-sm">
+              <span className="text-red-800 dark:text-red-200">Zur Bestätigung „KONTO LÖSCHEN“ eingeben</span>
+              <input
+                value={deleteAccountConfirmation}
+                onChange={(e) => setDeleteAccountConfirmation(e.target.value)}
+                className="h-10 w-full rounded-md border border-red-300 bg-white px-3 text-red-900 focus:border-red-500 focus:outline-none dark:border-red-800 dark:bg-gray-950 dark:text-red-100"
+                placeholder="KONTO LÖSCHEN"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                void deleteAccount();
+              }}
+              disabled={isDeletingAccount || deleteAccountConfirmation.trim() !== "KONTO LÖSCHEN"}
+              className="mt-3 inline-flex h-10 items-center rounded-md bg-red-600 px-4 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isDeletingAccount ? "Konto wird gelöscht..." : "Konto löschen"}
+            </button>
           </div>
         </section>
       );
@@ -3364,6 +3845,19 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           {globalErrorMessage}
         </div>
       ) : null}
+      {globalNoticeMessage ? (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-200">
+          <span>{globalNoticeMessage}</span>
+          <button
+            type="button"
+            onClick={() => setGlobalNoticeMessage("")}
+            className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-200"
+            aria-label="Hinweis schließen"
+          >
+            Schließen
+          </button>
+        </div>
+      ) : null}
       <div
         className={cn(
           "pointer-events-auto mb-4 sticky top-0 z-[90] flex w-full items-center justify-between gap-3 rounded-2xl px-3 pb-3 pt-[max(0.65rem,env(safe-area-inset-top))] sm:-mx-6 sm:mb-6 sm:rounded-none sm:px-6 sm:py-3",
@@ -3646,14 +4140,16 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         ) : null}
         <div className="relative" ref={profileMenuRef}>
           {profileMenuOpen ? (
-            <div className="fixed right-3 top-[calc(env(safe-area-inset-top)+3.75rem)] z-[130] w-[min(84vw,20rem)] overflow-hidden rounded-2xl border border-white/10 bg-[#12151b] text-white shadow-[0_24px_40px_-24px_rgba(0,0,0,0.9)] sm:absolute sm:right-0 sm:top-1 sm:w-64">
+            <div className="fixed right-3 top-[calc(env(safe-area-inset-top)+3.75rem)] z-[130] w-[min(84vw,20rem)] overflow-hidden rounded-2xl border border-white/10 bg-[#12151b] text-white shadow-[0_24px_40px_-24px_rgba(0,0,0,0.9)] sm:right-4 sm:top-[calc(env(safe-area-inset-top)+4.25rem)] sm:w-64">
                 <div className="border-b border-white/5 px-4 py-3">
                   <p className="truncate text-sm font-semibold text-white">{displayName}</p>
-                  <p className="text-xs text-zinc-400">Kostenloser Plan</p>
+                  <p className="text-xs text-zinc-400">
+                    {hasActiveBilling ? activePlanLabel : "Kein aktives Abo"}
+                  </p>
                 </div>
                 <div className="border-b border-white/5 px-4 py-3">
                   <div className="mb-2 flex items-center justify-between text-sm font-semibold text-white">
-                    <span>{remainingTokens.toLocaleString("de-DE")} Credits verfugbar</span>
+                    <span>{availableTokensDisplay.toLocaleString("de-DE")} Tokens verfügbar</span>
                     <ChevronDown className="-rotate-90 h-3.5 w-3.5 text-zinc-500" />
                   </div>
                   <div className="h-2 rounded-full bg-white/10">
@@ -3671,9 +4167,11 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                   >
                     <span className="inline-flex items-center gap-2 text-sm font-semibold text-white">
                       <Crown className="h-4 w-4 text-[#c8ff26]" />
-                      Premium aktivieren
+                      {hasActiveBilling ? "Plan verwalten" : "Premium aktivieren"}
                     </span>
-                    <span className="rounded-full bg-[#c8ff26] px-2 py-1 text-xs font-semibold text-black">Upgraden</span>
+                    <span className="rounded-full bg-[#c8ff26] px-2 py-1 text-xs font-semibold text-black">
+                      {hasActiveBilling ? "Aktiv" : "Upgraden"}
+                    </span>
                   </button>
                 </div>
                 <div className="px-2 pb-2">

@@ -3187,11 +3187,7 @@ export function ImagePromptWorkflow({
               </button>
             ) : null}
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Seitenverhältnis: {generatedRatio || "-"} | Modell:{" "}
-              {brief.plattform === "Instagram Post" && brief.textImLabel.trim()
-                ? "ChatGPT Image 2 (erzwungen für Text-Instagram-Posts)"
-                : brief.kiPlattform}{" "}
-              | Bei Etikett 1:1 bitte genau ein Referenzbild anhängen.
+              Seitenverhältnis: {generatedRatio || "-"} | Bei Etikett 1:1 bitte genau ein Referenzbild anhängen.
             </p>
             <div data-onboarding="content-preflight" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-950">
               <div className="flex items-center justify-between text-xs">

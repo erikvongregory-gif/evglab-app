@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="circ">
+      <circle cx="128" cy="128" r="127.00"></circle>
+    </clipPath>
+  </defs>
+
+  
+  <circle cx="128" cy="128" r="127.00" fill="#111110"></circle>
+
+  <g clip-path="url(#circ)">
+
+    
+    <path d="M 128 43.52&#xA;             C 115.71 18.18&#xA;               91.14 34.30&#xA;               87.04 45.82&#xA;             C 107.52 50.43&#xA;               125.44 45.82&#xA;               128 43.52 Z" fill="#D4A24C" opacity="0.55"></path>
+
+    
+    <path d="M 128 43.52&#xA;             C 140.29 18.18&#xA;               164.86 34.30&#xA;               168.96 45.82&#xA;             C 148.48 50.43&#xA;               130.56 45.82&#xA;               128 43.52 Z" fill="#D4A24C" opacity="0.55"></path>
+
+    
+    <line x1="128" y1="30.72" x2="128" y2="43.52" stroke="#D4A24C" stroke-width="7.17" stroke-linecap="round"></line>
+
+    
+    <ellipse cx="128" cy="143.36" rx="76.80" ry="102.40" fill="#D4A24C"></ellipse>
+
+    
+    <path d="M 90.41 100.35 Q 106.88 90.62 123.35 100.35" stroke="#111110" stroke-width="3.94" fill="none" stroke-linecap="round" opacity="0.35"></path>
+    <path d="M 132.65 100.35 Q 149.12 90.62 165.59 100.35" stroke="#111110" stroke-width="3.94" fill="none" stroke-linecap="round" opacity="0.35"></path>
+    <path d="M 71.07 129.02 Q 87.04 119.30 103.01 129.02" stroke="#111110" stroke-width="3.94" fill="none" stroke-linecap="round" opacity="0.35"></path>
+    <path d="M 112.03 129.02 Q 128.00 119.30 143.97 129.02" stroke="#111110" stroke-width="3.94" fill="none" stroke-linecap="round" opacity="0.35"></path>
+    <path d="M 152.99 129.02 Q 168.96 119.30 184.93 129.02" stroke="#111110" stroke-width="3.94" fill="none" stroke-linecap="round" opacity="0.35"></path>
+    <path d="M 78.18 159.74 Q 92.16 150.02 106.14 159.74" stroke="#111110" stroke-width="3.94" fill="none" stroke-linecap="round" opacity="0.35"></path>
+    <path d="M 114.02 159.74 Q 128.00 150.02 141.98 159.74" stroke="#111110" stroke-width="3.94" fill="none" stroke-linecap="round" opacity="0.35"></path>
+    <path d="M 149.86 159.74 Q 163.84 150.02 177.82 159.74" stroke="#111110" stroke-width="3.94" fill="none" stroke-linecap="round" opacity="0.35"></path>
+    
+
+    
+    <circle cx="105.47" cy="134.40" r="7.17" fill="#111110"></circle>
+    <circle cx="150.53" cy="134.40" r="7.17" fill="#111110"></circle>
+
+    
+    <path d="M 140.49 120.06&#xA;             Q 150.53 110.75&#xA;               160.56 120.06" stroke="#111110" stroke-width="6.45" fill="none" stroke-linecap="round"></path>
+
+    
+    <path d="M 116.74 166.40&#xA;             C 125.75 167.42&#xA;               132.51 162.82&#xA;               139.26 159.74" stroke="#111110" stroke-width="7.88" fill="none" stroke-linecap="round"></path>
+
+  </g>
+</svg>

@@ -22,8 +22,12 @@ type CreateTaskBody = {
   strictLabelMode?: boolean;
 };
 
-const KIE_MODEL_TEXT_TO_IMAGE = (process.env.KIE_IMAGE_MODEL?.trim() || "gpt-image-2-text-to-image") as string;
-const KIE_MODEL_IMAGE_TO_IMAGE = (process.env.KIE_IMAGE_TO_IMAGE_MODEL?.trim() || "gpt-image-2-image-to-image") as string;
+const KIE_MODEL_TEXT_TO_IMAGE = (process.env.KIE_NANOBANANA_TEXT_MODEL?.trim() ||
+  process.env.NANOBANANA_IMAGE_MODEL?.trim() ||
+  process.env.KIE_IMAGE_MODEL?.trim()) as string;
+const KIE_MODEL_IMAGE_TO_IMAGE = (process.env.KIE_NANOBANANA_IMAGE_MODEL?.trim() ||
+  process.env.NANOBANANA_IMAGE_TO_IMAGE_MODEL?.trim() ||
+  process.env.KIE_IMAGE_TO_IMAGE_MODEL?.trim()) as string;
 
 const createTaskSchema = z.object({
   prompt: z.string().trim().min(1).max(12000),
@@ -186,6 +190,15 @@ export async function POST(req: Request) {
     }
 
     const hasReferenceImages = Boolean(body.referenceImageUrls?.length);
+    if (!KIE_MODEL_TEXT_TO_IMAGE || !KIE_MODEL_IMAGE_TO_IMAGE) {
+      return NextResponse.json(
+        {
+          error:
+            "NanoBanana Modelle fehlen in der Env. Bitte KIE_NANOBANANA_TEXT_MODEL und KIE_NANOBANANA_IMAGE_MODEL setzen.",
+        },
+        { status: 500 },
+      );
+    }
     const kieModel = hasReferenceImages ? KIE_MODEL_IMAGE_TO_IMAGE : KIE_MODEL_TEXT_TO_IMAGE;
 
     const mappedAspect = mapAspectRatioForGptImage2(body.aspectRatio);

@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
+import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { consumeInviteByToken } from "@/lib/invite/server";
 import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
 import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
@@ -7,7 +7,7 @@ import { getOrCreateRequestId } from "@/lib/security/authObservability";
 
 export async function POST(request: Request) {
   const requestId = getOrCreateRequestId(request);
-  const { origin } = new URL(request.url);
+  const origin = getAppBaseUrlOrigin(new URL(request.url).origin);
   const originError = enforceSameOrigin(request);
   if (originError) return originError;
   if (!isSupabaseConfigured()) {
