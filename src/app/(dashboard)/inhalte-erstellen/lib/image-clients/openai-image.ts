@@ -2,9 +2,20 @@ import OpenAI from "openai";
 import { toFile } from "openai/uploads";
 import sharp from "sharp";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 const MODEL = "gpt-image-2-2026-04-21";
+
+let openAiClient: OpenAI | null = null;
+
+function getOpenAiClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY fehlt.");
+  }
+  if (!openAiClient) {
+    openAiClient = new OpenAI({ apiKey });
+  }
+  return openAiClient;
+}
 
 export type ImageSize = "1024x1024" | "1024x1280" | "1024x1536" | "1024x1792" | "1792x1024" | "1280x1024";
 export type Quality = "low" | "medium" | "high";
@@ -88,6 +99,7 @@ export async function generateImage(params: GenerateParams) {
 
   if (hasRefs) {
     const files = await urlsToFiles(params.referenceImageUrls ?? [], params.resolveReferenceUrl);
+    const client = getOpenAiClient();
     const editParams = {
       ...baseParams,
       image: files.length === 1 ? files[0] : files,
@@ -96,6 +108,7 @@ export async function generateImage(params: GenerateParams) {
     return result.data;
   }
 
+  const client = getOpenAiClient();
   const generateParams = baseParams as unknown as Parameters<typeof client.images.generate>[0];
   const result = (await client.images.generate(generateParams)) as { data: ImageApiData };
   return result.data;
