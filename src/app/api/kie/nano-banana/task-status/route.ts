@@ -29,9 +29,12 @@ function findFirstUrl(input: unknown): string | null {
 
 export async function GET(req: Request) {
   try {
+    // Polling-Endpoint: pro User max 4 parallele Varianten × ein Poll alle ~2.5s
+    // = bis zu ~96 Requests/Minute im Worst-Case. Großzügig dimensionieren, damit
+    // länger laufende Kie-Tasks nicht ins Rate-Limit laufen.
     const rateError = enforceRateLimit(req, {
       keyPrefix: "kie-task-status",
-      limit: 60,
+      limit: 300,
       windowMs: 60_000,
     });
     if (rateError) return rateError;

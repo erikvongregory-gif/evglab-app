@@ -1,21 +1,10 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import nextDynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
-
-const DashboardWithSidebar = nextDynamic(
-  () => import("@/components/ui/dashboard-with-collapsible-sidebar").then((mod) => mod.Example),
-  {
-    loading: () => (
-      <main className="relative z-10 mx-auto max-w-6xl px-4 py-16">
-        <div className="h-8 w-48 animate-pulse rounded bg-zinc-200" />
-        <div className="mt-6 h-48 w-full animate-pulse rounded-2xl bg-zinc-100" />
-      </main>
-    ),
-  },
-);
+import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { DashboardRedesignShell } from "@/components/ui/dashboard-redesign";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -56,11 +45,19 @@ export default async function DashboardPage() {
     redirect("/anmelden");
   }
 
-  const userName =
-    typeof user.user_metadata?.brewery === "string"
-      ? user.user_metadata.brewery
+  const dashboard = getDashboardMetadata(user.user_metadata);
+  const settings = dashboard.settings as Record<string, unknown> | undefined;
+  const profileName =
+    typeof settings?.profileName === "string"
+      ? settings.profileName
       : typeof user.user_metadata?.full_name === "string"
         ? user.user_metadata.full_name
+        : undefined;
+  const breweryName =
+    typeof settings?.breweryName === "string"
+      ? settings.breweryName
+      : typeof user.user_metadata?.brewery === "string"
+        ? user.user_metadata.brewery
         : undefined;
   const userRole =
     typeof user.user_metadata?.role === "string"
@@ -68,5 +65,12 @@ export default async function DashboardPage() {
       : "user";
   const isAdmin = userRole === "admin";
 
-  return <DashboardWithSidebar userEmail={user.email} userName={userName} isAdmin={isAdmin} />;
+  return (
+    <DashboardRedesignShell
+      userEmail={user.email}
+      initialProfileName={profileName}
+      initialBreweryName={breweryName}
+      isAdmin={isAdmin}
+    />
+  );
 }

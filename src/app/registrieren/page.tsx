@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { SITE } from "@/lib/siteConfig";
-import { RegisterForm } from "./register-form";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab - Registrierung",
+    absolute: "EvGlab · Registrierung",
   },
   alternates: {
     canonical: `${SITE.baseUrl}/registrieren`,
@@ -17,18 +16,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RegistrierenPage() {
-  return (
-    <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-950">
-      <Suspense
-        fallback={
-          <div className="mx-auto w-full max-w-sm rounded-xl border bg-white p-6 text-center text-sm text-zinc-600 dark:border-gray-800 dark:bg-gray-900 dark:text-zinc-400">
-            Wird geladen …
-          </div>
-        }
-      >
-        <RegisterForm />
-      </Suspense>
-    </main>
-  );
+export default async function RegistrierenPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = (await searchParams) ?? {};
+  const q = new URLSearchParams();
+  q.set("mode", "register");
+  for (const [key, raw] of Object.entries(params)) {
+    if (raw === undefined || key === "mode") continue;
+    const vals = Array.isArray(raw) ? raw : [raw];
+    for (const v of vals) q.append(key, v);
+  }
+  redirect(`/anmelden?${q.toString()}`);
 }

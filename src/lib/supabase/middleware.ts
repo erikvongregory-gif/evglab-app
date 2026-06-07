@@ -36,7 +36,7 @@ export async function updateSession(request: NextRequest) {
     const authResult = await Promise.race([
       supabase.auth.getUser(),
       new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("middleware_auth_timeout")), 4_000);
+        setTimeout(() => reject(new Error("middleware_auth_timeout")), 25_000);
       }),
     ]);
     user = authResult.data.user;
@@ -61,7 +61,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (isInviteOnlyEnabled() && pathname === "/registrieren") {
-    const redirect = NextResponse.redirect(new URL("/anmelden?error=invite_required", request.url));
+    const redirect = NextResponse.redirect(new URL("/anmelden?mode=register&error=invite_required", request.url));
     redirect.headers.set("x-request-id", requestId);
     redirect.headers.set("Cache-Control", "no-store, max-age=0");
     return redirect;

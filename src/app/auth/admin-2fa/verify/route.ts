@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     userId: user.id,
     ttlSeconds: 60 * 60 * 12,
   });
-  const done = createNoStoreRedirect(`${origin}/dashboard`, requestId);
+  const done = createNoStoreRedirect(`${origin}/admin`, requestId);
   done.cookies.set(getVerifiedCookieName(), verifiedToken, {
     httpOnly: true,
     ...cookieOptions,

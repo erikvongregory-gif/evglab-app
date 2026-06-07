@@ -34,7 +34,7 @@ export async function requireAdminPageAccess(options?: { allowWithout2FA?: boole
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/anmelden");
+  if (!user) redirect("/admin/anmelden");
   const role =
     typeof user.user_metadata?.role === "string"
       ? String(user.user_metadata.role).toLowerCase()

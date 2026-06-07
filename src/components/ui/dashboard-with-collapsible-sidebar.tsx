@@ -25,16 +25,25 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
+import { BrandProfileSetupModal, type BrandScanSuggestion } from "@/components/dashboard/BrandProfileSetupModal";
 import {
   BrewerySubscriptionPlans,
   type SubscriptionPlanKey,
 } from "@/components/dashboard/BrewerySubscriptionPlans";
 import { OnboardingDialog, type OnboardingStep } from "@/components/ui/onboarding-dialog";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
+import { getFlowTypingPhrases } from "@/components/ui/content-type-flows";
 import { DEFAULT_HOPFEN_AGENTS, FloatingChatWidget } from "@/components/ui/floating-chat-widget-shadcnui";
 import { cn } from "@/lib/utils";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
-import { buildCampaignCreativePrompt } from "@/lib/kie/campaignImagePrompt";
+import { buildCampaignCreativeFromReferencesPrompt, buildCampaignCreativePrompt } from "@/lib/kie/campaignImagePrompt";
+import {
+  type ContentCreationPreset,
+  type ContentEngine,
+  applyContentPresetPrompt,
+  getPolicyForPreset,
+  validateImageTypePolicy,
+} from "@/lib/image-types/policy";
 
 type OptionProps = {
   Icon: LucideIcon;
@@ -95,9 +104,6 @@ type HybridAnswer = {
   answer: string;
 };
 
-type ContentCreationPreset = "hyperreal" | "product_cutout" | "product_studio" | "campaign_social";
-type ContentEngine = "nano_banana" | "chatgpt_image2";
-
 const CONTENT_CREATION_PRESETS: Array<{
   id: ContentCreationPreset;
   title: string;
@@ -120,23 +126,23 @@ const CONTENT_CREATION_PRESETS: Array<{
     description: "Packshot/Freisteller ohne Hintergrund, z. B. für Shop, Website oder Anzeigen.",
     mode: "standard",
     engine: "chatgpt_image2",
-    previewSrc: "/public/product-cutout-preview.svg",
+    previewSrc: "/public/product-cutout-preview.png",
   },
   {
     id: "product_studio",
     title: "Produkt-Studio",
     description: "Kontrollierte Studio-Optik mit neutralem Hintergrund und Hero-Licht.",
     mode: "standard",
-    engine: "chatgpt_image2",
+    engine: "nano_banana",
     previewSrc: "/public/product-studio-preview.png",
   },
   {
     id: "campaign_social",
     title: "Kampagnenbild mit Text",
-    description: "Instagram-Motiv mit Headline, optional Subline und CTA.",
+    description: "Neue Instagram-Posts: Referenzbilder hochladen, Texte erfindet die KI (nur mit Markenprofil).",
     mode: "campaign",
     engine: "chatgpt_image2",
-    previewSrc: "/public/ki-beispiel-4.svg",
+    previewSrc: "/public/kampagnenbild-mit-text-preview.png",
   },
 ];
 
@@ -178,79 +184,9 @@ function getHomepageCheckoutPlan(params: URLSearchParams): SubscriptionPlanKey |
   return plan;
 }
 
-function applyContentPresetPrompt(basePrompt: string, preset: ContentCreationPreset): string {
-  const trimmed = basePrompt.trim();
-  if (!trimmed) return "";
-  if (preset === "product_cutout") {
-    return [
-      trimmed,
-      "",
-      "Preset lock:",
-      "- Generate a single centered product cutout.",
-      "- Background must be fully removed/transparent (alpha) with clean object edges and no halo/fringing.",
-      "- No environment, no people, no table, no decorative props, no text overlay, no shadows outside the product silhouette.",
-      "- Keep product label fully legible and undistorted.",
-      "- Output must look like an e-commerce ready PNG freisteller.",
-    ].join("\n");
-  }
-  if (preset === "product_studio") {
-    return [
-      trimmed,
-      "",
-      "Preset lock:",
-      "- Premium studio product photo with neutral seamless background and hero-lighting.",
-      "- Controlled key light with soft shadow and subtle reflection under the product; razor-sharp label readability is mandatory.",
-      "- Use tasteful brewery-related props (e.g. hop cones, barley, citrus slices, herbs) near the product, without clutter.",
-      "- If a reference image is uploaded, preserve the exact brand/label identity 1:1 from that reference.",
-      "- No people and no busy scene elements.",
-    ].join("\n");
-  }
-  if (preset === "hyperreal") {
-    return [
-      trimmed,
-      "",
-      "Preset lock:",
-      "- Hyper-realistic photography look with physically plausible light and material details.",
-      "- Use a real-world scene context (not a sterile packshot).",
-      "- No illustration/cartoon/3D-render look.",
-    ].join("\n");
-  }
-  if (preset === "campaign_social") {
-    return [
-      trimmed,
-      "",
-      "Preset lock:",
-      "- Must be an Instagram-ready campaign motif (attention-grabbing composition, social-ad style framing).",
-      "- Keep clear negative space for headline/subline/CTA overlays and avoid clutter around text zones.",
-      "- No print-flyer layout, no website banner layout, no generic stock composition.",
-    ].join("\n");
-  }
-  return trimmed;
-}
 
 const BILLING_CHECKOUT_ENABLED = process.env.NEXT_PUBLIC_BILLING_CHECKOUT_ENABLED !== "false";
 const BILLING_KLEINUNTERNEHMER_MODE = process.env.NEXT_PUBLIC_BILLING_KLEINUNTERNEHMER === "true";
-
-const BRAND_VISUAL_DNA_OPTIONS = [
-  "Authentische Produktfotografie mit realistischer Textur",
-  "Markante Etikett-/Typografie-Praesenz im Bild",
-  "Warme, biernahe Farbdramaturgie statt Lifestyle-Neon",
-  "Premium-Werbeaufnahme mit klarer Markenfuehrung",
-] as const;
-
-const BRAND_MUST_KEEP_OPTIONS = [
-  "Logo und Wortmarke unveraendert halten",
-  "Etikettgeometrie und Farbaufteilung konsistent halten",
-  "Produktidentitaet nicht gegen andere Marke tauschen",
-  "Typografie-Hierarchie der Marke beibehalten",
-] as const;
-
-const BRAND_MUST_AVOID_OPTIONS = [
-  "Cartoon-/Illustrations-Look",
-  "Falsche Markenfarben oder fremde Farbwelt",
-  "Unleserliche oder verformte Labels",
-  "Beliebiger Stockfoto-Look ohne Markenbezug",
-] as const;
 
 function getActivityIcon(type: ActivityItem["type"]): LucideIcon {
   if (type === "media") return Image;
@@ -781,8 +717,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [brandDonts, setBrandDonts] = useState("");
   const [brandReferenceImageUrls, setBrandReferenceImageUrls] = useState("");
   const [showBrandProfileChoice, setShowBrandProfileChoice] = useState(false);
-  const [guidedBrandStep, setGuidedBrandStep] = useState(0);
-  const [instagramAnalyzing, setInstagramAnalyzing] = useState(false);
+  const [brandProfileSetupOpen, setBrandProfileSetupOpen] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState("");
@@ -818,6 +753,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [hybridIsLoading, setHybridIsLoading] = useState(false);
   const [hybridError, setHybridError] = useState("");
   const [contentPendingFiles, setContentPendingFiles] = useState<File[] | undefined>(undefined);
+  const [contentComposerFiles, setContentComposerFiles] = useState<File[]>([]);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantAgentId] = useState(DEFAULT_HOPFEN_AGENTS[0]?.id ?? "hopfen-hugo");
   const [assistantInput, setAssistantInput] = useState("");
@@ -833,6 +769,12 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [contentGenerationProgress, setContentGenerationProgress] = useState(0);
   const [contentGeneratedPreviewUrls, setContentGeneratedPreviewUrls] = useState<string[]>([]);
   const [contentGenerationError, setContentGenerationError] = useState("");
+  const [lastGenerationTokenSpend, setLastGenerationTokenSpend] = useState<{
+    total: number;
+    imageCount: number;
+    source: "kie" | "openai";
+    freeTrial?: boolean;
+  } | null>(null);
   const [contentVariantCount, setContentVariantCount] = useState<1 | 2 | 3>(1);
   const [contentUsePerspectiveSet, setContentUsePerspectiveSet] = useState(true);
   const [contentAspectRatio, setContentAspectRatio] = useState<"1:1" | "3:4" | "4:5" | "16:9" | "9:16">("3:4");
@@ -840,9 +782,8 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [contentCreationPreset, setContentCreationPreset] = useState<ContentCreationPreset>("hyperreal");
   const [contentPresetPickerOpen, setContentPresetPickerOpen] = useState(false);
   const [contentImageMode, setContentImageMode] = useState<"standard" | "campaign">("standard");
-  const [contentCampaignHeadline, setContentCampaignHeadline] = useState("");
-  const [contentCampaignSubline, setContentCampaignSubline] = useState("");
-  const [contentCampaignCta, setContentCampaignCta] = useState("");
+  const [contentValidationError, setContentValidationError] = useState("");
+  const [hybridCurrentOptions, setHybridCurrentOptions] = useState<string[]>([]);
   const hasHomepageCheckoutIntentRef = useRef(false);
   const bellMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
@@ -856,6 +797,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       Boolean(brandColors.trim()) &&
       Boolean(brandDos.trim()) &&
       Boolean(brandDonts.trim()));
+  const campaignBrandOk = brandProfileMode === "guided" && brandProfileComplete;
   const tabTitle = selectedTab;
   const isCreationTab = selectedTab === "Inhalte erstellen";
   const selectedContentPreset =
@@ -886,43 +828,87 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
   const submitContentFlowInput = async (message: string, files?: File[]) => {
     const trimmed = message.trim();
-    if (!trimmed || contentIsGenerating) return;
-    const selectedPreset = CONTENT_CREATION_PRESETS.find((preset) => preset.id === contentCreationPreset);
-    const selectedEngine: ContentEngine = selectedPreset?.engine ?? "nano_banana";
-
-    if (contentImageMode === "campaign") {
-      if (hybridIsLoading) return;
-      setContentGenerationError("");
-      setHybridError("");
-      setHybridCurrentQuestion(null);
-      setHybridAnswers([]);
-      setHybridInitialInput("");
-      setContentPendingFiles(undefined);
-      if (selectedEngine === "chatgpt_image2") {
-        await generateCampaignWithOpenAiImage2(
-          trimmed,
-          contentCampaignHeadline.trim(),
-          contentCampaignSubline.trim(),
-          contentCampaignCta.trim(),
-          files,
-        );
-      } else {
-        await generateCampaignWithKie(trimmed, contentCampaignHeadline.trim(), contentCampaignSubline.trim(), contentCampaignCta.trim(), files);
-      }
+    const filesEarly = files ?? contentComposerFiles;
+    const hasRefFiles = filesEarly.length > 0;
+    const effectiveInput =
+      trimmed ||
+      (contentCreationPreset === "product_cutout"
+        ? "Produkt freistellen."
+        : contentCreationPreset === "campaign_social" && hasRefFiles
+          ? "Instagram-Post aus Referenzbildern generieren."
+          : "");
+    if (!effectiveInput || contentIsGenerating) return;
+    if (hybridCurrentQuestion && hybridCurrentOptions.length > 0 && !hybridCurrentOptions.includes(trimmed)) {
+      setHybridError("Bitte waehle eine der vorgeschlagenen Optionen aus.");
       return;
     }
+    const selectedPreset = CONTENT_CREATION_PRESETS.find((preset) => preset.id === contentCreationPreset);
+    const selectedEngine: ContentEngine =
+      contentCreationPreset === "product_cutout" ? "chatgpt_image2" : (selectedPreset?.engine ?? "nano_banana");
+    const filesToValidate = files ?? contentComposerFiles;
+    const preValidation = validateImageTypePolicy({
+      preset: contentCreationPreset,
+      engine: selectedEngine,
+      referenceImageCount: filesToValidate?.length ?? 0,
+      campaignMode: contentImageMode === "campaign",
+    });
+    if (preValidation) {
+      setContentValidationError(preValidation.message);
+      setHybridError(preValidation.message);
+      return;
+    }
+    if (contentCreationPreset === "campaign_social" && !campaignBrandOk) {
+      setContentValidationError("Kampagnenbild mit Text: bitte zuerst ein Markenprofil unter Einstellungen anlegen.");
+      setHybridError("Kampagnenbild mit Text: bitte zuerst ein Markenprofil unter Einstellungen anlegen.");
+      return;
+    }
+    setContentValidationError("");
 
     if (hybridIsLoading) return;
     setHybridError("");
     setHybridIsLoading(true);
 
     try {
+      trackImageFlowMetric("flow_started");
+      if (contentCreationPreset === "product_cutout" && !hybridCurrentQuestion) {
+        const filesToUse = files ?? contentComposerFiles;
+        const directPrompt = applyContentPresetPrompt(
+          "Create a production-ready transparent PNG product cutout.",
+          contentCreationPreset,
+        );
+        await generateContentWithKie(directPrompt, filesToUse);
+        setContentPendingFiles(undefined);
+        setHybridAnswers([]);
+        setHybridInitialInput("");
+        trackImageFlowMetric("flow_completed", { directFlow: true });
+        return;
+      }
+      if (contentCreationPreset === "campaign_social" && !hybridCurrentQuestion && campaignBrandOk) {
+        const filesToUse = files ?? contentComposerFiles;
+        if ((filesToUse?.length ?? 0) < 1) {
+          setHybridError("Bitte mindestens ein Referenzbild hochladen (z. B. Screenshot bestehender Instagram-Posts).");
+          setContentValidationError("Bitte mindestens ein Referenzbild hochladen.");
+          setHybridIsLoading(false);
+          return;
+        }
+        const scene =
+          trimmed ||
+          "Neue Instagram-Feed-Grafik im Markenstil: vom Referenzbild inspiriert, aber neu komponiert.";
+        setHybridCurrentQuestion(null);
+        setHybridCurrentOptions([]);
+        setHybridAnswers([]);
+        setHybridInitialInput("");
+        setContentPendingFiles(undefined);
+        await generateCampaignWithOpenAiImage2(scene, "", "", "", filesToUse, { imageLedFromReferences: true });
+        trackImageFlowMetric("flow_completed", { directFlow: true });
+        return;
+      }
       let nextAnswers = hybridAnswers;
       let effectiveInitialInput = hybridInitialInput;
       if (!hybridCurrentQuestion) {
         nextAnswers = [];
-        effectiveInitialInput = trimmed;
-        setHybridInitialInput(trimmed);
+        effectiveInitialInput = effectiveInput;
+        setHybridInitialInput(effectiveInput);
         setHybridAnswers([]);
         setContentPendingFiles(files);
       } else {
@@ -937,13 +923,21 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           initialInput: effectiveInitialInput,
           history: nextAnswers,
           questionCount: nextAnswers.length,
+          preset: contentCreationPreset,
         }),
       });
-      const data = (await res.json()) as { status?: "follow_up" | "complete"; question?: string; prompt?: string; error?: string };
+      const data = (await res.json()) as {
+        status?: "follow_up" | "complete";
+        question?: string;
+        options?: string[];
+        prompt?: string;
+        error?: string;
+      };
       if (!res.ok) throw new Error(data.error ?? "Analyse fehlgeschlagen.");
 
       if (data.status === "follow_up" && data.question) {
         setHybridCurrentQuestion(data.question);
+        setHybridCurrentOptions(Array.isArray(data.options) ? data.options.filter(Boolean).slice(0, 6) : []);
         return;
       }
 
@@ -951,8 +945,16 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       if (!finalPrompt) throw new Error("Prompt konnte nicht aufgebaut werden.");
       const presetPrompt = applyContentPresetPrompt(finalPrompt, contentCreationPreset);
       setHybridCurrentQuestion(null);
+      setHybridCurrentOptions([]);
       const filesToUse = hybridCurrentQuestion ? contentPendingFiles : files;
-      if (selectedEngine === "chatgpt_image2") {
+      if (contentImageMode === "campaign") {
+        const imageLedOpts = { imageLedFromReferences: true };
+        if (selectedEngine === "chatgpt_image2") {
+          await generateCampaignWithOpenAiImage2(presetPrompt, "", "", "", filesToUse, imageLedOpts);
+        } else {
+          await generateCampaignWithKie(presetPrompt, "", "", "", filesToUse, imageLedOpts);
+        }
+      } else if (selectedEngine === "chatgpt_image2") {
         await generateContentWithOpenAiImage2(presetPrompt, filesToUse);
       } else {
         await generateContentWithKie(presetPrompt, filesToUse);
@@ -960,7 +962,9 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       setContentPendingFiles(undefined);
       setHybridAnswers([]);
       setHybridInitialInput("");
+      trackImageFlowMetric("flow_completed");
     } catch (error) {
+      trackImageFlowMetric("flow_failed", { error: error instanceof Error ? error.message : "unknown" });
       setHybridError(error instanceof Error ? error.message : "Analyse fehlgeschlagen.");
     } finally {
       setHybridIsLoading(false);
@@ -972,8 +976,16 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     setHybridAnswers([]);
     setHybridInitialInput("");
     setHybridError("");
+    setHybridCurrentOptions([]);
     setContentPendingFiles(undefined);
+    setContentValidationError("");
   }, [contentImageMode, contentCreationPreset]);
+
+  useEffect(() => {
+    if (contentCreationPreset === "campaign_social" && !campaignBrandOk) {
+      setContentCreationPreset("hyperreal");
+    }
+  }, [campaignBrandOk, contentCreationPreset]);
 
   useEffect(() => {
     const selectedPreset = CONTENT_CREATION_PRESETS.find((preset) => preset.id === contentCreationPreset);
@@ -1140,7 +1152,6 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     if (!settingsLoaded) return;
     if (showOnboarding) return;
     if (brandProfileMode !== "undecided") return;
-    setGuidedBrandStep(0);
     setShowBrandProfileChoice(true);
   }, [brandProfileMode, settingsLoaded, showOnboarding]);
 
@@ -1390,7 +1401,6 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     if (hasHomepageCheckoutIntentRef.current) return;
     setSelectedTab("Dashboard");
     if (brandProfileMode === "undecided") {
-      setGuidedBrandStep(0);
       setShowBrandProfileChoice(true);
     }
     const hasActivePlan = Boolean(activeSubscription) && billingStatus !== "none" && billingStatus !== "canceled";
@@ -1405,76 +1415,17 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     }
   };
 
-  const toggleCsvChoice = (current: string, value: string) => {
-    const items = current
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-    if (items.includes(value)) return items.filter((item) => item !== value).join(", ");
-    return [...items, value].join(", ");
-  };
-
   const handleChooseBrandProfileGuided = () => {
     setBrandProfileMode("guided");
     setBrandLockLevel("strict");
-    setGuidedBrandStep(1);
-    setShowBrandProfileChoice(true);
+    setShowBrandProfileChoice(false);
+    setBrandProfileSetupOpen(true);
   };
 
   const handleSkipBrandProfile = () => {
     setBrandProfileMode("skip");
     setShowBrandProfileChoice(false);
-    void saveProfileSettings({ brandProfileMode: "skip" });
-  };
-
-  const handleFinishGuidedBrandProfile = () => {
-    setBrandProfileMode("guided");
-    setShowBrandProfileChoice(false);
-    void saveProfileSettings({ brandProfileMode: "guided" });
-  };
-
-  const analyzeInstagramBrand = async () => {
-    if (!brandInstagramUrl.trim()) return;
-    setInstagramAnalyzing(true);
-    setProfileSaveMessage("");
-    try {
-      const res = await fetch("/api/brand/instagram-intake", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instagramUrl: brandInstagramUrl.trim() }),
-      });
-      const data = (await res.json()) as {
-        error?: string;
-        suggestion?: {
-          breweryName?: string;
-          visualDna?: string;
-          mustKeep?: string;
-          mustAvoid?: string;
-          referenceImageUrls?: string[];
-        };
-      };
-      if (!res.ok) throw new Error(data.error ?? "Instagram-Analyse fehlgeschlagen.");
-      if (data.suggestion?.breweryName) setBreweryName(data.suggestion.breweryName);
-      if (data.suggestion?.visualDna) setBrandColors(data.suggestion.visualDna);
-      if (data.suggestion?.mustKeep) setBrandDos(data.suggestion.mustKeep);
-      if (data.suggestion?.mustAvoid) setBrandDonts(data.suggestion.mustAvoid);
-      const referenceImages = Array.isArray(data.suggestion?.referenceImageUrls)
-        ? data.suggestion.referenceImageUrls.filter((item) => typeof item === "string" && item.trim().length > 0)
-        : [];
-      if (referenceImages.length > 0) {
-        setBrandReferenceImageUrls(referenceImages.join("\n"));
-      }
-      setProfileSaveMessage(
-        referenceImages.length > 0
-          ? `Instagram-Profil analysiert. ${referenceImages.length} Referenzbild(er) wurden uebernommen.`
-          : "Instagram-Profil analysiert. Pruefe die Vorschlaege und speichere.",
-      );
-      setGuidedBrandStep(2);
-    } catch (error) {
-      setProfileSaveMessage(error instanceof Error ? error.message : "Instagram-Analyse fehlgeschlagen.");
-    } finally {
-      setInstagramAnalyzing(false);
-    }
+    void saveProfileSettings({ brandProfileMode: "skip", brandProfileSource: "skip" });
   };
 
   const handleRestartOnboardingGlobal = () => {
@@ -1564,6 +1515,29 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     }
   };
 
+  const trackImageFlowMetric = useCallback(
+    (eventName: "flow_started" | "flow_completed" | "flow_failed", extra?: Record<string, unknown>) => {
+      const payload = {
+        eventName,
+        preset: contentCreationPreset,
+        mode: contentImageMode,
+        ts: new Date().toISOString(),
+        ...extra,
+      };
+      try {
+        window.localStorage.setItem("evglab:last-image-flow-metric", JSON.stringify(payload));
+      } catch {
+        // ignore
+      }
+      void fetch("/api/analytics/image-flow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(() => undefined);
+    },
+    [contentCreationPreset, contentImageMode],
+  );
+
   const tabDescriptions: Record<DashboardTab, string> = {
     Dashboard: "Hier siehst du alle wichtigen Zahlen für dein Content- und Abo-Management.",
     "Prompt-Erstellung": "Baue deinen Prompt sauber auf, bevor du Bilder generierst.",
@@ -1579,11 +1553,22 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const hasActiveBilling = Boolean(activeSubscription) && billingStatus !== "none" && billingStatus !== "canceled";
   const basePlanTokens = activeSubscription ? PLAN_BASE_TOKENS[activeSubscription] : 0;
   const purchasedExtraTokens = hasActiveBilling ? Math.max(monthlyTokens - basePlanTokens, 0) : 0;
-  const availableTokensDisplay = Math.max(remainingTokens, dashboardSummary?.tokens.remaining ?? 0);
+  const availableTokensDisplay = hasActiveBilling ? remainingTokens : (dashboardSummary?.tokens.remaining ?? 0);
   const creditFillPercent =
     hasActiveBilling && monthlyTokens > 0
       ? Math.max(0, Math.min((remainingTokens / monthlyTokens) * 100, 100))
       : 0;
+  const draftRequestsBrandFidelity = /(label|etikett|logo|branding|brand|text on bottle|bottle text|wortmarke|marke)/i.test(
+    contentDraftPrompt.toLowerCase(),
+  );
+  const hasComposerReference = Boolean(contentComposerFiles.length);
+  const estimatedStrictLabelMode =
+    contentImageMode === "campaign" ? true : hasComposerReference || draftRequestsBrandFidelity || contentCreationPreset === "product_studio";
+  const estimatedImageCount =
+    contentImageMode === "standard" && contentCreationPreset !== "product_cutout" ? contentVariantCount : 1;
+  const estimatedTotalTokenSpend = estimateImageTokenCost(hasComposerReference, estimatedStrictLabelMode) * estimatedImageCount;
+  const defaultButtonText = contentCreationPreset === "product_cutout" ? "Produkt freistellen" : `Generate • ${estimatedTotalTokenSpend} Tokens`;
+  const generateButtonText = contentIsGenerating ? "Generiert..." : defaultButtonText;
   const bellNotifications = [
     {
       id: "generation-finished",
@@ -1771,38 +1756,63 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     if (billing.freeTrial) setFreeTrialImageUsed(true);
   };
 
+  function estimateImageTokenCost(hasReferenceImage: boolean, strictLabelMode: boolean) {
+    const base = contentResolution === "4K" ? 35 : contentResolution === "2K" ? 20 : 10;
+    return base + (hasReferenceImage ? 5 : 0) + (strictLabelMode ? 10 : 0);
+  }
+
+  const estimateTokenCost = useCallback(
+    (hasReferenceImage: boolean, strictLabelMode: boolean) => {
+      const base = contentResolution === "4K" ? 35 : contentResolution === "2K" ? 20 : 10;
+      return base + (hasReferenceImage ? 5 : 0) + (strictLabelMode ? 10 : 0);
+    },
+    [contentResolution],
+  );
+
   const saveProfileSettings = async (
     overrides?: Partial<{
       brandProfileMode: "undecided" | "guided" | "skip";
       brandInstagramUrl: string;
+      brandWebsiteUrl: string;
+      brandProfileSource: "url" | "manual" | "skip";
       brandLockLevel: "strict" | "balanced" | "loose";
       brandTone: string;
       brandColors: string;
       brandDos: string;
       brandDonts: string;
+      breweryName: string;
+      brandReferenceImageUrls: string[];
     }>,
   ) => {
     setSavingProfile(true);
     setProfileSaveMessage("");
     try {
+      const refFromState = brandReferenceImageUrls
+        .split(/\r?\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 10);
+      const refUrls =
+        overrides?.brandReferenceImageUrls !== undefined
+          ? overrides.brandReferenceImageUrls.filter(Boolean).slice(0, 10)
+          : refFromState;
+
       const payload = {
         profileName,
-        breweryName,
+        breweryName: overrides?.breweryName ?? breweryName,
         profilePhone,
         emailNotifications,
         weeklySummary,
         brandProfileMode: overrides?.brandProfileMode ?? brandProfileMode,
         brandInstagramUrl: overrides?.brandInstagramUrl ?? brandInstagramUrl,
+        brandWebsiteUrl: overrides?.brandWebsiteUrl ?? "",
+        brandProfileSource: overrides?.brandProfileSource ?? "manual",
         brandLockLevel: overrides?.brandLockLevel ?? brandLockLevel,
         brandTone: overrides?.brandTone ?? brandTone,
         brandColors: overrides?.brandColors ?? brandColors,
         brandDos: overrides?.brandDos ?? brandDos,
         brandDonts: overrides?.brandDonts ?? brandDonts,
-        brandReferenceImageUrls: brandReferenceImageUrls
-          .split(/\r?\n|,/)
-          .map((item) => item.trim())
-          .filter(Boolean)
-          .slice(0, 10),
+        brandReferenceImageUrls: refUrls,
       };
       const res = await fetch("/api/dashboard/settings", {
         method: "PUT",
@@ -1819,6 +1829,18 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     } finally {
       setSavingProfile(false);
     }
+  };
+
+  const applyBrandScanAndPersist = async (suggestion: BrandScanSuggestion) => {
+    setBreweryName(suggestion.breweryName);
+    setBrandTone(suggestion.brandTone);
+    setBrandColors(suggestion.brandColors);
+    setBrandDos(suggestion.brandDos);
+    setBrandDonts(suggestion.brandDonts);
+    setBrandInstagramUrl(suggestion.brandInstagramUrl);
+    setBrandReferenceImageUrls(suggestion.referenceImageUrls.join("\n"));
+    setBrandProfileMode("guided");
+    setProfileSaveMessage("Markenprofil gespeichert und aktiviert.");
   };
 
   const deleteAccount = async () => {
@@ -1879,7 +1901,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     async (prompt: string, files?: File[]) => {
       if (!brandProfileComplete) {
         setContentGenerationError(
-          "Bitte zuerst in Einstellungen dein Markenprofil vervollstaendigen oder die Nutzung ohne Markenprofil auswaehlen.",
+          "Bitte unter Einstellungen im Abschnitt Markenprofil oben ein Profil anlegen oder die Nutzung ohne Markenprofil auswaehlen.",
         );
         return;
       }
@@ -1887,82 +1909,95 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       if (!finalPrompt) return;
       const normalizedPrompt = finalPrompt.toLowerCase();
       const hasReferenceImages = Boolean(files?.length);
+      const preset = contentCreationPreset;
       const mentionsWater = /(water|river|lake|ocean|sea|beach|shore|stream|coast)/i.test(normalizedPrompt);
       const mentionsBottleAndGlass = /(bottle|flasche)/i.test(normalizedPrompt) && /(glass|glas)/i.test(normalizedPrompt);
       const mentionsPouring = /(pour|pouring|einschenk|einschenken|stream|foam\s*head)/i.test(normalizedPrompt);
       const requestsBrandFidelity =
         /(label|etikett|logo|branding|brand|paulaner|hefeweizen|alkoholfrei|text on bottle|bottle text)/i.test(normalizedPrompt);
-      const requestsInImageText =
-        /(overlay text|headline|slogan|typography|text overlay|caption)/i.test(normalizedPrompt) ||
-        /['"][A-Z0-9\s!&'.-]{8,}['"]/.test(finalPrompt);
 
-      const realismGuardrails = [
-        "Render all people as hyper-realistic adults with true anatomy and natural proportions.",
-        "Skin realism is mandatory: visible pores, subtle blemishes, micro skin texture, natural under-eye detail, realistic lips and ears, no beauty-filter look.",
-        "Hands and faces must be artifact-free: no extra fingers, no fused fingers, no asymmetry glitches, no warped teeth or uncanny expressions.",
-        "Use physically plausible photography: coherent light direction, contact shadows, realistic reflections, natural dynamic range, no CGI/plastic rendering.",
-        "Keep the scene specific and non-generic with concrete environmental details and believable material textures.",
-      ];
+      const typeGuardrails: string[] = [];
+      const negativeConstraints: string[] = [];
 
-      if (mentionsWater) {
-        realismGuardrails.push(
-          "Water realism lock: physically correct ripples/reflections/refraction and depth layering; avoid flat, overly smooth, or synthetic water.",
+      if (preset === "product_cutout") {
+        typeGuardrails.push(
+          "Generate exactly one centered product cutout with full silhouette visible.",
+          "Background must be transparent alpha only; no visible scene, no floor, no gradient background.",
+          "No props, no people, no decorative objects, no typography overlays.",
+          "Keep object edges clean and production-ready: no halo, no fringing, no jagged extraction artifacts.",
+          "Preserve authentic branding and keep all visible label text crisp and readable.",
         );
-      }
-
-      if (mentionsBottleAndGlass && mentionsPouring) {
-        realismGuardrails.push(
-          "Liquid continuity lock: bottle level, poured volume, foam growth, and glass fill must be physically consistent throughout the scene.",
+        negativeConstraints.push(
+          "no background",
+          "no props",
+          "no people",
+          "no text overlays",
+          "no edge halos",
+          "no fringing",
+          "no distorted labels",
         );
+      } else if (preset === "product_studio") {
+        typeGuardrails.push(
+          "Create a controlled premium studio product hero visual with explicit key/fill/rim light behavior.",
+          "Hero product and label must be tack-sharp and dominant in composition.",
+          "Use an intentional studio backdrop with clean depth separation, not a random lifestyle environment.",
+          "Allow only curated brewery-related companion elements near the product (e.g. hops, barley, citrus), with strict clutter control.",
+          "No people in frame.",
+        );
+        negativeConstraints.push(
+          "no chaotic background",
+          "no random lifestyle environment",
+          "no people",
+          "no cluttered props",
+          "no gibberish label text",
+          "no warped typography",
+        );
+      } else {
+        typeGuardrails.push(
+          "Render all people as hyper-realistic adults with true anatomy and natural proportions.",
+          "Skin realism is mandatory: visible pores, subtle blemishes, micro skin texture, natural under-eye detail, realistic lips and ears, no beauty-filter look.",
+          "Hands and faces must be artifact-free: no extra fingers, no fused fingers, no asymmetry glitches, no warped teeth or uncanny expressions.",
+          "Use physically plausible photography: coherent light direction, contact shadows, realistic reflections, natural dynamic range, no CGI/plastic rendering.",
+          "Keep the scene specific and non-generic with concrete environmental details and believable material textures.",
+          "Strictly forbid illustration, cartoon, painting, stylized ai-art and 3D render aesthetics.",
+        );
+        negativeConstraints.push(
+          "no waxy/plastic skin",
+          "no uncanny facial proportions",
+          "no extra fingers, fused fingers, malformed hands, or duplicate limbs",
+          "no distorted teeth, warped lips, or asymmetrical eye glitches",
+          "no CGI/3D-render look",
+          "no cartoon/illustration style",
+        );
+        if (mentionsWater) {
+          typeGuardrails.push(
+            "Water realism lock: physically correct ripples/reflections/refraction and depth layering; avoid flat, overly smooth, or synthetic water.",
+          );
+          negativeConstraints.push("no flat artificial water texture", "no synthetic smooth water surface");
+        }
+        if (mentionsBottleAndGlass && mentionsPouring) {
+          typeGuardrails.push(
+            "Liquid continuity lock: bottle level, poured volume, foam growth, and glass fill must be physically consistent throughout the scene.",
+          );
+        }
       }
 
       if (hasReferenceImages || requestsBrandFidelity) {
-        realismGuardrails.push(
+        typeGuardrails.push(
           hasReferenceImages
             ? "Reference brand lock: use the uploaded reference as the primary anchor; reproduce brand identity 1:1 (logo, typography, colors, crest placement, label geometry) without redesign."
             : "Brand lock: reproduce authentic brand identity for any bottles or packaging shown (logo, typography, colors, crest placement, label geometry) without redesign.",
-        );
-        realismGuardrails.push(
           "Label text must be crisp and legible where visible. No gibberish text, no mirrored letters, no warped or melted typography, no fake substitute branding.",
-        );
-        realismGuardrails.push(
           "Bottle readability lock: keep at least one hero bottle fully in focus with tack-sharp label detail, no motion blur on the label area, and clear edge contrast around logo and text.",
         );
-        realismGuardrails.push(
-          "Composition priority: if depth of field is shallow, prioritize sharp focus on the branded bottle/label over background elements.",
-        );
+        negativeConstraints.push("no gibberish label text", "no mirrored text", "no melted or stretched typography", "no fake substitute branding");
       }
 
-      if (requestsInImageText) {
-        realismGuardrails.push(
-          "Do not render typography directly inside the image. Reserve clean negative space for post-production text overlay instead.",
-        );
-      }
-
-      const negativeConstraints: string[] = [
-        "no waxy/plastic skin",
-        "no uncanny facial proportions",
-        "no extra fingers, fused fingers, malformed hands, or duplicate limbs",
-        "no distorted teeth, warped lips, or asymmetrical eye glitches",
-        "no CGI/3D-render look",
-      ];
-      if (hasReferenceImages || requestsBrandFidelity) {
-        negativeConstraints.push(
-          "no gibberish label text",
-          "no mirrored text",
-          "no melted or stretched typography",
-          "no fake substitute branding",
-        );
-      }
-      if (mentionsWater) {
-        negativeConstraints.push("no flat artificial water texture", "no synthetic smooth water surface");
-      }
-
-      const finalPromptWithRealismLock = [
+      const finalPromptWithTypeLock = [
         finalPrompt,
         "",
         "Generation constraints:",
-        ...realismGuardrails.map((line) => `- ${line}`),
+        ...typeGuardrails.map((line) => `- ${line}`),
         "",
         `Negative prompt: ${negativeConstraints.join(", ")}.`,
       ].join("\n");
@@ -1970,12 +2005,13 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       setContentIsGenerating(true);
       setContentGenerationProgress(6);
       setContentGenerationError("");
+      setLastGenerationTokenSpend(null);
       setContentGeneratedPreviewUrls([]);
-      setContentDraftPrompt(finalPromptWithRealismLock);
 
       try {
+        const refCap = getPolicyForPreset(contentCreationPreset).upload.max;
         const referenceImageUrls = files?.length
-          ? await Promise.all(files.slice(0, 2).map((file) => fileToDataUrl(file)))
+          ? await Promise.all(files.slice(0, refCap).map((file) => fileToDataUrl(file)))
           : undefined;
 
         const perspectivePrompts = [
@@ -1989,17 +2025,21 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         const previews: string[] = [];
         const createdItems: MediaLibraryItem[] = [];
 
+        let consumedTotal = 0;
+        let consumedImageCount = 0;
+        let usedFreeTrial = false;
         for (let variantIdx = 0; variantIdx < contentVariantCount; variantIdx += 1) {
           setContentGenerationProgress((prev) => Math.max(prev, 8 + variantIdx * 18));
           const variantPrompt =
             contentUsePerspectiveSet && contentVariantCount > 1
-              ? `${finalPromptWithRealismLock}\n\n${identityContinuityLock}\n\n${perspectivePrompts[variantIdx % perspectivePrompts.length]}`
-              : finalPromptWithRealismLock;
+              ? `${finalPromptWithTypeLock}\n\n${identityContinuityLock}\n\n${perspectivePrompts[variantIdx % perspectivePrompts.length]}`
+              : finalPromptWithTypeLock;
 
           const createRes = await fetch("/api/kie/nano-banana/create-task", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              imageType: contentCreationPreset,
               prompt: variantPrompt,
               aspectRatio: contentAspectRatio,
               resolution: contentResolution,
@@ -2013,9 +2053,24 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
             taskId?: string;
             error?: string;
             usedModel?: string;
+            billing?: {
+              monthlyTokens?: number;
+              usedTokens?: number;
+              remainingTokens?: number;
+              consumed?: number;
+              freeTrial?: boolean;
+            };
           };
           if (!createRes.ok || !createData.taskId) {
             throw new Error(createData.error ?? "Kie Task konnte nicht erstellt werden.");
+          }
+          if (createData.billing) {
+            applyBillingUpdateFromGeneration(createData.billing);
+            if (typeof createData.billing.consumed === "number") {
+              consumedTotal += createData.billing.consumed;
+              consumedImageCount += 1;
+            }
+            if (createData.billing.freeTrial) usedFreeTrial = true;
           }
 
           const taskId = createData.taskId;
@@ -2076,6 +2131,17 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         }
 
         setContentGeneratedPreviewUrls(previews);
+        if (usedFreeTrial) {
+          setLastGenerationTokenSpend({ total: 0, imageCount: previews.length, source: "kie", freeTrial: true });
+        } else {
+          const strictLabelMode = hasReferenceImages || requestsBrandFidelity;
+          const fallbackTotal = estimateTokenCost(hasReferenceImages, strictLabelMode) * previews.length;
+          setLastGenerationTokenSpend({
+            total: consumedTotal > 0 ? consumedTotal : fallbackTotal,
+            imageCount: previews.length,
+            source: "kie",
+          });
+        }
         setContentGenerationProgress(100);
         setMediaItems((prev) => [...createdItems, ...prev.filter((entry) => !createdItems.some((it) => it.id === entry.id))].slice(0, 12));
         void Promise.all(
@@ -2098,7 +2164,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         setContentGenerationProgress(0);
       }
     },
-    [brandProfileComplete, contentAspectRatio, contentResolution, contentUsePerspectiveSet, contentVariantCount, refreshSummary],
+    [applyBillingUpdateFromGeneration, brandProfileComplete, contentAspectRatio, contentCreationPreset, contentResolution, contentUsePerspectiveSet, contentVariantCount, estimateTokenCost, refreshSummary],
   );
 
   const generateWithOpenAiImage2 = useCallback(
@@ -2119,13 +2185,15 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       subline?: string;
       cta?: string;
     }) => {
+      const refCap = getPolicyForPreset(contentCreationPreset).upload.max;
       const referenceImageUrls = files?.length
-        ? await Promise.all(files.slice(0, 2).map((file) => fileToDataUrl(file)))
+        ? await Promise.all(files.slice(0, refCap).map((file) => fileToDataUrl(file)))
         : undefined;
       const res = await fetch("/api/openai/image2/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          imageType: contentCreationPreset,
           prompt,
           aspectRatio: contentAspectRatio,
           resolution: contentResolution,
@@ -2144,9 +2212,19 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         imageUrl?: string;
         usedModel?: string;
         error?: string;
+        billing?: {
+          monthlyTokens?: number;
+          usedTokens?: number;
+          remainingTokens?: number;
+          consumed?: number;
+          freeTrial?: boolean;
+        };
       };
       if (!res.ok || !data.imageUrl) {
         throw new Error(data.error ?? "ChatGPT Image 2 Generierung fehlgeschlagen.");
+      }
+      if (data.billing) {
+        applyBillingUpdateFromGeneration(data.billing);
       }
       const id = data.generationId ?? `openai-${Date.now()}`;
       const preview = `/api/kie/download?url=${encodeURIComponent(data.imageUrl)}&format=png&taskId=${encodeURIComponent(id)}`;
@@ -2161,16 +2239,16 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         model: data.usedModel ?? "chatgpt-image-2",
         referenceImageUrl: referenceImageUrls?.[0],
       };
-      return { preview, createdItem };
+      return { preview, createdItem, billing: data.billing };
     },
-    [contentAspectRatio, contentResolution],
+    [applyBillingUpdateFromGeneration, contentAspectRatio, contentCreationPreset, contentResolution],
   );
 
   const generateContentWithOpenAiImage2 = useCallback(
     async (prompt: string, files?: File[]) => {
       if (!brandProfileComplete) {
         setContentGenerationError(
-          "Bitte zuerst in Einstellungen dein Markenprofil vervollstaendigen oder die Nutzung ohne Markenprofil auswaehlen.",
+          "Bitte unter Einstellungen im Abschnitt Markenprofil oben ein Profil anlegen oder die Nutzung ohne Markenprofil auswaehlen.",
         );
         return;
       }
@@ -2189,14 +2267,26 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       setContentIsGenerating(true);
       setContentGenerationProgress(10);
       setContentGenerationError("");
+      setLastGenerationTokenSpend(null);
       setContentGeneratedPreviewUrls([]);
-      setContentDraftPrompt(modelReadyPrompt);
       try {
-        const { preview, createdItem } = await generateWithOpenAiImage2({
+        const { preview, createdItem, billing } = await generateWithOpenAiImage2({
           prompt: modelReadyPrompt,
           files,
           strictLabelMode,
         });
+        if (billing?.freeTrial) {
+          setLastGenerationTokenSpend({ total: 0, imageCount: 1, source: "openai", freeTrial: true });
+        } else {
+          setLastGenerationTokenSpend({
+            total:
+              typeof billing?.consumed === "number"
+                ? billing.consumed
+                : estimateTokenCost(hasReferenceImages, strictLabelMode),
+            imageCount: 1,
+            source: "openai",
+          });
+        }
         setContentGenerationProgress(100);
         setContentGeneratedPreviewUrls([preview]);
         setMediaItems((prev) => [createdItem, ...prev.filter((entry) => entry.id !== createdItem.id)].slice(0, 12));
@@ -2217,37 +2307,57 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         setContentGenerationProgress(0);
       }
     },
-    [brandProfileComplete, contentCreationPreset, generateWithOpenAiImage2, refreshSummary],
+    [brandProfileComplete, contentCreationPreset, estimateTokenCost, generateWithOpenAiImage2, refreshSummary],
   );
 
   const generateCampaignWithOpenAiImage2 = useCallback(
-    async (scenePrompt: string, headline: string, subline: string, cta: string, files?: File[]) => {
-      if (!brandProfileComplete) {
+    async (
+      scenePrompt: string,
+      headline: string,
+      subline: string,
+      cta: string,
+      files?: File[],
+      opts?: { imageLedFromReferences?: boolean },
+    ) => {
+      if (!campaignBrandOk) {
         setContentGenerationError(
-          "Bitte zuerst in Einstellungen dein Markenprofil vervollstaendigen oder die Nutzung ohne Markenprofil auswaehlen.",
+          "Kampagnenbild mit Text ist nur mit angelegtem Markenprofil moeglich (Einstellungen, nicht „ohne Markenprofil“).",
         );
         return;
       }
       const scene = scenePrompt.trim();
       if (!scene) return;
-      const campaignPrompt = applyContentPresetPrompt(buildCampaignCreativePrompt(scene, headline, subline, cta), "campaign_social");
+      const imageLed = Boolean(opts?.imageLedFromReferences);
+      const campaignPrompt = imageLed
+        ? applyContentPresetPrompt(buildCampaignCreativeFromReferencesPrompt(scene), "campaign_social")
+        : applyContentPresetPrompt(buildCampaignCreativePrompt(scene, headline, subline, cta), "campaign_social");
 
       setContentIsGenerating(true);
       setContentGenerationProgress(8);
       setContentGenerationError("");
+      setLastGenerationTokenSpend(null);
       setContentGeneratedPreviewUrls([]);
-      setContentDraftPrompt(campaignPrompt);
 
       try {
-        const { preview, createdItem } = await generateWithOpenAiImage2({
+        const { preview, createdItem, billing } = await generateWithOpenAiImage2({
           prompt: campaignPrompt,
           files,
           strictLabelMode: true,
           campaignMode: true,
-          headline,
-          subline,
-          cta,
+          headline: imageLed ? "" : headline,
+          subline: imageLed ? "" : subline,
+          cta: imageLed ? "" : cta,
         });
+        const hasReferenceImages = Boolean(files?.length);
+        if (billing?.freeTrial) {
+          setLastGenerationTokenSpend({ total: 0, imageCount: 1, source: "openai", freeTrial: true });
+        } else {
+          setLastGenerationTokenSpend({
+            total: typeof billing?.consumed === "number" ? billing.consumed : estimateTokenCost(hasReferenceImages, true),
+            imageCount: 1,
+            source: "openai",
+          });
+        }
         setContentGenerationProgress(100);
         setContentGeneratedPreviewUrls([preview]);
         setMediaItems((prev) => [createdItem, ...prev.filter((entry) => entry.id !== createdItem.id)].slice(0, 12));
@@ -2268,32 +2378,43 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         setContentGenerationProgress(0);
       }
     },
-    [brandProfileComplete, generateWithOpenAiImage2, refreshSummary],
+    [campaignBrandOk, estimateTokenCost, generateWithOpenAiImage2, refreshSummary],
   );
 
   const generateCampaignWithKie = useCallback(
-    async (scenePrompt: string, headline: string, subline: string, cta: string, files?: File[]) => {
-      if (!brandProfileComplete) {
+    async (
+      scenePrompt: string,
+      headline: string,
+      subline: string,
+      cta: string,
+      files?: File[],
+      opts?: { imageLedFromReferences?: boolean },
+    ) => {
+      if (!campaignBrandOk) {
         setContentGenerationError(
-          "Bitte zuerst in Einstellungen dein Markenprofil vervollstaendigen oder die Nutzung ohne Markenprofil auswaehlen.",
+          "Kampagnenbild mit Text ist nur mit angelegtem Markenprofil moeglich (Einstellungen, nicht „ohne Markenprofil“).",
         );
         return;
       }
       const scene = scenePrompt.trim();
       if (!scene) return;
 
-      const campaignPrompt = buildCampaignCreativePrompt(scene, headline, subline, cta);
+      const imageLed = Boolean(opts?.imageLedFromReferences);
+      const campaignPrompt = imageLed
+        ? applyContentPresetPrompt(buildCampaignCreativeFromReferencesPrompt(scene), "campaign_social")
+        : buildCampaignCreativePrompt(scene, headline, subline, cta);
 
       setContentIsGenerating(true);
       setContentGenerationProgress(8);
       setContentGenerationError("");
+      setLastGenerationTokenSpend(null);
       setContentGeneratedPreviewUrls([]);
-      setContentDraftPrompt(campaignPrompt);
 
       try {
+        const refCap = getPolicyForPreset(contentCreationPreset).upload.max;
         const referenceImageUrls =
           files?.length && files.length > 0
-            ? await Promise.all(files.slice(0, 2).map((file) => fileToDataUrl(file)))
+            ? await Promise.all(files.slice(0, refCap).map((file) => fileToDataUrl(file)))
             : undefined;
 
         setContentGenerationProgress(18);
@@ -2301,6 +2422,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            imageType: contentCreationPreset,
             prompt: campaignPrompt,
             aspectRatio: contentAspectRatio,
             resolution: contentResolution,
@@ -2310,9 +2432,23 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           }),
         });
 
-        const createData = (await createRes.json()) as { taskId?: string; error?: string; usedModel?: string };
+        const createData = (await createRes.json()) as {
+          taskId?: string;
+          error?: string;
+          usedModel?: string;
+          billing?: {
+            monthlyTokens?: number;
+            usedTokens?: number;
+            remainingTokens?: number;
+            consumed?: number;
+            freeTrial?: boolean;
+          };
+        };
         if (!createRes.ok || !createData.taskId) {
           throw new Error(createData.error ?? "Kie Task konnte nicht erstellt werden.");
+        }
+        if (createData.billing) {
+          applyBillingUpdateFromGeneration(createData.billing);
         }
 
         const taskId = createData.taskId;
@@ -2361,7 +2497,10 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         const createdItem: MediaLibraryItem = {
           id: taskId,
           imageUrl,
-          prompt: [`[Kampagnenbild] ${headline}`, scene.slice(0, 180)].filter(Boolean).join(" — ").slice(0, 240),
+          prompt: [`[Instagram-Kampagne] ${headline.trim() || "Text aus Referenz + Marke"}`, scene.slice(0, 180)]
+            .filter(Boolean)
+            .join(" — ")
+            .slice(0, 240),
           createdAt: new Date().toISOString(),
           aspectRatio: contentAspectRatio,
           resolution: contentResolution,
@@ -2373,6 +2512,18 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         };
 
         setContentGeneratedPreviewUrls([preview]);
+        if (createData.billing?.freeTrial) {
+          setLastGenerationTokenSpend({ total: 0, imageCount: 1, source: "kie", freeTrial: true });
+        } else {
+          setLastGenerationTokenSpend({
+            total:
+              typeof createData.billing?.consumed === "number"
+                ? createData.billing.consumed
+                : estimateTokenCost(Boolean(referenceImageUrls?.length), true),
+            imageCount: 1,
+            source: "kie",
+          });
+        }
         setContentGenerationProgress(100);
         setMediaItems((prev) => [createdItem, ...prev.filter((entry) => entry.id !== createdItem.id)].slice(0, 12));
 
@@ -2393,7 +2544,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         setContentGenerationProgress(0);
       }
     },
-    [brandProfileComplete, contentAspectRatio, contentResolution, refreshSummary],
+    [applyBillingUpdateFromGeneration, campaignBrandOk, contentAspectRatio, contentCreationPreset, contentResolution, estimateTokenCost, refreshSummary],
   );
 
   const inviteTeamMember = async () => {
@@ -2603,7 +2754,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
     if (selectedTab === "Inhalte erstellen") {
       return (
-        <section className="relative min-h-[calc(100vh-5.5rem)] overflow-hidden bg-transparent">
+        <section className="relative min-h-[calc(100vh-5.5rem)] overflow-x-hidden bg-transparent pb-[env(safe-area-inset-bottom)]">
           {contentIsGenerating ? (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#070b13]/70 backdrop-blur-[2px]">
               <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#111827]/90 p-5 shadow-2xl">
@@ -2625,15 +2776,10 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           ) : null}
           <div
             data-onboarding="content-workflow"
-            className={cn(
-              "relative z-0 mx-auto flex min-h-[calc(100dvh-4.75rem)] max-w-5xl flex-col items-center justify-start px-4 pt-0 text-center sm:min-h-[calc(100vh-5.5rem)] sm:px-10 sm:pt-4",
-              contentImageMode === "campaign" && contentGeneratedPreviewUrls.length === 0
-                ? "pb-[min(42rem,78vh)] sm:pb-[min(40rem,72vh)] sm:justify-start"
-                : "pb-32 sm:justify-center sm:pb-36",
-            )}
+            className="relative z-0 mx-auto flex min-h-0 max-w-5xl flex-col items-center justify-center px-4 pb-4 pt-1 text-center sm:min-h-[calc(100vh-5.5rem)] sm:justify-center sm:px-6 sm:pb-[min(22rem,40vh)] sm:pt-4"
           >
               {contentGeneratedPreviewUrls.length > 0 ? (
-                <div data-onboarding="content-result" className="mb-6 w-full max-w-5xl rounded-2xl border border-white/15 bg-black/20 p-3 shadow-[0_18px_44px_-28px_rgba(0,0,0,0.85)]">
+                <div data-onboarding="content-result" className="mb-3 w-full max-w-5xl rounded-2xl border border-white/15 bg-black/20 p-3 shadow-[0_18px_44px_-28px_rgba(0,0,0,0.85)]">
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {contentGeneratedPreviewUrls.map((url, idx) => (
                       <div key={url} className="overflow-hidden rounded-xl border border-white/10 bg-[#111827]/80">
@@ -2652,21 +2798,15 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                       </div>
                     ))}
                   </div>
-                  <div className="mt-3 border-t border-white/10 px-1 pt-3 text-left">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#c8ff26]">Prompt-Status</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-zinc-300">
-                      Prompt wird intern verarbeitet und ist für Nutzer nicht sichtbar.
-                    </p>
-                  </div>
                 </div>
               ) : null}
               {contentGeneratedPreviewUrls.length === 0 ? (
                 <>
-                  <div className="-mt-16 mb-5 flex -space-x-3 sm:-mt-24">
+                  <div className="mt-1 mb-3 flex -space-x-3 sm:mt-1">
                     {["/public/ki-real-1.png", "/public/ki-real-2.png", "/public/ki-real-3.png"].map((src, i) => (
                       <div
                         key={src}
-                        className={`h-20 w-20 overflow-hidden rounded-xl border border-white/20 shadow-[0_12px_28px_-18px_rgba(70,120,255,0.9)] sm:h-24 sm:w-24 ${
+                        className={`h-24 w-24 overflow-hidden rounded-xl border border-white/20 shadow-[0_12px_28px_-18px_rgba(70,120,255,0.9)] sm:h-28 sm:w-28 ${
                           i === 1 ? "translate-y-1 rotate-0" : i === 0 ? "-rotate-12" : "rotate-12"
                         }`}
                       >
@@ -2674,132 +2814,83 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                       </div>
                     ))}
                   </div>
-                  <h2 className="text-3xl font-extrabold uppercase tracking-tight text-white sm:text-4xl">
+                  <h2 className="text-2xl font-extrabold uppercase tracking-tight text-white sm:text-3xl">
                     Inhalte erstellen mit
-                    <span className="mt-1 block text-white">deinem KI-Studio.</span>
+                    <span className="mt-0.5 block text-white">deinem KI-Studio.</span>
                   </h2>
-                  <p className="mt-3 max-w-xl text-sm text-zinc-300 sm:text-base">
-                    {contentImageMode === "campaign"
-                      ? "Szene und Stimmung unten beschreiben, Text im Bild über die Felder im Panel steuern."
-                      : `${selectedContentPreset.title}: Beschreibe Szene, Stimmung und Stil - wir generieren daraus starke Motive für deine Brauerei.`}
+                  <p className="mt-2 max-w-xl text-sm leading-snug text-zinc-300 sm:text-base">
+                    Wähle den Bildtyp im Composer, hänge bei Bedarf Referenzen an und beschreibe kurz Szene oder Stimmung — die KI erzeugt daraus fertige Motive für Social und Kampagnen (inkl. Text im Bild beim Typ „Kampagnenbild mit Text“).
                   </p>
                 </>
               ) : null}
             </div>
           <div
             data-onboarding="content-brief"
-            className="absolute right-4 bottom-6 left-4 z-20 mx-auto w-auto max-w-5xl sm:right-6 sm:left-6"
+            className={cn(
+              "z-20 mx-auto w-auto max-w-5xl",
+              contentGeneratedPreviewUrls.length > 0
+                ? "relative mt-2 px-4 sm:px-5"
+                : "relative mt-1 px-4 pb-20 sm:absolute sm:right-5 sm:bottom-24 sm:left-5 sm:mt-0 sm:px-0 sm:pb-0",
+            )}
           >
             {!brandProfileComplete ? (
               <p className="mb-2 rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                Bitte zuerst in <strong>Einstellungen</strong> dein Markenprofil vervollstaendigen oder die Nutzung ohne Markenprofil aktivieren.
+                Bitte unter <strong>Einstellungen</strong> im Abschnitt <strong>Markenprofil</strong> oben ein Profil anlegen oder die Nutzung ohne Markenprofil aktivieren.
               </p>
             ) : null}
-            <div className="mb-3 max-h-[min(70vh,32rem)] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#070b13]/95 p-3 text-left shadow-[0_12px_32px_-24px_rgba(0,0,0,0.85)] backdrop-blur-md sm:max-h-none sm:overflow-visible">
-              <p className="text-xs text-zinc-400">Bildstil über den Auswahl-Button neben dem Format wählen.</p>
-              <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-                Aktiv: <span className="font-semibold text-zinc-300">{selectedContentPreset.title}</span>
-              </p>
-              {contentImageMode === "campaign" ? (
-                <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-                  Szene im grossen Feld beschreiben. Headline, Subline und CTA sind optional.
-                </p>
-              ) : null}
-              {contentImageMode === "campaign" ? (
-                <div className="mt-3 grid gap-2 border-t border-white/10 pt-3 sm:grid-cols-3">
-                  <label className="sm:col-span-3">
-                    <span className="mb-1 block text-xs font-medium text-[#c8ff26]">Headline (optional)</span>
-                    <input
-                      type="text"
-                      value={contentCampaignHeadline}
-                      onChange={(e) => setContentCampaignHeadline(e.target.value)}
-                      placeholder="z. B. Fruehlings-Anstich am Samstag"
-                      className="w-full rounded-lg border border-white/15 bg-[#0d1119] px-3 py-2 text-sm text-white placeholder:text-zinc-600"
-                      disabled={!brandProfileComplete}
-                    />
-                  </label>
-                  <label className="sm:col-span-1">
-                    <span className="mb-1 block text-xs font-medium text-zinc-300">Subline (optional)</span>
-                    <input
-                      type="text"
-                      value={contentCampaignSubline}
-                      onChange={(e) => setContentCampaignSubline(e.target.value)}
-                      placeholder="Kurzer Nutzen oder Datum"
-                      className="w-full rounded-lg border border-white/15 bg-[#0d1119] px-3 py-2 text-sm text-white placeholder:text-zinc-600"
-                      disabled={!brandProfileComplete}
-                    />
-                  </label>
-                  <label className="sm:col-span-2">
-                    <span className="mb-1 block text-xs font-medium text-zinc-300">CTA (optional)</span>
-                    <input
-                      type="text"
-                      value={contentCampaignCta}
-                      onChange={(e) => setContentCampaignCta(e.target.value)}
-                      placeholder="z. B. Jetzt Tisch reservieren"
-                      className="w-full rounded-lg border border-white/15 bg-[#0d1119] px-3 py-2 text-sm text-white placeholder:text-zinc-600"
-                      disabled={!brandProfileComplete}
-                    />
-                  </label>
-                  <p className="sm:col-span-3 text-[11px] leading-snug text-zinc-500">
-                    Plattform ist fuer Kampagnenbilder fest auf <strong className="text-zinc-400">Instagram Post</strong> gesetzt.
-                  </p>
-                </div>
-              ) : null}
-            </div>
+            <p className="mb-2 text-left text-xs leading-snug text-zinc-500 sm:text-center">
+              Konkrete Stichworte zu Licht, Getränk und Stimmung verbessern das Ergebnis. Referenzbilder dort nutzen, wo der gewählte Bildtyp sie unterstützt.
+            </p>
             <PromptInputBox
               key={hybridCurrentQuestion ? "content-follow-up" : "content-typing"}
               value={contentDraftPrompt}
               onValueChange={setContentDraftPrompt}
+              onFilesChange={setContentComposerFiles}
+              maxReferenceImages={getPolicyForPreset(contentCreationPreset).upload.max}
               aspectRatio={contentAspectRatio}
               onAspectRatioChange={setContentAspectRatio}
               resolution={contentResolution}
               onResolutionChange={setContentResolution}
+              sendButtonText={generateButtonText}
+              variantCount={contentImageMode === "standard" && contentCreationPreset !== "product_cutout" ? contentVariantCount : undefined}
+              onVariantCountChange={contentImageMode === "standard" && contentCreationPreset !== "product_cutout" ? setContentVariantCount : undefined}
+              usePerspectiveSet={contentImageMode === "standard" && contentCreationPreset !== "product_cutout" ? contentUsePerspectiveSet : undefined}
+              onUsePerspectiveSetChange={
+                contentImageMode === "standard" && contentCreationPreset !== "product_cutout"
+                  ? setContentUsePerspectiveSet
+                  : undefined
+              }
               presetButtonLabel={selectedContentPreset.title}
               onPresetButtonClick={() => setContentPresetPickerOpen(true)}
               placeholder={
-                hybridCurrentQuestion ? "Kurz und konkret antworten..." : " "
+                hybridCurrentQuestion
+                  ? "Bitte eine Option unten auswählen..."
+                  : contentCreationPreset === "product_cutout"
+                    ? "Kein Prompt nötig - Produktbild hochladen und generieren."
+                    : contentImageMode === "campaign"
+                      ? "Optional: Zusätzliche Stimmung — leer lassen reicht mit Referenzbild(ern)."
+                      : " "
               }
               enableTypingPlaceholder={!hybridCurrentQuestion}
-              typingPhrases={
-                contentImageMode === "campaign"
-                  ? [
-                      "Biergarten-Szene, Headline: Wochenende startet hier, CTA: Tisch sichern.",
-                      "Helles im Willibecher, Headline: Frisch gezapft, Subline: Nur bis Sonntag.",
-                      "Abendstimmung am Wasser, Headline: Prost zur neuen Saison, CTA: Link in Bio.",
-                    ]
-                  : contentCreationPreset === "product_cutout"
-                    ? [
-                        "Freigestelltes Produktbild einer Dose, transparent, saubere Kontur, frontale Perspektive.",
-                        "Flasche ohne Hintergrund als Shop-Packshot, Label gestochen scharf, neutral.",
-                        "Einzelnes Glas freigestellt auf transparentem Alpha, keine Deko, keine Szene.",
-                      ]
-                    : contentCreationPreset === "product_studio"
-                      ? [
-                          "Premium-Studiobild einer Dose auf neutralem Hintergrund, softes Hero-Licht, klare Reflexe.",
-                          "Flasche im kontrollierten Studio-Setup, sauberer Schatten, eCommerce-ready.",
-                          "Produkt-Studioaufnahme mit ruhigem Hintergrund und hoher Label-Lesbarkeit.",
-                        ]
-                  : [
-                      "Helles im Willibecher auf Holztisch, warmes Abendlicht, echte Biergarten-Stimmung.",
-                      "Pils im schlanken Pilstulpen-Glas, klare Lichtkante, kuehler Premium-Werbe-Look.",
-                      "Weizenbier im hohen Weizenglas mit dichter Schaumkrone, sommerliche Abendsonne.",
-                    ]
-              }
+              typingPhrases={getFlowTypingPhrases(contentCreationPreset, contentImageMode)}
               className="border-white/10 bg-[#131926]/80"
               isLoading={contentIsGenerating || hybridIsLoading}
               disabled={!brandProfileComplete}
               clearOnSend={false}
+              onValidationError={setContentValidationError}
               onSend={(message, files) => {
                 void submitContentFlowInput(message, files);
               }}
             />
             {contentPresetPickerOpen ? (
-              <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-3 py-6 backdrop-blur-sm">
-                <div className="w-full max-w-5xl rounded-3xl border border-white/15 bg-[#0a0f16] p-4 shadow-[0_35px_90px_-40px_rgba(0,0,0,0.9)] sm:p-6">
-                  <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/70 px-2 py-2 backdrop-blur-sm sm:items-center sm:px-3 sm:py-4">
+                <div className="w-full max-w-5xl rounded-2xl border border-white/15 bg-[#0a0f16] p-3 shadow-[0_35px_90px_-40px_rgba(0,0,0,0.9)] sm:rounded-3xl sm:p-4">
+                  <div className="mb-2 flex items-start justify-between gap-2 sm:mb-3">
                     <div>
-                      <p className="text-2xl font-extrabold uppercase tracking-tight text-white sm:text-3xl">Bildtyp auswählen</p>
-                      <p className="mt-1 text-sm text-zinc-400">Wähle das Format, danach wird der Prompt passend aufgebaut.</p>
+                      <p className="text-xl font-extrabold uppercase tracking-tight text-white sm:text-3xl">Bildtyp auswählen</p>
+                      <p className="mt-1 text-xs text-zinc-400 sm:text-sm">
+                        Wähle den Stil. Wir bauen den Prompt danach automatisch passend auf.
+                      </p>
                     </div>
                     <button
                       type="button"
@@ -2810,81 +2901,97 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                       ×
                     </button>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="max-h-[min(78vh,40rem)] overflow-y-auto overscroll-contain pb-2 pr-1 sm:max-h-[85vh] sm:pb-1 sm:pr-0">
+                    <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-4">
                     {CONTENT_CREATION_PRESETS.map((preset) => {
                       const active = preset.id === contentCreationPreset;
+                      const campaignLocked = preset.id === "campaign_social" && !campaignBrandOk;
+                      const previewTall = preset.id === "campaign_social";
                       return (
                         <button
                           key={preset.id}
                           type="button"
+                          title={
+                            campaignLocked
+                              ? "Nur mit Markenprofil (Einstellungen, nicht ohne Profil)"
+                              : undefined
+                          }
                           onClick={() => {
+                            if (campaignLocked) return;
                             setContentCreationPreset(preset.id);
                             setContentPresetPickerOpen(false);
                           }}
                           className={cn(
-                            "rounded-2xl border p-3 text-left transition",
+                            "rounded-xl border p-2.5 text-left transition sm:rounded-2xl sm:p-3",
                             active
                               ? "border-[#c8ff26]/50 bg-[#c8ff26]/12"
                               : "border-white/10 bg-black/25 hover:bg-white/10",
+                            campaignLocked && "cursor-not-allowed opacity-45 hover:bg-black/25",
                           )}
                         >
-                          <div className="mb-3 aspect-[4/3] w-full overflow-hidden rounded-xl border border-white/10 bg-[#0f172a] p-1">
-                            <img src={preset.previewSrc} alt={preset.title} className="h-full w-full object-contain" />
+                          <div
+                            className={cn(
+                              "mb-2 flex w-full items-center justify-center rounded-lg border border-white/10 bg-[#0f172a] p-2 sm:mb-3 sm:rounded-xl",
+                              previewTall ? "min-h-[13rem] sm:min-h-[15rem]" : "min-h-[9.5rem] sm:min-h-[10.5rem]",
+                            )}
+                          >
+                            <img
+                              src={preset.previewSrc}
+                              alt={preset.title}
+                              className={cn(
+                                "w-full object-contain object-center",
+                                previewTall ? "max-h-[min(52vh,15.5rem)] sm:max-h-[17rem]" : "max-h-[min(28vh,10.5rem)] sm:max-h-[11rem]",
+                              )}
+                            />
                           </div>
-                          <p className={cn("text-sm font-semibold", active ? "text-[#d7ff6f]" : "text-zinc-100")}>{preset.title}</p>
-                          <p className="mt-1 text-xs leading-relaxed text-zinc-400">{preset.description}</p>
+                          <p className={cn("text-sm font-semibold leading-tight", active ? "text-[#d7ff6f]" : "text-zinc-100")}>
+                            {preset.title}
+                          </p>
+                          <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-400 sm:text-xs">
+                            {preset.description}
+                          </p>
                         </button>
                       );
                     })}
+                    </div>
                   </div>
                 </div>
               </div>
             ) : null}
-            {hybridCurrentQuestion && contentImageMode === "standard" ? (
-              <div className="mt-2 rounded-lg border border-[#c8ff26]/35 bg-[#c8ff26]/10 px-3 py-2 text-xs text-[#e8ff9a]">
+            {hybridCurrentQuestion ? (
+              <div className="mt-1.5 rounded-lg border border-[#c8ff26]/35 bg-[#c8ff26]/10 px-3 py-2 text-xs text-[#e8ff9a]">
                 <p className="font-semibold uppercase tracking-wide">Rueckfrage</p>
                 <p className="mt-1 text-sm normal-case text-zinc-100">{hybridCurrentQuestion}</p>
+                {hybridCurrentOptions.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {hybridCurrentOptions.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => {
+                          setContentDraftPrompt(option);
+                          void submitContentFlowInput(option, contentPendingFiles);
+                        }}
+                        className="rounded-full border border-[#c8ff26]/45 bg-[#1a2b07] px-3 py-1.5 text-xs font-medium text-[#eaffb4] transition hover:bg-[#243d0a]"
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
-            {contentImageMode === "standard" && contentCreationPreset !== "product_cutout" ? (
-            <div data-onboarding="content-preflight" className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-300">
-              <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1">Varianten:</span>
-              {[1, 2, 3].map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  onClick={() => setContentVariantCount(count as 1 | 2 | 3)}
-                  className={cn(
-                    "min-h-8 rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                    contentVariantCount === count
-                      ? "border-[#c8ff26]/40 bg-[#c8ff26]/15 text-[#c8ff26]"
-                      : "border-white/10 bg-black/20 text-zinc-300 hover:bg-white/10",
-                  )}
-                >
-                  {count} Bild{count > 1 ? "er" : ""}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setContentUsePerspectiveSet((prev) => !prev)}
-                className={cn(
-                  "min-h-8 rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                  contentUsePerspectiveSet
-                    ? "border-[#c8ff26]/40 bg-[#c8ff26]/15 text-[#c8ff26]"
-                    : "border-white/10 bg-black/20 text-zinc-300 hover:bg-white/10",
-                )}
-              >
-                Perspektiven variieren
-              </button>
-            </div>
-            ) : (
-              <p className="mt-2 text-xs text-zinc-500">
-                Kampagnenbilder laufen einzeln über ChatGPT Image 2 (bei Bedarf mit Referenzbild/Label-Lock).
+            {lastGenerationTokenSpend ? (
+              <p className="mt-1.5 text-xs text-[#c8ff26]">
+                {lastGenerationTokenSpend.freeTrial
+                  ? `Letzte Generierung (${lastGenerationTokenSpend.source === "kie" ? "KIE" : "GPT Image 2"}): Gratisbild genutzt (0 Tokens).`
+                  : `Letzte Generierung (${lastGenerationTokenSpend.source === "kie" ? "KIE" : "GPT Image 2"}): ${lastGenerationTokenSpend.total} Tokens für ${lastGenerationTokenSpend.imageCount} Bild${lastGenerationTokenSpend.imageCount > 1 ? "er" : ""} verbraucht.`}
               </p>
-            )}
-            {contentGenerationError ? (
-              <p className="mt-2 text-sm text-red-300">{contentGenerationError}</p>
             ) : null}
+            {contentGenerationError ? (
+              <p className="mt-1.5 text-sm text-red-300">{contentGenerationError}</p>
+            ) : null}
+            {contentValidationError ? <p className="mt-1 text-sm text-red-300">{contentValidationError}</p> : null}
             {hybridError ? <p className="mt-1 text-sm text-red-300">{hybridError}</p> : null}
           </div>
         </section>
@@ -3172,15 +3279,39 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
     }
 
     if (selectedTab === "Einstellungen") {
+      const markenprofilButtonLabel =
+        brandProfileMode === "guided" && brandProfileComplete ? "Markenprofil bearbeiten" : "Markenprofil erstellen";
       return (
-        <section data-onboarding="settings-overview" className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <>
+          <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Markenprofil</h2>
+                <p className="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-300">
+                  {brandProfileMode === "skip"
+                    ? "Du nutzt EvGlab ohne Markenprofil. Ueber den Button kannst du jederzeit ein Profil aus fuenf Instagram-Post-Screenshots anlegen — die KI uebernimmt Tonality, Farben und Regeln fuer Texte auf Bildern."
+                    : brandProfileComplete
+                      ? "Dein Markenprofil ist aktiv. Zum Anpassen erneut fuenf aktuelle Instagram-Posts hochladen und auswerten lassen."
+                      : "Lege dein Markenprofil fest: fuenf Screenshots deiner Instagram-Posts, dann wertet die KI Stil und Vorgaben aus."}
+                </p>
+              </div>
+              <button
+                type="button"
+                data-onboarding="settings-brand-profile"
+                onClick={() => {
+                  setBrandProfileSetupOpen(true);
+                }}
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#c65a20] px-5 text-sm font-semibold text-white transition hover:bg-[#b14f1c]"
+              >
+                {markenprofilButtonLabel}
+              </button>
+            </div>
+          </section>
+          <section data-onboarding="settings-overview" className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Profil-Einstellungen</h2>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              Markenprofil-Status:{" "}
-              <span className={brandProfileComplete ? "font-semibold text-emerald-600 dark:text-emerald-400" : "font-semibold text-amber-600 dark:text-amber-400"}>
-                {brandProfileMode === "skip" ? "deaktiviert" : brandProfileComplete ? "vollstaendig" : "unvollstaendig"}
-              </span>
+              Kontaktdaten und Benachrichtigungen — Markenprofil legst du im Abschnitt darueber fest.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -3190,7 +3321,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 value={profileName}
                 onChange={(e) => setProfileName(e.target.value)}
                 className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-gray-900 focus:border-[#c65a20] focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                placeholder="z. B. Max Mustermann"
+                placeholder="z. B. Anna Schmidt"
               />
             </label>
             <label className="space-y-1 text-sm">
@@ -3199,7 +3330,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 value={breweryName}
                 onChange={(e) => setBreweryName(e.target.value)}
                 className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-gray-900 focus:border-[#c65a20] focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                placeholder="z. B. Brauerei Adler"
+                placeholder="z. B. Meine Marke"
               />
             </label>
             <label className="space-y-1 text-sm">
@@ -3241,15 +3372,27 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
             </label>
           </div>
           <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-950">
-            <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Markenprofil für KI-Generierung</h3>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleChooseBrandProfileGuided}
-                className="inline-flex h-9 items-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+            <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Markenprofil &amp; KI</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Markenstil und Referenzbilder kommen aus dem Abschnitt{" "}
+              <strong>Markenprofil</strong> oben (Instagram-Posts). Hier kannst du die Nutzung ohne Markenprofil
+              freischalten, falls du nur schnell testen willst.
+            </p>
+            <label className="mt-3 block max-w-md space-y-1 text-sm">
+              <span className="text-gray-700 dark:text-gray-300">Brand-Lock (nur mit aktivem Markenprofil)</span>
+              <select
+                value={brandLockLevel}
+                onChange={(e) => setBrandLockLevel(e.target.value as "strict" | "balanced" | "loose")}
+                disabled={brandProfileMode === "skip"}
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-gray-900 focus:border-[#c65a20] focus:outline-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                aria-label="Brand-Lock Stufe"
               >
-                Gefuehrt anlegen
-              </button>
+                <option value="strict">Strict — maximale Markentreue</option>
+                <option value="balanced">Balanced — Markentreue mit Spielraum</option>
+                <option value="loose">Loose — nur Stilrichtung</option>
+              </select>
+            </label>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handleSkipBrandProfile}
@@ -3259,85 +3402,10 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
               </button>
             </div>
             {brandProfileMode === "skip" ? (
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                KI-Bildgenerierung ist aktuell ohne Markenprofil freigegeben. Du kannst jederzeit zur gefuehrten Einrichtung wechseln.
+              <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                KI-Bildgenerierung laeuft ohne Markenbindung. Zum Aktivieren oben &quot;Markenprofil erstellen&quot; waehlen.
               </p>
             ) : null}
-            <div className={cn("grid grid-cols-1 gap-4 md:grid-cols-2", brandProfileMode === "skip" ? "opacity-60" : "")}>
-              <label className="space-y-1 text-sm md:col-span-2">
-                <span className="text-gray-700 dark:text-gray-300">Instagram-Profil der Marke</span>
-                <input
-                  value={brandInstagramUrl}
-                  onChange={(e) => setBrandInstagramUrl(e.target.value)}
-                  disabled={brandProfileMode === "skip"}
-                  className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-gray-900 focus:border-[#c65a20] focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  placeholder="https://instagram.com/deinemarke"
-                />
-              </label>
-              <label className="space-y-1 text-sm md:col-span-2">
-                <span className="text-gray-700 dark:text-gray-300">Brand-Lock</span>
-                <select
-                  value={brandLockLevel}
-                  onChange={(e) => setBrandLockLevel(e.target.value as "strict" | "balanced" | "loose")}
-                  disabled={brandProfileMode === "skip"}
-                  className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-gray-900 focus:border-[#c65a20] focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option value="strict">Strict - maximale Markentreue</option>
-                  <option value="balanced">Balanced - Markentreue mit Spielraum</option>
-                  <option value="loose">Loose - nur Stilrichtung</option>
-                </select>
-              </label>
-              <label className="space-y-1 text-sm md:col-span-2">
-                <span className="text-gray-700 dark:text-gray-300">Brand-Beschreibung</span>
-                <input
-                  value={brandTone}
-                  onChange={(e) => setBrandTone(e.target.value)}
-                  disabled={brandProfileMode === "skip"}
-                  className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-gray-900 focus:border-[#c65a20] focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  placeholder="z. B. klassische deutsche Premium-Biermarke mit traditioneller Etikettensprache"
-                />
-              </label>
-              <label className="space-y-1 text-sm md:col-span-2">
-                <span className="text-gray-700 dark:text-gray-300">Visuelle DNA (Farben, Bildsprache, Materialitaet)</span>
-                <input
-                  value={brandColors}
-                  onChange={(e) => setBrandColors(e.target.value)}
-                  disabled={brandProfileMode === "skip"}
-                  className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-gray-900 focus:border-[#c65a20] focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  placeholder="z. B. dunkles Grün, Kupfer, matte Etiketten, rustikale Holztextur"
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                <span className="text-gray-700 dark:text-gray-300">Dos</span>
-                <textarea
-                  value={brandDos}
-                  onChange={(e) => setBrandDos(e.target.value)}
-                  disabled={brandProfileMode === "skip"}
-                  className="min-h-[96px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-[#c65a20] focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  placeholder="z. B. natürliche Lichtstimmung, echter Schaum, klar lesbares Etikett"
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                <span className="text-gray-700 dark:text-gray-300">Donts</span>
-                <textarea
-                  value={brandDonts}
-                  onChange={(e) => setBrandDonts(e.target.value)}
-                  disabled={brandProfileMode === "skip"}
-                  className="min-h-[96px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-[#c65a20] focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  placeholder="z. B. Cartoon-Look, Neonfarben, unleserliche Labels, Plastikhaut"
-                />
-              </label>
-              <label className="space-y-1 text-sm md:col-span-2">
-                <span className="text-gray-700 dark:text-gray-300">Referenzbild-URLs (1 pro Zeile)</span>
-                <textarea
-                  value={brandReferenceImageUrls}
-                  onChange={(e) => setBrandReferenceImageUrls(e.target.value)}
-                  disabled={brandProfileMode === "skip"}
-                  className="min-h-[110px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-[#c65a20] focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  placeholder="https://.../brand-reference-1.jpg"
-                />
-              </label>
-            </div>
           </div>
           <div className="mt-5 flex items-center gap-3">
             <button
@@ -3380,6 +3448,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
             </button>
           </div>
         </section>
+        </>
       );
     }
 
@@ -3566,7 +3635,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   return (
     <div
       className={cn(
-        "relative flex-1 overflow-auto px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-3 sm:p-6",
+        "relative flex-1 overflow-auto px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-2 sm:p-4 sm:pb-[calc(6.5rem+env(safe-area-inset-bottom))]",
         isCreationTab ? "bg-[#070b13]" : "bg-gray-50 dark:bg-gray-950",
       )}
     >
@@ -3609,203 +3678,40 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           </div>
         </div>
       ) : null}
+      <BrandProfileSetupModal
+        open={brandProfileSetupOpen}
+        onOpenChange={setBrandProfileSetupOpen}
+        title={
+          brandProfileMode === "guided" && brandProfileComplete ? "Markenprofil bearbeiten" : "Markenprofil erstellen"
+        }
+        onSaved={async (suggestion) => {
+          await applyBrandScanAndPersist(suggestion);
+        }}
+      />
       {showBrandProfileChoice ? (
         <div className="fixed inset-0 z-[126] flex items-center justify-center bg-black/65 px-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-white/15 bg-[#131926]/95 p-6 text-zinc-100 shadow-2xl">
-            {brandProfileMode === "guided" ? (
-              <>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#c8ff26]">Brand Blueprint Schritt {guidedBrandStep}/5</p>
-                <h3 className="mt-2 text-xl font-semibold text-white">Markenprofil im echten Brand-Stil anlegen</h3>
-                <p className="mt-1 text-sm text-zinc-300">Ziel: Wenn sich z. B. Paulaner anmeldet, soll auch Paulaner-Look herauskommen.</p>
-                {guidedBrandStep === 1 ? (
-                  <div className="mt-4 space-y-3">
-                    <p className="text-sm text-zinc-300">Welche Marke soll als Referenz gelten?</p>
-                    <input
-                      value={breweryName}
-                      onChange={(e) => setBreweryName(e.target.value)}
-                      className="h-11 w-full rounded-lg border border-white/15 bg-black/20 px-3 text-sm text-white placeholder:text-zinc-400 focus:border-[#c8ff26] focus:outline-none"
-                      placeholder="z. B. Paulaner Original"
-                    />
-                    <label className="space-y-1 text-sm">
-                      <span className="text-zinc-300">Instagram-Link der Marke (optional, aber empfohlen)</span>
-                      <div className="flex gap-2">
-                        <input
-                          value={brandInstagramUrl}
-                          onChange={(e) => setBrandInstagramUrl(e.target.value)}
-                          className="h-11 w-full rounded-lg border border-white/15 bg-black/20 px-3 text-sm text-white placeholder:text-zinc-400 focus:border-[#c8ff26] focus:outline-none"
-                          placeholder="https://instagram.com/paulaner"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void analyzeInstagramBrand();
-                          }}
-                          disabled={!brandInstagramUrl.trim() || instagramAnalyzing}
-                          className="inline-flex h-11 shrink-0 items-center rounded-lg border border-[#c8ff26]/30 bg-[#c8ff26]/15 px-3 text-xs font-semibold text-[#c8ff26] transition hover:bg-[#c8ff26]/25 disabled:opacity-40"
-                        >
-                          {instagramAnalyzing ? "Scannt..." : "Instagram scannen"}
-                        </button>
-                      </div>
-                    </label>
-                  </div>
-                ) : null}
-                {guidedBrandStep === 2 ? (
-                  <div className="mt-4 space-y-3">
-                    <p className="text-sm text-zinc-300">Wie stark soll die KI an der Marke kleben?</p>
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      {[
-                        { key: "strict", label: "Strict", desc: "Maximale Markentreue" },
-                        { key: "balanced", label: "Balanced", desc: "Treu, mit etwas Spielraum" },
-                        { key: "loose", label: "Loose", desc: "Nur Richtung, mehr Kreativitaet" },
-                      ].map((option) => (
-                        <button
-                          key={option.key}
-                          type="button"
-                          onClick={() => setBrandLockLevel(option.key as "strict" | "balanced" | "loose")}
-                          className={cn(
-                            "rounded-lg border px-3 py-2 text-left transition",
-                            brandLockLevel === option.key
-                              ? "border-[#c8ff26]/60 bg-[#c8ff26]/15 text-[#e8ff9a]"
-                              : "border-white/15 bg-black/20 text-zinc-200 hover:bg-white/10",
-                          )}
-                        >
-                          <p className="text-sm font-semibold">{option.label}</p>
-                          <p className="text-xs text-zinc-300">{option.desc}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {guidedBrandStep === 3 ? (
-                  <div className="mt-4 space-y-3">
-                    <p className="text-sm text-zinc-300">Welche visuellen DNA-Merkmale muessen rein?</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {BRAND_VISUAL_DNA_OPTIONS.map((option) => {
-                        const active = brandColors.split(",").map((item) => item.trim()).includes(option);
-                        return (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => setBrandColors((prev) => toggleCsvChoice(prev, option))}
-                            className={cn(
-                              "rounded-lg border px-3 py-2 text-left text-sm transition",
-                              active
-                                ? "border-[#c8ff26]/60 bg-[#c8ff26]/15 text-[#e8ff9a]"
-                                : "border-white/15 bg-black/20 text-zinc-200 hover:bg-white/10",
-                            )}
-                          >
-                            {option}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-                {guidedBrandStep === 4 ? (
-                  <div className="mt-4 space-y-3">
-                    <p className="text-sm text-zinc-300">Was muss die KI strikt beibehalten?</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {BRAND_MUST_KEEP_OPTIONS.map((option) => {
-                        const active = brandDos.split(",").map((item) => item.trim()).includes(option);
-                        return (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => setBrandDos((prev) => toggleCsvChoice(prev, option))}
-                            className={cn(
-                              "rounded-lg border px-3 py-2 text-left text-sm transition",
-                              active
-                                ? "border-[#c8ff26]/60 bg-[#c8ff26]/15 text-[#e8ff9a]"
-                                : "border-white/15 bg-black/20 text-zinc-200 hover:bg-white/10",
-                            )}
-                          >
-                            {option}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-                {guidedBrandStep === 5 ? (
-                  <div className="mt-4 space-y-3">
-                    <p className="text-sm text-zinc-300">Was soll die KI unbedingt vermeiden?</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {BRAND_MUST_AVOID_OPTIONS.map((option) => {
-                        const active = brandDonts.split(",").map((item) => item.trim()).includes(option);
-                        return (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => setBrandDonts((prev) => toggleCsvChoice(prev, option))}
-                            className={cn(
-                              "rounded-lg border px-3 py-2 text-left text-sm transition",
-                              active
-                                ? "border-[#c8ff26]/60 bg-[#c8ff26]/15 text-[#e8ff9a]"
-                                : "border-white/15 bg-black/20 text-zinc-200 hover:bg-white/10",
-                            )}
-                          >
-                            {option}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-                <div className="mt-6 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setGuidedBrandStep((prev) => Math.max(prev - 1, 1))}
-                    disabled={guidedBrandStep === 1}
-                    className="inline-flex h-10 items-center rounded-md border border-white/15 px-4 text-sm font-medium text-zinc-200 transition hover:bg-white/10 disabled:opacity-40"
-                  >
-                    Zurueck
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (guidedBrandStep < 5) {
-                        setGuidedBrandStep((prev) => prev + 1);
-                        return;
-                      }
-                      handleFinishGuidedBrandProfile();
-                    }}
-                    disabled={
-                      (guidedBrandStep === 1 && !breweryName.trim()) ||
-                      (guidedBrandStep === 2 && !brandLockLevel) ||
-                      (guidedBrandStep === 3 && !brandColors) ||
-                      (guidedBrandStep === 4 && !brandDos) ||
-                      (guidedBrandStep === 5 && !brandDonts)
-                    }
-                    className="inline-flex h-10 items-center rounded-md bg-[#c8ff26] px-4 text-sm font-semibold text-black transition hover:bg-[#b8ef22] disabled:opacity-40"
-                  >
-                    {guidedBrandStep < 5 ? "Weiter" : "Markenprofil speichern"}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className="text-xl font-semibold text-white">Willst du deinen Markenstil fixieren?</h3>
-                <p className="mt-2 text-sm text-zinc-300">
-                  Wir bauen ein Brand-Blueprint, damit die Bildwelt wirklich nach deiner Marke aussieht - nicht nur nach generischen Stilwoertern.
-                </p>
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleChooseBrandProfileGuided}
-                    className="inline-flex h-11 items-center rounded-md bg-[#c8ff26] px-5 text-sm font-semibold text-black transition hover:bg-[#b8ef22]"
-                  >
-                    Ja, Brand-Blueprint starten
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSkipBrandProfile}
-                    className="inline-flex h-11 items-center rounded-md border border-white/15 px-5 text-sm font-medium text-zinc-200 transition hover:bg-white/10"
-                  >
-                    Nein, direkt Bilder generieren
-                  </button>
-                </div>
-              </>
-            )}
+          <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-[#131926]/95 p-6 text-zinc-100 shadow-2xl">
+            <h3 className="text-xl font-semibold text-white">Willst du deinen Markenstil fixieren?</h3>
+            <p className="mt-2 text-sm text-zinc-300">
+              Ueber fuenf Screenshots deiner Instagram-Posts erstellt die KI dein Markenprofil — damit Texte auf Bildern
+              und Motive zu eurer Linie passen. Du kannst das spaeter unter Einstellungen jederzeit aendern.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleChooseBrandProfileGuided}
+                className="inline-flex h-11 items-center rounded-md bg-[#c8ff26] px-5 text-sm font-semibold text-black transition hover:bg-[#b8ef22]"
+              >
+                Ja, Markenprofil anlegen
+              </button>
+              <button
+                type="button"
+                onClick={handleSkipBrandProfile}
+                className="inline-flex h-11 items-center rounded-md border border-white/15 px-5 text-sm font-medium text-zinc-200 transition hover:bg-white/10"
+              >
+                Nein, direkt Bilder generieren
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -3860,9 +3766,9 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       ) : null}
       <div
         className={cn(
-          "pointer-events-auto mb-4 sticky top-0 z-[90] flex w-full items-center justify-between gap-3 rounded-2xl px-3 pb-3 pt-[max(0.65rem,env(safe-area-inset-top))] sm:-mx-6 sm:mb-6 sm:rounded-none sm:px-6 sm:py-3",
+          "pointer-events-auto mb-3 sticky top-0 z-[90] flex w-full items-center justify-between gap-2 rounded-2xl px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:-mx-4 sm:mb-4 sm:rounded-none sm:px-4 sm:py-2.5",
           isCreationTab
-            ? "border-b border-white/5 bg-[#070b13]/95 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.75)] backdrop-blur-md"
+            ? "border-b border-white/10 bg-black/[0.08] shadow-none backdrop-blur-2xl dark:bg-black/[0.08]"
             : "border-b border-gray-200/80 bg-gray-50/95 backdrop-blur dark:border-gray-800/80 dark:bg-gray-950/90",
         )}
       >

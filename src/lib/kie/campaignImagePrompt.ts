@@ -2,6 +2,32 @@
  * Prompt block for Instagram-style campaign images (text baked into the image).
  * Brand context is appended server-side by the create-task route.
  */
+/**
+ * Referenzbild(er) + Markenkontext (serverseitig angehängt): Modell erfindet deutschsprachige Headline/Subline/CTA im Bild.
+ */
+export function buildCampaignCreativeFromReferencesPrompt(scene: string): string {
+  const s = scene.trim();
+  return [
+    "You are creating ONE new Instagram feed post graphic (mobile-first). German ad copy must appear as real baked-in typography in the image (not as a caption).",
+    "",
+    "REFERENCE-DRIVEN CREATIVE (no fixed headline from user):",
+    "- Use the provided reference image(s) only as style/mood/composition inspiration; do NOT duplicate them pixel-for-pixel.",
+    "- Invent a fresh layout: new framing, lighting variation, or storytelling beat while staying on-brand.",
+    "- YOU must author all on-image German text: a strong HEADLINE, optional SUBLINE, optional CTA — idiomatic, correctly spelled, no gibberish, no warped letters.",
+    "- Headline must feel native to the brand voice implied by the brand context block appended by the system.",
+    "",
+    "USER / SYSTEM SCENE NOTES (may be short):",
+    s || "(No extra notes — rely on references + brand context.)",
+    "",
+    "LAYOUT & READABILITY:",
+    "- Reserve generous negative space behind text; avoid busy textures under headline.",
+    "- Safe margins from edges; headline must still read at small feed thumbnail size.",
+    "- High contrast sans-serif for ad text; no ornate scripts for body/CTA.",
+    "",
+    "QUALITY: premium campaign polish, intentional lighting, no stock clutter.",
+  ].join("\n");
+}
+
 export function buildCampaignCreativePrompt(scene: string, headline: string, subline: string, cta: string): string {
   const sub = subline.trim();
   const c = cta.trim();

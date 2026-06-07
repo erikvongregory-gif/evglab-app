@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 
 export async function GET() {
@@ -19,6 +20,20 @@ export async function GET() {
   try {
     await ensureBillingRow(user.id);
     billing = await getBillingRow(user.id);
+    if (!billing?.plan || billing.subscription_status === "none" || billing.subscription_status === "canceled") {
+      try {
+        const syncResult = await syncBillingFromStripe({
+          userId: user.id,
+          userEmail: user.email,
+          currentRow: billing,
+        });
+        if (syncResult.synced) {
+          billing = await getBillingRow(user.id);
+        }
+      } catch {
+        /* Stripe-Sync optional; Summary liefert trotzdem */
+      }
+    }
   } catch (error) {
     degradedBilling = true;
     console.error("dashboard.summary: billing fallback aktiv", error);

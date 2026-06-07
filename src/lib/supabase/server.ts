@@ -33,6 +33,44 @@ export async function createClient() {
 }
 
 /**
+ * Supabase-Client für Auth-Route-Handler.
+ * Liest Cookies über next/headers (chunk-safe), schreibt auf Response + Cookie-Store.
+ */
+export async function createAuthRouteHandlerClient(response: NextResponse) {
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
+  if (!url || !key) {
+    throw new Error(
+      "Supabase env fehlt: NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY (oder PUBLISHABLE_KEY).",
+    );
+  }
+
+  const cookieStore = await cookies();
+
+  return createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet, headers) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          try {
+            cookieStore.set(name, value, options);
+          } catch {
+            /* Route Handler */
+          }
+          response.cookies.set(name, value, options);
+        });
+        Object.entries(headers).forEach(([k, v]) => {
+          if (k.toLowerCase() === "set-cookie") return;
+          response.headers.set(k, String(v));
+        });
+      },
+    },
+  });
+}
+
+/**
  * Supabase-Client für Route Handler: Cookies müssen auf derselben {@link NextResponse} landen,
  * die zurückgegeben wird (v. a. bei Redirects), sonst geht die Session verloren.
  */

@@ -7,7 +7,14 @@ export async function middleware(request: NextRequest) {
   if (loginWaitlistEnabled) {
     const isBlockedAuthPath =
       pathname === "/registrieren" ||
-      (pathname.startsWith("/auth/") && pathname !== "/auth/signout");
+      pathname === "/passwort-vergessen" ||
+      pathname === "/passwort-zuruecksetzen" ||
+      (pathname.startsWith("/auth/") &&
+        pathname !== "/auth/signout" &&
+        pathname !== "/auth/signin" &&
+        pathname !== "/auth/admin-signin" &&
+        pathname !== "/auth/signup" &&
+        pathname !== "/auth/admin-2fa/verify");
     if (isBlockedAuthPath) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/anmelden";
@@ -18,10 +25,14 @@ export async function middleware(request: NextRequest) {
 
   const needsAuthSession =
     pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/admin") ||
+    (pathname.startsWith("/admin") && pathname !== "/admin/anmelden") ||
     pathname.startsWith("/invite") ||
+    pathname.startsWith("/inhalte-erstellen") ||
+    pathname.startsWith("/auth/finish") ||
     pathname === "/anmelden" ||
-    pathname === "/registrieren";
+    pathname === "/registrieren" ||
+    pathname === "/passwort-vergessen" ||
+    pathname === "/passwort-zuruecksetzen";
 
   if (!needsAuthSession) {
     return NextResponse.next();

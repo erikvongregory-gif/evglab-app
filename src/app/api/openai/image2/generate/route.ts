@@ -2,19 +2,30 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { consumeTokens, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { requireActiveSubscription } from "@/lib/billing/access";
 import {
   buildBrandProfilePromptContext,
+  canUseCampaignWithTextProfile,
   getBrandProfileFromMetadata,
   isBrandProfileComplete,
 } from "@/lib/dashboard/brandProfile";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { buildCampaignCreativePrompt } from "@/lib/kie/campaignImagePrompt";
+import {
+  buildCampaignCreativeFromReferencesPrompt,
+  buildCampaignCreativePrompt,
+} from "@/lib/kie/campaignImagePrompt";
+import {
+  type ContentCreationPreset,
+  MAX_REFERENCE_UPLOADS,
+  applyContentPresetPrompt,
+  validateImageTypePolicy,
+} from "@/lib/image-types/policy";
 
 type GenerateImageBody = {
   prompt: string;
+  imageType?: ContentCreationPreset;
   aspectRatio?: string;
   resolution?: "1K" | "2K" | "4K";
   outputFormat?: "png" | "jpg";
@@ -28,13 +39,14 @@ type GenerateImageBody = {
 };
 
 const schema = z.object({
-  prompt: z.string().trim().min(1).max(12000),
+  prompt: z.string().trim().min(1).max(40000),
+  imageType: z.enum(["hyperreal", "product_cutout", "product_studio", "campaign_social"]),
   aspectRatio: z
     .enum(["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9", "auto"])
     .optional(),
   resolution: z.enum(["1K", "2K", "4K"]).optional(),
   outputFormat: z.enum(["png", "jpg"]).optional(),
-  referenceImageUrls: z.array(z.string().max(12_000_000)).max(2).optional(),
+  referenceImageUrls: z.array(z.string().max(12_000_000)).max(MAX_REFERENCE_UPLOADS).optional(),
   strictLabelMode: z.boolean().optional(),
   plattform: z.string().optional(),
   textImLabel: z.string().optional(),
@@ -42,6 +54,8 @@ const schema = z.object({
   subline: z.string().trim().max(800).optional(),
   cta: z.string().trim().max(400).optional(),
 });
+
+const MAX_OPENAI_PROMPT_CHARS = 12_000;
 
 function mapAspectRatioToOpenAiSize(aspectRatio: string | undefined): "1024x1024" | "1024x1536" | "1536x1024" {
   if (!aspectRatio) return "1024x1024";
@@ -123,11 +137,22 @@ export async function POST(req: Request) {
 
     const parsed = schema.safeParse(await req.json());
     if (!parsed.success) {
-      return NextResponse.json({ error: "Ungueltige Anfrage." }, { status: 400 });
+      const firstIssue = parsed.error.issues[0];
+      const detail = firstIssue ? `${firstIssue.path.join(".")}: ${firstIssue.message}` : "Payload validation failed.";
+      return NextResponse.json({ error: `Ungueltige Anfrage. ${detail}` }, { status: 400 });
     }
     const body = parsed.data as GenerateImageBody;
 
     const headline = (body.textImLabel ?? "").trim();
+    const violation = validateImageTypePolicy({
+      preset: body.imageType ?? "hyperreal",
+      engine: "chatgpt_image2",
+      referenceImageCount: body.referenceImageUrls?.length ?? 0,
+      campaignMode: body.campaignMode,
+    });
+    if (violation) {
+      return NextResponse.json({ error: violation.message, code: violation.code }, { status: 400 });
+    }
 
     const openAiKey = process.env.OPENAI_API_KEY?.trim();
     if (!openAiKey) {
@@ -139,7 +164,6 @@ export async function POST(req: Request) {
     }
 
     let userId: string | null = null;
-    let freeTrialUsed = false;
     let currentUserMetadata: Record<string, unknown> = {};
     let brandContext = "";
     if (isSupabaseConfigured()) {
@@ -152,11 +176,24 @@ export async function POST(req: Request) {
       }
       userId = user.id;
       currentUserMetadata = (user.user_metadata as Record<string, unknown> | null) ?? {};
-      freeTrialUsed = Boolean(user.user_metadata?.free_trial_image_used_at);
       const profile = getBrandProfileFromMetadata(user.user_metadata);
       if (!isBrandProfileComplete(profile)) {
         return NextResponse.json(
-          { error: "Bitte zuerst dein Markenprofil vollständig ausfüllen.", code: "brand_profile_incomplete" },
+          {
+            error:
+              "Bitte vervollständige zuerst dein Markenprofil unter Einstellungen (Abschnitt Markenprofil oben) oder aktiviere die Nutzung ohne Markenprofil.",
+            code: "brand_profile_incomplete",
+          },
+          { status: 400 },
+        );
+      }
+      if ((body.imageType === "campaign_social" || body.campaignMode) && !canUseCampaignWithTextProfile(profile)) {
+        return NextResponse.json(
+          {
+            error:
+              "Kampagnenbild mit Text ist nur mit einem angelegten Markenprofil möglich (Einstellungen → Markenprofil, nicht „ohne Markenprofil“).",
+            code: "campaign_requires_guided_brand_profile",
+          },
           { status: 400 },
         );
       }
@@ -167,33 +204,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Nicht angemeldet.", code: "auth_required" }, { status: 401 });
     }
 
+    const subscriptionError = await requireActiveSubscription(userId);
+    if (subscriptionError) return subscriptionError;
+
     await ensureBillingRow(userId);
     const currentState = await getBillingRow(userId);
-    const hasActiveSubscription = Boolean(
-      currentState?.plan &&
-        currentState.monthly_tokens > 0 &&
-        currentState.subscription_status !== "none" &&
-        currentState.subscription_status !== "canceled",
-    );
-    const isFreeTrialRequest = !hasActiveSubscription;
-    if (isFreeTrialRequest && freeTrialUsed) {
-      return NextResponse.json(
-        { error: "Dein kostenloses Bild wurde bereits genutzt. Bitte Abo aktivieren, um weiter zu generieren." },
-        { status: 402 },
-      );
-    }
 
     const hasReferenceImage = Boolean(body.referenceImageUrls?.length);
+    const usedModelLabel = hasReferenceImage ? "gpt-image-2-image-to-image" : "gpt-image-2-text-to-image";
     const baseCost = body.resolution === "4K" ? 35 : body.resolution === "2K" ? 20 : 10;
     const tokenCost = baseCost + (hasReferenceImage ? 5 : 0) + (body.strictLabelMode ? 10 : 0);
-    if (!isFreeTrialRequest) {
-      const remainingTokens = Math.max((currentState?.monthly_tokens ?? 0) - (currentState?.used_tokens ?? 0), 0);
-      if (remainingTokens < tokenCost) {
-        return NextResponse.json(
-          { error: `Nicht genug Tokens. Benoetigt: ${tokenCost}, verfuegbar: ${remainingTokens}.` },
-          { status: 402 },
-        );
-      }
+    const remainingTokens = Math.max((currentState?.monthly_tokens ?? 0) - (currentState?.used_tokens ?? 0), 0);
+    if (remainingTokens < tokenCost) {
+      return NextResponse.json(
+        { error: `Nicht genug Tokens. Benoetigt: ${tokenCost}, verfuegbar: ${remainingTokens}.` },
+        { status: 402 },
+      );
     }
 
     const model =
@@ -201,11 +227,23 @@ export async function POST(req: Request) {
       process.env.OPENAI_IMAGE_MODEL?.trim() ||
       "gpt-image-1";
     const scenePrompt = body.prompt.trim();
+    const subTrim = (body.subline ?? "").trim();
+    const ctaTrim = (body.cta ?? "").trim();
+    const imageLedCampaign =
+      body.campaignMode === true &&
+      hasReferenceImage &&
+      !headline &&
+      !subTrim &&
+      !ctaTrim;
     const creativeCore =
       body.campaignMode === true
-        ? buildCampaignCreativePrompt(scenePrompt, headline, body.subline ?? "", body.cta ?? "")
+        ? imageLedCampaign
+          ? buildCampaignCreativeFromReferencesPrompt(scenePrompt)
+          : buildCampaignCreativePrompt(scenePrompt, headline, subTrim, ctaTrim)
         : scenePrompt;
-    const prompt = [creativeCore, "", brandContext].filter(Boolean).join("\n");
+    const policyPrompt = applyContentPresetPrompt(creativeCore, body.imageType ?? "hyperreal");
+    const promptRaw = [policyPrompt, "", brandContext].filter(Boolean).join("\n");
+    const prompt = promptRaw.length > MAX_OPENAI_PROMPT_CHARS ? promptRaw.slice(0, MAX_OPENAI_PROMPT_CHARS) : promptRaw;
     const openAiRes = hasReferenceImage
       ? await (async () => {
           const firstReference = body.referenceImageUrls?.[0];
@@ -256,25 +294,6 @@ export async function POST(req: Request) {
 
     const imageUrl = await uploadBase64ToKie(kieKey, base64Image, body.outputFormat ?? "png");
 
-    if (isFreeTrialRequest) {
-      const admin = createAdminClient();
-      const { error: metadataError } = await admin.auth.admin.updateUserById(userId, {
-        user_metadata: {
-          ...currentUserMetadata,
-          free_trial_image_used_at: new Date().toISOString(),
-        },
-      });
-      if (metadataError) {
-        return NextResponse.json({ error: "Kostenloses Bild konnte nicht verbucht werden." }, { status: 500 });
-      }
-      return NextResponse.json({
-        generationId: `openai-${randomUUID()}`,
-        imageUrl,
-        usedModel: "chatgpt-image-2",
-        billing: { freeTrial: true, consumed: 0 },
-      });
-    }
-
     const consumeResult = await consumeTokens(userId, tokenCost);
     if (!consumeResult.ok) {
       return NextResponse.json({ error: consumeResult.error }, { status: 402 });
@@ -283,7 +302,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       generationId: `openai-${randomUUID()}`,
       imageUrl,
-      usedModel: "chatgpt-image-2",
+      usedModel: usedModelLabel,
       billing: {
         plan: consumeResult.state.plan,
         monthlyTokens: consumeResult.state.monthly_tokens,

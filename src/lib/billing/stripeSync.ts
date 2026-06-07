@@ -7,6 +7,7 @@ import {
   setStripeCustomerId,
   updateByStripeSubscription,
 } from "@/lib/billing/store";
+import { mapPriceIdToPlan as mapPriceIdToPlanFromEnv } from "@/lib/billing/stripePrices";
 import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
 export function getStripeClient() {
@@ -16,13 +17,7 @@ export function getStripeClient() {
 }
 
 export function mapPriceIdToPlan(priceId?: string | null): SubscriptionPlanKey | null {
-  const map: Record<SubscriptionPlanKey, string | undefined> = {
-    start: process.env.STRIPE_PRICE_START_MONTHLY,
-    growth: process.env.STRIPE_PRICE_GROWTH_MONTHLY,
-    pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
-  };
-  const entry = Object.entries(map).find(([, id]) => id && id === priceId);
-  return (entry?.[0] as SubscriptionPlanKey | undefined) ?? null;
+  return mapPriceIdToPlanFromEnv(priceId);
 }
 
 export function toIsoFromUnix(seconds?: number | null) {

@@ -18,6 +18,7 @@ const DEFAULT_ALLOWED_HOSTS = [
   "api.kie.ai",
   "redpandaai.co",
   "kieai.redpandaai.co",
+  "tempfile.redpandaai.co",
   "tempfile.aiquickdraw.com",
 ];
 

@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { DEFAULT_BREWERY_IMAGE_SKILL_SYSTEM_PROMPT } from "@/lib/prompts/brewerySkill";
+import { getBreweryImageSkillSystemPrompt } from "@/lib/prompts/brewerySkill";
+import { createAnthropicMessageWithModelFallback } from "@/lib/anthropic/modelCandidates";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -10,6 +11,11 @@ import {
   getBrandProfileFromMetadata,
   isBrandProfileComplete,
 } from "@/lib/dashboard/brandProfile";
+import {
+  type ContentCreationPreset,
+  getPresetSystemDirectives,
+  getRequiredFieldsByPreset,
+} from "@/lib/image-types/policy";
 
 const requestSchema = z.object({
   initialInput: z.string().trim().min(1).max(2000),
@@ -23,15 +29,11 @@ const requestSchema = z.object({
     .max(12)
     .default([]),
   questionCount: z.number().int().min(0).max(12),
+  preset: z.enum(["hyperreal", "product_cutout", "product_studio", "campaign_social"]).optional().default("hyperreal"),
 });
 
-const MIN_FOLLOW_UPS_BEFORE_COMPLETE = 3;
-
-function getPreferredModel(): string {
-  const fromEnv = process.env.ANTHROPIC_MODEL?.trim();
-  if (fromEnv) return fromEnv;
-  return "claude-3-5-sonnet-latest";
-}
+const MIN_FOLLOW_UPS_BEFORE_COMPLETE = 2;
+type HybridPreset = ContentCreationPreset;
 
 const ENGLISH_FINALIZE_SYSTEM = [
   "You prepare the final text for an English-only image generation model.",
@@ -48,8 +50,7 @@ async function finalizeEnglishOnlyPrompt(
 ): Promise<string> {
   const trimmed = draft.trim();
   if (!trimmed) return trimmed;
-  const response = await client.messages.create({
-    model: getPreferredModel(),
+  const response = await createAnthropicMessageWithModelFallback(client, {
     max_tokens: 2048,
     temperature: 0.15,
     system:
@@ -91,39 +92,162 @@ const ANTI_GENERIC_MASTER_BLOCK = [
   "- Keep constraints tight and commercial-grade while avoiding repetitive buzzword stuffing.",
 ].join("\n");
 
-function buildLocalFallbackPrompt(initialInput: string, history: Array<{ question: string; answer: string }>): string {
+function buildCollectedBrief(initialInput: string, history: Array<{ question: string; answer: string }>): string {
+  const items = [
+    `Initial request: ${initialInput.trim()}`,
+    ...history
+      .map((item) => `${item.question.trim()}: ${item.answer.trim()}`)
+      .filter((line) => line.length > 0),
+  ];
+  return items.join(" | ");
+}
+
+function buildHyperrealMasterPrompt(
+  initialInput: string,
+  history: Array<{ question: string; answer: string }>,
+  draftPrompt?: string,
+): string {
+  const collectedBrief = buildCollectedBrief(initialInput, history);
+  const draft = draftPrompt?.trim();
+  const authoredDirectives = draft ? `Additional authored directives to preserve: ${draft}` : "";
+  return [
+    "Create a hyper-realistic commercial beer campaign photograph that is indistinguishable from a real camera capture.",
+    "The scene must depict real-world context only, with physically plausible lighting, reflections, shadows, and material response.",
+    "Render all people as clearly adult humans with natural anatomy, realistic proportions, and true skin detail (pores, subtle blemishes, under-eye texture, realistic lips and ears).",
+    "Hands and faces must be artifact-free: no extra fingers, no fused fingers, no warped teeth, no uncanny asymmetry.",
+    "Use premium ad-photography direction: cinematic color grading, realistic micro-textures, authored composition, and explicit camera intent.",
+    "Define camera and lighting concretely (lens choice, angle, depth behavior, key/fill/rim logic) and keep the shot production-ready.",
+    "Keep at least one hero bottle in crisp focus with fully legible label typography and undistorted branding geometry.",
+    "If pouring is shown, enforce liquid continuity: bottle fill level, poured volume, foam growth, and final glass level must be physically consistent.",
+    "Avoid stock-photo genericity by including specific environmental cues, concrete surface details, believable urban or venue texture, and brand-coded styling anchors.",
+    "Strictly forbid illustration, cartoon, painting, CGI, 3D render aesthetics, and synthetic AI-art styling.",
+    "Client intent to fulfill exactly (translate and refine internally into polished production English):",
+    collectedBrief,
+    authoredDirectives,
+    "Negative constraints: no waxy plastic skin, no malformed hands, no duplicate limbs, no mirrored or gibberish label text, no stretched typography, no synthetic flat liquid behavior.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function buildLocalFallbackPrompt(
+  initialInput: string,
+  history: Array<{ question: string; answer: string }>,
+  preset: HybridPreset,
+): string {
   const followUps = history
     .map((item) => `- ${item.question}: ${item.answer}`)
     .join("\n");
 
-  return [
-    "Create a photorealistic commercial beer campaign image.",
-    `Core request: ${initialInput}.`,
-    followUps ? `Collected follow-up details:\n${followUps}` : "",
-    "Mandatory constraints:",
-    "- Hyper-realistic adult humans with natural anatomy and skin texture.",
-    "- Preserve subject identity consistency (face, hair, body proportions, wardrobe details).",
-    "- Physically plausible environment and water behavior; avoid generic stock-photo backgrounds.",
-    "- If pouring is shown: liquid continuity must be physically consistent (bottle volume vs glass fill).",
-    "- Premium ad photography: high dynamic range, realistic micro-textures, cinematic color grading.",
-    "- Camera/lens, composition, and lighting should be explicit and production-ready.",
-    "- Anti-generic lock: avoid stock look by using specific environmental cues, brand-coded styling, and authored camera direction.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  if (preset === "product_cutout") {
+    return [
+      "Create a single premium e-commerce product cutout image.",
+      `Core request: ${initialInput}.`,
+      followUps ? `Collected follow-up details:\n${followUps}` : "",
+      "Mandatory constraints:",
+      "- True transparent alpha background only (no visible background scene).",
+      "- Exactly one centered product with complete silhouette and clean contour extraction.",
+      "- No environment, no props, no people, no text overlays, no decorative objects.",
+      "- Preserve brand and label authenticity with fully readable text and undistorted geometry.",
+      "- Edge quality must be clean and production-ready: no halo, no fringing, no jagged border artifacts.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (preset === "product_studio") {
+    return [
+      "Create a premium controlled studio product hero shot for a brewery brand.",
+      `Core request: ${initialInput}.`,
+      followUps ? `Collected follow-up details:\n${followUps}` : "",
+      "Mandatory constraints:",
+      "- Commercial-grade studio setup with defined key/fill/rim lighting and controlled reflections.",
+      "- Hero product in tack-sharp focus with crystal-clear label readability.",
+      "- Designed studio background with tasteful color/texture control and depth separation.",
+      "- Optional brewery-relevant companion elements (hops, barley, citrus, herbs) arranged intentionally with no clutter.",
+      "- No people and no random lifestyle environment.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (preset === "campaign_social") {
+    return [
+      "Create a premium Instagram campaign visual with baked-in text hierarchy.",
+      `Core request: ${initialInput}.`,
+      followUps ? `Collected follow-up details:\n${followUps}` : "",
+      "Mandatory constraints:",
+      "- Headline is dominant and high-contrast; subline is supporting; CTA is concise and clearly readable.",
+      "- Composition must preserve clean copy zones and safe margins for mobile feed readability.",
+      "- Typography must be coherent and correctly spelled, with no gibberish or warped letters.",
+      "- Keep brand colors, product identity, and campaign message tightly aligned.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  return buildHyperrealMasterPrompt(initialInput, history);
+}
+
+function toGermanFieldLabel(field: string): string {
+  const normalized = field.trim().toLowerCase();
+  const labels: Record<string, string> = {
+    bildtyp: "Bildtyp",
+    biertyp: "Biertyp",
+    behaelter: "Behälter (Flasche/Glas)",
+    markenname: "Marke/Etikett",
+    zielgruppe: "Zielgruppe",
+    plattform: "Zielplattform",
+    stimmung: "Stimmung",
+    shottype: "Kameraperspektive/Shot-Typ",
+    motiv: "Motiv",
+    headline: "Headline",
+    subline_oder_keine: "Subline oder keine",
+    cta_oder_keine: "CTA oder keine",
+    kampagnenziel: "Kampagnenziel",
+    brandfarben: "Brandfarben",
+    produkt: "Produkt",
+    perspektive: "Perspektive",
+    freisteller_spezifikation: "Freisteller-Vorgabe",
+    label_anforderung: "Label-Anforderung",
+    studio_hintergrund: "Studio-Hintergrund",
+    licht_setup: "Licht-Setup",
+    komposition: "Komposition",
+    props: "Props/Beielemente",
+  };
+  return labels[normalized] ?? field;
 }
 
 function buildFallbackFollowUpQuestion(
   questionCount: number,
+  preset: HybridPreset,
   missingFields?: string[],
 ): string {
+  if (preset === "product_cutout") {
+    if (questionCount === 0) {
+      return "Bitte nenne Produkt (z. B. Flasche/Dose/Glas), Ansicht (frontal/45°/Top) und ob transparentes PNG ohne Hintergrund strikt Pflicht ist.";
+    }
+    return "Welche Details muessen exakt erhalten bleiben (Labeltext, Farben, Material, Kratzer/Prägung) und was ist strikt verboten (Props, Schatten, Text-Overlays)?";
+  }
+  if (preset === "product_studio") {
+    if (questionCount === 0) {
+      return "Welches Studio-Setup willst du konkret: Hintergrundart/Farbe, Lichtstimmung (clean, dramatisch, warm/kuehl) und Hauptperspektive?";
+    }
+    return "Welche Companion-Elemente sollen neben dem Produkt sichtbar sein (z. B. Hopfen, Gerste, Zitrone), und welche davon sind Pflicht vs. optional?";
+  }
+  if (preset === "campaign_social") {
+    if (questionCount === 0) {
+      return "Bitte gib mir die exakten Texte fuer Headline, optionale Subline und CTA sowie den Kampagnenanlass (Angebot/Event/Launch).";
+    }
+    return "Welche visuelle Tonalitaet soll das Kampagnenmotiv haben (z. B. premium, frisch, festival) und welche Brand-Farben muessen dominant sein?";
+  }
   if (Array.isArray(missingFields) && missingFields.length > 0) {
     const mapped = missingFields
       .slice(0, 3)
-      .map((field) => String(field).trim())
+      .map((field) => toGermanFieldLabel(String(field).trim()))
       .filter(Boolean);
     if (mapped.length > 0) {
-      return `Kurz nachgeschärft: Bitte nenne noch ${mapped.join(", ")} so konkret wie möglich.`;
+      return `Kurz nachgeschärft: Bitte nenne noch ${mapped.join(", ")} konkret, damit ich den Prompt sauber finalisieren kann.`;
     }
   }
   if (questionCount === 0) {
@@ -133,6 +257,67 @@ function buildFallbackFollowUpQuestion(
     return "Welche Stimmung, Zielgruppe und Bildwirkung möchtest du genau (z. B. rustikal, premium, modern, urban)?";
   }
   return "Letzter Feinschliff: Welche konkreten Markenanker (Farben, Etikett-Details, Umfeld/Location) sollen zwingend sichtbar sein?";
+}
+
+function buildFallbackFollowUpOptions(
+  questionCount: number,
+  preset: HybridPreset,
+  _missingFields?: string[],
+): string[] {
+  if (preset === "product_cutout") {
+    if (questionCount === 0) {
+      return [
+        "Flasche frontal, transparentes PNG Pflicht",
+        "Dose 45°, transparentes PNG Pflicht",
+        "Glas frontal, transparentes PNG Pflicht",
+      ];
+    }
+    return [
+      "Label 1:1 behalten, keine Props, keine Overlays",
+      "Farbe/Material exakt, nur subtiler Kontaktschatten",
+      "Kratzer/Prägung behalten, sonst clean freistellen",
+    ];
+  }
+  if (preset === "product_studio") {
+    if (questionCount === 0) {
+      return [
+        "Dunkles Premium-Setup, Rim-Light, 45° Hero",
+        "Helles Clean-Setup, soft key light, frontal",
+        "Dramatisch warm, Spot-Hintergrund, low angle",
+      ];
+    }
+    return [
+      "Mit Hopfen + Gerste, minimal und sauber",
+      "Mit Zitrone + Kondenswasser, frisch-modern",
+      "Ohne Props, nur High-End Studio-Look",
+    ];
+  }
+  if (preset === "campaign_social") {
+    if (questionCount === 0) {
+      return [
+        'Headline: "Frisch gezapft am Wochenende" | CTA: "Jetzt entdecken"',
+        'Headline: "Sommer im Glas" | CTA: "Jetzt probieren"',
+        'Headline: "Neuer Anstich" | CTA: "Mehr erfahren"',
+      ];
+    }
+    return [
+      "Premium und dunkel-kontrastreich",
+      "Frisch und hell, sommerlich",
+      "Eventig und dynamisch, hohe Energie",
+    ];
+  }
+  if (questionCount === 0) {
+    return [
+      "Instagram Feed, Helles im Willibecher, junge Zielgruppe",
+      "Instagram Story, Pils in Flasche+Glas, urban",
+      "Website Hero, Weizen im Biergarten, Premium-Look",
+    ];
+  }
+  return [
+    "Stimmung: warm, authentisch, golden hour",
+    "Stimmung: modern, clean, kontrastreich",
+    "Stimmung: rustikal, regional, natuerlich",
+  ];
 }
 
 export async function POST(req: Request) {
@@ -161,7 +346,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Bitte zuerst dein Markenprofil in den Einstellungen vollständig ausfüllen (Tonalität, Farben, Do/Don'ts und mindestens 1 Referenzbild-URL).",
+            "Bitte vervollständige zuerst dein Markenprofil unter Einstellungen (Abschnitt Markenprofil oben: fünf Instagram-Post-Screenshots mit KI auswerten) oder aktiviere die Nutzung ohne Markenprofil.",
           code: "brand_profile_incomplete",
         },
         { status: 400 },
@@ -174,14 +359,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
     }
 
-    const { initialInput, history, questionCount } = parsed.data;
+    const { initialInput, history, questionCount, preset } = parsed.data;
     const apiKey = process.env.ANTHROPIC_API_KEY;
     const anthropic = apiKey ? new Anthropic({ apiKey }) : null;
 
     async function respondComplete(rawPrompt: string, warning?: string) {
       let prompt = rawPrompt.trim();
       if (!prompt) {
-        prompt = buildLocalFallbackPrompt(initialInput, history);
+        prompt = buildLocalFallbackPrompt(initialInput, history, preset);
+      }
+      if (preset === "hyperreal") {
+        prompt = buildHyperrealMasterPrompt(initialInput, history, prompt);
       }
       if (anthropic) {
         try {
@@ -204,7 +392,8 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             status: "follow_up",
-            question: buildFallbackFollowUpQuestion(questionCount),
+            question: buildFallbackFollowUpQuestion(questionCount, preset),
+            options: buildFallbackFollowUpOptions(questionCount, preset),
             warning: "Claude ist nicht konfiguriert (ANTHROPIC_API_KEY fehlt). Lokaler Follow-up-Fallback wird verwendet.",
           },
           { status: 200 },
@@ -213,7 +402,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           status: "complete",
-          prompt: buildLocalFallbackPrompt(initialInput, history),
+          prompt: buildLocalFallbackPrompt(initialInput, history, preset),
           warning: "Claude ist nicht konfiguriert (ANTHROPIC_API_KEY fehlt). Lokaler Fallback wurde verwendet.",
         },
         { status: 200 },
@@ -222,32 +411,22 @@ export async function POST(req: Request) {
 
     const claude = anthropic as Anthropic;
 
-    const requiredFields = [
-      "bildtyp",
-      "biertyp",
-      "behaelter",
-      "markenname",
-      "zielgruppe",
-      "plattform",
-      "stimmung",
-      "etikettModus",
-      "personenModus",
-      "shotType",
-    ] as const;
+    const requiredFields = getRequiredFieldsByPreset(preset);
 
     let response: Anthropic.Messages.Message;
     try {
-      response = await claude.messages.create({
-        model: getPreferredModel(),
+      response = await createAnthropicMessageWithModelFallback(claude, {
         max_tokens: 900,
         temperature: 0.2,
         system:
-          `${DEFAULT_BREWERY_IMAGE_SKILL_SYSTEM_PROMPT}\n\n` +
+          `${getBreweryImageSkillSystemPrompt()}\n\n` +
           "You are an expert brewery image prompt strategist. Reply with JSON only. " +
           'Schema: {"status":"follow_up","question":"...","missingFields":["..."],"collected":{"field":"value"}} OR {"status":"complete","prompt":"...","collected":{"field":"value"}}.' +
           "Follow-up questions must be short, specific, and in German. " +
+          "In complete mode, DO NOT paste raw user text; rewrite the intent into a clean authored production prompt. " +
           "When status=complete, the prompt string must be 100% English: fully translate every phrase from the user's German (or other non-English) request and Q&A into natural English. " +
           "Never mix German and English inside the prompt; proper nouns (brand/beer/place names) may stay as names. " +
+          `${getPresetSystemDirectives(preset)} ` +
           "Final prompt must be production-ready for image generation. " +
           "When status=complete, the prompt must be highly detailed (at least 180 words) and include: " +
           "scene setup, product and glass constraints, subject styling, camera/lens, lighting, composition, texture realism, color palette, and quality constraints. " +
@@ -266,6 +445,7 @@ export async function POST(req: Request) {
               `Already asked follow-up questions: ${questionCount}`,
               "",
               `Required fields that MUST be captured before completion: ${requiredFields.join(", ")}`,
+              `Selected preset: ${preset}`,
               "",
               "Rules:",
               "- Extract all required fields from initialInput + history.",
@@ -295,14 +475,15 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             status: "follow_up",
-            question: buildFallbackFollowUpQuestion(questionCount),
+            question: buildFallbackFollowUpQuestion(questionCount, preset),
+            options: buildFallbackFollowUpOptions(questionCount, preset),
             warning: `Claude-Aufruf fehlgeschlagen (${reason}). Lokaler Follow-up-Fallback wird verwendet.`,
           },
           { status: 200 },
         );
       }
       return await respondComplete(
-        buildLocalFallbackPrompt(initialInput, history),
+        buildLocalFallbackPrompt(initialInput, history, preset),
         `Claude-Aufruf fehlgeschlagen (${reason}). Lokaler Fallback wurde verwendet.`,
       );
     }
@@ -314,22 +495,47 @@ export async function POST(req: Request) {
     if (!payload) {
       if (questionCount < MIN_FOLLOW_UPS_BEFORE_COMPLETE) {
         return NextResponse.json(
-          { status: "follow_up", question: buildFallbackFollowUpQuestion(questionCount) },
+          {
+            status: "follow_up",
+            question: buildFallbackFollowUpQuestion(questionCount, preset),
+            options: buildFallbackFollowUpOptions(questionCount, preset),
+          },
           { status: 200 },
         );
       }
-      return await respondComplete(buildLocalFallbackPrompt(initialInput, history));
+      return await respondComplete(buildLocalFallbackPrompt(initialInput, history, preset));
     }
 
     const status = payload.status;
     if (status === "follow_up") {
       const question = typeof payload.question === "string" ? payload.question.trim() : "";
-      if (question) return NextResponse.json({ status: "follow_up", question }, { status: 200 });
+      const missingFields = Array.isArray(payload.missingFields)
+        ? payload.missingFields.map((item) => String(item).trim()).filter(Boolean)
+        : undefined;
+      const fallbackQuestion = buildFallbackFollowUpQuestion(questionCount, preset, missingFields);
+      const normalizedQuestion = question || fallbackQuestion;
+      if (normalizedQuestion) {
+        const parsedOptions = Array.isArray(payload.options)
+          ? payload.options.map((item) => String(item).trim()).filter(Boolean).slice(0, 6)
+          : [];
+        return NextResponse.json(
+          {
+            status: "follow_up",
+            question: normalizedQuestion,
+            options: parsedOptions.length > 0 ? parsedOptions : buildFallbackFollowUpOptions(questionCount, preset),
+          },
+          { status: 200 },
+        );
+      }
     }
     if (status === "complete" && questionCount < MIN_FOLLOW_UPS_BEFORE_COMPLETE) {
       const missingFields = Array.isArray(payload.missingFields) ? payload.missingFields.map((v) => String(v)) : undefined;
       return NextResponse.json(
-        { status: "follow_up", question: buildFallbackFollowUpQuestion(questionCount, missingFields) },
+        {
+          status: "follow_up",
+          question: buildFallbackFollowUpQuestion(questionCount, preset, missingFields),
+          options: buildFallbackFollowUpOptions(questionCount, preset, missingFields),
+        },
         { status: 200 },
       );
     }

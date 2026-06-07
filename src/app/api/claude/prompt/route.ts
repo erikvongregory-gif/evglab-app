@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { DEFAULT_BREWERY_IMAGE_SKILL_SYSTEM_PROMPT } from "@/lib/prompts/brewerySkill";
+import { generateBrauereiBildPrompt } from "@/lib/prompts/brauerei-bild/generate-prompt";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -10,8 +10,10 @@ import {
   getBrandProfileFromMetadata,
   isBrandProfileComplete,
 } from "@/lib/dashboard/brandProfile";
+import { type ContentCreationPreset, getPresetSystemDirectives } from "@/lib/image-types/policy";
 
 type PromptRequestBody = {
+  imageType?: ContentCreationPreset;
   bildtyp?: string;
   biertyp: string;
   behaelter?: string;
@@ -37,27 +39,28 @@ type PromptRequestBody = {
 };
 
 const promptRequestSchema = z.object({
-  bildtyp: z.string().trim().max(80).optional(),
-  biertyp: z.string().trim().min(1).max(80),
-  behaelter: z.string().trim().max(50).optional(),
-  flaschenTyp: z.string().trim().max(50).optional(),
-  flaschenVolumen: z.string().trim().max(50).optional(),
-  markenname: z.string().trim().min(1).max(120),
-  zielgruppe: z.string().trim().min(1).max(80),
-  plattform: z.string().trim().min(1).max(80),
-  stimmung: z.string().trim().min(1).max(80),
-  personenModus: z.string().trim().max(80).optional(),
-  shotType: z.string().trim().max(80).optional(),
-  studioStyle: z.string().trim().max(80).optional(),
-  studioProps: z.string().trim().max(240).optional(),
-  kiPlattform: z.string().trim().max(80),
+  imageType: z.enum(["hyperreal", "product_cutout", "product_studio", "campaign_social"]).optional(),
+  bildtyp: z.string().trim().max(160).optional(),
+  biertyp: z.string().trim().min(1).max(160),
+  behaelter: z.string().trim().max(100).optional(),
+  flaschenTyp: z.string().trim().max(100).optional(),
+  flaschenVolumen: z.string().trim().max(100).optional(),
+  markenname: z.string().trim().min(1).max(240),
+  zielgruppe: z.string().trim().min(1).max(200),
+  plattform: z.string().trim().min(1).max(120),
+  stimmung: z.string().trim().min(1).max(200),
+  personenModus: z.string().trim().max(160).optional(),
+  shotType: z.string().trim().max(160).optional(),
+  studioStyle: z.string().trim().max(160).optional(),
+  studioProps: z.string().trim().max(600).optional(),
+  kiPlattform: z.string().trim().max(120),
   etikettModus: z.string().trim().max(50).optional(),
   referenzStaerke: z.enum(["Niedrig", "Mittel", "Hoch", "Strikt"]).optional(),
-  referenzen: z.string().trim().max(500).optional(),
-  besondererHintergrund: z.string().trim().max(500).optional(),
-  saisonalerBezug: z.string().trim().max(240).optional(),
-  textImLabel: z.string().trim().max(240).optional(),
-  vermeiden: z.string().trim().max(500).optional(),
+  referenzen: z.string().trim().max(1200).optional(),
+  besondererHintergrund: z.string().trim().max(1200).optional(),
+  saisonalerBezug: z.string().trim().max(600).optional(),
+  textImLabel: z.string().trim().max(600).optional(),
+  vermeiden: z.string().trim().max(1200).optional(),
   personGeschlecht: z.enum(["Frau", "Mann", "Egal"]).optional(),
 });
 
@@ -73,18 +76,6 @@ function getStrictGlassRule(biertyp: string): string {
     return "Mandatory glass constraint: use ONLY a tall slender Pilsner flute. NEVER use a Weizen glass.";
   }
   return "Mandatory glass constraint: use the beer-style-correct glass only. Never substitute with a Weizen glass unless beer style is Weizen.";
-}
-
-function getClaudeSystemPrompt(): string {
-  const fromEnv = process.env.ANTHROPIC_SKILL_PROMPT?.trim();
-  return fromEnv || DEFAULT_BREWERY_IMAGE_SKILL_SYSTEM_PROMPT;
-}
-
-function getPreferredModel(): string {
-  const fromEnv = process.env.ANTHROPIC_MODEL?.trim();
-  if (fromEnv) return fromEnv;
-  // Stable default alias from Anthropic docs; avoids brittle hard-coded snapshot names.
-  return "claude-3-5-sonnet-latest";
 }
 
 function classifyAnthropicError(message: string) {
@@ -146,6 +137,7 @@ function buildClaudeInput(body: PromptRequestBody, brandProfileContext: string):
                 ? "Scene lock: enforce true macro-detail optics with close-up texture focus, optical falloff, and material realism."
                 : "Scene lock: enforce authentic lifestyle context with believable human/product interaction.";
 
+  const presetDirectives = body.imageType ? getPresetSystemDirectives(body.imageType) : "";
   return [
     "Erstelle einen hochwertigen ENGLISCHEN Image-Generation Prompt für eine Brauerei auf Basis dieses Briefings.",
     "",
@@ -167,6 +159,7 @@ function buildClaudeInput(body: PromptRequestBody, brandProfileContext: string):
     `- ${sceneLockRule}`,
     `- ${strictGlassRule}`,
     `- ${containerRule}`,
+    presetDirectives ? `- ${presetDirectives}` : "",
   ].join("\n");
 }
 
@@ -195,7 +188,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Bitte zuerst dein Markenprofil in den Einstellungen vollständig ausfüllen (Tonalität, Farben, Do/Don'ts und mindestens 1 Referenzbild-URL).",
+            "Bitte vervollständige zuerst dein Markenprofil unter Einstellungen (Abschnitt Markenprofil oben: fünf Instagram-Post-Screenshots mit KI auswerten) oder aktiviere die Nutzung ohne Markenprofil.",
           code: "brand_profile_incomplete",
         },
         { status: 400 },
@@ -210,42 +203,24 @@ export async function POST(req: Request) {
 
     const parseResult = promptRequestSchema.safeParse(await req.json());
     if (!parseResult.success) {
-      return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+      const firstIssue = parseResult.error.issues[0];
+      const detail = firstIssue ? `${firstIssue.path.join(".")}: ${firstIssue.message}` : "Payload konnte nicht validiert werden.";
+      return NextResponse.json({ error: `Ungültige Anfrage. ${detail}` }, { status: 400 });
     }
 
     const body = parseResult.data as PromptRequestBody;
     const anthropic = new Anthropic({ apiKey });
-    const modelCandidates = Array.from(
-      new Set([
-        getPreferredModel(),
-        "claude-3-5-sonnet-latest",
-        "claude-3-5-haiku-latest",
-      ]),
-    );
 
-    let response: Awaited<ReturnType<typeof anthropic.messages.create>> | null = null;
-    let lastError: unknown = null;
-    for (const model of modelCandidates) {
-      try {
-        response = await anthropic.messages.create({
-          model,
-          max_tokens: 1000,
-          temperature: 0.4,
-          system: getClaudeSystemPrompt(),
-          messages: [
-            {
-              role: "user",
-              content: buildClaudeInput(body, brandProfileContext),
-            },
-          ],
-        });
-        break;
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    if (!response) {
+    let prompt: string;
+    try {
+      prompt = await generateBrauereiBildPrompt({
+        anthropic,
+        userMessage: buildClaudeInput(body, brandProfileContext),
+        brandProfileContext: "",
+        maxTokens: 1000,
+        temperature: 0.4,
+      });
+    } catch (lastError) {
       const msg = lastError instanceof Error ? lastError.message : "Claude-Model konnte nicht geladen werden.";
       const classified = classifyAnthropicError(msg);
       return NextResponse.json(
@@ -256,10 +231,6 @@ export async function POST(req: Request) {
         { status: classified.status },
       );
     }
-
-    const textBlock = response.content.find((item) => item.type === "text");
-    const promptRaw = textBlock?.type === "text" ? textBlock.text.trim() : "";
-    const prompt = promptRaw.replace(/^```[a-zA-Z]*\s*/g, "").replace(/```$/g, "").trim();
 
     if (!prompt) {
       return NextResponse.json({ error: "Claude hat keinen Prompt geliefert." }, { status: 502 });

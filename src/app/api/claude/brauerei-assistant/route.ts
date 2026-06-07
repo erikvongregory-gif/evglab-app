@@ -1,44 +1,45 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  buildHopfenHugoSystemPrompt,
+  isLikelyPolicyViolation,
+  policyRefusalAnswer,
+} from "@/lib/assistant/hopfenHugoPolicy";
+import { createAnthropicMessageWithModelFallback } from "@/lib/anthropic/modelCandidates";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
-const requestSchema = z.object({
-  question: z.string().trim().min(1).max(1200),
-  currentTab: z.string().trim().max(80).optional(),
-  assistantPersona: z.string().trim().max(80).optional(),
+const messageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  text: z.string().trim().min(1).max(2000),
 });
 
-const HOPFEN_HUGO_SYSTEM = [
-  "Du bist Hopfen Hugo, der Chat-Assistent im EvGlab-Dashboard.",
-  "Du darfst ueber allgemeine, harmlose Alltagsthemen reden und auf Wunsch den Stil wechseln (z. B. Schweizerdeutsch, bayerisch, locker, freundlich).",
-  "Verweigere nur unzulaessige oder gefaehrliche Inhalte (illegale Handlungen, Gewaltanleitungen, Selbstverletzung, Hass, Betrug, Datenschutzverletzungen, sexualisierte Inhalte mit Minderjaehrigen).",
-  "Wenn es um EvGlab und KI-Bilder geht, gib praktische Hilfe zu Prompts, Motiven, Szenen, Licht, Stil und Markenkonsistenz.",
-  "Gib keine Optimierungs- oder Spartipps zu Token, Billing, Abo oder internen Dashboard-Kosten.",
-  "Antworte kurz, freundlich und natuerlich auf Deutsch; Dialekt nur wenn gewuenscht.",
-].join(" ");
+const requestSchema = z
+  .object({
+    question: z.string().trim().min(1).max(1200).optional(),
+    messages: z.array(messageSchema).max(24).optional(),
+    currentTab: z.string().trim().max(80).optional(),
+    assistantPersona: z.string().trim().max(80).optional(),
+  })
+  .refine((data) => (data.messages?.length ?? 0) > 0 || Boolean(data.question?.trim()), {
+    message: "Nachricht oder Verlauf erforderlich.",
+  });
 
 function fallbackAnswer(question: string): string {
   const q = question.toLowerCase();
   if (/schweizerdeutsch|schwiizerdutsch|schwiizerdütsch/.test(q)) {
-    return "Ja klar, ich cha au Schwiizerdutsch rede. Wenn du wotsch, antworte ich ab jetzt im Schwiizer Stil.";
+    return "Ja klar, ich cha au Schwiizerdütsch rede. Frag mich eifach öppis — zu EvGlab, Marketing oder allgemeine Themen.";
   }
-  if (/bayerisch|bayrisch|dialekt|mundart|freundlich|locker|duzen|siezen|tonfall|humor|witzig/i.test(q)) {
-    return "Klar, mach ich gern. Ich passe meinen Stil an und antworte dir freundlich und locker.";
+  if (/evglab|dashboard|mediathek|markenprofil|inhalte erstellen|abo|tarif/i.test(q)) {
+    return "Gern helfe ich dir in EvGlab weiter: Dashboard, Inhalte erstellen, Markenprofil, Mediathek oder Tarife — was möchtest du wissen?";
   }
-  if (/token|abo|billing|budget|credit|kosten sparen|spar|guenstig|günstig/i.test(q)) {
-    return "Zu Token-, Abo- oder Billing-Optimierung gebe ich keine Tipps. Bei Bildideen, Prompt und Stil helfe ich dir gern.";
+  if (/marke|brand|stil|look|prompt|bild|motiv|kampagne|social/i.test(q)) {
+    return "Super Thema. Beschreib mir Produkt, Stimmung und Format — ich formuliere dir gern einen Prompt oder eine Idee.";
   }
-  if (/marke|brand|stil|look|prompt|bild|motiv|foto|render|kampagne/i.test(q)) {
-    return "Gern. Nenn mir Produkt, Stimmung und Format, dann formuliere ich dir direkt einen starken Prompt.";
+  if (/token|billing|budget|kosten sparen|umgeh|hack/i.test(q)) {
+    return policyRefusalAnswer();
   }
-  return "Klar, ich bin da. Wenn du willst, antworte ich normal, locker, bayerisch oder Schweizerdeutsch.";
-}
-
-function getPreferredModel(): string {
-  const fromEnv = process.env.ANTHROPIC_MODEL?.trim();
-  if (fromEnv) return fromEnv;
-  return "claude-3-5-sonnet-latest";
+  return "Prost! Ich bin Hopfen Hugo — frag mich zu EvGlab, Marketing, Brauerei oder allgemeinen Themen. Bei Bild-Prompts bin ich besonders stark.";
 }
 
 function hasUsableAnthropicKey(value: string | undefined): value is string {
@@ -47,6 +48,16 @@ function hasUsableAnthropicKey(value: string | undefined): value is string {
   if (!normalized) return false;
   if (/^paste[_-]?anthropic[_-]?api[_-]?key$/i.test(normalized)) return false;
   return true;
+}
+
+function resolveConversationMessages(input: z.infer<typeof requestSchema>): Array<{ role: "user" | "assistant"; text: string }> {
+  if (input.messages?.length) {
+    return input.messages.slice(-20);
+  }
+  if (input.question) {
+    return [{ role: "user", text: input.question }];
+  }
+  return [];
 }
 
 export async function POST(req: Request) {
@@ -66,38 +77,50 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ungueltige Anfrage." }, { status: 400 });
     }
 
-    const { question, currentTab, assistantPersona } = parsed.data;
-    questionForFallback = question;
+    const { currentTab, assistantPersona } = parsed.data;
+    const conversation = resolveConversationMessages(parsed.data);
+    const lastUser = [...conversation].reverse().find((m) => m.role === "user");
+    if (!lastUser) {
+      return NextResponse.json({ error: "Keine Nachricht." }, { status: 400 });
+    }
+
+    questionForFallback = lastUser.text;
+    if (isLikelyPolicyViolation(lastUser.text)) {
+      return NextResponse.json({ answer: policyRefusalAnswer() }, { status: 200 });
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!hasUsableAnthropicKey(apiKey)) {
-      return NextResponse.json({ answer: fallbackAnswer(question) }, { status: 200 });
+      return NextResponse.json({ answer: fallbackAnswer(lastUser.text) }, { status: 200 });
     }
 
     const anthropic = new Anthropic({ apiKey });
-    const response = await anthropic.messages.create({
-      model: getPreferredModel(),
-      max_tokens: 350,
-      temperature: 0.35,
-      system: HOPFEN_HUGO_SYSTEM,
-      messages: [
-        {
-          role: "user",
-          content: [
-            `Aktiver Dashboard-Tab: ${currentTab ?? "unbekannt"}`,
-            `Persona: ${assistantPersona ?? "hopfen-hugo"}`,
-            "",
-            "Nutzerfrage:",
-            question,
-            "",
-            "Folge den Systemregeln: allgemein harmlose Fragen sind okay, aber keine Hilfe zu illegalen/gefaehrlichen Themen und keine Token-/Billing-Spar-Tipps.",
-          ].join("\n"),
-        },
-      ],
+    const anthropicMessages = conversation.map((msg, index) => {
+      const isLastUser = index === conversation.length - 1 && msg.role === "user";
+      if (!isLastUser) {
+        return { role: msg.role, content: msg.text };
+      }
+      return {
+        role: "user" as const,
+        content: [
+          `Kontext: EvGlab Studio, Tab „${currentTab ?? "unbekannt"}“, Persona „${assistantPersona ?? "hopfen-hugo"}“.`,
+          "Halte dich an die Nutzungsrichtlinien im System-Prompt.",
+          "",
+          msg.text,
+        ].join("\n"),
+      };
+    });
+
+    const response = await createAnthropicMessageWithModelFallback(anthropic, {
+      max_tokens: 700,
+      temperature: 0.45,
+      system: buildHopfenHugoSystemPrompt(),
+      messages: anthropicMessages,
     });
 
     const textBlock = response.content.find((item) => item.type === "text");
     const answer = textBlock?.type === "text" ? textBlock.text.trim() : "";
-    return NextResponse.json({ answer: answer || fallbackAnswer(question) }, { status: 200 });
+    return NextResponse.json({ answer: answer || fallbackAnswer(lastUser.text) }, { status: 200 });
   } catch {
     return NextResponse.json({ answer: fallbackAnswer(questionForFallback) }, { status: 200 });
   }

@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { redirectWithAdminEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
 import { getAppBaseUrlOrigin, isSupabaseConfigured } from "@/lib/supabase/env";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
+import { mapSignInErrorCode, signInErrorDetail } from "@/lib/auth/signInErrors";
+import { repairOversizedMetadataForUser } from "@/lib/auth/repairOversizedMetadata";
+import { createAuthRouteHandlerClient } from "@/lib/supabase/server";
 import { logAuthEvent, getOrCreateRequestId } from "@/lib/security/authObservability";
-import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
+import {
+  createNoStoreRedirect,
+  createOAuthSessionPollerHtml,
+  normalizeNextPath,
+} from "@/lib/security/authResponses";
 import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
 export async function POST(request: Request) {
@@ -36,18 +42,13 @@ export async function POST(request: Request) {
     return createNoStoreRedirect(`${origin}/anmelden?error=missing`, requestId);
   }
 
-  const redirectResponse = createNoStoreRedirect(`${origin}${next}`, requestId);
-  const withAuthCookies = (response: NextResponse) => {
-    for (const cookie of redirectResponse.cookies.getAll()) {
-      response.cookies.set(cookie.name, cookie.value, cookie);
-    }
-    response.headers.set("x-request-id", requestId);
-    return response;
-  };
+  const finishTarget = `${origin}/auth/finish?next=${encodeURIComponent(next)}`;
+  const redirectResponse = createNoStoreRedirect(finishTarget, requestId);
 
-  const supabase = createRouteHandlerClient(request, redirectResponse);
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const supabase = await createAuthRouteHandlerClient(redirectResponse);
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
+    const errorCode = mapSignInErrorCode(error);
     logAuthEvent({
       event: "signin_failed",
       level: "warn",
@@ -55,14 +56,25 @@ export async function POST(request: Request) {
       email,
       status: 303,
       durationMs: Date.now() - startedAt,
-      meta: { reason: "auth" },
+      meta: {
+        reason: errorCode,
+        supabaseCode: error.code,
+        supabaseMessage: signInErrorDetail(error),
+      },
     });
-    return createNoStoreRedirect(`${origin}/anmelden?error=auth`, requestId);
+    const params = new URLSearchParams({ error: errorCode });
+    const detail = signInErrorDetail(error);
+    if (process.env.NODE_ENV === "development" && detail) {
+      params.set("detail", detail);
+    }
+    return createNoStoreRedirect(`${origin}/anmelden?${params.toString()}`, requestId);
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = signInData.user;
+  if (user) {
+    await repairOversizedMetadataForUser(supabase, user.id, user.user_metadata);
+  }
+
   const admin2fa = await redirectWithAdminEmail2FAIfNeeded(request, {
     user,
     requestId,
@@ -80,5 +92,9 @@ export async function POST(request: Request) {
     status: 303,
     durationMs: Date.now() - startedAt,
   });
-  return withAuthCookies(redirectResponse);
+  const successUrl = `${origin}${next}`;
+  return createOAuthSessionPollerHtml(
+    { successUrl, fallbackUrl: finishTarget, requestId },
+    redirectResponse,
+  );
 }

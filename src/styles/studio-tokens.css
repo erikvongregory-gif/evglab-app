@@ -1,0 +1,3568 @@
+/* EvGlab Studio — Design tokens + primitives (from EvGlab Studio redesign) */
+
+.evg-studio {
+  /* Surfaces */
+  --bg-0: #131211;
+  --bg-1: #1a1816;
+  --bg-2: #201d1b;
+  --bg-3: #272320;
+  --bg-4: #312c28;
+
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-accent: color-mix(in srgb, var(--acc) 45%, transparent);
+
+  --tx-0: #f4f1ec;
+  --tx-1: #c4bdb3;
+  --tx-2: #8a837a;
+  --tx-3: #635c54;
+
+  --acc: #e8772e;
+  --acc-hi: color-mix(in oklab, var(--acc), white 15%);
+  --acc-lo: color-mix(in oklab, var(--acc), black 24%);
+  --acc-soft: color-mix(in srgb, var(--acc) 14%, transparent);
+  --acc-softer: color-mix(in srgb, var(--acc) 7%, transparent);
+  --acc-ink: color-mix(in oklab, var(--acc), black 82%);
+
+  --ok: #6fae84;
+  --ok-soft: rgba(111, 174, 132, 0.14);
+  --warn: #d9a441;
+
+  --r-xs: 7px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-2: 0 4px 14px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --sh-pop: 0 24px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--line-strong);
+
+  --studio-accent-serif: var(--font-newsreader), Georgia, serif;
+  --studio-sans: var(--font-hanken), system-ui, -apple-system, sans-serif;
+  --studio-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --sidebar-w: 260px;
+  --topbar-h: 64px;
+  --gutter: 40px;
+  --maxw: 1180px;
+
+  color: var(--tx-0);
+  font-family: var(--studio-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.evg-studio.dens-compact {
+  --gutter: 28px;
+  --topbar-h: 58px;
+}
+
+.evg-studio ::selection {
+  background: var(--acc-soft);
+  color: var(--acc-hi);
+}
+
+/* Typography */
+.evg-studio .studio-eyebrow {
+  font-family: var(--studio-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.evg-studio .studio-eyebrow .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--acc);
+  box-shadow: 0 0 0 3px var(--acc-softer);
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-eyebrow .dot.ok {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+
+.evg-studio .studio-display {
+  font-family: var(--studio-sans);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-display em {
+  font-family: var(--studio-accent-serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-serif {
+  font-family: var(--studio-sans);
+  font-weight: 700;
+}
+
+.evg-studio .studio-accent-serif {
+  font-family: var(--studio-accent-serif);
+}
+
+.evg-studio .studio-mono {
+  font-family: var(--studio-mono);
+}
+
+.evg-studio .studio-tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.evg-studio .studio-muted {
+  color: var(--tx-2);
+}
+
+.evg-studio .studio-faint {
+  color: var(--tx-3);
+}
+
+/* Buttons */
+.evg-studio .studio-btn {
+  font-family: var(--studio-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  padding: 0 16px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.06s ease;
+  user-select: none;
+  text-decoration: none;
+}
+
+.evg-studio .studio-btn:active {
+  transform: translateY(0.5px);
+}
+
+.evg-studio .studio-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-btn-primary {
+  background: var(--acc);
+  color: var(--acc-ink);
+  border-color: var(--acc-lo);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    var(--sh-1);
+}
+
+.evg-studio .studio-btn-primary:hover {
+  background: var(--acc-hi);
+}
+
+.evg-studio .studio-btn-ghost {
+  background: transparent;
+  color: var(--tx-1);
+  border-color: var(--line-strong);
+}
+
+.evg-studio .studio-btn-ghost:hover {
+  background: var(--bg-3);
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-btn-soft {
+  background: var(--bg-3);
+  color: var(--tx-0);
+  border-color: var(--line);
+}
+
+.evg-studio .studio-btn-soft:hover {
+  background: var(--bg-4);
+}
+
+.evg-studio .studio-btn-sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  border-radius: var(--r-xs);
+}
+
+.evg-studio .studio-btn-lg {
+  height: 46px;
+  padding: 0 22px;
+  font-size: 14.5px;
+}
+
+.evg-studio .studio-icon-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--tx-1);
+  cursor: pointer;
+  transition:
+    background 0.16s,
+    color 0.16s,
+    border-color 0.16s;
+  padding: 0;
+}
+
+.evg-studio .studio-icon-btn:hover {
+  background: var(--bg-3);
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Cards */
+.evg-studio .studio-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.evg-studio .studio-card-pad {
+  padding: 22px;
+}
+
+.evg-studio .studio-card-hover {
+  transition:
+    border-color 0.16s ease,
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.evg-studio .studio-card-hover:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--sh-2);
+}
+
+/* Chips */
+.evg-studio .studio-chip {
+  font-family: var(--studio-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tx-1);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  white-space: nowrap;
+}
+
+.evg-studio .studio-chip:hover {
+  border-color: var(--line-strong);
+  color: var(--tx-0);
+  background: var(--bg-3);
+}
+
+.evg-studio .studio-chip.on {
+  background: var(--acc-soft);
+  border-color: var(--line-accent);
+  color: var(--acc-hi);
+}
+
+/* Fields */
+.evg-studio .studio-field {
+  width: 100%;
+  height: 44px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  color: var(--tx-0);
+  font-family: var(--studio-sans);
+  font-size: 14px;
+  padding: 0 14px;
+  transition:
+    border-color 0.14s,
+    background 0.14s,
+    box-shadow 0.14s;
+}
+
+.evg-studio .studio-field::placeholder {
+  color: var(--tx-3);
+}
+
+.evg-studio .studio-field:focus {
+  outline: none;
+  border-color: var(--line-accent);
+  box-shadow: 0 0 0 3px var(--acc-softer);
+  background: var(--bg-0);
+}
+
+.evg-studio textarea.studio-field {
+  height: auto;
+  padding: 12px 14px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.evg-studio select.studio-field {
+  appearance: none;
+  cursor: pointer;
+}
+
+.evg-studio .studio-field-label {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  display: block;
+  margin-bottom: 9px;
+}
+
+/* Badge */
+.evg-studio .studio-badge {
+  font-family: var(--studio-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tx-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  padding: 3px 7px;
+  background: var(--bg-1);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.evg-studio .studio-badge.acc {
+  color: var(--acc-hi);
+  border-color: var(--line-accent);
+  background: var(--acc-softer);
+}
+
+.evg-studio .studio-badge.ok {
+  color: var(--ok);
+  border-color: var(--ok-soft);
+  background: var(--ok-soft);
+}
+
+/* Stat cards */
+.evg-studio .studio-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .evg-studio .studio-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .evg-studio .studio-stat-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evg-studio .studio-stat-card {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 20px 22px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.16s ease;
+}
+
+.evg-studio .studio-stat-card:hover {
+  border-color: var(--line-strong);
+}
+
+.evg-studio .studio-stat-card.primary::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--acc), color-mix(in srgb, var(--acc) 20%, transparent));
+}
+
+.evg-studio .studio-stat-card .stat-label {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  margin-bottom: 10px;
+}
+
+.evg-studio .studio-stat-card .stat-value {
+  font-family: var(--studio-sans);
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-stat-card .stat-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.evg-studio .studio-stat-card .stat-sub {
+  font-size: 12.5px;
+  color: var(--tx-2);
+  line-height: 1.35;
+}
+
+/* Sidebar nav */
+.evg-studio .studio-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  position: relative;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--tx-1);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.12s ease;
+  text-decoration: none;
+  font-family: var(--studio-sans);
+}
+
+.evg-studio .studio-nav-item:hover:not(.studio-nav-item--active) {
+  background: var(--bg-3);
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-nav-item--active {
+  border-color: var(--line-accent);
+  background: var(--acc-soft);
+  color: var(--acc-hi);
+  font-weight: 600;
+}
+
+.evg-studio .studio-nav-item--active::before {
+  content: "";
+  position: absolute;
+  left: -13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--acc);
+}
+
+.evg-studio .studio-nav-item--locked {
+  opacity: 0.72;
+}
+
+.evg-studio .studio-nav-item--locked:hover {
+  opacity: 0.9;
+}
+
+.evg-studio .studio-hr {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+  margin: 0;
+}
+
+/* Activity list */
+.evg-studio .studio-activity-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 16px;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.evg-studio .studio-activity-row:hover {
+  background: var(--bg-3);
+  margin-left: -8px;
+  margin-right: -8px;
+  padding-left: 12px;
+  padding-right: 12px;
+  border-radius: var(--r-sm);
+}
+
+.evg-studio .studio-activity-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-xs);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--bg-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tx-2);
+  flex-shrink: 0;
+}
+
+@keyframes studio-pop-in {
+  from {
+    transform: translateY(8px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.evg-studio .studio-pop {
+  animation: studio-pop-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-studio .studio-pop {
+    animation: none;
+  }
+}
+
+.evg-studio .studio-view-transition {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.evg-studio .studio-view-transition__panel {
+  grid-area: 1 / 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.evg-studio .studio-view-transition--inline {
+  display: inline-grid;
+  vertical-align: middle;
+}
+
+.evg-studio .studio-view-transition--inline .studio-view-transition__panel {
+  display: inline-flex;
+  align-items: center;
+}
+
+.evg-studio .studio-main-pending {
+  opacity: 0.88;
+  transition: opacity 0.18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-studio .studio-main-pending {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+/* Page header (Dashboard, Markenprofil, …) */
+.evg-studio .studio-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .evg-studio .studio-page-header .studio-btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .evg-studio .studio-alert {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .evg-studio .studio-alert .studio-btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+}
+
+.evg-studio .studio-page-eyebrow {
+  font-family: var(--studio-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  margin-bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.evg-studio .studio-page-eyebrow .line {
+  width: 18px;
+  height: 1px;
+  background: color-mix(in srgb, var(--acc) 35%, transparent);
+}
+
+.evg-studio .studio-page-title {
+  font-family: var(--studio-sans);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-page-title em {
+  font-family: var(--studio-accent-serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-page-sub {
+  font-size: 13px;
+  color: var(--tx-2);
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+/* Stat icon chips */
+.evg-studio .studio-stat-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-stat-icon.acc {
+  background: var(--acc-soft);
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-stat-icon.ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.evg-studio .studio-stat-icon.blue {
+  background: rgba(100, 149, 220, 0.12);
+  color: #7eb0e8;
+}
+
+.evg-studio .studio-stat-icon.purple {
+  background: rgba(150, 100, 220, 0.12);
+  color: #b08ae8;
+}
+
+.evg-studio .studio-stat-card .stat-badge-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--studio-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tx-2);
+  margin-top: 8px;
+}
+
+.evg-studio .studio-stat-card .stat-badge-row.up {
+  color: var(--ok);
+}
+
+/* Dashboard main grid */
+.evg-studio .studio-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .evg-studio .studio-dash-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evg-studio .studio-sidebar-card-title {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  margin-bottom: 14px;
+}
+
+/* Quick actions */
+.evg-studio .studio-qa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evg-studio .studio-qa-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.16s, background 0.16s;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+}
+
+.evg-studio .studio-qa-btn:hover {
+  border-color: var(--line-strong);
+  background: var(--acc-softer);
+}
+
+.evg-studio .studio-qa-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.evg-studio .studio-qa-icon {
+  color: var(--acc-hi);
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-qa-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-qa-arrow {
+  color: var(--tx-3);
+  flex-shrink: 0;
+}
+
+/* Activity (compact) */
+.evg-studio .studio-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evg-studio .studio-activity-row-compact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.evg-studio .studio-activity-row-compact:hover {
+  background: var(--acc-softer);
+}
+
+.evg-studio .studio-activity-thumb-compact {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--acc-hi);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.evg-studio .studio-activity-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.evg-studio .studio-activity-desc {
+  font-size: 12px;
+  color: var(--tx-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.evg-studio .studio-activity-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-activity-time {
+  font-family: var(--studio-mono);
+  font-size: 9.5px;
+  color: var(--tx-3);
+}
+
+.evg-studio .studio-activity-tag {
+  font-family: var(--studio-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.evg-studio .studio-activity-tag.product {
+  background: var(--acc-soft);
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-activity-tag.campaign {
+  background: rgba(100, 149, 220, 0.12);
+  color: #7eb0e8;
+}
+
+.evg-studio .studio-activity-tag.social {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.evg-studio .studio-activity-tag.team {
+  background: rgba(150, 100, 220, 0.12);
+  color: #b08ae8;
+}
+
+/* Tarif card */
+.evg-studio .studio-tarif-plan {
+  font-family: var(--studio-sans);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--tx-0);
+  margin: 6px 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.evg-studio .studio-tarif-plan em {
+  font-family: var(--studio-accent-serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-tarif-tokens {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ok);
+  margin-bottom: 12px;
+}
+
+.evg-studio .studio-token-bar-bg {
+  height: 4px;
+  background: var(--acc-softer);
+  border-radius: 2px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.evg-studio .studio-token-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--acc), color-mix(in oklab, var(--acc-hi), white 20%));
+  border-radius: 2px;
+}
+
+.evg-studio .studio-token-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tx-2);
+}
+
+.evg-studio .studio-upgrade-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--acc) 30%, transparent);
+  border-radius: var(--r-xs);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--acc-hi);
+  cursor: pointer;
+  transition: background 0.16s, border-color 0.16s;
+}
+
+.evg-studio .studio-upgrade-btn:hover {
+  background: var(--acc-softer);
+  border-color: var(--line-accent);
+}
+
+/* Account avatar */
+.evg-studio .studio-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--studio-sans);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--acc-ink);
+  background: linear-gradient(150deg, var(--acc-hi), var(--acc-lo));
+  border: 1px solid var(--acc-lo);
+}
+
+.evg-studio .studio-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.evg-studio .studio-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tx-0);
+  letter-spacing: -0.01em;
+}
+
+.evg-studio .studio-section-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--acc-hi) 75%, transparent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.evg-studio .studio-section-link:hover {
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-accent);
+  background: var(--acc-softer);
+  margin-bottom: 22px;
+}
+
+/* Markenprofil (Marke & Stil) */
+.evg-studio .studio-brand-status {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acc-hi);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.evg-studio .studio-brand-status .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--acc);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--acc) 60%, transparent);
+}
+
+.evg-studio .studio-brand-status .sep {
+  color: var(--tx-3);
+  font-weight: 500;
+}
+
+.evg-studio .studio-brand-title {
+  font-family: var(--studio-sans);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  color: var(--tx-0);
+  margin: 0;
+}
+
+.evg-studio .studio-brand-sub {
+  font-size: 13.5px;
+  color: var(--tx-2);
+  line-height: 1.5;
+  margin-top: 8px;
+  max-width: 560px;
+}
+
+.evg-studio .studio-brand-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.evg-studio .studio-brand-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .evg-studio .studio-brand-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evg-studio .studio-brand-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.evg-studio .studio-brand-website-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.evg-studio .studio-brand-divider {
+  margin-bottom: 20px;
+}
+
+.evg-studio .studio-brand-swatch-row {
+  display: flex;
+  gap: 10px;
+}
+
+.evg-studio .studio-brand-swatch-bar {
+  flex: 1;
+  height: 56px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-tones-label {
+  margin: 24px 0 12px;
+}
+
+.evg-studio .studio-brand-rules-card .studio-brand-rules-head {
+  margin-bottom: 12px;
+}
+
+.evg-studio .studio-brand-refs-section {
+  margin-top: 22px;
+}
+
+.evg-studio .studio-brand-refs-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.evg-studio .studio-brand-ref-tile {
+  aspect-ratio: 1;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.evg-studio .studio-brand-ref-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.evg-studio .studio-brand-lock-list--flat .studio-brand-lock-opt {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+}
+
+.evg-studio .studio-brand-lock-list--flat .studio-brand-lock-opt:hover {
+  background: transparent;
+}
+
+.evg-studio .studio-brand-lock-list--flat .studio-brand-lock-opt.on {
+  background: transparent;
+  border-color: var(--line);
+}
+
+.evg-studio .studio-brand-website-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  margin-bottom: 22px;
+}
+
+.evg-studio .studio-brand-website-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-website-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--bg-4);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  color: var(--acc-hi);
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-brand-website-icon.ok {
+  background: var(--ok-soft);
+  border-color: var(--ok-soft);
+  color: var(--ok);
+}
+
+.evg-studio .studio-brand-domain {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-brand-meta {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  color: var(--tx-3);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+}
+
+.evg-studio .studio-brand-connected {
+  font-family: var(--studio-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  background: var(--ok-soft);
+  color: var(--ok);
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-brand-section-label {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  margin-bottom: 12px;
+}
+
+.evg-studio .studio-brand-swatches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.evg-studio .studio-brand-swatch {
+  width: 56px;
+  height: 56px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-brand-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evg-studio .studio-brand-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx-1);
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 7px 14px;
+}
+
+.evg-studio .studio-brand-rules {
+  margin-top: 18px;
+}
+
+.evg-studio .studio-brand-rules-head {
+  margin-bottom: 16px;
+}
+
+.evg-studio .studio-brand-rules-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tx-0);
+  letter-spacing: -0.01em;
+}
+
+.evg-studio .studio-brand-rules-sub {
+  font-size: 12px;
+  color: var(--tx-2);
+  margin-top: 4px;
+}
+
+.evg-studio .studio-brand-rule-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  align-items: start;
+}
+
+.evg-studio .studio-brand-rule-row:last-child {
+  padding-bottom: 0;
+}
+
+.evg-studio .studio-brand-rule-key {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  padding-top: 2px;
+}
+
+.evg-studio .studio-brand-rule-val {
+  font-size: 13.5px;
+  color: var(--tx-1);
+  line-height: 1.45;
+}
+
+.evg-studio .studio-brand-lock-label {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  margin-bottom: 6px;
+}
+
+.evg-studio .studio-brand-lock-desc {
+  font-size: 12px;
+  color: var(--tx-2);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.evg-studio .studio-brand-lock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.evg-studio .studio-brand-lock-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background 0.14s, border-color 0.14s;
+}
+
+.evg-studio .studio-brand-lock-opt:hover {
+  background: var(--acc-softer);
+}
+
+.evg-studio .studio-brand-lock-opt.on {
+  background: var(--acc-softer);
+  border-color: var(--line-accent);
+}
+
+.evg-studio .studio-brand-lock-radio {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  margin-top: 2px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.evg-studio .studio-brand-lock-opt.on .studio-brand-lock-radio {
+  border-color: var(--acc);
+}
+
+.evg-studio .studio-brand-lock-opt.on .studio-brand-lock-radio::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--acc);
+}
+
+.evg-studio .studio-brand-lock-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-brand-lock-sub {
+  font-size: 12px;
+  color: var(--tx-2);
+  margin-top: 2px;
+}
+
+/* Markenprofil-Modal */
+.evg-studio .studio-modal-eyebrow {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--acc-hi);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.evg-studio .studio-modal-eyebrow .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--acc);
+}
+
+.evg-studio .studio-modal-title {
+  font-family: var(--studio-sans);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--tx-0);
+  margin: 0;
+}
+
+.evg-studio .studio-modal-sub {
+  font-size: 13px;
+  color: var(--tx-2);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.evg-studio .studio-modal-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  margin-top: 22px;
+}
+
+.evg-studio .studio-modal-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-xs);
+  border: none;
+  background: transparent;
+  color: var(--tx-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.14s, color 0.14s;
+}
+
+.evg-studio .studio-modal-tab.on {
+  background: var(--bg-2);
+  color: var(--tx-0);
+  box-shadow: var(--sh-1);
+}
+
+.evg-studio .studio-field-with-icon {
+  position: relative;
+}
+
+.evg-studio .studio-field-with-icon .studio-field {
+  padding-left: 40px;
+}
+
+.evg-studio .studio-field-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--tx-3);
+  pointer-events: none;
+}
+
+.evg-studio .studio-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-1);
+}
+
+.evg-studio .studio-modal-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  color: var(--tx-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.14s, color 0.14s;
+}
+
+.evg-studio .studio-modal-close:hover {
+  background: var(--bg-4);
+  color: var(--tx-0);
+}
+
+/* Markenprofil Review (Modal Schritt 2) */
+.evg-studio .studio-brand-review {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(92vh, 720px);
+  height: min(92vh, 720px);
+  overflow: hidden;
+}
+
+.evg-studio .studio-modal-mobile.flex .studio-brand-review {
+  height: 100%;
+  max-height: 100%;
+}
+
+.evg-studio .studio-brand-review-head {
+  flex-shrink: 0;
+  padding: 22px 24px 18px;
+  padding-right: 56px;
+}
+
+.evg-studio .studio-brand-review-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+}
+
+.evg-studio .studio-brand-review-source-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--tx-2);
+}
+
+.evg-studio .studio-brand-review-source-left span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evg-studio .studio-brand-review-confidence {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ok);
+  border: 1px solid var(--ok-soft);
+  background: var(--ok-soft);
+  border-radius: var(--r-xs);
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-brand-review-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 24px 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.evg-studio .studio-brand-review-label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.evg-studio .studio-brand-review-refs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.evg-studio .studio-brand-review-ref {
+  width: 92px;
+  height: 70px;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-brand-review-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.evg-studio .studio-brand-review-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 12px;
+  border-radius: var(--r-pill);
+  background: var(--bg-3);
+  border: 1px solid var(--line-strong);
+  font-size: 13px;
+  color: var(--tx-1);
+}
+
+.evg-studio .studio-brand-review-chip button {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--tx-3);
+  padding: 0;
+}
+
+.evg-studio .studio-brand-review-tone-input {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  width: 130px;
+  background: var(--bg-1);
+  border: 1px solid var(--line-accent);
+  color: var(--tx-0);
+  font-family: var(--studio-sans);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--acc-softer);
+}
+
+.evg-studio .studio-brand-review-add-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  border: 1.5px dashed var(--line-strong);
+  background: transparent;
+  color: var(--tx-3);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--studio-sans);
+  transition: color 0.14s, border-color 0.14s;
+}
+
+.evg-studio .studio-brand-review-add-chip:hover:not(:disabled) {
+  color: var(--tx-1);
+  border-color: var(--acc);
+}
+
+.evg-studio .studio-brand-review-colors {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.evg-studio .studio-brand-review-color {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.evg-studio .studio-brand-review-color-swatch-wrap {
+  position: relative;
+}
+
+.evg-studio .studio-brand-review-color-swatch {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.evg-studio .studio-brand-review-color-swatch-wrap button {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--bg-2);
+  color: var(--tx-3);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.evg-studio .studio-brand-review-color-hex {
+  font-family: var(--studio-mono);
+  font-size: 9px;
+  color: var(--tx-3);
+  letter-spacing: 0.04em;
+}
+
+.evg-studio .studio-brand-review-rules-wrap {
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-review-rules {
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  overflow: clip;
+}
+
+.evg-studio .studio-brand-review-rules-dos {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(111, 174, 132, 0.05);
+}
+
+.evg-studio .studio-brand-review-rules-donts {
+  padding: 12px 14px 10px;
+  background: rgba(232, 119, 46, 0.04);
+}
+
+.evg-studio .studio-brand-review-rules-heading {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 9px;
+  font-weight: 600;
+}
+
+.evg-studio .studio-brand-review-rules-heading.ok {
+  color: var(--ok);
+}
+
+.evg-studio .studio-brand-review-rules-heading.warn {
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-brand-review-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evg-studio .studio-brand-review-rule-line {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--tx-1);
+  line-height: 1.5;
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-review-rule-line > span:last-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.evg-studio .studio-brand-review-rule-icon {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.evg-studio .studio-brand-review-rule-icon.ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.evg-studio .studio-brand-review-rule-icon.warn {
+  background: var(--acc-softer);
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-brand-review-edit-details {
+  margin-top: 12px;
+}
+
+.evg-studio .studio-brand-review-edit-details summary {
+  font-size: 12px;
+  color: var(--tx-3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.evg-studio .studio-brand-review-edit-fields {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.evg-studio .studio-brand-review-foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+}
+
+.evg-studio .studio-brand-review-foot-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-review-foot-actions .studio-btn {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.evg-studio .studio-brand-review-error {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--warn);
+}
+
+.evg-studio .studio-settings-brand-banner {
+  margin-top: 24px;
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-accent);
+  background: linear-gradient(100deg, var(--acc-softer), transparent 55%), var(--bg-2);
+}
+
+.evg-studio .studio-settings-brand-banner-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.evg-studio .studio-settings-brand-banner-left {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.evg-studio .studio-settings-brand-banner-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--acc-soft);
+  color: var(--acc-hi);
+  border: 1px solid var(--line-accent);
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-settings-brand-banner-title {
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-settings-brand-banner-sub {
+  font-size: 13px;
+  color: var(--tx-2);
+  margin-top: 3px;
+}
+
+@keyframes studio-tour-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes studio-tour-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes studio-tour-wavebob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes studio-tour-pulsebtn {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(232, 119, 46, 0.4);
+  }
+  60% {
+    box-shadow: 0 0 0 9px rgba(232, 119, 46, 0);
+  }
+}
+
+.evg-studio .studio-tour-sheet-in {
+  animation: studio-tour-sheet-in 0.26s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* ============================================================
+   Mobile / tablet responsive (default → sm/md; desktop lg+ unchanged)
+   ============================================================ */
+
+@media (max-width: 639px) {
+  .evg-studio {
+    --gutter: 16px;
+    --topbar-h: 56px;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .evg-studio {
+    --gutter: 24px;
+    --topbar-h: 58px;
+  }
+}
+
+/* Shell layout */
+.evg-shell-topbar {
+  gap: 18px;
+}
+
+.evg-shell-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.evg-shell-topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--tx-0);
+  flex-shrink: 0;
+  padding: 4px 2px;
+  border-radius: var(--r-xs);
+  transition: opacity 0.14s ease;
+}
+
+.evg-shell-topbar-brand:hover {
+  opacity: 0.88;
+}
+
+.evg-shell-topbar-brand-name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.evg-shell-menu-btn {
+  display: none;
+  flex-shrink: 0;
+}
+
+.evg-shell-topbar-search {
+  flex: 1;
+  max-width: 460px;
+  position: relative;
+}
+
+.evg-shell-topbar-create-label {
+  display: inline;
+}
+
+.evg-shell-mobile-nav,
+.evg-shell-mobile-drawer,
+.evg-shell-mobile-backdrop {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .evg-shell-sidebar {
+    display: none !important;
+  }
+
+  .evg-shell-topbar {
+    gap: 10px;
+  }
+
+  .evg-shell-menu-btn {
+    display: inline-flex;
+  }
+
+  .evg-shell-topbar-breadcrumb {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .evg-shell-topbar-breadcrumb .studio-view-transition {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .evg-shell-topbar-breadcrumb .studio-view-transition__panel {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .evg-shell-topbar-spacer {
+    display: none;
+  }
+
+  .evg-shell-topbar-actions {
+    gap: 8px;
+  }
+
+  .evg-shell-topbar-divider {
+    display: none;
+  }
+
+  .evg-shell-topbar-brand-divider {
+    display: none;
+  }
+
+  .evg-shell-topbar-brand-name {
+    display: none;
+  }
+
+  .evg-shell-topbar-search {
+    display: none;
+  }
+
+  .evg-shell-main-column {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .evg-shell-mobile-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    height: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+    border-top: 1px solid var(--line);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .evg-shell-mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 44px;
+    padding: 6px 4px;
+    border: none;
+    background: transparent;
+    color: var(--tx-2);
+    font-family: var(--studio-sans);
+    font-size: 10px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.14s ease;
+  }
+
+  .evg-shell-mobile-nav-item svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .evg-shell-mobile-nav-item--active {
+    color: var(--acc-hi);
+  }
+
+  .evg-shell-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 34;
+    background: rgba(10, 8, 7, 0.72);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .evg-shell-mobile-backdrop--open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .evg-shell-mobile-drawer {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 35;
+    width: min(300px, 88vw);
+    background: var(--bg-1);
+    border-right: 1px solid var(--line);
+    padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-100%);
+    transition: transform 0.24s cubic-bezier(0.2, 0.7, 0.2, 1);
+    overflow-y: auto;
+  }
+
+  .evg-shell-mobile-drawer--open {
+    transform: translateX(0);
+  }
+
+  .evg-shell-mobile-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 4px 18px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 14px;
+  }
+
+  .evg-shell-mobile-drawer-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+  }
+}
+
+@media (max-width: 479px) {
+  .evg-shell-topbar-studio-label,
+  .evg-shell-topbar-chevron {
+    display: none;
+  }
+
+  .evg-shell-topbar-tokens-label {
+    display: none;
+  }
+
+  .evg-shell-topbar-create-label {
+    display: none;
+  }
+
+  .evg-shell-topbar-create {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    max-width: 38px;
+    padding: 0 !important;
+    gap: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0;
+  }
+
+  .evg-shell-topbar-create svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: block;
+    margin: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .evg-shell-mobile-nav,
+  .evg-shell-mobile-drawer,
+  .evg-shell-mobile-backdrop {
+    display: none !important;
+  }
+}
+
+/* Page titles (dashboard tabs with inline 44px headings) */
+.evg-studio .studio-dash-page-title {
+  margin-top: 10px;
+  font-family: var(--studio-sans);
+  font-weight: 700;
+  font-size: 44px;
+  letter-spacing: -1.4px;
+  line-height: 1.05;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-dash-page-title {
+    font-size: 28px;
+    letter-spacing: -0.8px;
+  }
+
+  .evg-studio .studio-page-title {
+    font-size: 24px;
+  }
+
+  .evg-studio .studio-stat-card .stat-value {
+    font-size: 2rem;
+  }
+
+  .evg-studio .studio-stat-card {
+    padding: 16px 18px;
+  }
+
+  .evg-studio .studio-card-pad {
+    padding: 16px;
+  }
+
+  .evg-studio .studio-brand-title {
+    font-size: 26px;
+  }
+
+  .evg-studio .studio-modal-title {
+    font-size: 22px;
+  }
+}
+
+/* Masthead */
+.evg-studio .studio-masthead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.evg-studio .studio-masthead-meta {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .evg-studio .studio-masthead {
+    font-size: 9.5px;
+    letter-spacing: 1.1px;
+    padding: 10px 0 14px;
+  }
+
+  .evg-studio .studio-masthead-meta {
+    gap: 12px;
+    width: 100%;
+  }
+
+  .evg-studio .studio-masthead-status {
+    width: 100%;
+  }
+}
+
+/* Dashboard hero header */
+.evg-studio .studio-dash-hero {
+  padding-top: 40px;
+  padding-bottom: 32px;
+}
+
+.evg-studio .studio-dash-hero-row {
+  margin-top: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 40px;
+}
+
+.evg-studio .studio-dash-hero-title {
+  font-family: var(--studio-sans);
+  font-weight: 700;
+  font-size: 64px;
+  line-height: 1;
+  letter-spacing: -2.4px;
+  margin: 0;
+  max-width: 760px;
+}
+
+@media (max-width: 1023px) {
+  .evg-studio .studio-dash-hero-title {
+    font-size: 40px;
+    letter-spacing: -1.4px;
+  }
+
+  .evg-studio .studio-dash-hero-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .evg-studio .studio-dash-hero-tokens {
+    text-align: left;
+    width: 100%;
+  }
+
+  .evg-studio .studio-dash-hero-tokens .studio-token-bar {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-dash-hero {
+    padding-top: 24px;
+    padding-bottom: 20px;
+  }
+
+  .evg-studio .studio-dash-hero-title {
+    font-size: 32px;
+    letter-spacing: -1px;
+  }
+}
+
+/* Section header */
+@media (max-width: 639px) {
+  .evg-studio .studio-section-header-wrap {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 8px;
+  }
+
+  .evg-studio .studio-section-header-wrap h2 {
+    font-size: 22px !important;
+  }
+}
+
+/* Grids */
+.evg-studio .studio-media-grid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 479px) {
+  .evg-studio .studio-media-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evg-studio .studio-team-invite-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.9fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+@media (max-width: 767px) {
+  .evg-studio .studio-team-invite-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .evg-studio .studio-team-invite-grid .studio-team-invite-submit {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+.evg-studio .studio-team-member-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-team-member-row {
+    flex-wrap: wrap;
+  }
+
+  .evg-studio .studio-team-member-row .studio-team-member-actions {
+    width: 100%;
+    margin-left: 50px;
+  }
+}
+
+.evg-studio .studio-settings-two-col {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 767px) {
+  .evg-studio .studio-settings-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evg-studio .studio-settings-save-row {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-settings-save-row .studio-btn,
+  .evg-studio .studio-settings-save-row .evg-cta {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+}
+
+.evg-studio .studio-pricing-summary {
+  padding: 20px 24px;
+  margin-bottom: 44px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, auto));
+  gap: 32px;
+  align-items: center;
+}
+
+@keyframes studio-pricing-price-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.evg-studio .studio-pricing-yearly-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  margin-bottom: 40px;
+  max-width: 520px;
+  margin-inline: auto;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  border-radius: var(--r-md);
+  transition:
+    background 0.32s ease,
+    border-color 0.32s ease,
+    box-shadow 0.32s ease;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on {
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  background: var(--ok-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 18%, transparent);
+}
+
+.evg-studio .studio-pricing-yearly-toggle-copy {
+  min-width: 0;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-title {
+  font-weight: 650;
+  font-size: 14px;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-pricing-yearly-toggle-pill {
+  position: relative;
+  display: inline-grid;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--bg-4);
+  color: var(--tx-3);
+  transition: background 0.32s ease, color 0.32s ease;
+  overflow: hidden;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-pill {
+  background: var(--ok);
+  color: #fff;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-pill-on,
+.evg-studio .studio-pricing-yearly-toggle-pill-off {
+  grid-area: 1 / 1;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-pill-on {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.evg-studio .studio-pricing-yearly-toggle-pill-off {
+  opacity: 1;
+  transform: none;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-pill-on {
+  opacity: 1;
+  transform: none;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-pill-off {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.evg-studio .studio-pricing-yearly-toggle-hint {
+  display: grid;
+  margin-top: 6px;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-hint p {
+  grid-area: 1 / 1;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.32s ease, transform 0.32s ease;
+  pointer-events: none;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-hint .studio-pricing-yearly-toggle-hint-off {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-hint-on {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-hint-off {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.evg-studio .studio-pricing-yearly-switch {
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--bg-4);
+  border: 1px solid var(--line-strong);
+  position: relative;
+  transition:
+    background 0.32s ease,
+    border-color 0.32s ease,
+    box-shadow 0.32s ease;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-switch {
+  background: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 70%, white);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+
+.evg-studio .studio-pricing-yearly-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: transform 0.32s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-switch-knob {
+  transform: translateX(18px);
+}
+
+.evg-studio .studio-pricing-yearly-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.evg-studio .studio-pricing-plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.evg-studio .studio-pricing-plans .studio-pricing-card {
+  transition:
+    border-color 0.38s ease,
+    box-shadow 0.38s ease,
+    background 0.38s ease;
+}
+
+.evg-studio .studio-pricing-card-wrap {
+  position: relative;
+}
+
+.evg-studio .studio-pricing-card-wrap.rec {
+  padding-top: 18px;
+}
+
+.evg-studio .studio-pricing-rec-badge {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  background: var(--acc);
+  color: var(--acc-ink);
+  font-family: var(--studio-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.evg-studio .studio-pricing-card {
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 26px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.evg-studio .studio-pricing-card.rec {
+  background: var(--bg-0);
+  border-color: var(--line-accent);
+  box-shadow: 0 0 0 1px var(--acc-lo), 0 20px 56px rgba(0, 0, 0, 0.45);
+}
+
+.evg-studio .studio-pricing-card.current {
+  border-color: var(--line-accent);
+}
+
+.evg-studio .studio-pricing-card-head {
+  margin-bottom: 20px;
+}
+
+.evg-studio .studio-pricing-card-tag {
+  font-family: var(--studio-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.evg-studio .studio-pricing-card-tag.rec {
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-pricing-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.evg-studio .studio-pricing-card-title {
+  font-family: var(--studio-accent-serif);
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 500;
+  margin: 0;
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-pricing-current-badge {
+  flex-shrink: 0;
+  margin-top: 4px;
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: var(--r-xs);
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.evg-studio .studio-pricing-promo-slot {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  overflow: hidden;
+  margin-bottom: 0;
+  transition:
+    grid-template-rows 0.42s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.34s ease,
+    margin-bottom 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.evg-studio .studio-pricing-promo-slot.on {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-bottom: 2px;
+}
+
+.evg-studio .studio-pricing-promo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  margin-bottom: 12px;
+  transform: translateY(-4px);
+  transition: transform 0.38s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.evg-studio .studio-pricing-promo-slot.on .studio-pricing-promo-row {
+  transform: none;
+}
+
+.evg-studio .studio-pricing-promo-badge {
+  font-family: var(--studio-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+  background: var(--acc);
+  color: var(--acc-ink);
+}
+
+.evg-studio .studio-pricing-promo-savings {
+  font-size: 12.5px;
+  color: var(--tx-2);
+}
+
+.evg-studio .studio-pricing-price-block {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+
+.evg-studio .studio-pricing-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.evg-studio .studio-pricing-price {
+  font-size: 52px;
+  line-height: 1;
+}
+
+.evg-studio .studio-pricing-price-anim {
+  display: inline-block;
+  animation: studio-pricing-price-in 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.evg-studio .studio-pricing-currency {
+  color: var(--tx-2);
+  font-size: 13px;
+  transition: color 0.28s ease;
+}
+
+.evg-studio .studio-pricing-compare-wrap {
+  display: inline-grid;
+  grid-template-columns: 0fr;
+  opacity: 0;
+  overflow: hidden;
+  vertical-align: baseline;
+  transition:
+    grid-template-columns 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.3s ease;
+}
+
+.evg-studio .studio-pricing-compare-wrap.on {
+  grid-template-columns: 1fr;
+  opacity: 1;
+}
+
+.evg-studio .studio-pricing-compare {
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--tx-3);
+  text-decoration: line-through;
+}
+
+.evg-studio .studio-pricing-price-meta-slot {
+  display: grid;
+  margin-top: 8px;
+  min-height: 1.35em;
+}
+
+.evg-studio .studio-pricing-price-meta {
+  grid-area: 1 / 1;
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.32s ease, transform 0.32s ease;
+  pointer-events: none;
+}
+
+.evg-studio .studio-pricing-price-meta.on {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.evg-studio .studio-pricing-price-sub-slot {
+  display: grid;
+  min-height: 1.5em;
+}
+
+.evg-studio .studio-pricing-price-sub {
+  grid-area: 1 / 1;
+  font-size: 10px;
+  margin: 6px 0 0;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.32s ease, transform 0.32s ease;
+  pointer-events: none;
+}
+
+.evg-studio .studio-pricing-price-sub.on {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.evg-studio .studio-pricing-savings-amount {
+  color: var(--ok);
+  transition: color 0.28s ease;
+}
+
+.evg-studio .studio-pricing-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  flex: 1;
+}
+
+.evg-studio .studio-pricing-features li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--tx-1);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.evg-studio .studio-pricing-check {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.evg-studio .studio-pricing-cta {
+  margin-top: 26px;
+}
+
+.evg-studio .studio-pricing-cta-current {
+  height: 46px;
+  border-radius: var(--r-sm);
+  background: var(--bg-4);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tx-3);
+  font-size: 13.5;
+  font-weight: 600;
+}
+
+.evg-studio .studio-pricing-cta-dark.studio-btn-primary {
+  background: var(--tx-0);
+  color: var(--bg-0);
+  border-color: var(--tx-0);
+  box-shadow: none;
+}
+
+.evg-studio .studio-pricing-cta-dark.studio-btn-primary:hover {
+  background: color-mix(in oklab, var(--tx-0), black 8%);
+  color: var(--bg-0);
+}
+
+.evg-studio .studio-pricing-footnote {
+  margin-top: 36px;
+  text-align: center;
+}
+
+.evg-studio .studio-pricing-footnote p {
+  font-family: var(--studio-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tx-3);
+  line-height: 2;
+  margin: 0;
+}
+
+@media (max-width: 1023px) {
+  .evg-studio .studio-pricing-plans {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-pricing-summary {
+    padding: 16px;
+    gap: 20px;
+    grid-template-columns: 1fr;
+  }
+
+  .evg-studio .studio-pricing-price {
+    font-size: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-studio .studio-pricing-price-anim {
+    animation: none;
+  }
+
+  .evg-studio .studio-pricing-promo-slot,
+  .evg-studio .studio-pricing-compare-wrap,
+  .evg-studio .studio-pricing-price-meta,
+  .evg-studio .studio-pricing-price-sub,
+  .evg-studio .studio-pricing-promo-row,
+  .evg-studio .studio-pricing-yearly-toggle,
+  .evg-studio .studio-pricing-yearly-switch,
+  .evg-studio .studio-pricing-yearly-switch-knob,
+  .evg-studio .studio-pricing-yearly-toggle-hint p,
+  .evg-studio .studio-pricing-yearly-toggle-pill-on,
+  .evg-studio .studio-pricing-yearly-toggle-pill-off,
+  .evg-studio .studio-pricing-plans .studio-pricing-card {
+    transition: none;
+  }
+}
+
+/* Inhalte erstellen */
+.evg-studio .studio-create-eyebrow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-create-eyebrow {
+    font-size: 9px !important;
+    letter-spacing: 0.8px !important;
+    white-space: nowrap;
+  }
+}
+
+.evg-studio .studio-create-form-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .evg-studio .studio-create-form-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.evg-studio .studio-create-coach-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 18px;
+  align-items: stretch;
+}
+
+@media (max-width: 1023px) {
+  .evg-studio .studio-create-coach-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evg-studio .studio-create-wizard {
+  position: relative;
+  display: grid;
+  gap: 0;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-create-wizard {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .evg-studio .studio-create-wizard::-webkit-scrollbar {
+    display: none;
+  }
+
+  .evg-studio .studio-create-wizard .studio-create-wizard-label {
+    font-size: 9px;
+    letter-spacing: 0.2px;
+  }
+
+  .evg-studio .evg-pill {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 479px) {
+  .evg-studio .studio-create-wizard .studio-create-wizard-label {
+    display: none;
+  }
+}
+
+.evg-studio .studio-create-preview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-create-preview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evg-studio .studio-create-coach-panel {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-create-coach-panel {
+    flex-direction: column;
+    gap: 14px;
+  }
+}
+
+.evg-studio .studio-create-generate-btn {
+  min-height: 44px;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-create-generate-btn {
+    width: 100%;
+  }
+}
+
+/* Activity rows on narrow screens */
+@media (max-width: 479px) {
+  .evg-studio .studio-activity-row-compact {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .evg-studio .studio-activity-meta {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+/* Brand profile rules */
+@media (max-width: 639px) {
+  .evg-studio .studio-brand-rule-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .evg-studio .studio-brand-website-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Modals — near full-screen on mobile */
+@media (max-width: 639px) {
+  .evg-studio.studio-modal-mobile,
+  .evg-studio .studio-modal-mobile {
+    position: fixed !important;
+    inset: 0 !important;
+    max-height: 100dvh !important;
+    height: 100dvh;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  .evg-studio .studio-brand-choice-modal {
+    margin: 0 !important;
+    max-width: 100% !important;
+    min-height: 100dvh;
+    border-radius: 0 !important;
+    padding: 20px 16px !important;
+  }
+
+  .evg-studio .studio-brand-choice-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .evg-studio .studio-brand-choice-actions .evg-cta,
+  .evg-studio .studio-brand-choice-actions button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .evg-studio .studio-modal-ref-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .evg-studio .studio-modal-foot {
+    flex-direction: column;
+  }
+
+  .evg-studio .studio-modal-foot .studio-btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .evg-studio .studio-brand-review {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .evg-studio .studio-brand-review-head {
+    padding: 18px 16px 14px;
+    padding-right: 48px;
+  }
+
+  .evg-studio .studio-brand-review-body {
+    padding: 14px 16px 4px;
+  }
+
+  .evg-studio .studio-brand-review-foot {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .evg-studio .studio-brand-review-foot-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .evg-studio .studio-brand-review-foot-actions .studio-btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+}
+
+/* Onboarding tour card */
+@media (max-width: 639px) {
+  .evg-studio .studio-tour-card-mobile {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: none !important;
+    top: auto !important;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+    transform: none !important;
+  }
+}
+
+/* Hopfen Hugo — floating chat (Studio design, works outside .evg-studio) */
+.evg-hopfenhugo-root {
+  --hh-bg-0: #131211;
+  --hh-bg-1: #1a1816;
+  --hh-bg-2: #201d1b;
+  --hh-bg-3: #272320;
+  --hh-line: rgba(255, 255, 255, 0.08);
+  --hh-line-strong: rgba(255, 255, 255, 0.12);
+  --hh-tx-0: #f4f1ec;
+  --hh-tx-1: #c4bdb3;
+  --hh-tx-2: #8a837a;
+  --hh-tx-3: #635c54;
+  --hh-acc: #e8772e;
+  --hh-acc-hi: #f0924f;
+  --hh-acc-soft: rgba(232, 119, 46, 0.14);
+  --hh-acc-ink: #1a1208;
+  --hh-sh-pop: 0 24px 60px -12px rgba(0, 0, 0, 0.72), 0 0 0 1px var(--hh-line-strong);
+  font-family: var(--font-hanken), system-ui, sans-serif;
+}
+
+.evg-hopfenhugo-panel {
+  width: min(400px, 92vw);
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--hh-line-strong);
+  background: var(--hh-bg-1);
+  box-shadow: var(--hh-sh-pop);
+  color: var(--hh-tx-0);
+}
+
+.evg-hopfenhugo-head {
+  position: relative;
+  border-bottom: 1px solid var(--hh-line);
+  padding: 14px 16px;
+  overflow: hidden;
+}
+
+.evg-hopfenhugo-head-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 120% at 0% 0%, var(--hh-acc-soft), transparent 55%);
+  pointer-events: none;
+}
+
+.evg-hopfenhugo-head-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.evg-hopfenhugo-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.evg-hopfenhugo-status {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #6fae84;
+  border: 2px solid var(--hh-bg-1);
+}
+
+.evg-hopfenhugo-head-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.evg-hopfenhugo-name {
+  margin: 0;
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--hh-tx-0);
+}
+
+.evg-hopfenhugo-role {
+  margin: 2px 0 0;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hh-tx-3);
+}
+
+.evg-hopfenhugo-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--hh-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hh-tx-2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.evg-hopfenhugo-close:hover {
+  background: var(--hh-bg-3);
+  color: var(--hh-tx-0);
+}
+
+.evg-hopfenhugo-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: min(360px, 48vh);
+  overflow-y: auto;
+  padding: 16px;
+  background: linear-gradient(180deg, var(--hh-bg-1) 0%, var(--hh-bg-0) 100%);
+}
+
+.evg-hopfenhugo-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  max-width: 100%;
+}
+
+.evg-hopfenhugo-row--user {
+  flex-direction: row-reverse;
+  align-self: flex-end;
+}
+
+.evg-hopfenhugo-msg-avatar {
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+.evg-hopfenhugo-bubble {
+  max-width: min(88%, 280px);
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.evg-hopfenhugo-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.evg-hopfenhugo-bubble-label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hh-tx-3);
+}
+
+.evg-hopfenhugo-bubble--assistant {
+  background: var(--hh-bg-3);
+  border: 1px solid var(--hh-line);
+  color: var(--hh-tx-0);
+  border-bottom-left-radius: 4px;
+}
+
+.evg-hopfenhugo-bubble--user {
+  background: var(--hh-acc);
+  color: var(--hh-acc-ink);
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 14px rgba(232, 119, 46, 0.25);
+}
+
+.evg-hopfenhugo-bubble--typing {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 16px;
+}
+
+.evg-hopfenhugo-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--hh-tx-2);
+  animation: evg-hopfenhugo-bounce 1.2s ease-in-out infinite;
+}
+
+.evg-hopfenhugo-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.evg-hopfenhugo-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes evg-hopfenhugo-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.evg-hopfenhugo-foot {
+  border-top: 1px solid var(--hh-line);
+  padding: 12px 14px 14px;
+  background: var(--hh-bg-1);
+}
+
+.evg-hopfenhugo-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.evg-hopfenhugo-input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--hh-line-strong);
+  background: var(--hh-bg-2);
+  color: var(--hh-tx-0);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.evg-hopfenhugo-input::placeholder {
+  color: var(--hh-tx-3);
+}
+
+.evg-hopfenhugo-input:focus {
+  border-color: color-mix(in srgb, var(--hh-acc) 55%, transparent);
+  box-shadow: 0 0 0 3px var(--hh-acc-soft);
+}
+
+.evg-hopfenhugo-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--hh-acc);
+  color: var(--hh-acc-ink);
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.evg-hopfenhugo-send:hover:not(:disabled) {
+  background: var(--hh-acc-hi);
+  transform: scale(1.04);
+}
+
+.evg-hopfenhugo-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.evg-hopfenhugo-policy {
+  margin: 10px 4px 0;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--hh-tx-3);
+  text-align: center;
+}
+
+.evg-hopfenhugo-policy a {
+  color: var(--hh-tx-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.evg-hopfenhugo-policy a:hover {
+  color: var(--hh-acc-hi);
+}
+
+.evg-hopfenhugo-fab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border: 2px solid color-mix(in srgb, var(--hh-acc) 35%, transparent);
+  border-radius: 999px;
+  background: var(--hh-bg-2);
+  box-shadow: var(--hh-sh-pop), 0 0 24px var(--hh-acc-soft);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.evg-hopfenhugo-fab:hover {
+  border-color: var(--hh-acc);
+  box-shadow: var(--hh-sh-pop), 0 0 32px rgba(232, 119, 46, 0.35);
+}
+
+.evg-hopfenhugo-fab--open {
+  background: var(--hh-bg-3);
+  border-color: var(--hh-line-strong);
+  color: var(--hh-tx-0);
+  box-shadow: var(--hh-sh-pop);
+}
+
+.evg-hopfenhugo-fab-icon {
+  width: 44px;
+  height: 44px;
+}

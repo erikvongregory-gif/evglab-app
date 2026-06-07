@@ -24,12 +24,12 @@ async function handleSignOut(request: Request) {
     return response;
   };
   if (!isSupabaseConfigured()) {
-    const response = createNoStoreRedirect(`${origin}/`, requestId);
+    const response = createNoStoreRedirect(`${origin}/anmelden?notice=signed_out`, requestId);
     return clearAdmin2FACookies(response);
   }
   const supabase = await createClient();
   await supabase.auth.signOut();
-  const response = createNoStoreRedirect(`${origin}/`, requestId);
+  const response = createNoStoreRedirect(`${origin}/anmelden?notice=signed_out`, requestId);
   return clearAdmin2FACookies(response);
 }
 

@@ -1,0 +1,187 @@
+import { z } from "zod";
+
+export const flaschenTypSchema = z.enum([
+  "euro_longneck_330",
+  "euro_steinie_330",
+  "nrw_500",
+  "vichy_500",
+  "buegel_500",
+  "buegel_330",
+]);
+
+export const glasTypSchema = z.enum(["pils_tulpe", "weizen", "willibecher", "masskrug", "ipa_teku", "schwenker", "stange"]);
+
+export const bierstilSchema = z.enum([
+  "hefeweizen",
+  "kristallweizen",
+  "pils",
+  "helles_lager",
+  "helles",
+  "ipa",
+  "neipa",
+  "stout",
+  "porter",
+  "bock",
+  "saison",
+  "kellerbier",
+  "rauchbier",
+]);
+
+export const imageQualitySchema = z.enum(["medium", "high"]).default("high");
+export const aspectRatioSchema = z.enum(["1:1", "4:5", "9:16", "16:9"]).default("4:5");
+export const studioAspectRatioSchema = z.enum(["1:1", "2:3"]).default("1:1");
+
+/** Aus Skill SCHRITT 1, Frage 8 — Personen-Modus A–E + Sub-Slots. */
+export const personenModusSchema = z.enum(["A", "B", "C", "D", "E"]);
+export const gruppenDynamikSchema = z.enum(["E1", "E2", "E3", "E4"]);
+export const gruppenAnzahlSchema = z.enum(["2", "3", "4_5"]);
+export const gruppenTypSchema = z.enum(["gemischt", "frauen", "maenner", "paerchen"]);
+export const personGenderSchema = z.enum(["maennlich", "weiblich", "divers"]);
+export const personAlterSchema = z.enum(["jung", "mittel", "aelter"]);
+export const personKoerperSchema = z.enum(["kopf_schultern", "halbkoerper", "ganzkoerper"]);
+export const personMoodSchema = z.enum(["entspannt", "lachend", "nachdenklich", "aktiv"]);
+export const gruppenSettingSchema = z.enum([
+  "alpine_huette",
+  "biergarten",
+  "berge_outdoor",
+  "rooftop_urban",
+  "strand",
+]);
+
+/** Aus Skill SCHRITT 1, Frage 1b — Behälter G/F/B. */
+export const behaelterSchema = z.enum(["G", "F", "B"]);
+
+/** Aus Skill — 5 Stimmung-Trends. */
+export const stimmungSchema = z.enum([
+  "nachhaltig",
+  "modern",
+  "nostalgie",
+  "aktiv",
+  "premium",
+]);
+
+/** Aus Skill SCHRITT 1, Frage 9 — Shot Type A–H. */
+export const shotTypeSchema = z.enum(["A", "B", "C", "D", "E", "F", "G", "H"]);
+
+/** Aus Skill SCHRITT 1, Frage 7 — Etikett-Treue. */
+export const etikettModusSchema = z.enum(["marke", "generisch"]);
+
+/** Aus Skill — KI-Plattform-Auswahl. */
+export const kiPlattformSchema = z.enum([
+  "gpt_image_2",
+  "nano_banana_pro",
+  "nano_banana_2",
+  "midjourney",
+]);
+
+/** Aus Skill — Zielgruppe a–d. */
+export const zielgruppeSchema = z.enum([
+  "entdecker",
+  "traditionsbewusst",
+  "gesundheitsbewusst",
+  "geniesser",
+]);
+
+export const hyperrealisticSchema = z.object({
+  etikettBild: z.string().url(),
+  flaschenTyp: flaschenTypSchema,
+  flaschenfarbe: z.enum(["braun", "gruen", "klar"]).default("braun"),
+  bierstil: z.string().trim().min(1),
+  glasTyp: glasTypSchema.optional(),
+  szene: z.enum([
+    "biergarten_sommer",
+    "wirtshaus_innen",
+    "kueche_zuhause",
+    "wiese_picknick",
+    "strand_sonnenuntergang",
+    "alpenpanorama",
+    "stadtbalkon_abend",
+    "brauereihof",
+    "fussball_public_viewing",
+  ]),
+  /** Legacy boolean; bevorzugt personenModus verwenden. */
+  personImBild: z.boolean().default(false),
+  personBeschreibung: z.string().trim().max(180).optional(),
+  /** Aus Skill Frage 8 [A–E]. Optional fuer Backwards-Compat — Default im Builder. */
+  personenModus: personenModusSchema.optional(),
+  personGender: personGenderSchema.optional(),
+  personAlter: personAlterSchema.optional(),
+  personKoerper: personKoerperSchema.optional(),
+  personMood: personMoodSchema.optional(),
+  gruppenDynamik: gruppenDynamikSchema.optional(),
+  gruppenAnzahl: gruppenAnzahlSchema.optional(),
+  gruppenTyp: gruppenTypSchema.optional(),
+  gruppenSetting: gruppenSettingSchema.optional(),
+  /** Skill Frage 1b [G/F/B]. */
+  behaelter: behaelterSchema.optional(),
+  tageszeit: z.enum(["goldene_stunde", "mittag", "abend_warm", "blaue_stunde"]).default("goldene_stunde"),
+  /** Trend-Stimmung aus Skill — bevorzugt vor Legacy stimmung-Begriffen. */
+  stimmungTrend: stimmungSchema.optional(),
+  /** Legacy. */
+  stimmung: z.enum(["entspannt", "feierlich", "gesellig", "kontemplativ"]).default("entspannt"),
+  /** Shot Type A–H aus Skill Frage 9. */
+  shotType: shotTypeSchema.optional(),
+  /** Etikett-Treue aus Skill Frage 7. */
+  etikettModus: etikettModusSchema.optional(),
+  /** Ziel-KI aus Skill Frage 6. */
+  kiPlattform: kiPlattformSchema.optional(),
+  /** Zielgruppe — optional, kommt sonst aus Markenprofil. */
+  zielgruppe: zielgruppeSchema.optional(),
+  zusatzWunsch: z.string().trim().max(300).optional(),
+  aspectRatio: aspectRatioSchema,
+  quality: imageQualitySchema,
+});
+
+export const productIsolateSchema = z.object({
+  inputBild: z.string().url(),
+  hintergrund: z.enum(["transparent", "weiss", "schwarz"]).default("transparent"),
+  schattenErhalten: z.boolean().default(true),
+  outputFormat: z.enum(["png", "webp"]).default("png"),
+});
+
+export const productStudioSchema = z.object({
+  referenzBild: z.string().url(),
+  bierstil: bierstilSchema,
+  hintergrundStil: z.enum([
+    "naturholz_warm",
+    "marmor_hell",
+    "schiefer_dunkel",
+    "leinen_rustikal",
+    "studio_gradient_warm",
+    "studio_gradient_kuehl",
+    "outdoor_naturlich",
+  ]),
+  glasNebenFlasche: z.boolean().default(true),
+  glasTyp: glasTypSchema.optional(),
+  customProps: z.string().trim().max(240).optional(),
+  lichtStimmung: z.enum(["weich_diffuse", "hart_dramatisch", "natuerlich_fensterlicht"]).default("weich_diffuse"),
+  aspectRatio: studioAspectRatioSchema,
+  quality: imageQualitySchema,
+});
+
+export const campaignTextSchema = z.object({
+  referenzBilder: z.array(z.string().url()).min(3).max(5),
+  postZiel: z.enum([
+    "produkt_launch",
+    "event_ankuendigung",
+    "saisonal",
+    "behind_the_scenes",
+    "rezept_pairing",
+    "community_engagement",
+    "edukativ_bierwissen",
+    "sale_aktion",
+  ]),
+  headline: z.string().trim().min(1).max(60),
+  subline: z.string().trim().max(120).optional(),
+  ctaText: z.string().trim().max(30).optional(),
+  brauereiName: z.string().trim().min(1).max(80),
+  bierstilOderProdukt: z.string().trim().max(80).optional(),
+  zusatzKontext: z.string().trim().max(400).optional(),
+  aspectRatio: z.enum(["1:1", "4:5", "9:16"]).default("4:5"),
+  quality: imageQualitySchema,
+});
+
+export type HyperrealisticInput = z.infer<typeof hyperrealisticSchema>;
+export type ProductIsolateInput = z.infer<typeof productIsolateSchema>;
+export type ProductStudioInput = z.infer<typeof productStudioSchema>;
+export type CampaignTextInput = z.infer<typeof campaignTextSchema>;

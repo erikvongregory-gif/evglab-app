@@ -1,0 +1,80 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`inhalte-erstellen prompt builders > builds a campaign text prompt snapshot 1`] = `
+"INSTAGRAM CAMPAIGN POST for craft brewery "Hopfenhof".
+
+STYLE REFERENCE: Match the visual style, color grading, composition rules, and tonal mood of the 5 reference images provided (treat them as the brand's existing Instagram feed aesthetic). Maintain visual consistency with that feed — same color palette, same lighting language, same compositional rhythm.
+
+POST PURPOSE: new product launch announcement.
+FEATURED PRODUCT: Helles Lager.
+
+TEXT OVERLAY — render the following text directly into the image, integrated into the design:
+
+  HEADLINE (large, prominent): "Frisch eingebraut"
+  SUBLINE (smaller): "Unser neues Helles ist da."
+  CTA (bottom, clear): "Jetzt probieren"
+
+TEXT RENDERING RULES:
+- Typography must be legible at thumbnail size
+- German umlauts (ä, ö, ü, ß) MUST render correctly
+- Text placement respects the composition, doesn't cover the hero subject
+- Font choice should feel native to the brand style shown in references (modern sans-serif if feed is contemporary, serif if classic, hand-lettered if rustic)
+
+FORMAT: 4:5 aspect ratio, Instagram-native.
+
+ADDITIONAL CONTEXT: Sommerlich, hell und freundlich.
+
+QUALITY: Editorial, on-brand, scroll-stopping. Not generic AI aesthetic. Feel like it was designed by a human social media designer who knows this brewery."
+`;
+
+exports[`inhalte-erstellen prompt builders > builds a hyperrealistic prompt snapshot 1`] = `
+"PHOTOREALISTIC PRODUCT-IN-SCENE PHOTOGRAPHY.
+
+SUBJECT: A amber-brown glass 500ml NRW beer bottle, classic German regional shape, slightly tapered neck. The label on the bottle MUST be reproduced 1:1 EXACTLY from the reference image — same artwork, same typography, same colors, same proportions, no reinterpretation, no stylization. Treat the label as a fixed graphic asset to be applied flat-perspective-corrected onto the bottle.
+
+A poured tall slender Pils tulip glass with thin stem, narrow opening, fine white foam head ca. 2cm stands next to the bottle. The beer color matches the style "pils". Maintain correct proportional scale: "bottle and glass shown in correct proportional scale, glass volume visually matches bottle content".
+
+A person (Mann ca. 40, Bart, lacht) holding or sitting next to the bottle, natural authentic body language, no posing.
+
+SCENE: traditional German Biergarten, wooden bench and table, gravel ground, chestnut tree shade with dappled sunlight, other guests blurred in background.
+LIGHTING: golden hour lighting, warm 3200K tones, long soft shadows.
+MOOD: rustic sustainable craft atmosphere, warm earth tones, muted greens, natural brown, honey-yellow palette, farm-to-brew authenticity.
+
+SHOT: classic 45° hero shot, balanced commercial framing.
+
+STYLE: Editorial commercial photography, shot on full-frame DSLR, 50mm or 85mm lens, f/2.8, shallow depth of field but bottle and label fully sharp. Natural color grading, no Instagram filters. Authentic, no AI-glossy plastic look.
+
+ADDITIONAL: Dezente Hopfenranken im Vordergrund.
+
+NEGATIVE: distorted label, warped text on label, generic stock-photo bottle, wrong bottle shape, plastic bottle, illustration style, painting, cartoon, oversaturated, hands with extra fingers, AI face artifacts, glossy unrealistic skin, floating bottle, condensation overdone like sticker droplets."
+`;
+
+exports[`inhalte-erstellen prompt builders > builds a product isolate prompt snapshot 1`] = `
+"PRODUCT CUTOUT / ISOLATION TASK.
+
+Isolate the beer bottle (and any glass if visible) from the reference image. Preserve every detail of the label, the bottle glass color, the cap, the liquid color visible through the glass. Place onto a fully transparent background (alpha channel).
+
+Keep a soft natural contact shadow under the bottle for grounding.
+
+DO NOT redraw, restyle, or reinterpret the label or bottle. Pixel-faithful isolation only. Clean edges, no halo, no fringing. Studio-grade alpha matte quality."
+`;
+
+exports[`inhalte-erstellen prompt builders > builds a product studio prompt snapshot 1`] = `
+"COMMERCIAL PRODUCT STUDIO PHOTOGRAPHY for a craft brewery.
+
+HERO PRODUCT: The beer bottle from the reference image, with the label reproduced 1:1 EXACTLY — same artwork, typography, colors, proportions. The label is a fixed graphic asset, not to be reinterpreted.
+
+COMPANION GLASS: A tall curvy 500ml Weizen glass (vase shape), thick foam crown 3-4cm, hazy golden-amber color, freshly poured beer matching the style "hefeweizen".
+
+STYLING / PROPS arranged tastefully around the product: Zitronenscheibe, frische Weizenähren, Bananenblätter dezent. Props are accents, not clutter — composition follows the rule of thirds, breathing space around the hero bottle.
+
+SURFACE / BACKGROUND: warm natural oak wood surface, slight grain visible.
+
+LIGHTING: soft diffused studio light from large softbox, gentle shadows. Bottle has subtle highlight on the shoulder, label is fully readable and evenly lit. Slight condensation droplets allowed but realistic (not stickered-on look).
+
+CAMERA: Medium-format quality, 100mm macro or 85mm lens equivalent, f/5.6, tack-sharp on the label, gentle bokeh on background props.
+
+STYLE: Editorial product photography, magazine-quality, reminiscent of high-end craft brewery campaigns. No AI-glossy look, no oversaturation, authentic textures.
+
+NEGATIVE: warped label, distorted text, wrong bottle shape, plastic-looking glass, oversaturated colors, cluttered composition, generic stock-photo feel, cartoonish, painted style, melted glass, floating props."
+`;

@@ -27,12 +27,16 @@ export type DashboardSettings = {
   weeklySummary: boolean;
   brandProfileMode: "undecided" | "guided" | "skip";
   brandInstagramUrl: string;
+  brandWebsiteUrl: string;
+  brandProfileSource: "url" | "instagram" | "manual" | "skip";
   brandLockLevel: "strict" | "balanced" | "loose";
   brandTone: string;
   brandColors: string;
   brandDos: string;
   brandDonts: string;
   brandReferenceImageUrls: string[];
+  /** ISO-Zeitstempel der letzten Website-/Marken-Analyse */
+  brandAnalyzedAt?: string;
 };
 
 export type DashboardMetadata = {

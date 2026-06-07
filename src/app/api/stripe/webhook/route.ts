@@ -11,21 +11,12 @@ import {
   updateByStripeSubscription,
 } from "@/lib/billing/store";
 import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import { mapPriceIdToPlan } from "@/lib/billing/stripePrices";
 
 function getStripeClient() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY fehlt.");
   return new Stripe(key);
-}
-
-function mapPriceIdToPlan(priceId?: string | null): SubscriptionPlanKey | null {
-  const map: Record<SubscriptionPlanKey, string | undefined> = {
-    start: process.env.STRIPE_PRICE_START_MONTHLY,
-    growth: process.env.STRIPE_PRICE_GROWTH_MONTHLY,
-    pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
-  };
-  const entry = Object.entries(map).find(([, id]) => id && id === priceId);
-  return (entry?.[0] as SubscriptionPlanKey | undefined) ?? null;
 }
 
 function toIsoFromUnix(seconds?: number | null) {

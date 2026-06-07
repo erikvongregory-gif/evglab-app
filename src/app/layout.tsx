@@ -27,9 +27,9 @@ export const metadata: Metadata = {
   description: SITE.defaultDescription,
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
   icons: {
-    icon: [{ url: "/icon.svg?v=20260427", type: "image/svg+xml" }],
-    shortcut: ["/icon.svg?v=20260427"],
-    apple: [{ url: "/icon.png?v=20260427", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: "/icon.svg?v=20260607", type: "image/svg+xml" }],
+    shortcut: ["/icon.svg?v=20260607"],
+    apple: [{ url: "/icon.png?v=20260607", sizes: "180x180", type: "image/png" }],
   },
 };
 

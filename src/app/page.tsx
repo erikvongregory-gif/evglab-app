@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { AuthLandingRouter } from "@/components/auth/auth-landing-router";
+import { hasAuthCallbackParams, resolveAuthCallbackRedirect } from "@/lib/supabase/authEntryRedirect";
 
 export default async function HomePage({
   searchParams,
@@ -6,12 +8,10 @@ export default async function HomePage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = (await searchParams) ?? {};
-  const q = new URLSearchParams();
-  for (const [key, raw] of Object.entries(params)) {
-    if (raw === undefined) continue;
-    const vals = Array.isArray(raw) ? raw : [raw];
-    for (const v of vals) q.append(key, v);
+
+  if (hasAuthCallbackParams(params)) {
+    redirect(resolveAuthCallbackRedirect(params)!);
   }
-  const qs = q.toString();
-  redirect(qs ? `/anmelden?${qs}` : "/anmelden");
+
+  return <AuthLandingRouter searchParams={params} />;
 }

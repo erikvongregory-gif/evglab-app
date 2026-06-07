@@ -1,172 +1,298 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import React, { startTransition, useCallback, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Eye, EyeOff } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { GridBackground } from "@/components/ui/grid-background";
-import { Icons } from "@/components/ui/icons";
-import { Input } from "@/components/ui/input";
+import { loginFontClassName } from "@/lib/fonts/studio-fonts";
 import { LOGIN_WAITLIST_ENABLED } from "@/lib/featureFlags";
+import { EvglabMark } from "@/components/studio/evglab-mark";
+import { MARKETING_SITE_URL } from "@/lib/siteConfig";
+import styles from "./sign-in.module.css";
 
-const GoogleIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 48 48" aria-hidden>
+type AuthMode = "signin" | "register";
+
+function resolveAuthMode(searchParams: URLSearchParams, fallback: AuthMode): AuthMode {
+  const modeParam = searchParams.get("mode");
+  if (modeParam === "register") return "register";
+  if (modeParam === "signin") return "signin";
+  return fallback;
+}
+
+const GoogleG = () => (
+  <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden>
     <path
-      fill="#FFC107"
-      d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s12-5.373 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-2.641-.21-5.236-.611-7.743z"
+      fill="#4285F4"
+      d="M22.5 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.9a5 5 0 0 1-2.2 3.3v2.7h3.5c2-1.9 3.3-4.7 3.3-7.9z"
     />
     <path
-      fill="#FF3D00"
-      d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+      fill="#34A853"
+      d="M12 23c3 0 5.5-1 7.3-2.7l-3.5-2.7c-1 .7-2.3 1.1-3.8 1.1-2.9 0-5.4-2-6.3-4.6H2v2.8A11 11 0 0 0 12 23z"
     />
+    <path fill="#FBBC05" d="M5.7 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2a11 11 0 0 0 0 9.8l3.7-2.8z" />
     <path
-      fill="#4CAF50"
-      d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
-    />
-    <path
-      fill="#1976D2"
-      d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C42.022 35.026 44 30.038 44 24c0-2.641-.21-5.236-.611-7.743z"
+      fill="#EA4335"
+      d="M12 5.4c1.6 0 3 .6 4.2 1.6l3.1-3.1A11 11 0 0 0 2 7.1l3.7 2.8C6.6 7.3 9.1 5.4 12 5.4z"
     />
   </svg>
 );
 
-export interface Testimonial {
-  avatarSrc: string;
-  name: string;
-  handle: string;
-  text: string;
+const MailIcon = () => (
+  <svg
+    className={styles.icoLeft}
+    viewBox="0 0 24 24"
+    width="17"
+    height="17"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <rect x="3" y="5.5" width="18" height="13" rx="2" />
+    <path d="m4 7 8 5.5L20 7" />
+  </svg>
+);
+
+const LockIcon = () => (
+  <svg
+    className={styles.icoLeft}
+    viewBox="0 0 24 24"
+    width="17"
+    height="17"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+    <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+  </svg>
+);
+
+function EyeIcon({ off }: { off: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="17"
+      height="17"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {off ? (
+        <>
+          <path d="M3 3l18 18" />
+          <path d="M10.6 5.1A10 10 0 0 1 12 5c5 0 9 4.5 10 7-.4 1-1.3 2.4-2.6 3.6M6.2 6.7C4.2 8 2.8 9.8 2 12c1 2.5 5 7 10 7 1.6 0 3-.4 4.3-1" />
+          <path d="M9.5 9.6a3 3 0 0 0 4.2 4.2" />
+        </>
+      ) : (
+        <>
+          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      )}
+    </svg>
+  );
 }
 
 export interface SignInPageProps {
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  heroImageSrc?: string;
-  testimonials?: Testimonial[];
-  /** POST-Ziel für E-Mail/Passwort (Standard `/auth/signin`). Wird ignoriert, wenn `onSignIn` gesetzt ist. */
   authPostAction?: string;
-  /** Wert für verstecktes Feld `next` */
+  signupPostAction?: string;
   nextPath?: string;
   showGoogle?: boolean;
   googleNextPath?: string;
-  registerHref?: string;
   resetPasswordHref?: string;
   feedbackNotice?: React.ReactNode;
   feedbackError?: React.ReactNode;
+  initialMode?: AuthMode;
+  inviteToken?: string;
+  inviteOnly?: boolean;
   onSignIn?: (event: React.FormEvent<HTMLFormElement>) => void;
+  onSignUp?: (event: React.FormEvent<HTMLFormElement>) => void;
   onGoogleSignIn?: () => void;
+  googlePending?: boolean;
   onResetPassword?: () => void;
-  onCreateAccount?: () => void;
   waitlistMode?: boolean;
+  signInOnly?: boolean;
 }
 
-function GlassInputWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-border bg-foreground/5 backdrop-blur-sm transition-colors focus-within:border-[#c65a20]/55 focus-within:bg-[#c65a20]/[0.07] dark:focus-within:border-[#e07a40]/50">
-      {children}
-    </div>
-  );
-}
-
-function TestimonialCard({ testimonial, delay }: { testimonial: Testimonial; delay: string }) {
-  return (
-    <div
-      className={`animate-testimonial ${delay} flex w-64 items-start gap-3 rounded-3xl border border-white/10 bg-card/40 p-5 backdrop-blur-xl dark:bg-zinc-800/40`}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element -- externe Demo-Avatare */}
-      <img
-        src={testimonial.avatarSrc}
-        className="h-10 w-10 rounded-2xl object-cover"
-        alt={`Portrait ${testimonial.name} (${testimonial.handle})`}
-      />
-      <div className="text-sm leading-snug">
-        <p className="flex items-center gap-1 font-medium">{testimonial.name}</p>
-        <p className="text-muted-foreground">{testimonial.handle}</p>
-        <p className="mt-1 text-foreground/80">{testimonial.text}</p>
-      </div>
-    </div>
-  );
-}
-
-function SignInSubmitInner({ label }: { label: string }) {
+function AuthSubmitInner({ mode }: { mode: AuthMode }) {
   const { pending } = useFormStatus();
+  const isRegister = mode === "register";
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="animate-element animate-delay-600 w-full rounded-2xl bg-[#c65a20] py-4 font-medium text-white transition-colors hover:bg-[#b14f1c] disabled:cursor-not-allowed disabled:opacity-70"
-    >
-      {pending ? "Wird angemeldet …" : label}
+    <button type="submit" disabled={pending} className={styles.btnPrimary}>
+      {pending
+        ? isRegister
+          ? "Wird registriert …"
+          : "Wird angemeldet …"
+        : isRegister
+          ? "Jetzt registrieren"
+          : "Anmelden"}
     </button>
   );
 }
 
-const DEFAULT_HERO =
-  "https://images.unsplash.com/photo-1642615835477-d303d7dc9ee9?w=2160&q=80&auto=format&fit=crop";
+function LoginHero({ mode }: { mode: AuthMode }) {
+  const isRegister = mode === "register";
 
-const DEFAULT_TESTIMONIALS: Testimonial[] = [
-  {
-    avatarSrc: "https://randomuser.me/api/portraits/women/57.jpg",
-    name: "Anna M.",
-    handle: "Brauhaus Süd",
-    text: "KI-Bilder und Posts sparen uns jede Woche Stunden – alles aus einem Dashboard.",
-  },
-  {
-    avatarSrc: "https://randomuser.me/api/portraits/men/64.jpg",
-    name: "Jonas K.",
-    handle: "@wildbräu",
-    text: "Sauberes Onboarding, klare Oberfläche. Genau das, was wir als kleine Brauerei brauchen.",
-  },
-  {
-    avatarSrc: "https://randomuser.me/api/portraits/men/32.jpg",
-    name: "Lea T.",
-    handle: "Gasthaus am Markt",
-    text: "Bewertungen und Social laufen stabiler seit wir mit EvGlab arbeiten.",
-  },
-];
+  return (
+    <section className={styles.hero}>
+      <div className={styles.glow} aria-hidden />
+      <div className={styles.mesh} aria-hidden />
+
+      <a href={MARKETING_SITE_URL} className={styles.brand} aria-label="EvGlab Startseite">
+        <EvglabMark className={styles.brandMark} />
+        <span className={styles.brandName}>EvGlab</span>
+      </a>
+
+      <div className={`${styles.heroBody} ${styles.stagger}`}>
+        <div className={styles.eyebrow}>
+          <span className={styles.eyebrowLine} aria-hidden />
+          KI-Marketing · Brauereien
+        </div>
+
+        <div className={styles.heroHeadlineStack}>
+          <h1
+            className={`${styles.display} ${styles.heroHeadline} ${!isRegister ? styles.heroHeadlineVisible : ""}`}
+            aria-hidden={isRegister}
+          >
+            Dein Motiv.
+            <br />
+            <em>Generiert.</em>
+            <br />
+            Sofort.
+          </h1>
+          <h1
+            className={`${styles.display} ${styles.heroHeadline} ${isRegister ? styles.heroHeadlineVisible : ""}`}
+            aria-hidden={!isRegister}
+          >
+            Drei Motive.
+            <br />
+            <em>Kostenlos.</em>
+            <br />
+            Jetzt.
+          </h1>
+        </div>
+
+        <div className={styles.hook}>
+          <span className={styles.hookCount}>3</span>
+          <span>
+            Bilder <b>kostenlos</b> generieren — keine Kreditkarte
+          </span>
+        </div>
+      </div>
+
+      <div className={`${styles.heroFoot} ${styles.eyebrow}`}>
+        <span className={styles.dotOk} aria-hidden />
+        app.evglab.com · v2.4 · live
+      </div>
+    </section>
+  );
+}
 
 export const SignInPage: React.FC<SignInPageProps> = ({
-  title = <span className="font-light tracking-tighter text-foreground">Willkommen zurück</span>,
-  description = "Melde dich an und weiter im Dashboard mit KI-Content für deine Brauerei.",
-  heroImageSrc = DEFAULT_HERO,
-  testimonials = DEFAULT_TESTIMONIALS,
   authPostAction,
+  signupPostAction,
   nextPath = "/dashboard",
   showGoogle = true,
   googleNextPath,
-  registerHref = "/registrieren",
-  resetPasswordHref = "/registrieren",
+  resetPasswordHref = "/passwort-vergessen",
   feedbackNotice,
   feedbackError,
+  initialMode = "signin",
+  inviteToken,
+  inviteOnly = false,
   onSignIn,
+  onSignUp,
   onGoogleSignIn,
+  googlePending = false,
   onResetPassword,
-  onCreateAccount,
   waitlistMode = LOGIN_WAITLIST_ENABLED,
+  signInOnly = false,
 }) => {
-  const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const mode = resolveAuthMode(searchParams, initialMode);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [showPw, setShowPw] = useState(false);
+  const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [waitlistJoined, setWaitlistJoined] = useState(false);
   const [waitlistPending, setWaitlistPending] = useState(false);
   const [waitlistError, setWaitlistError] = useState<string | null>(null);
-  const nextQuery = new URLSearchParams(nextPath.split("?")[1] ?? "");
-  const intentPlan = nextQuery.get("plan");
-  const intentCheckout = nextQuery.get("checkout");
-  const intentSource = nextQuery.get("source");
-  const hasHomepageCheckoutIntent =
-    (intentPlan === "start" || intentPlan === "growth" || intentPlan === "pro") &&
-    intentCheckout === "1" &&
-    intentSource === "homepage_pricing";
-  const appendIntentToHref = (href: string) => {
-    if (!hasHomepageCheckoutIntent) return href;
-    const sep = href.includes("?") ? "&" : "?";
-    return `${href}${sep}plan=${encodeURIComponent(intentPlan)}&checkout=1&source=homepage_pricing`;
-  };
-  const registerHrefWithIntent = appendIntentToHref(registerHref);
+
+  const isRegister = mode === "register";
+
+  const setMode = useCallback(
+    (next: AuthMode) => {
+      setLocalError(null);
+      const params = new URLSearchParams(searchParams.toString());
+      if (next === "register") {
+        params.set("mode", "register");
+      } else {
+        params.delete("mode");
+        params.delete("error");
+        params.delete("notice");
+      }
+      const qs = params.toString();
+      const href = qs ? `${pathname}?${qs}` : pathname;
+      startTransition(() => {
+        router.replace(href, { scroll: false });
+      });
+    },
+    [pathname, router, searchParams],
+  );
+
   const googleHref = `/auth/google?next=${encodeURIComponent(googleNextPath ?? nextPath)}`;
-  const googleRegisterHref = `/auth/google?next=${encodeURIComponent(googleNextPath ?? nextPath)}`;
-  const postTarget = authPostAction ?? "/auth/signin";
+  const signInAction = authPostAction ?? "/auth/signin";
+  const signUpAction = signupPostAction ?? "/auth/signup";
+  const postTarget = isRegister ? signUpAction : signInAction;
+
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (onSignIn && !isRegister) {
+      onSignIn(event);
+      return;
+    }
+    if (onSignUp && isRegister) {
+      onSignUp(event);
+      return;
+    }
+
+    if (isRegister) {
+      const form = event.currentTarget;
+      const password = String(new FormData(form).get("password") ?? "");
+      const passwordConfirm = String(new FormData(form).get("passwordConfirm") ?? "");
+      if (password !== passwordConfirm) {
+        event.preventDefault();
+        setLocalError("Passwörter stimmen nicht überein.");
+        return;
+      }
+    }
+    setLocalError(null);
+  };
+
+  const formProps =
+    onSignIn && !isRegister
+      ? { onSubmit: onSignIn }
+      : onSignUp && isRegister
+        ? { onSubmit: onSignUp }
+        : {
+            action: postTarget,
+            method: "post" as const,
+            onSubmit: handleFormSubmit,
+          };
+
+  const displayError = localError ?? feedbackError;
+
   const handleWaitlistSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const email = waitlistEmail.trim();
@@ -182,9 +308,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, source: "login_waitlist" }),
       });
-      const payload = (await res.json().catch(() => null)) as
-        | { ok?: boolean; duplicate?: boolean; error?: string }
-        | null;
+      const payload = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!res.ok) {
         setWaitlistError(payload?.error || "Eintrag fehlgeschlagen. Bitte versuch es erneut.");
         return;
@@ -198,289 +322,237 @@ export const SignInPage: React.FC<SignInPageProps> = ({
     }
   };
 
-  const formProps = onSignIn
-    ? { onSubmit: onSignIn }
-    : {
-        action: postTarget,
-        method: "post" as const,
-      };
-
   if (waitlistMode) {
     return (
-      <div className="relative min-h-screen">
-        <GridBackground />
-        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8">
-          <div className="w-full max-w-xl space-y-10 rounded-2xl border border-white/10 bg-black/40 p-8 text-white backdrop-blur-xl">
-            <div className="space-y-4 text-center">
-              <h2 className="bg-gradient-to-br from-gray-100 to-gray-400 bg-clip-text text-4xl font-extrabold text-transparent sm:text-5xl">
-                Login bald wieder offen
-              </h2>
-              <p className="mx-auto max-w-lg text-lg text-gray-300">
-                Trag dich in die Warteliste ein. Du bekommst als Erstes Bescheid, sobald Login und Registrierung
-                wieder freigeschaltet sind.
-              </p>
-            </div>
-
-            <form className="mx-auto flex max-w-md gap-2" onSubmit={handleWaitlistSubmit}>
-              <Input
-                type="email"
-                placeholder="Deine E-Mail"
-                value={waitlistEmail}
-                onChange={(event) => setWaitlistEmail(event.target.value)}
-                className="h-12 border-gray-700 bg-gray-950/60 text-white placeholder:text-gray-400"
-              />
-              <Button
-                type="submit"
-                disabled={waitlistPending}
-                className="h-12 bg-white px-6 text-black hover:bg-white/90 disabled:opacity-70"
-                variant="ghost"
-              >
-                {waitlistPending ? "..." : "Eintragen"}
-              </Button>
-            </form>
-
-            {waitlistJoined ? (
-              <p className="text-center text-sm text-emerald-300">Danke! Du stehst jetzt auf der Warteliste.</p>
-            ) : null}
-            {waitlistError ? (
-              <p className="text-center text-sm text-rose-300">{waitlistError}</p>
-            ) : null}
-
-            <div className="flex flex-col items-center gap-8">
-              <div className="flex items-center gap-4">
-                <div className="flex -space-x-3">
-                  <Avatar className="h-12 w-12 border-2 border-white/20">
-                    <AvatarFallback className="bg-purple-600 text-sm font-semibold">JD</AvatarFallback>
-                  </Avatar>
-                  <Avatar className="h-12 w-12 border-2 border-white/20">
-                    <AvatarFallback className="bg-blue-600 text-sm font-semibold">AS</AvatarFallback>
-                  </Avatar>
-                  <Avatar className="h-12 w-12 border-2 border-white/20">
-                    <AvatarFallback className="bg-blue-700 text-sm font-semibold">MK</AvatarFallback>
-                  </Avatar>
+      <div className={`${styles.shell} ${styles.shellFormOnly} ${loginFontClassName}`}>
+        <section className={styles.formwrap}>
+          <div className={styles.formcol}>
+            <h2 className={styles.waitlistTitle}>Login bald wieder offen</h2>
+            <p className={styles.waitlistDesc}>
+              Trag dich in die Warteliste ein. Du bekommst als Erstes Bescheid, sobald Login und Registrierung
+              wieder freigeschaltet sind.
+            </p>
+            <form onSubmit={handleWaitlistSubmit}>
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel} htmlFor="waitlist-email">
+                  E-Mail
+                </label>
+                <div className={styles.fieldIco}>
+                  <input
+                    id="waitlist-email"
+                    type="email"
+                    value={waitlistEmail}
+                    onChange={(event) => setWaitlistEmail(event.target.value)}
+                    placeholder="name@beispiel.de"
+                    className={styles.field}
+                    autoComplete="email"
+                  />
+                  <MailIcon />
                 </div>
-                <span className="font-bold text-gray-100">100+ Personen auf der Warteliste</span>
               </div>
-
-              <div className="flex justify-center gap-6">
-                <a
-                  href="https://wa.me/4915565602176"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="WhatsApp"
-                >
-                  <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-200">
-                    <Icons.whatsApp className="h-5 w-5 fill-current" />
-                  </Button>
-                </a>
-                <a
-                  href="https://www.linkedin.com/in/erik-freiherr-von-gregory-22852b329"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="LinkedIn"
-                >
-                  <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-200">
-                    <Icons.linkedIn className="h-5 w-5 fill-current" />
-                  </Button>
-                </a>
-              </div>
-            </div>
+              <button type="submit" disabled={waitlistPending} className={styles.btnPrimary}>
+                {waitlistPending ? "Wird eingetragen …" : "Auf die Warteliste"}
+              </button>
+            </form>
+            {waitlistJoined ? <p className={styles.waitlistSuccess}>Danke! Du stehst jetzt auf der Warteliste.</p> : null}
+            {waitlistError ? <p className={styles.waitlistError}>{waitlistError}</p> : null}
           </div>
-        </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="flex h-[100dvh] w-[100dvw] flex-col font-sans md:flex-row">
-      <section className="flex flex-1 items-center justify-center overflow-y-auto p-8">
-        <div className="w-full max-w-md">
-          <div className="flex flex-col gap-6">
-            <h1 className="animate-element animate-delay-100 text-4xl font-semibold leading-tight md:text-5xl">{title}</h1>
-            <p className="animate-element animate-delay-200 text-muted-foreground">{description}</p>
+    <div className={`${styles.shell} ${loginFontClassName}`}>
+      <LoginHero mode={mode} />
+      <div className={styles.divider} aria-hidden />
 
-            {feedbackNotice ? (
-              <div
-                className="animate-element animate-delay-240 rounded-2xl border border-emerald-200/80 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-900/25 dark:text-emerald-100"
-                role="status"
-              >
-                {feedbackNotice}
-              </div>
-            ) : null}
-
-            {feedbackError ? (
-              <div
-                className="animate-element animate-delay-240 rounded-2xl border border-red-200/90 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
-                role="alert"
-              >
-                {feedbackError}
-              </div>
-            ) : null}
-
-            <form className="space-y-5" {...formProps}>
-              <input type="hidden" name="next" value={nextPath} />
-              <div className="animate-element animate-delay-300">
-                <label className="text-sm font-medium text-muted-foreground">E-Mail</label>
-                <GlassInputWrapper>
-                  <input
-                    name="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    placeholder="name@brauerei.de"
-                    className="w-full rounded-2xl bg-transparent p-4 text-sm focus:outline-none"
-                  />
-                </GlassInputWrapper>
-              </div>
-
-              <div className="animate-element animate-delay-400">
-                <label className="text-sm font-medium text-muted-foreground">Passwort</label>
-                <GlassInputWrapper>
-                  <div className="relative">
-                    <input
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      autoComplete="current-password"
-                      placeholder="Dein Passwort"
-                      className="w-full rounded-2xl bg-transparent p-4 pr-12 text-sm focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-3 flex items-center"
-                      aria-label={showPassword ? "Passwort verbergen" : "Passwort anzeigen"}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5 text-muted-foreground transition-colors hover:text-foreground" />
-                      ) : (
-                        <Eye className="h-5 w-5 text-muted-foreground transition-colors hover:text-foreground" />
-                      )}
-                    </button>
-                  </div>
-                </GlassInputWrapper>
-              </div>
-
-              <div className="animate-element animate-delay-500 flex flex-wrap items-center justify-between gap-2 text-sm">
-                <label className="flex cursor-pointer items-center gap-3">
-                  <input type="checkbox" name="rememberMe" className="size-4 rounded border border-input accent-[#c65a20]" />
-                  <span className="text-foreground/90">Angemeldet bleiben</span>
-                </label>
-                {onResetPassword ? (
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onResetPassword?.();
-                    }}
-                    className="text-[#c65a20] transition-colors hover:underline"
-                  >
-                    Passwort vergessen?
-                  </a>
-                ) : (
-                  <Link href={resetPasswordHref} className="text-[#c65a20] transition-colors hover:underline">
-                    Passwort vergessen?
-                  </Link>
-                )}
-              </div>
-
-              <SignInSubmitInner label="Anmelden" />
-            </form>
-
-            {showGoogle ? (
+      <section className={styles.formwrap}>
+        <div className={`${styles.formcol} ${styles.stagger}`}>
+          <h2 className={styles.formTitle}>{signInOnly ? "Admin-Anmeldung" : isRegister ? "Konto erstellen" : "Willkommen zurück"}</h2>
+          <p className={styles.lead}>
+            {signInOnly ? (
+              <>Nur für EvGlab-Administratoren. Nach dem Login folgt ein E-Mail-Sicherheitscode.</>
+            ) : isRegister ? (
               <>
-                <div className="animate-element animate-delay-700 relative flex items-center justify-center">
-                  <span className="w-full border-t border-border" />
-                  <span className="absolute bg-background px-4 text-sm text-muted-foreground">Oder weiter mit</span>
-                </div>
-
-                {onGoogleSignIn ? (
-                  <div className="space-y-3">
-                    <button
-                      type="button"
-                      onClick={onGoogleSignIn}
-                      className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
-                    >
-                      <GoogleIcon />
-                      Mit Google anmelden
-                    </button>
-                    <Link
-                      href={googleRegisterHref}
-                      className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
-                    >
-                      <GoogleIcon />
-                      Mit Google registrieren
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <Link
-                      href={googleHref}
-                      className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
-                    >
-                      <GoogleIcon />
-                      Mit Google anmelden
-                    </Link>
-                    <Link
-                      href={googleRegisterHref}
-                      className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-2xl border border-border py-4 transition-colors hover:bg-secondary"
-                    >
-                      <GoogleIcon />
-                      Mit Google registrieren
-                    </Link>
-                  </div>
-                )}
+                Bereits Konto?{" "}
+                <button type="button" className={styles.modeToggle} onClick={() => setMode("signin")}>
+                  Anmelden →
+                </button>
               </>
-            ) : null}
+            ) : (
+              <>
+                Noch kein Konto?{" "}
+                <button type="button" className={styles.modeToggle} onClick={() => setMode("register")}>
+                  Kostenlos starten →
+                </button>
+              </>
+            )}
+          </p>
 
-            <p className="animate-element animate-delay-900 text-center text-sm text-muted-foreground">
-              Neu bei EvGlab?{" "}
-              {onCreateAccount ? (
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onCreateAccount?.();
-                  }}
-                  className="text-[#c65a20] transition-colors hover:underline"
-                >
-                  Registrierung (Einladung)
-                </a>
-              ) : (
-                <Link href={registerHrefWithIntent} className="text-[#c65a20] transition-colors hover:underline">
-                  Registrierung (Einladung)
-                </Link>
-              )}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {heroImageSrc ? (
-        <section className="relative hidden flex-1 p-4 md:block">
-          <div
-            className="animate-slide-right animate-delay-300 absolute inset-4 rounded-3xl bg-cover bg-center shadow-inner dark:shadow-black/40"
-            style={{ backgroundImage: `url(${heroImageSrc})` }}
-            role="img"
-            aria-label="Stimmungsbild: moderne Brauerei- und Arbeitsumgebung für Marketing"
-          />
-          {testimonials.length > 0 ? (
-            <div className="absolute bottom-8 left-1/2 flex w-full -translate-x-1/2 justify-center gap-4 px-8">
-              <TestimonialCard testimonial={testimonials[0]!} delay="animate-delay-1000" />
-              {testimonials[1] ? (
-                <div className="hidden xl:flex">
-                  <TestimonialCard testimonial={testimonials[1]} delay="animate-delay-1200" />
-                </div>
-              ) : null}
-              {testimonials[2] ? (
-                <div className="hidden 2xl:flex">
-                  <TestimonialCard testimonial={testimonials[2]} delay="animate-delay-1400" />
-                </div>
-              ) : null}
+          {inviteOnly && isRegister && !inviteToken ? (
+            <div className={`${styles.feedback} ${styles.feedbackError}`} role="status">
+              Registrierung ist nur mit Einladung möglich. Bitte nutze deinen Einladungslink.
             </div>
           ) : null}
-        </section>
-      ) : null}
+
+          {feedbackNotice ? (
+            <div className={`${styles.feedback} ${styles.feedbackNotice}`} role="status">
+              {feedbackNotice}
+            </div>
+          ) : null}
+
+          {displayError ? (
+            <div className={`${styles.feedback} ${styles.feedbackError}`} role="alert">
+              {displayError}
+            </div>
+          ) : null}
+
+          <form key={mode} className={styles.formBlock} {...formProps}>
+            <input type="hidden" name="next" value={nextPath} />
+            {inviteToken ? <input type="hidden" name="inviteToken" value={inviteToken} /> : null}
+
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel} htmlFor="auth-email">
+                E-Mail
+              </label>
+              <div className={styles.fieldIco}>
+                <input
+                  id="auth-email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="name@beispiel.de"
+                  className={styles.field}
+                />
+                <MailIcon />
+              </div>
+            </div>
+
+            <div className={isRegister ? styles.fieldGroup : styles.fieldGroupLast}>
+              <div className={isRegister ? undefined : styles.labelRow}>
+                <label className={styles.fieldLabel} htmlFor="auth-password">
+                  Passwort
+                </label>
+                {!isRegister ? (
+                  onResetPassword ? (
+                    <a
+                      href="#"
+                      className={styles.forgot}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onResetPassword();
+                      }}
+                    >
+                      Vergessen?
+                    </a>
+                  ) : (
+                    <Link href={resetPasswordHref} className={styles.forgot}>
+                      Vergessen?
+                    </Link>
+                  )
+                ) : null}
+              </div>
+              <div className={styles.fieldIco}>
+                <input
+                  id="auth-password"
+                  name="password"
+                  type={showPw ? "text" : "password"}
+                  required
+                  minLength={isRegister ? 8 : undefined}
+                  autoComplete={isRegister ? "new-password" : "current-password"}
+                  placeholder="••••••••"
+                  className={`${styles.field} ${styles.fieldPw}`}
+                />
+                <LockIcon />
+                <button
+                  type="button"
+                  className={styles.pwToggle}
+                  onClick={() => setShowPw((value) => !value)}
+                  aria-label={showPw ? "Passwort verbergen" : "Passwort anzeigen"}
+                >
+                  <EyeIcon off={showPw} />
+                </button>
+              </div>
+            </div>
+
+            <div className={`${styles.confirmWrap} ${isRegister ? styles.confirmWrapOpen : ""}`}>
+              <div className={styles.confirmInner}>
+                <div className={styles.fieldGroupLast}>
+                  <label className={styles.fieldLabel} htmlFor="auth-password-confirm">
+                    Passwort bestätigen
+                  </label>
+                  <div className={styles.fieldIco}>
+                    <input
+                      id="auth-password-confirm"
+                      name="passwordConfirm"
+                      type={showPwConfirm ? "text" : "password"}
+                      required={isRegister}
+                      disabled={!isRegister}
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      className={`${styles.field} ${styles.fieldPw}`}
+                      tabIndex={isRegister ? 0 : -1}
+                      aria-hidden={!isRegister}
+                    />
+                    <LockIcon />
+                    <button
+                      type="button"
+                      className={styles.pwToggle}
+                      onClick={() => setShowPwConfirm((value) => !value)}
+                      aria-label={showPwConfirm ? "Passwort verbergen" : "Passwort anzeigen"}
+                      tabIndex={isRegister ? 0 : -1}
+                    >
+                      <EyeIcon off={showPwConfirm} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <AuthSubmitInner mode={mode} />
+          </form>
+
+          {showGoogle ? (
+            <>
+              <div className={styles.or}>oder</div>
+              {onGoogleSignIn ? (
+                <button
+                  type="button"
+                  onClick={onGoogleSignIn}
+                  disabled={googlePending}
+                  className={styles.btnGoogle}
+                >
+                  <GoogleG />
+                  {googlePending
+                    ? "Weiter zu Google …"
+                    : isRegister
+                      ? "Mit Google registrieren"
+                      : "Mit Google anmelden"}
+                </button>
+              ) : (
+                <a href={googleHref} className={styles.btnGoogle} rel="noopener">
+                  <GoogleG />
+                  {isRegister ? "Mit Google registrieren" : "Mit Google anmelden"}
+                </a>
+              )}
+            </>
+          ) : null}
+
+          <p className={styles.legal}>
+            Mit der {isRegister ? "Registrierung" : "Anmeldung"} akzeptierst du unsere{" "}
+            <Link href="/agb" target="_blank" rel="noopener noreferrer">
+              AGB
+            </Link>{" "}
+            und{" "}
+            <Link href="/datenschutz" target="_blank" rel="noopener noreferrer">
+              Datenschutzerklärung
+            </Link>
+            .
+          </p>
+        </div>
+      </section>
     </div>
   );
 };

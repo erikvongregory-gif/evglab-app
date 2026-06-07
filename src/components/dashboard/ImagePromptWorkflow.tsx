@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { ImageGeneration } from "@/components/ui/ai-chat-image-generation-1";
+import { MAX_REFERENCE_UPLOADS } from "@/lib/image-types/policy";
 import { cn } from "@/lib/utils";
 
 type Zielgruppe =
@@ -1886,7 +1887,7 @@ export function ImagePromptWorkflow({
       type: "select",
       options: ["330ml", "500ml", "750ml"],
     },
-    { key: "markenname", label: "5) Markenname", required: true, placeholder: 'z. B. Brauerei Adler oder "generisch"', type: "text" },
+    { key: "markenname", label: "5) Markenname", required: true, placeholder: 'z. B. Muster GmbH oder "generisch"', type: "text" },
     {
       key: "zielgruppe",
       label: "6) Zielgruppe",
@@ -2289,7 +2290,7 @@ export function ImagePromptWorkflow({
         behaelter: "Flasche + Glas",
         flaschenTyp: "Longneck",
         flaschenVolumen: "500ml",
-        markenname: "Brauerei Muster",
+        markenname: "Muster GmbH",
         zielgruppe: scene === "Produkt-Studio" ? "" : "Der Genießer",
         plattform: "Instagram Post",
         stimmung: config.allowedMoods[0],
@@ -2308,7 +2309,7 @@ export function ImagePromptWorkflow({
         behaelter: "Flasche + Glas",
         flaschenTyp: "Stubbi / NRW",
         flaschenVolumen: "500ml",
-        markenname: "Brauerei Muster",
+        markenname: "Muster GmbH",
         zielgruppe: "Der Genießer",
         plattform: "Instagram Post",
         stimmung: "Premium/Luxus",
@@ -2331,7 +2332,7 @@ export function ImagePromptWorkflow({
         behaelter: "Flasche + Glas",
         flaschenTyp: "Longneck",
         flaschenVolumen: "500ml",
-        markenname: "Brauerei Muster",
+        markenname: "Muster GmbH",
         zielgruppe: "Der Genießer",
         plattform: "Instagram Post",
         stimmung: "Premium/Luxus",
@@ -2637,7 +2638,7 @@ export function ImagePromptWorkflow({
         .filter(Boolean)
         .join("\n\n");
 
-      const maxReferenceFiles = effectiveBrief.etikettModus === "Ja, Etikett 1:1" ? 1 : 2;
+      const maxReferenceFiles = effectiveBrief.etikettModus === "Ja, Etikett 1:1" ? 1 : MAX_REFERENCE_UPLOADS;
       const referenceImageUrls = files?.length
         ? await Promise.all(files.slice(0, maxReferenceFiles).map((file) => fileToDataUrl(file)))
         : undefined;
@@ -2683,7 +2684,10 @@ export function ImagePromptWorkflow({
         const previewUrl = `/api/kie/download?url=${encodeURIComponent(openAiData.imageUrl)}&format=${imageOutputFormat}&taskId=${encodeURIComponent(generationId)}`;
         setGeneratedImageUrl(previewUrl);
         setLastTaskId(generationId);
-        setLastUsedModel(openAiData.usedModel || "chatgpt-image-2");
+        setLastUsedModel(
+          openAiData.usedModel ||
+            (referenceImageUrls?.length ? "gpt-image-2-image-to-image" : "gpt-image-2-text-to-image"),
+        );
         if (openAiData.billing) {
           onBillingStateUpdate?.(openAiData.billing);
         }
@@ -3168,6 +3172,7 @@ export function ImagePromptWorkflow({
               clearOnSend={false}
               isLoading={isImageGenerating}
               disabled={!hasActiveSubscription && !hasFreeTrialAvailable}
+              maxReferenceImages={brief.etikettModus === "Ja, Etikett 1:1" ? 1 : MAX_REFERENCE_UPLOADS}
               placeholder="Prompt anpassen, optional Referenzbild anhängen, dann auf Senden klicken (= Bild generieren)."
               onSend={(message, fileList) => {
                 if (requiresSubscription) {

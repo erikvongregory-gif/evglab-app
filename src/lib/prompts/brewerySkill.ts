@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+/** Kurzer Fallback, falls SKILL.md nicht geladen werden kann. */
 export const DEFAULT_BREWERY_IMAGE_SKILL_SYSTEM_PROMPT = `
 You are EvGlab's senior creative director for brewery marketing visuals in DACH.
 You convert structured German briefing data into one technically precise, production-ready English image prompt.
@@ -5,23 +9,60 @@ You convert structured German briefing data into one technically precise, produc
 Hard rules:
 - Output ONLY the final English prompt as plain text.
 - No markdown, no headings, no explanations, no JSON, no code fences.
-- Always assume target model is Nano Banana Pro quality style.
+- Always assume target model is GPT Image 2 unless briefing specifies otherwise.
 - Keep result photorealistic and commercially usable.
-
-Prompt quality requirements:
-- Include beer style realism: liquid color, carbonation behavior, foam texture/retention.
-- Use correct glass mapping by beer style (e.g. Weizen -> tall curved Weizen glass, Pils -> tall slender Pilsner flute, Helles/Lager -> Willibecher).
-- Include material realism terms (dielectric glass/refraction, condensation droplets, specular highlights).
-- Include scene mood from briefing and coherent props/background.
-- Include lighting strategy (at least one clear technique + realistic direction).
-- Include camera intent (angle/composition + lens/depth of field).
-- Include platform-fit composition guidance and aspect-ratio awareness.
-- If label text is provided, ask for clear, legible label rendering.
-- If "vermeiden" is provided, include concise negative constraints at the end.
-- Avoid painterly/illustrated look unless user explicitly requests it.
-
-Safety/style constraints:
-- No references to real identifiable persons.
-- Prefer anonymous/product-focused scenes unless user explicitly asks for people.
-- Keep wording concise but specific; avoid redundant adjectives.
 `.trim();
+
+export const DASHBOARD_PROMPT_OUTPUT_RULES = `
+Dashboard-API-Modus (ueberschreibt Schritt 5 Ausgabeformat):
+- Gib NUR den finalen englischen Bildprompt als reinen Fliesstext zurueck.
+- Kein Markdown, keine Ueberschriften, kein Deutsch, kein Konfigurationsblock.
+- Wende Schritte 2–4 intern an (Glas-Mapping, SRM-Farbe, Licht, Kamera, Negative als Prosa am Ende).
+- Bei GPT Image 2: beginne mit "High-fidelity photorealistic commercial product shot.", nutze SRM+Hex im Subject-Block, Qualitaets-Trigger (ultra-detailed, professionally retouched).
+- Integriere Negative Prompts als "Avoid ... Do not include ... Exclude ..." am Promptende.
+`.trim();
+
+function stripMarkdownFrontmatter(markdown: string): string {
+  const trimmed = markdown.trim();
+  if (!trimmed.startsWith("---")) return trimmed;
+  const end = trimmed.indexOf("---", 3);
+  if (end === -1) return trimmed;
+  return trimmed.slice(end + 3).trim();
+}
+
+function loadBrauereiBildSkillMarkdown(): string {
+  const skillPath = join(process.cwd(), "src/lib/prompts/brauerei-bild/SKILL.md");
+  return stripMarkdownFrontmatter(readFileSync(skillPath, "utf8"));
+}
+
+let cachedSkillMarkdown: string | null = null;
+
+export function clearBrauereiBildSkillCache(): void {
+  cachedSkillMarkdown = null;
+}
+
+export function getBrauereiBildSkillMarkdown(): string {
+  if (cachedSkillMarkdown) return cachedSkillMarkdown;
+  try {
+    cachedSkillMarkdown = loadBrauereiBildSkillMarkdown();
+    return cachedSkillMarkdown;
+  } catch {
+    return DEFAULT_BREWERY_IMAGE_SKILL_SYSTEM_PROMPT;
+  }
+}
+
+/** Vollstaendiger brauerei-bild Skill fuer Claude System-Prompts. */
+export function getBreweryImageSkillSystemPrompt(): string {
+  const fromEnv = process.env.ANTHROPIC_SKILL_PROMPT?.trim();
+  if (fromEnv) return fromEnv;
+  return getBrauereiBildSkillMarkdown();
+}
+
+/** System-Prompt fuer Dashboard-APIs: Skill + Plain-Text-Ausgabe. */
+export function getDashboardBrauereiBildSystemPrompt(): string {
+  return `${getBreweryImageSkillSystemPrompt()}\n\n${DASHBOARD_PROMPT_OUTPUT_RULES}`;
+}
+
+export function sanitizeClaudePromptOutput(raw: string): string {
+  return raw.replace(/^```[a-zA-Z]*\s*/g, "").replace(/```$/g, "").trim();
+}

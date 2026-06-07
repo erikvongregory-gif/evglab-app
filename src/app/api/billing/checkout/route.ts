@@ -4,11 +4,14 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAppBaseUrlOrigin, isBillingCheckoutEnabled, isKleinunternehmerModeEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow, setStripeCustomerId } from "@/lib/billing/store";
+import { getPriceIdForPlan } from "@/lib/billing/stripePrices";
+import type { BillingInterval } from "@/lib/billing/planCatalog";
 import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
 const checkoutSchema = z.object({
   plan: z.enum(["start", "growth", "pro"]),
+  interval: z.enum(["monthly", "yearly"]).optional().default("yearly"),
 });
 
 function getStripeClient() {
@@ -17,15 +20,8 @@ function getStripeClient() {
   return new Stripe(key);
 }
 
-function getPriceIdForPlan(plan: SubscriptionPlanKey) {
-  const map: Record<SubscriptionPlanKey, string | undefined> = {
-    start: process.env.STRIPE_PRICE_START_MONTHLY,
-    growth: process.env.STRIPE_PRICE_GROWTH_MONTHLY,
-    pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
-  };
-  const priceId = map[plan];
-  if (!priceId) throw new Error(`Stripe Price-ID für Plan "${plan}" fehlt.`);
-  return priceId;
+function getPriceIdForPlanCheckout(plan: SubscriptionPlanKey, interval: BillingInterval) {
+  return getPriceIdForPlan(plan, interval);
 }
 
 function isAutomaticTaxEnabled() {
@@ -67,6 +63,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
     }
     const plan: SubscriptionPlanKey = parsed.data.plan;
+    const interval: BillingInterval = parsed.data.interval;
 
     const stripe = getStripeClient();
     await ensureBillingRow(user.id);
@@ -82,7 +79,7 @@ export async function POST(req: Request) {
       await setStripeCustomerId(user.id, customer.id);
     }
 
-    const priceId = getPriceIdForPlan(plan);
+    const priceId = getPriceIdForPlanCheckout(plan, interval);
     const origin = getAppBaseUrlOrigin(new URL(req.url).origin);
     const kleinunternehmerMode = isKleinunternehmerModeEnabled();
     const automaticTaxEnabled = isAutomaticTaxEnabled() && !kleinunternehmerMode;
@@ -90,8 +87,8 @@ export async function POST(req: Request) {
       mode: "subscription",
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/dashboard?billing=cancel`,
+      success_url: `${origin}/dashboard?tab=pricing&billing=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/dashboard?tab=pricing&billing=cancel`,
       billing_address_collection: automaticTaxEnabled ? "required" : "auto",
       tax_id_collection: { enabled: automaticTaxEnabled },
       customer_update: automaticTaxEnabled
@@ -111,18 +108,21 @@ export async function POST(req: Request) {
       metadata: {
         user_id: user.id,
         plan,
+        interval,
       },
       subscription_data: {
         metadata: {
           user_id: user.id,
           plan,
+          interval,
         },
       },
     });
 
     return NextResponse.json({ url: session.url });
-  } catch {
-    return NextResponse.json({ error: "Checkout konnte nicht gestartet werden." }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Checkout konnte nicht gestartet werden.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

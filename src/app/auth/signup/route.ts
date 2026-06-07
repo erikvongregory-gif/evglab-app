@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const originError = enforceSameOrigin(request);
   if (originError) return originError;
   if (!isSupabaseConfigured()) {
-    return createNoStoreRedirect(`${origin}/registrieren?error=config`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=config`, requestId);
   }
 
   const formData = await request.formData();
@@ -33,11 +33,11 @@ export async function POST(request: Request) {
   if (rateLimitError) return rateLimitError;
 
   if (!email || !password) {
-    return createNoStoreRedirect(`${origin}/registrieren?error=missing`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=missing`, requestId);
   }
 
   if (isInviteOnlyEnabled() && !inviteToken) {
-    return createNoStoreRedirect(`${origin}/registrieren?error=invite_required`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=invite_required`, requestId);
   }
 
   if (isInviteOnlyEnabled()) {
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
             : consumed.status === "email_mismatch"
               ? "invite_email_mismatch"
               : "invite_invalid";
-      return createNoStoreRedirect(`${origin}/registrieren?error=${reason}`, requestId);
+      return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=${reason}`, requestId);
     }
   }
 
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   });
 
   if (error || !data.user) {
-    return createNoStoreRedirect(`${origin}/registrieren?error=auth`, requestId);
+    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=auth`, requestId);
   }
 
   if (isInviteOnlyEnabled()) {

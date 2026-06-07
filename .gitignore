@@ -21,6 +21,9 @@
 /build
 
 # misc
+.cursor/
+_import-evglab-dashboard/
+redesign-assets/
 .DS_Store
 *.pem
 

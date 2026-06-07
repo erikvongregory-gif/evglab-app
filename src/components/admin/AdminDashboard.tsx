@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { StudioButton, StudioCard, StudioChip } from "@/components/studio/ui";
 
 type AdminTab = "users" | "billing" | "team" | "content";
 
@@ -130,46 +131,72 @@ export function AdminDashboard() {
   }, [q, tab]);
 
   const tabButton = (value: AdminTab, label: string) => (
-    <button
-      type="button"
-      onClick={() => setTab(value)}
-      className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-        tab === value
-          ? "bg-[#c65a20] text-white"
-          : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-      }`}
-    >
+    <StudioChip active={tab === value} onClick={() => setTab(value)} type="button">
       {label}
-    </button>
+    </StudioChip>
   );
 
+  const inputStyle: React.CSSProperties = {
+    height: 40,
+    width: "100%",
+    borderRadius: 8,
+    border: "1px solid var(--rule-strong, rgba(255,255,255,0.12))",
+    background: "var(--bg-1, #1a1918)",
+    color: "var(--tx-0, #f5f0e8)",
+    padding: "0 12px",
+    fontSize: 14,
+  };
+
+  const tableWrapStyle: React.CSSProperties = {
+    overflowX: "auto",
+    borderRadius: 12,
+    border: "1px solid var(--rule, rgba(255,255,255,0.08))",
+  };
+
+  const thStyle: React.CSSProperties = {
+    padding: "10px 12px",
+    textAlign: "left",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "var(--tx-2, #a89f92)",
+    borderBottom: "1px solid var(--rule, rgba(255,255,255,0.08))",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: "10px 12px",
+    fontSize: 13,
+    color: "var(--tx-1, #d9d0c4)",
+    borderTop: "1px solid var(--rule, rgba(255,255,255,0.06))",
+  };
+
   const usersView = (
-    <div className="space-y-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Suche nach E-Mail, Rolle, Brauerei..."
-        className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
+        style={inputStyle}
       />
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left dark:bg-gray-900">
-            <tr>
-              <th className="px-3 py-2">E-Mail</th>
-              <th className="px-3 py-2">Rolle</th>
-              <th className="px-3 py-2">Brauerei</th>
-              <th className="px-3 py-2">Aktion</th>
+      <div style={tableWrapStyle}>
+        <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "var(--bg-2, #201f1d)" }}>
+              <th style={thStyle}>E-Mail</th>
+              <th style={thStyle}>Rolle</th>
+              <th style={thStyle}>Brauerei</th>
+              <th style={thStyle}>Aktion</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="border-t border-gray-100 dark:border-gray-800">
-                <td className="px-3 py-2">{user.email}</td>
-                <td className="px-3 py-2">{user.role}</td>
-                <td className="px-3 py-2">{user.brewery || "-"}</td>
-                <td className="px-3 py-2">
-                  <button
-                    type="button"
+              <tr key={user.id}>
+                <td style={tdStyle}>{user.email}</td>
+                <td style={tdStyle}>{user.role}</td>
+                <td style={tdStyle}>{user.brewery || "—"}</td>
+                <td style={tdStyle}>
+                  <StudioButton
+                    size="sm"
+                    variant="soft"
                     onClick={async () => {
                       const nextRole = user.role === "admin" ? "user" : "admin";
                       const res = await fetch("/api/admin/users", {
@@ -184,10 +211,9 @@ export function AdminDashboard() {
                       }
                       await loadUsers();
                     }}
-                    className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
                   >
                     {user.role === "admin" ? "Admin entfernen" : "Zu Admin machen"}
-                  </button>
+                  </StudioButton>
                 </td>
               </tr>
             ))}
@@ -198,112 +224,135 @@ export function AdminDashboard() {
   );
 
   const billingView = (
-    <div className="space-y-3">
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left dark:bg-gray-900">
-            <tr>
-              <th className="px-3 py-2">User ID</th>
-              <th className="px-3 py-2">E-Mail</th>
-              <th className="px-3 py-2">Plan</th>
-              <th className="px-3 py-2">Monatlich</th>
-              <th className="px-3 py-2">Verbraucht</th>
-              <th className="px-3 py-2">Verfügbar</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Periode bis</th>
-              <th className="px-3 py-2">Aktion</th>
+    <div style={tableWrapStyle}>
+      <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ background: "var(--bg-2, #201f1d)" }}>
+            <th style={thStyle}>User ID</th>
+            <th style={thStyle}>E-Mail</th>
+            <th style={thStyle}>Plan</th>
+            <th style={thStyle}>Monatlich</th>
+            <th style={thStyle}>Verbraucht</th>
+            <th style={thStyle}>Verfügbar</th>
+            <th style={thStyle}>Status</th>
+            <th style={thStyle}>Periode bis</th>
+            <th style={thStyle}>Aktion</th>
+          </tr>
+        </thead>
+        <tbody>
+          {billingRows.map((row) => (
+            <tr key={row.userId}>
+              <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: 11 }}>{row.userId}</td>
+              <td style={tdStyle}>{row.email || "—"}</td>
+              <td style={tdStyle}>{row.plan ?? "—"}</td>
+              <td style={tdStyle}>{row.monthlyTokens.toLocaleString("de-DE")}</td>
+              <td style={tdStyle}>{row.usedTokens.toLocaleString("de-DE")}</td>
+              <td style={{ ...tdStyle, fontWeight: 600, color: "var(--acc, #c9a227)" }}>
+                {row.remainingTokens.toLocaleString("de-DE")}
+              </td>
+              <td style={tdStyle}>{row.status}</td>
+              <td style={tdStyle}>
+                {row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toLocaleString("de-DE") : "—"}
+              </td>
+              <td style={tdStyle}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, minWidth: "15rem" }}>
+                  <select
+                    value={billingPlanDrafts[row.userId] ?? "start"}
+                    onChange={(e) =>
+                      setBillingPlanDrafts((prev) => ({
+                        ...prev,
+                        [row.userId]: e.target.value as PlanOption,
+                      }))
+                    }
+                    style={{ ...inputStyle, height: 32, width: "auto", fontSize: 12 }}
+                    disabled={billingSavingUserId === row.userId}
+                  >
+                    <option value="start">Start</option>
+                    <option value="growth">Growth</option>
+                    <option value="pro">Pro</option>
+                  </select>
+                  <StudioButton
+                    size="sm"
+                    variant="soft"
+                    disabled={billingSavingUserId === row.userId}
+                    onClick={() => updateUserPlan(row.userId, billingPlanDrafts[row.userId] ?? "start")}
+                  >
+                    Freischalten
+                  </StudioButton>
+                  <StudioButton
+                    size="sm"
+                    variant="ghost"
+                    disabled={billingSavingUserId === row.userId}
+                    onClick={() => updateUserPlan(row.userId, null)}
+                  >
+                    Entziehen
+                  </StudioButton>
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {billingRows.map((row) => (
-              <tr key={row.userId} className="border-t border-gray-100 dark:border-gray-800">
-                <td className="px-3 py-2 font-mono text-xs">{row.userId}</td>
-                <td className="px-3 py-2">{row.email || "-"}</td>
-                <td className="px-3 py-2">{row.plan ?? "-"}</td>
-                <td className="px-3 py-2">{row.monthlyTokens.toLocaleString("de-DE")}</td>
-                <td className="px-3 py-2">{row.usedTokens.toLocaleString("de-DE")}</td>
-                <td className="px-3 py-2 font-semibold text-emerald-700 dark:text-emerald-300">
-                  {row.remainingTokens.toLocaleString("de-DE")}
-                </td>
-                <td className="px-3 py-2">{row.status}</td>
-                <td className="px-3 py-2">{row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toLocaleString("de-DE") : "-"}</td>
-                <td className="px-3 py-2">
-                  <div className="flex min-w-[15rem] items-center gap-2">
-                    <select
-                      value={billingPlanDrafts[row.userId] ?? "start"}
-                      onChange={(e) =>
-                        setBillingPlanDrafts((prev) => ({
-                          ...prev,
-                          [row.userId]: e.target.value as PlanOption,
-                        }))
-                      }
-                      className="h-8 rounded-md border border-gray-300 bg-white px-2 text-xs dark:border-gray-700 dark:bg-gray-900"
-                      disabled={billingSavingUserId === row.userId}
-                    >
-                      <option value="start">Start</option>
-                      <option value="growth">Growth</option>
-                      <option value="pro">Pro</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => updateUserPlan(row.userId, billingPlanDrafts[row.userId] ?? "start")}
-                      disabled={billingSavingUserId === row.userId}
-                      className="rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800"
-                    >
-                      Freischalten
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateUserPlan(row.userId, null)}
-                      disabled={billingSavingUserId === row.userId}
-                      className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40"
-                    >
-                      Entziehen
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {billingRows.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-gray-500 dark:text-gray-400">
-                  Keine Billing-Daten gefunden.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+          ))}
+          {billingRows.length === 0 ? (
+            <tr>
+              <td colSpan={9} style={{ ...tdStyle, textAlign: "center", color: "var(--tx-2)" }}>
+                Keine Billing-Daten gefunden.
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
     </div>
   );
 
   const genericTable = (rows: Array<Record<string, unknown>>) => (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-      <pre className="max-h-[60vh] overflow-auto p-3 text-xs">{JSON.stringify(rows, null, 2)}</pre>
+    <div style={tableWrapStyle}>
+      <pre
+        style={{
+          maxHeight: "60vh",
+          overflow: "auto",
+          padding: 12,
+          fontSize: 11,
+          color: "var(--tx-1)",
+          margin: 0,
+        }}
+      >
+        {JSON.stringify(rows, null, 2)}
+      </pre>
     </div>
   );
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div className="mb-4 flex flex-wrap gap-2">
+    <StudioCard pad style={{ marginTop: 22 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
         {tabButton("users", "Nutzer")}
         {tabButton("billing", "Billing")}
         {tabButton("team", "Team/Invites")}
         {tabButton("content", "Inhalte")}
       </div>
-      {loading ? <p className="text-sm text-gray-500">Lade Daten…</p> : null}
+      {loading ? <p style={{ fontSize: 14, color: "var(--tx-2)" }}>Lade Daten…</p> : null}
       {error ? (
-        <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p
+          style={{
+            marginBottom: 12,
+            borderRadius: 8,
+            border: "1px solid rgba(239,68,68,0.35)",
+            background: "rgba(239,68,68,0.08)",
+            padding: "10px 12px",
+            fontSize: 14,
+            color: "#fca5a5",
+          }}
+        >
+          {error}
+        </p>
       ) : null}
       {!loading && tab === "users" ? usersView : null}
       {!loading && tab === "billing" ? billingView : null}
       {!loading && tab === "team" ? genericTable(teamRows) : null}
       {!loading && tab === "content" ? (
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {contentRows.length > 0 ? (
-            <button
-              type="button"
-              className="rounded-md border border-gray-300 px-3 py-2 text-xs hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+            <StudioButton
+              size="sm"
+              variant="soft"
               onClick={async () => {
                 const first = contentRows[0] as { ownerUserId?: string; id?: string };
                 if (!first?.ownerUserId || !first?.id) return;
@@ -320,12 +369,12 @@ export function AdminDashboard() {
                 await loadContent();
               }}
             >
-              Erstes Element entfernen (MVP-Aktion)
-            </button>
+              Erstes Element entfernen (MVP)
+            </StudioButton>
           ) : null}
           {genericTable(contentRows)}
         </div>
       ) : null}
-    </section>
+    </StudioCard>
   );
 }
