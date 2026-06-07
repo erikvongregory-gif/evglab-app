@@ -18,7 +18,7 @@ function clampText(value: unknown, max: number): string | undefined {
 }
 
 /** Kuerzt Markenprofil-Texte vor Validierung/Speichern (KI-Antworten koennen zu lang sein). */
-export function clampBrandSettingsFields<T extends Record<string, unknown>>(input: T): T {
+export function clampBrandSettingsFields(input: Record<string, unknown>): Record<string, unknown> {
   const next = { ...input };
   const breweryName = clampText(next.breweryName, BRAND_SETTINGS_LIMITS.breweryName);
   const brandTone = clampText(next.brandTone, BRAND_SETTINGS_LIMITS.brandTone);

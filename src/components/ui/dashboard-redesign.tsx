@@ -103,7 +103,7 @@ const PLAN_LABELS: Record<string, string> = {
 
 const isBrandProfileComplete = isBrandProfileCompleteFromSettings;
 
-function normalizeSettings(raw: SettingsPayload): SettingsPayload {
+function normalizeSettings(raw: Partial<SettingsPayload> | SettingsPayload): SettingsPayload {
   return sanitizeDashboardSettings(raw);
 }
 
