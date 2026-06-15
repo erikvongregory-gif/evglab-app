@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireAuthenticatedUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
 const bodySchema = z.object({
@@ -72,6 +73,9 @@ async function fetchInstagramReferenceImages(username: string): Promise<string[]
 }
 
 export async function POST(req: Request) {
+  const authGuard = await requireAuthenticatedUser(req, "brand-instagram-intake-auth");
+  if (!authGuard.ok) return authGuard.response;
+
   const rateError = await enforceRateLimitPersistent(req, {
     keyPrefix: "brand-instagram-intake",
     limit: 20,

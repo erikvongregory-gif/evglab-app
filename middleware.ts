@@ -1,20 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isPasswordResetPublicPath } from "@/lib/auth/passwordResetPaths";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const loginWaitlistEnabled = process.env.NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED !== "0";
   if (loginWaitlistEnabled) {
+    const passwordResetAllowed = isPasswordResetPublicPath(pathname, request.nextUrl.searchParams);
     const isBlockedAuthPath =
-      pathname === "/registrieren" ||
-      pathname === "/passwort-vergessen" ||
-      pathname === "/passwort-zuruecksetzen" ||
-      (pathname.startsWith("/auth/") &&
-        pathname !== "/auth/signout" &&
-        pathname !== "/auth/signin" &&
-        pathname !== "/auth/admin-signin" &&
-        pathname !== "/auth/signup" &&
-        pathname !== "/auth/admin-2fa/verify");
+      !passwordResetAllowed &&
+      (pathname === "/registrieren" ||
+        (pathname.startsWith("/auth/") &&
+          pathname !== "/auth/signout" &&
+          pathname !== "/auth/signin" &&
+          pathname !== "/auth/admin-signin" &&
+          pathname !== "/auth/signup" &&
+          pathname !== "/auth/admin-2fa/verify"));
     if (isBlockedAuthPath) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/anmelden";

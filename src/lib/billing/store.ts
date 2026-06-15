@@ -141,6 +141,34 @@ export async function getByStripeCustomerId(customerId: string): Promise<Billing
   return (data as BillingRow | null) ?? null;
 }
 
+export async function getByStripeSubscriptionId(subscriptionId: string): Promise<BillingRow | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("billing_subscriptions")
+    .select("user_id,plan,monthly_tokens,used_tokens,stripe_customer_id,stripe_subscription_id,subscription_status,current_period_end")
+    .eq("stripe_subscription_id", subscriptionId)
+    .maybeSingle();
+  return (data as BillingRow | null) ?? null;
+}
+
+/** Setzt used_tokens bei Abo-Verlängerung zurück; gekaufte Token-Packs bleiben erhalten. */
+export async function renewBillingPeriodTokens(args: {
+  stripeSubscriptionId: string;
+  currentPeriodEnd: string | null;
+}) {
+  const row = await getByStripeSubscriptionId(args.stripeSubscriptionId);
+  if (!row?.plan) return;
+
+  const baseMonthly = SUBSCRIPTION_PLAN_TOKENS[row.plan];
+  const purchasedExtras = Math.max(row.monthly_tokens - getBaseTokensForPlan(row.plan), 0);
+
+  await updateByStripeSubscription(args.stripeSubscriptionId, {
+    monthly_tokens: baseMonthly + purchasedExtras,
+    used_tokens: 0,
+    current_period_end: args.currentPeriodEnd,
+  });
+}
+
 export async function consumeTokens(userId: string, amount: number) {
   const admin = createAdminClient();
   const row = await getBillingRow(userId);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
+import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { aspectRatioToImageSize, generateProductStudio } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
 import { buildProductStudioPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/product-studio";
 import { productStudioSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
@@ -10,7 +10,7 @@ export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
-    const guard = await requireImageGenerationUser(req, "generate-studio");
+    const guard = await requireBillableImageGenerationUser(req, "generate-studio");
     if (!guard.ok) return guard.response;
 
     const parsed = productStudioSchema.safeParse(await req.json());

@@ -33,6 +33,31 @@ export function createRedirectWithCookies(
   return response;
 }
 
+/** Recovery-Links: Hash-Fragment (#access_token) erreicht den Server nicht — im Browser weiterleiten. */
+export function createRecoveryHashForwardHtml(opts: {
+  targetUrl: string;
+  fallbackUrl: string;
+  requestId: string;
+}): NextResponse {
+  const target = JSON.stringify(opts.targetUrl);
+  const fallback = JSON.stringify(opts.fallbackUrl);
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Passwort zurücksetzen</title></head><body><p style="font-family:system-ui,sans-serif;color:#c4bdb3;background:#131211;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center">Passwort-Reset wird vorbereitet …</p><script>
+(function(){var target=${target},fallback=${fallback},hash=location.hash||"",search=location.search||"";
+if(hash.indexOf("access_token")>=0){location.replace(target+hash);return}
+if(search.indexOf("code=")>=0||search.indexOf("token_hash=")>=0){location.replace("/auth/callback"+search+hash);return}
+var n=0;function step(){n++;fetch("/api/auth/status",{credentials:"same-origin",cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(j){if(j&&j.authenticated)return location.replace(target);if(n>=15)return location.replace(fallback);setTimeout(step,200)}).catch(function(){if(n>=15)return location.replace(fallback);setTimeout(step,250)})}
+step()})();</script></body></html>`;
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      Pragma: "no-cache",
+      "x-request-id": opts.requestId,
+    },
+  });
+}
+
 /** 200 + JS-Redirect: verhindert doppelte 303-Requests mit demselben OAuth-Code. */
 export function createHtmlRedirect(
   url: string,

@@ -8,6 +8,7 @@ import {
   claimStripeWebhookEvent,
   markStripeWebhookEventProcessed,
   releaseStripeWebhookEvent,
+  renewBillingPeriodTokens,
   updateByStripeSubscription,
 } from "@/lib/billing/store";
 import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
@@ -27,6 +28,22 @@ function toIsoFromUnix(seconds?: number | null) {
 function getCurrentPeriodEndUnix(subscription: Stripe.Subscription) {
   const value = (subscription as Stripe.Subscription & { current_period_end?: number }).current_period_end;
   return typeof value === "number" ? value : null;
+}
+
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+  const legacy = (invoice as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }).subscription;
+  if (typeof legacy === "string") return legacy;
+  if (legacy && typeof legacy === "object" && "id" in legacy) return legacy.id;
+
+  const fromParent = invoice.parent?.subscription_details?.subscription;
+  if (typeof fromParent === "string") return fromParent;
+  if (fromParent && typeof fromParent === "object" && "id" in fromParent) return fromParent.id;
+
+  const lineSub = invoice.lines?.data?.[0]?.subscription;
+  if (typeof lineSub === "string") return lineSub;
+  if (lineSub && typeof lineSub === "object" && "id" in lineSub) return lineSub.id;
+
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -127,6 +144,21 @@ export async function POST(req: Request) {
           subscription_status: "canceled",
           current_period_end: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
         });
+      }
+
+      if (event.type === "invoice.paid") {
+        const invoice = event.data.object as Stripe.Invoice;
+        const billingReason = invoice.billing_reason;
+        if (billingReason === "subscription_cycle" || billingReason === "subscription_update") {
+          const subscriptionId = getInvoiceSubscriptionId(invoice);
+          if (subscriptionId) {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            await renewBillingPeriodTokens({
+              stripeSubscriptionId: subscriptionId,
+              currentPeriodEnd: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
+            });
+          }
+        }
       }
 
       await markStripeWebhookEventProcessed(event.id);

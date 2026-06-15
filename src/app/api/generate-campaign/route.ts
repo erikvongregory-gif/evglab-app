@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
+import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { aspectRatioToImageSize, generateCampaignImage } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
 import { buildCampaignTextPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/campaign-text";
 import { campaignTextSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
@@ -13,7 +13,7 @@ export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
-    const guard = await requireImageGenerationUser(req, "generate-campaign");
+    const guard = await requireBillableImageGenerationUser(req, "generate-campaign");
     if (!guard.ok) return guard.response;
 
     if (isSupabaseConfigured()) {

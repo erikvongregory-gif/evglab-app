@@ -184,6 +184,7 @@ export function StudioPricingView({
   const [yearlyBilling, setYearlyBilling] = useState(true);
   const billing: BillingInterval = yearlyBilling ? "yearly" : "monthly";
   const [checkoutPending, setCheckoutPending] = useState<SubscriptionPlanKey | null>(null);
+  const [tokenPackPending, setTokenPackPending] = useState<"tokens_500" | "tokens_2000" | null>(null);
   const [portalPending, setPortalPending] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
@@ -234,6 +235,29 @@ export function StudioPricingView({
       setCheckoutError("Kundenportal konnte nicht geöffnet werden.");
     } finally {
       setPortalPending(false);
+    }
+  }, []);
+
+  const buyTokenPack = useCallback(async (pack: "tokens_500" | "tokens_2000") => {
+    setCheckoutError(null);
+    setTokenPackPending(pack);
+    try {
+      const res = await fetch("/api/billing/buy-tokens", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pack }),
+      });
+      const json = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
+      if (!res.ok || !json?.url) {
+        setCheckoutError(json?.error ?? "Token-Kauf konnte nicht gestartet werden.");
+        return;
+      }
+      window.location.href = json.url;
+    } catch {
+      setCheckoutError("Token-Kauf konnte nicht gestartet werden.");
+    } finally {
+      setTokenPackPending(null);
     }
   }, []);
 
@@ -335,6 +359,50 @@ export function StudioPricingView({
           />
         ))}
       </div>
+
+      {currentPlan ? (
+        <div className="studio-card" style={{ marginTop: 24, padding: 20 }}>
+          <div className="studio-page-eyebrow" style={{ marginBottom: 8 }}>
+            Zusätzliche Tokens
+          </div>
+          <p className="studio-faint" style={{ fontSize: 13, marginBottom: 16, maxWidth: 520 }}>
+            Einmalige Token-Packs für mehr Generierungen im aktuellen Abrechnungszeitraum. Gekaufte Tokens bleiben
+            erhalten, bis du sie verbrauchst.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            <div className="studio-pricing-card" style={{ padding: 16 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>+500 Tokens</div>
+              <div className="studio-accent-serif" style={{ fontSize: 22, marginBottom: 12 }}>
+                39 €
+              </div>
+              <StudioButton
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                disabled={tokenPackPending !== null}
+                onClick={() => void buyTokenPack("tokens_500")}
+              >
+                {tokenPackPending === "tokens_500" ? "Weiterleitung …" : "Jetzt kaufen →"}
+              </StudioButton>
+            </div>
+            <div className="studio-pricing-card" style={{ padding: 16 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>+2.000 Tokens</div>
+              <div className="studio-accent-serif" style={{ fontSize: 22, marginBottom: 12 }}>
+                119 €
+              </div>
+              <StudioButton
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                disabled={tokenPackPending !== null}
+                onClick={() => void buyTokenPack("tokens_2000")}
+              >
+                {tokenPackPending === "tokens_2000" ? "Weiterleitung …" : "Jetzt kaufen →"}
+              </StudioButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="studio-pricing-footnote">
         <p>Alle Preise gemäß § 19 UStG ohne Umsatzsteuer · Monatlich kündbar · Tokens übertragbar je nach Plan</p>

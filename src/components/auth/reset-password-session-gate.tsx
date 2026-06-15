@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { ResetPasswordPage } from "@/components/ui/password-reset-pages";
+import { useEffect, useState } from "react";
+import {
+  PasswordResetLoading,
+  ResetPasswordPage,
+} from "@/components/ui/password-reset-pages";
 import { createClient } from "@/lib/supabase/client";
 
 type Props = {
   notice?: string;
   error?: string;
-  children?: ReactNode;
 };
 
 async function serverHasUser(): Promise<boolean> {
@@ -113,19 +115,11 @@ export function ResetPasswordSessionGate({ notice, error }: Props) {
     if (typeof window !== "undefined") {
       window.location.replace("/passwort-vergessen?error=session");
     }
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#131211] px-4">
-        <p className="text-sm text-[#c4bdb3]">Link ungültig — weiter …</p>
-      </main>
-    );
+    return <PasswordResetLoading message="Link ungültig — weiter …" />;
   }
 
   if (!ready) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#131211] px-4">
-        <p className="text-sm text-[#c4bdb3]">Passwort-Reset wird vorbereitet …</p>
-      </main>
-    );
+    return <PasswordResetLoading message="Passwort-Reset wird vorbereitet …" />;
   }
 
   return <ResetPasswordPage notice={notice} error={error} />;

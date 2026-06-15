@@ -16,6 +16,7 @@ import { createAuthRouteHandlerClient, createRouteHandlerClient } from "@/lib/su
 import {
   createNoStoreRedirect,
   createOAuthSessionPollerHtml,
+  createRecoveryHashForwardHtml,
   createRedirectWithCookies,
   normalizeNextPath,
 } from "@/lib/security/authResponses";
@@ -179,6 +180,13 @@ export async function handleAuthCallbackGet(request: Request) {
   }
 
   if (!code) {
+    if (isPasswordRecovery) {
+      return createRecoveryHashForwardHtml({
+        targetUrl: `${appOrigin}${postAuthNext}`,
+        fallbackUrl: `${appOrigin}/passwort-vergessen?error=session`,
+        requestId,
+      });
+    }
     return createNoStoreRedirect(`${appOrigin}/anmelden?error=auth`, requestId);
   }
 

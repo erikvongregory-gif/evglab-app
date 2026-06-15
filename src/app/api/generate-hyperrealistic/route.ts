@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
+import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { aspectRatioToImageSize, generateHyperrealistic } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
 import { buildHyperrealisticPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
@@ -15,7 +15,7 @@ export const maxDuration = 90;
 
 export async function POST(req: Request) {
   try {
-    const guard = await requireImageGenerationUser(req, "generate-hyperrealistic");
+    const guard = await requireBillableImageGenerationUser(req, "generate-hyperrealistic");
     if (!guard.ok) return guard.response;
 
     const parsed = hyperrealisticSchema.safeParse(await req.json());

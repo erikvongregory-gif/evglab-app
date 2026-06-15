@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
+import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { removeBackground } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/background-removal";
 import { buildProductIsolatePrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/product-isolate";
 import { productIsolateSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
@@ -16,7 +16,7 @@ const BG_COLOR = {
 
 export async function POST(req: Request) {
   try {
-    const guard = await requireImageGenerationUser(req, "generate-isolate");
+    const guard = await requireBillableImageGenerationUser(req, "generate-isolate");
     if (!guard.ok) return guard.response;
 
     const parsed = productIsolateSchema.safeParse(await req.json());

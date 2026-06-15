@@ -2,7 +2,7 @@
 
 ## 1) Pflicht-Env in Produktion
 
-- `NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED=1` — Wartelisten-Screen auf `/anmelden` (Login gesperrt). Erst auf `0` setzen, wenn Login/Registrierung öffentlich freigegeben werden.
+- `NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED=0` — **Pflicht für Go-live** (Login/Registrierung freigeben). Solange `1` oder unset, blockiert die Middleware neue Nutzer.
 - `NEXT_PUBLIC_APP_BASE_URL=https://app.evglab.com`
 - `NEXT_PUBLIC_MARKETING_SITE_URL=https://evglab.com`
 - `NEXT_PUBLIC_SUPABASE_URL=...`
@@ -63,6 +63,7 @@ STRIPE_SECRET_KEY=sk_live_... node scripts/sync-stripe-plan-prices.mjs
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
+   - `invoice.paid` (Token-Reset bei Abo-Verlängerung)
 7. Live-Webhook-Secret in `STRIPE_WEBHOOK_SECRET` setzen.
 
 ## 4) Smoke-Test (Live-Readiness)

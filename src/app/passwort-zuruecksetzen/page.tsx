@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ResetPasswordSessionGate } from "@/components/auth/reset-password-session-gate";
-import { messageForResetPassword } from "@/components/ui/password-reset-pages";
+import { messageForResetPassword } from "@/lib/auth/passwordResetMessages";
 import { SITE } from "@/lib/siteConfig";
 import { resolveAuthCallbackRedirect } from "@/lib/supabase/authEntryRedirect";
 

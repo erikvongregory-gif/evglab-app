@@ -139,7 +139,7 @@ function AuthSubmitInner({ mode }: { mode: AuthMode }) {
   );
 }
 
-function LoginHero({ mode }: { mode: AuthMode }) {
+export function LoginHero({ mode }: { mode: AuthMode }) {
   const isRegister = mode === "register";
 
   return (
@@ -324,9 +324,11 @@ export const SignInPage: React.FC<SignInPageProps> = ({
 
   if (waitlistMode) {
     return (
-      <div className={`${styles.shell} ${styles.shellFormOnly} ${loginFontClassName}`}>
+      <div className={`${styles.shell} ${loginFontClassName}`}>
+        <LoginHero mode="signin" />
+        <div className={styles.divider} aria-hidden />
         <section className={styles.formwrap}>
-          <div className={styles.formcol}>
+          <div className={`${styles.formcol} ${styles.stagger}`}>
             <h2 className={styles.waitlistTitle}>Login bald wieder offen</h2>
             <p className={styles.waitlistDesc}>
               Trag dich in die Warteliste ein. Du bekommst als Erstes Bescheid, sobald Login und Registrierung
@@ -356,6 +358,11 @@ export const SignInPage: React.FC<SignInPageProps> = ({
             </form>
             {waitlistJoined ? <p className={styles.waitlistSuccess}>Danke! Du stehst jetzt auf der Warteliste.</p> : null}
             {waitlistError ? <p className={styles.waitlistError}>{waitlistError}</p> : null}
+            <p className={styles.register}>
+              <Link href="/passwort-vergessen" className={styles.modeToggle}>
+                Passwort vergessen?
+              </Link>
+            </p>
           </div>
         </section>
       </div>

@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { z } from "zod";
+import { requireAuthenticatedUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { enforceRateLimit, sanitizeTaskId } from "@/lib/security/requestGuards";
 
 type DownloadFormat = "png" | "jpg" | "webp" | "svg";
@@ -116,6 +117,9 @@ async function readWithLimit(response: Response, maxBytes: number): Promise<Buff
 
 export async function GET(req: Request) {
   try {
+    const authGuard = await requireAuthenticatedUser(req, "kie-download-auth");
+    if (!authGuard.ok) return authGuard.response;
+
     const rateError = enforceRateLimit(req, {
       keyPrefix: "kie-download",
       limit: 20,

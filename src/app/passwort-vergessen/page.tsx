@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import {
-  ForgotPasswordPage,
-  messageForForgotPassword,
-} from "@/components/ui/password-reset-pages";
+import { ForgotPasswordPage } from "@/components/ui/password-reset-pages";
+import { messageForForgotPassword } from "@/lib/auth/passwordResetMessages";
 import { SITE } from "@/lib/siteConfig";
 
 export const metadata: Metadata = {
@@ -19,10 +17,12 @@ export default async function PasswortVergessenPage({
   const params = (await searchParams) ?? {};
   const noticeRaw = params.notice;
   const errorRaw = params.error;
+  const detailRaw = params.detail;
   const noticeCode = Array.isArray(noticeRaw) ? noticeRaw[0] : noticeRaw;
   const errorCode = Array.isArray(errorRaw) ? errorRaw[0] : errorRaw;
+  const detail = Array.isArray(detailRaw) ? detailRaw[0] : detailRaw;
   const { notice } = noticeCode ? messageForForgotPassword(noticeCode) : {};
-  const { error } = errorCode ? messageForForgotPassword(errorCode) : {};
+  const { error } = errorCode ? messageForForgotPassword(errorCode, detail) : {};
 
   return <ForgotPasswordPage notice={notice} error={error} />;
 }
