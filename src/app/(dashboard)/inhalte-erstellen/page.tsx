@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
-import { getBrandProfileFromMetadata, isBrandProfileComplete } from "@/lib/dashboard/brandProfile";
+import { getBrandProfileFromMetadata, isBrandProfileActive, isBrandProfileComplete } from "@/lib/dashboard/brandProfile";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { hasActiveSubscription } from "@/lib/billing/access";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
@@ -89,6 +89,7 @@ export default async function InhalteErstellenPage() {
       initialProfileName={profileName}
       initialBreweryName={breweryName}
       brandProfileComplete={isBrandProfileComplete(brandProfile)}
+      brandProfileActive={isBrandProfileActive(brandProfile)}
       brandProfileMode={brandProfile.brandProfileMode}
     />
   );

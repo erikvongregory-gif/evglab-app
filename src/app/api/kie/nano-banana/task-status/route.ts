@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { refundTokens } from "@/lib/billing/store";
+import { parseUpstreamProgress } from "@/lib/kie/generationProgress";
 import { getPendingTaskBillingMap, withoutPendingTask } from "@/lib/kie/taskBillingMetadata";
 import { enforceRateLimit, sanitizeTaskId } from "@/lib/security/requestGuards";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -112,6 +113,7 @@ export async function GET(req: Request) {
       (payload.status as string | undefined) ||
       "unknown";
     const state = rawState.toLowerCase();
+    const upstreamProgress = parseUpstreamProgress(payload, state);
     let imageUrl = findFirstUrl(data);
 
     // Kie liefert bei manchen Modellen URLs als JSON-String in resultJson.
@@ -139,7 +141,11 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ state, imageUrl });
+    return NextResponse.json({
+      state,
+      imageUrl,
+      progress: upstreamProgress ?? (imageUrl ? 100 : null),
+    });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json(

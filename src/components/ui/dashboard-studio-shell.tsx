@@ -696,11 +696,9 @@ export function DashboardStudioShell({
     <div
       className={cn(studioFontClassName, "evg-studio", "evg-shell")}
       style={{
-        minHeight: "100vh",
         background: "var(--bg-0)",
         display: "flex",
         width: "100%",
-        overflow: "hidden",
       }}
     >
       <style>{`
@@ -733,16 +731,12 @@ export function DashboardStudioShell({
         className="evg-shell-sidebar"
         style={{
           width: "var(--sidebar-w)",
-          flexShrink: 0,
           background: "var(--bg-1)",
           borderRight: "1px solid var(--line)",
-          display: "flex",
-          flexDirection: "column",
           padding: "24px 18px",
-          height: "100vh",
         }}
       >
-        <div style={{ padding: "0 6px 26px" }}>
+        <div className="evg-shell-sidebar-brand" style={{ padding: "0 6px 26px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <StudioBrandMark />
             <div>
@@ -756,7 +750,11 @@ export function DashboardStudioShell({
           </div>
         </div>
 
-        <nav data-tour="nav" style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        <nav
+          className="evg-shell-sidebar-nav"
+          data-tour="nav"
+          style={{ display: "flex", flexDirection: "column", gap: 3 }}
+        >
           <div className="studio-field-label" style={{ padding: "0 12px", marginBottom: 8 }}>
             Arbeitsbereich
           </div>
@@ -771,9 +769,7 @@ export function DashboardStudioShell({
           ))}
         </nav>
 
-        <div style={{ flex: 1 }} />
-
-        <div style={{ marginTop: "auto" }}>
+        <div className="evg-shell-sidebar-footer">
           {isAdmin ? (
             <Link
               href="/admin"
@@ -817,7 +813,7 @@ export function DashboardStudioShell({
         <main
           ref={mainRef}
           className={cn("evg-shell-main", contentPending && "studio-main-pending")}
-          style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}
+          style={{ flex: 1, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}
         >
           <div style={{ maxWidth: "var(--maxw)", margin: "0 auto", padding: pad, boxSizing: "border-box" }}>
             {contentKey ? (

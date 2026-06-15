@@ -7,8 +7,14 @@ export async function middleware(request: NextRequest) {
   const loginWaitlistEnabled = process.env.NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED !== "0";
   if (loginWaitlistEnabled) {
     const passwordResetAllowed = isPasswordResetPublicPath(pathname, request.nextUrl.searchParams);
+    const oauthPathsAllowedDuringWaitlist = new Set([
+      "/auth/google",
+      "/auth/callback",
+      "/auth/finish",
+    ]);
     const isBlockedAuthPath =
       !passwordResetAllowed &&
+      !oauthPathsAllowedDuringWaitlist.has(pathname) &&
       (pathname === "/registrieren" ||
         (pathname.startsWith("/auth/") &&
           pathname !== "/auth/signout" &&

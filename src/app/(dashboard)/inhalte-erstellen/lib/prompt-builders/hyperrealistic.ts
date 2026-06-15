@@ -11,7 +11,8 @@ const SZENE_DESCRIPTIONS = {
   alpenpanorama: "alpine mountain hut terrace, snow-capped peaks in background, crisp blue sky",
   stadtbalkon_abend: "urban rooftop balcony at dusk, city lights bokeh background",
   brauereihof: "brewery courtyard, copper brewing kettles visible in background, industrial-rustic atmosphere",
-  fussball_public_viewing: "outdoor public viewing event, blurred crowd, large screen glow",
+  fussball_public_viewing:
+    "outdoor football public viewing party (German Fanmeile / WM or EM watch event), large LED screen or projector showing a live football match clearly visible in background, fans in jerseys or scarves cheering, standing and seated crowd, screen glow on faces — NOT a Biergarten, NOT a cozy Wirtshaus interior",
 } as const;
 
 const TAGESZEIT_LIGHTING = {
@@ -51,14 +52,53 @@ const PERSON_FRAGMENTS = {
   C: "A person visible from behind, face fully turned away from camera, body silhouette only, anonymous.",
 } as const;
 
-function buildPersonFragment(input: HyperrealisticInput): string {
+function groupSettingPhrase(input: HyperrealisticInput): string {
+  return `in ${SZENE_DESCRIPTIONS[input.szene]}`;
+}
+
+function groupSeatedPhrase(szene: HyperrealisticInput["szene"]): string {
+  if (szene === "fussball_public_viewing") {
+    return "sitting on picnic benches or standing among fans";
+  }
+  if (szene === "biergarten_sommer" || szene === "wirtshaus_innen" || szene === "brauereihof") {
+    return "sitting together at a rustic wooden table";
+  }
+  return "sitting together";
+}
+
+function buildBrandLockFragment(input: HyperrealisticInput, breweryName?: string): string {
+  if ((input.etikettModus ?? "marke") !== "marke" || !breweryName?.trim()) return "";
+  const brand = breweryName.trim();
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  if (behaelter === "G") {
+    return `
+GLASS BRAND LOCK (MANDATORY): Every beer glass in frame MUST display the "${brand}" logo/branding (etched or printed on glass), matching reference label artwork — correct colors, legible typography.
+FORBIDDEN: plain unbranded glasses, wrong brewery names on glass, fictional brands, missing logos.
+COMPOSITION: GLASS ONLY — no bottle, no can, no packaging anywhere in the image.`;
+  }
+  return `
+BRAND IDENTITY LOCK (MANDATORY): Every visible brand touchpoint — bottle label, glass logo/etching, coasters, napkins, signage — MUST show "${brand}" only, matching the reference label artwork.
+FORBIDDEN: any other brewery names, fictional brands, wrong logos on glasses (e.g. random text like "Brauhaus Weißbach"), unbranded glasses when a branded bottle is present, or mixed competing brands in one frame.
+All beer glasses in frame must carry the same "${brand}" branding as the bottle — consistent logo placement, legible, not distorted.`;
+}
+
+function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<HyperrealisticInput["behaelter"]>): string {
   // Legacy-Kompat: ältere Aufrufer ohne personenModus aber mit personImBild + Freitext.
   if (!input.personenModus && input.personImBild && input.personBeschreibung) {
     return `A person (${input.personBeschreibung}) holding or sitting next to the bottle, natural authentic body language, no posing.`;
   }
   const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
-  if (modus === "A" || modus === "B" || modus === "C") {
+  if (modus === "A" || modus === "C") {
     return PERSON_FRAGMENTS[modus];
+  }
+  if (modus === "B") {
+    if (behaelter === "G") {
+      return "Anonymous hands holding a branded beer glass only — NO bottle, NO can — cropped at wrist level, no face visible, no body.";
+    }
+    if (behaelter === "F") {
+      return "Anonymous hands holding the branded bottle only — NO glass — cropped at wrist level, no face visible, no body.";
+    }
+    return PERSON_FRAGMENTS.B;
   }
   if (modus === "D") {
     const gender =
@@ -96,41 +136,38 @@ function buildPersonFragment(input: HyperrealisticInput): string {
       : input.gruppenAnzahl === "3"
         ? "three"
         : "four to five";
-  const setting =
-    input.gruppenSetting === "alpine_huette"
-      ? "in front of an alpine wooden hut"
-      : input.gruppenSetting === "biergarten"
-        ? "in a traditional Biergarten"
-        : input.gruppenSetting === "berge_outdoor"
-          ? "outdoors in a mountain landscape"
-          : input.gruppenSetting === "rooftop_urban"
-            ? "on an urban rooftop at golden hour"
-            : input.gruppenSetting === "strand"
-              ? "on a sunlit beach"
-              : "in a natural lifestyle setting";
+  const setting = groupSettingPhrase(input);
+  const groupVessel =
+    behaelter === "G"
+      ? "branded beer glasses"
+      : behaelter === "F"
+        ? "branded beer bottles"
+        : "branded beer glasses and bottles";
   switch (input.gruppenDynamik) {
     case "E1":
-      return `Dynamic POV selfie-style group shot, ${n} attractive anonymous young adults in their mid-20s holding beer glasses stretched toward the camera, laughing and cheering directly into lens, one hand extended holding phone, tight energetic framing, spontaneous joyful atmosphere ${setting}.`;
+      return `Dynamic POV selfie-style group shot, ${n} attractive anonymous young adults in their mid-20s holding ${groupVessel} stretched toward the camera, laughing and cheering directly into lens, one hand extended holding phone, tight energetic framing, spontaneous joyful atmosphere ${setting}.`;
     case "E2":
-      return `Group of ${n} anonymous young adults raising and clinking beer glasses together, mid-toast, joyful expressions, ${setting}, celebration energy.`;
+      return `Group of ${n} anonymous young adults raising and clinking ${groupVessel} together, mid-toast, joyful expressions, ${setting}, celebration energy.`;
     case "E3":
-      return `Group of ${n} anonymous young adults sitting together at a rustic wooden table ${setting}, relaxed and laughing, each holding a beer glass, warm social atmosphere.`;
+      return `Group of ${n} anonymous young adults ${groupSeatedPhrase(input.szene)} ${setting}, relaxed and laughing, each holding ${groupVessel.replace(" and bottles", "")}, warm social atmosphere.`;
     case "E4":
-      return `Group of ${n} anonymous young adults walking ${setting}, casually holding beer bottles, smiling and talking, candid natural movement.`;
+      return `Group of ${n} anonymous young adults walking ${setting}, casually holding ${groupVessel}, smiling and talking, candid natural movement.`;
     default:
       return `Group of ${n} anonymous young adults enjoying beer together ${setting}, candid lifestyle moment, no specific real persons.`;
   }
 }
 
-export function buildHyperrealisticPrompt(input: HyperrealisticInput): string {
+export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: { breweryName?: string }): string {
   const flasche = FLASCHEN_TYPEN[input.flaschenTyp];
   const glas = input.glasTyp ? GLAS_TYPEN[input.glasTyp] : null;
   const szene = SZENE_DESCRIPTIONS[input.szene];
   const lighting = TAGESZEIT_LIGHTING[input.tageszeit];
   const trend = STIMMUNG_TREND_PROMPT[input.stimmungTrend ?? "nachhaltig"];
+  const personenModus = input.personenModus ?? (input.personImBild ? "D" : "A");
   const shot = SHOT_TYPE_PROMPT[input.shotType ?? "A"];
   const behaelter = input.behaelter ?? (glas ? "B" : "F");
   const etikettModus = input.etikettModus ?? "marke";
+  const brandLock = buildBrandLockFragment(input, options?.breweryName);
 
   const flaschenfarbeText = {
     braun: "amber-brown glass",
@@ -138,7 +175,7 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput): string {
     klar: "clear flint glass",
   }[input.flaschenfarbe];
 
-  const personPart = buildPersonFragment(input);
+  const personPart = buildPersonFragment(input, behaelter);
 
   const bottlePart =
     behaelter === "G"
@@ -151,28 +188,49 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput): string {
     behaelter === "F"
       ? ""
       : glas
-        ? `A poured ${glas.promptDescription} ${behaelter === "B" ? "stands next to the bottle" : "in centered hero position"}. The beer color matches the style "${input.bierstil}".${behaelter === "B" ? ' Maintain correct proportional scale: "bottle and glass shown in correct proportional scale, glass volume visually matches bottle content".' : ""}`
+        ? `HERO SUBJECT: A poured ${glas.promptDescription} ${behaelter === "B" ? "stands next to the bottle" : "in centered hero position — ONLY the glass, absolutely NO bottle or can anywhere in frame"}. The beer color matches the style "${input.bierstil}".${
+            etikettModus === "marke" && options?.breweryName?.trim()
+              ? ` EXACT TEXT on the glass: "${options.breweryName.trim()}". The glass MUST show this logo/branding clearly on the glass surface — never plain/unbranded, never a different brewery name.`
+              : ""
+          }${behaelter === "B" ? ' Maintain correct proportional scale: "bottle and glass shown in correct proportional scale, glass volume visually matches bottle content".' : ""}`
         : "";
+
+  const subjectBlock =
+    behaelter === "G"
+      ? `SUBJECT: ${glasPart || "Branded beer glass hero shot — glass only, no bottle."}`
+      : `SUBJECT: ${bottlePart}\n\n${glasPart}`.trim();
+
+  const sceneBlock = `SCENE: ${szene}.`;
+  const shotBlock = personenModus === "E" ? "" : `SHOT: ${shot}.`;
+
+  const glassOnlyNegative =
+    behaelter === "G"
+      ? "beer bottle, bottle on table, bottle in hand, beer can, packaging, unbranded plain glass, wrong brewery logo on glass, "
+      : "";
+
+  const sceneNegative =
+    input.szene === "fussball_public_viewing"
+      ? "biergarten, beer garden, chestnut tree shade, wirtshaus interior, cozy tavern, alpine hut, "
+      : "";
 
   return `
 PHOTOREALISTIC PRODUCT-IN-SCENE PHOTOGRAPHY.
 
-SUBJECT: ${bottlePart}
-
-${glasPart}
+${subjectBlock}
 
 ${personPart}
 
-SCENE: ${szene}.
+${sceneBlock}
 LIGHTING: ${lighting}.
 MOOD: ${trend}.
 
-SHOT: ${shot}.
+${shotBlock}
+${brandLock}
 
-STYLE: Editorial commercial photography, shot on full-frame DSLR, 50mm or 85mm lens, f/2.8, shallow depth of field but ${behaelter === "G" ? "glass" : "bottle and label"} fully sharp. Natural color grading, no Instagram filters. Authentic, no AI-glossy plastic look.
+STYLE: Editorial commercial photography, shot on full-frame DSLR, 50mm or 85mm lens, f/2.8, shallow depth of field but ${behaelter === "G" ? "glass and glass logo" : "bottle and label"} fully sharp. Natural color grading, no Instagram filters. Authentic, no AI-glossy plastic look.
 
 ${input.zusatzWunsch ? `ADDITIONAL: ${input.zusatzWunsch}` : ""}
 
-NEGATIVE: ${etikettModus === "marke" ? "distorted label, warped text on label, " : ""}generic stock-photo bottle, wrong bottle shape, plastic bottle, illustration style, painting, cartoon, oversaturated, hands with extra fingers, AI face artifacts, glossy unrealistic skin, floating bottle, condensation overdone like sticker droplets.
+NEGATIVE: ${sceneNegative}${glassOnlyNegative}${etikettModus === "marke" ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, " : ""}generic stock-photo bottle, wrong bottle shape, plastic bottle, illustration style, painting, cartoon, oversaturated, hands with extra fingers, AI face artifacts, glossy unrealistic skin, condensation overdone like sticker droplets.
   `.trim();
 }

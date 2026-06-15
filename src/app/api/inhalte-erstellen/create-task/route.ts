@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { buildHyperrealisticPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
+import {
+  enforceHyperrealisticPromptConstraints,
+  shouldUseImageReferenceForGeneration,
+} from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/enforce-prompt-constraints";
 import { hyperrealisticSchema, type HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { uploadBase64ToKie } from "@/lib/brand/kie-upload";
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
@@ -111,19 +115,28 @@ export async function POST(req: Request) {
     // Referenzbild fuer Claude vision vorbereiten (Schritt A–D im Skill).
     // Nur ausfuehren, wenn der User wirklich ein Markenetikett verwenden moechte.
     const wantsBrandLabel = input.etikettModus !== "generisch";
+    const profileReferenceUrl = brandProfile.brandReferenceImageUrls[0]?.trim() || "";
+    let effectiveEtikettBild = input.etikettBild?.trim() ?? "";
+    if (
+      wantsBrandLabel &&
+      (!effectiveEtikettBild || effectiveEtikettBild.includes("example.com/placeholder")) &&
+      profileReferenceUrl
+    ) {
+      effectiveEtikettBild = profileReferenceUrl;
+    }
     const hasEtikettInput =
-      Boolean(input.etikettBild) && !input.etikettBild.includes("example.com/placeholder");
+      Boolean(effectiveEtikettBild) && !effectiveEtikettBild.includes("example.com/placeholder");
     let visionReference = null as Awaited<ReturnType<typeof resolveReferenceImageForVision>>;
     if (wantsBrandLabel && hasEtikettInput) {
       try {
-        visionReference = await resolveReferenceImageForVision(input.etikettBild, guard.userMetadata);
+        visionReference = await resolveReferenceImageForVision(effectiveEtikettBild, guard.userMetadata);
       } catch (visionError) {
         console.warn("[inhalte-erstellen/create-task] vision reference resolve failed:", visionError);
       }
     }
 
     // 1) Prompt via Claude (Skill) erzeugen — Fallback: lokaler Builder.
-    let prompt = buildHyperrealisticPrompt(input);
+    let prompt = buildHyperrealisticPrompt(input, { breweryName: brandProfile.breweryName });
     const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
     if (anthropicKey) {
       try {
@@ -144,12 +157,13 @@ export async function POST(req: Request) {
       }
     }
     if (prompt.length > MAX_PROMPT_CHARS) prompt = prompt.slice(0, MAX_PROMPT_CHARS);
+    prompt = enforceHyperrealisticPromptConstraints(prompt, input, brandProfile.breweryName);
 
-    // 2) Referenzbild ggf. zu Kie hochladen (gpt-image-2-image-to-image braucht oeffentliche URLs).
-    const wantsReference = input.etikettModus !== "generisch";
+    // 2) Referenzbild fuer Kie — NICHT bei „Nur Glas“ (i2i wuerde Flasche aus Referenz kopieren).
+    const useImageReference = shouldUseImageReferenceForGeneration(input) && hasEtikettInput;
     let referenceUrl: string | null = null;
-    if (wantsReference && input.etikettBild && !input.etikettBild.includes("example.com/placeholder")) {
-      referenceUrl = await ensureKieReferenceUrl(input.etikettBild, guard.userMetadata, kieApiKey);
+    if (useImageReference) {
+      referenceUrl = await ensureKieReferenceUrl(effectiveEtikettBild, guard.userMetadata, kieApiKey);
       if (!referenceUrl) {
         return NextResponse.json(
           { error: "Referenzbild konnte nicht zu Kie hochgeladen werden. Bitte erneut hochladen oder „Generisch“ waehlen." },

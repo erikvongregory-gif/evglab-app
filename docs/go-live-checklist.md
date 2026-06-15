@@ -29,6 +29,14 @@
 1. SQL aus `docs/billing-schema.sql` ausführen.
 2. SQL aus `docs/stripe-webhook-events-schema.sql` ausführen.
 3. Prüfen, dass `billing_subscriptions` und `stripe_webhook_events` existieren.
+4. **Authentication → URL Configuration** (sonst hängt Google-Login in Production):
+   - **Site URL:** `https://app.evglab.com` (nicht `http://localhost:3001`)
+   - **Redirect URLs** (alle eintragen):
+     - `https://app.evglab.com/**`
+     - `http://localhost:3001/**`
+5. **Authentication → Providers → Google:** aktiviert, Client ID/Secret aus Google Cloud.
+6. **Google Cloud Console** → OAuth-Client → Authorized redirect URI (exakt):
+   - `https://lutmsbxcjmocftiovwfs.supabase.co/auth/v1/callback`
 
 ## 3) Stripe Dashboard Setup
 

@@ -113,6 +113,19 @@ export function canUseCampaignWithTextProfile(profile: BrandProfile): boolean {
   return profile.brandProfileMode === "guided" && isBrandProfileComplete(profile);
 }
 
+/** Sichtbar „Markenstil aktiv“ — gleiche Logik wie Markenprofil-Ansicht (Textprofil), unabhängig vom Referenzbild. */
+export function isBrandProfileActive(profile: BrandProfile): boolean {
+  if (profile.brandProfileMode === "skip" || profile.brandProfileMode === "undecided") return false;
+  if (isBrandProfileComplete(profile)) return true;
+  return Boolean(
+    profile.brandTone &&
+      profile.brandColors &&
+      profile.brandDos &&
+      profile.brandDonts &&
+      (profile.breweryName || profile.brandWebsiteUrl),
+  );
+}
+
 export function buildBrandProfilePromptContext(profile: BrandProfile): string {
   return [
     "Brand profile lock (MANDATORY):",

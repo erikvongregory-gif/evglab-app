@@ -66,14 +66,6 @@ const GRUPPEN_DYNAMIK_LABELS: Record<NonNullable<HyperrealisticInput["gruppenDyn
   E4: "E4 — Walking / Outdoor mit Flaschen in Hand",
 };
 
-const GRUPPEN_SETTING_LABELS: Record<NonNullable<HyperrealisticInput["gruppenSetting"]>, string> = {
-  alpine_huette: "alpine Holzhütte",
-  biergarten: "Biergarten",
-  berge_outdoor: "Berge / Outdoor",
-  rooftop_urban: "urban Rooftop",
-  strand: "Strand",
-};
-
 const GRUPPEN_TYP_LABELS: Record<NonNullable<HyperrealisticInput["gruppenTyp"]>, string> = {
   gemischt: "gemischte Gruppe",
   frauen: "nur Frauen",
@@ -145,7 +137,7 @@ function describePersonenModus(input: HyperrealisticInput): {
         input.gruppenAnzahl ? GRUPPEN_ANZAHL_LABELS[input.gruppenAnzahl] : null,
         input.gruppenTyp ? GRUPPEN_TYP_LABELS[input.gruppenTyp] : null,
         input.gruppenDynamik ? GRUPPEN_DYNAMIK_LABELS[input.gruppenDynamik] : null,
-        input.gruppenSetting ? `Setting: ${GRUPPEN_SETTING_LABELS[input.gruppenSetting]}` : null,
+        `Schauplatz: ${SZENE_LABELS[input.szene]}`,
       ].filter(Boolean);
       return {
         modus: "E – GRUPPE (2–5 anonyme Figuren, Lifestyle-Szene)",
@@ -254,7 +246,13 @@ export function buildHyperrealisticClaudeUserMessage(
   ];
 
   const hasReferenceImage = Boolean(options?.hasReferenceImage) && input.etikettModus === "marke";
-  if (hasReferenceImage) {
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  if (behaelter === "G") {
+    lines.push(
+      "KRITISCH Behaelter = G (Nur Glas): Der Prompt darf KEINE Flasche und KEINE Dose enthalten — nur Glas/Gläser.",
+      "Das Referenzbild dient NUR zum Lesen von Logo/Typografie fuer das GLAS (EXACT TEXT auf Glas), NICHT zum Kopieren der Flasche in die Szene.",
+    );
+  } else if (hasReferenceImage) {
     lines.push(
       "WICHTIG: Im ersten Content-Block dieser Nachricht ist das Referenzbild der Flasche/des Etiketts der Brauerei eingebettet.",
       "Fuehre den REFERENZBILD-WORKFLOW (Schritt A–D) aus dem Skill aus, BEVOR du den Prompt schreibst:",
@@ -270,6 +268,13 @@ export function buildHyperrealisticClaudeUserMessage(
     );
   } else {
     lines.push("Generischer Look ohne Marken-Etikett — keine EXACT-TEXT-Syntax verwenden.");
+  }
+
+  if (input.szene === "fussball_public_viewing") {
+    lines.push(
+      "KRITISCH Schauplatz = Public Viewing: Die Szene MUSS ein oeffentliches Fussball-Public-Viewing / Fanmeile mit sichtbarer Grossleinwand oder Stadion-Atmosphaere zeigen.",
+      "VERBOTEN als Haupsetting: klassischer Biergarten, Wirtshaus-Innenraum, Alpenhuette, gemuetlicher Holztisch unter Kastanien.",
+    );
   }
 
   lines.push(

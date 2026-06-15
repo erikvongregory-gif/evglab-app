@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { BrandProfileSetupModal, type BrandScanSuggestion } from "@/components/dashboard/BrandProfileSetupModal";
 import { useStudioShell } from "@/components/studio/studio-workspace-shell";
-import { StudioViewTransition } from "@/components/studio/studio-view-transition";
 import {
   STUDIO_PAD_X,
   STUDIO_TOKENS,
@@ -14,7 +13,12 @@ import {
 } from "@/components/ui/dashboard-studio-shell";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { calculateGenerationTokenCost } from "@/lib/billing/generationTokenCost";
+import { estimateGenerationProgress } from "@/lib/kie/generationProgress";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
+import {
+  MarketingPromptCreateShell,
+  type PromptSegment,
+} from "@/components/ui/marketing-prompt-create-shell";
 
 type ImageResponse = { b64_json?: string; url?: string };
 
@@ -145,14 +149,6 @@ const GRUPPEN_TYP_OPTIONS: { code: NonNullable<HyperrealisticInput["gruppenTyp"]
   { code: "paerchen", label: "Pärchen" },
 ];
 
-const GRUPPEN_SETTING_OPTIONS: { code: NonNullable<HyperrealisticInput["gruppenSetting"]>; label: string }[] = [
-  { code: "alpine_huette", label: "Alpine Hütte" },
-  { code: "biergarten", label: "Biergarten" },
-  { code: "berge_outdoor", label: "Berge Outdoor" },
-  { code: "rooftop_urban", label: "Urban Rooftop" },
-  { code: "strand", label: "Strand" },
-];
-
 const PERSON_GENDER_OPTIONS: { code: NonNullable<HyperrealisticInput["personGender"]>; label: string }[] = [
   { code: "maennlich", label: "Männlich" },
   { code: "weiblich", label: "Weiblich" },
@@ -237,6 +233,236 @@ const WIZARD_STEPS: WizardStep[] = [
   { id: "format", index: "05", title: "Format, Marke und Extras", subtitle: "Aspect-Ratio, Etikett und optionale Referenz." },
   { id: "review", index: "06", title: "Brief und Generieren", subtitle: "Letzter Check, dann gehts los." },
 ];
+
+const ASPECT_CHIP_OPTIONS = [
+  { label: "9:16", value: "9:16" as const },
+  { label: "4:5", value: "4:5" as const },
+  { label: "1:1", value: "1:1" as const },
+  { label: "16:9", value: "16:9" as const },
+];
+
+const MICRO_STEP_META: Record<string, { title: string; subtitle?: string }> = {
+  bierstil: { title: "Welches Bier?", subtitle: "Bierstil bestimmt Glas, Schaum und Farbe." },
+  behaelter: { title: "Was soll im Bild sein?", subtitle: "Flasche, Glas oder beides?" },
+  flaschentyp: { title: "Welche Flasche?", subtitle: "Silhouette und Volumen für realistische Proportionen." },
+  flaschenfarbe: { title: "Flaschenfarbe?", subtitle: "Glas-/Flaschenfarbe passend zum Etikett." },
+  schauplatz: { title: "Wo spielt die Szene?", subtitle: "Schauplatz und Stimmung der Umgebung." },
+  personen: { title: "Mensch im Bild?", subtitle: "Produkt solo oder Lifestyle mit Personen?" },
+  "person-gender": { title: "Geschlecht der Person", subtitle: "Nur für anonyme Lifestyle-Figuren." },
+  "person-alter": { title: "Altersgruppe", subtitle: "Zielgruppe der Darstellung." },
+  "person-koerper": { title: "Bildausschnitt Person", subtitle: "Wie viel von der Person ist sichtbar?" },
+  "person-mood": { title: "Stimmung der Person", subtitle: "Ausdruck und Körpersprache." },
+  "gruppe-anzahl": { title: "Wie viele Personen?", subtitle: "Gruppengröße in der Szene." },
+  "gruppe-typ": { title: "Gruppentyp", subtitle: "Wer ist in der Gruppe?" },
+  "gruppe-dynamik": { title: "Was macht die Gruppe?", subtitle: "Anstoßen, Sitzen, Outdoor …" },
+  stimmung: { title: "Welche Trend-Stimmung?", subtitle: "Visueller Stil des Motivs." },
+  licht: { title: "Welches Licht?", subtitle: "Tageszeit und Lichtstimmung." },
+  shot: { title: "Bildausschnitt?", subtitle: "Kamerawinkel und Komposition." },
+  format: { title: "Für welches Format?", subtitle: "Aspect Ratio für Social oder Print." },
+  referenz: { title: "Referenz-Etikett", subtitle: "Optional: eigenes Etikett für diesen Run hochladen." },
+  extras: { title: "Extras im Bild?", subtitle: "Optionale Details — mehr Extras = charakteristischer." },
+  review: { title: "Prompt fertig — bereit zum Generieren?", subtitle: "Prüfe den aufgebauten Brief und starte drei Varianten." },
+};
+
+function buildMicroStepIds(
+  behaelter: NonNullable<HyperrealisticInput["behaelter"]>,
+  personenModus: NonNullable<HyperrealisticInput["personenModus"]>,
+): string[] {
+  const ids = ["bierstil", "behaelter"];
+  if (behaelter !== "G") {
+    ids.push("flaschentyp", "flaschenfarbe");
+  }
+  ids.push("personen");
+  ids.push("schauplatz");
+  if (personenModus === "D") {
+    ids.push("person-gender", "person-alter", "person-koerper", "person-mood");
+  }
+  if (personenModus === "E") {
+    ids.push("gruppe-anzahl", "gruppe-typ", "gruppe-dynamik");
+  }
+  ids.push("stimmung", "licht");
+  if (personenModus !== "E") {
+    ids.push("shot");
+  }
+  ids.push("format", "referenz", "extras", "review");
+  return ids;
+}
+
+type PromptBuildState = {
+  was: WasOption;
+  behaelter: NonNullable<HyperrealisticInput["behaelter"]>;
+  flaschenTyp: HyperrealisticInput["flaschenTyp"];
+  flaschenfarbe: HyperrealisticInput["flaschenfarbe"];
+  wo: WoOption;
+  wie: WieOption;
+  wofuer: WofuerOption;
+  personenModus: NonNullable<HyperrealisticInput["personenModus"]>;
+  personGender?: HyperrealisticInput["personGender"];
+  personAlter?: HyperrealisticInput["personAlter"];
+  personKoerper?: HyperrealisticInput["personKoerper"];
+  personMood?: HyperrealisticInput["personMood"];
+  gruppenAnzahl?: HyperrealisticInput["gruppenAnzahl"];
+  gruppenTyp?: HyperrealisticInput["gruppenTyp"];
+  gruppenDynamik?: HyperrealisticInput["gruppenDynamik"];
+  stimmungTrend: NonNullable<HyperrealisticInput["stimmungTrend"]>;
+  shotType: NonNullable<HyperrealisticInput["shotType"]>;
+  extras: string[];
+};
+
+function segmentForMicroStep(stepId: string, s: PromptBuildState): PromptSegment | null {
+  switch (stepId) {
+    case "format":
+      return { text: `${GENERATION_VARIANT_COUNT}× ${s.wofuer.aspectRatio}-Varianten`, highlight: true };
+    case "flaschentyp": {
+      const label = FLASCHEN_OPTIONS.find((o) => o.code === s.flaschenTyp)?.label ?? "Flasche";
+      return { text: label, highlight: true };
+    }
+    case "flaschenfarbe": {
+      const map = { braun: "braune Flasche", gruen: "grüne Flasche", klar: "klare Flasche" } as const;
+      return { text: map[s.flaschenfarbe ?? "braun"], highlight: false };
+    }
+    case "bierstil":
+      return { text: s.was.label, highlight: true };
+    case "behaelter": {
+      const map = { B: "Flasche + Glas", G: "Hero-Glas", F: "Produktfoto" } as const;
+      return { text: map[s.behaelter], highlight: false };
+    }
+    case "schauplatz":
+      return { text: s.wo.label, highlight: true };
+    case "personen":
+      return {
+        text: PERSONEN_OPTIONS.find((o) => o.code === s.personenModus)?.label ?? "Kein Mensch",
+        highlight: false,
+      };
+    case "person-gender":
+      return s.personGender
+        ? { text: PERSON_GENDER_OPTIONS.find((o) => o.code === s.personGender)?.label ?? "", highlight: false }
+        : null;
+    case "person-alter":
+      return s.personAlter
+        ? { text: PERSON_ALTER_OPTIONS.find((o) => o.code === s.personAlter)?.label ?? "", highlight: false }
+        : null;
+    case "person-koerper":
+      return s.personKoerper
+        ? { text: PERSON_KOERPER_OPTIONS.find((o) => o.code === s.personKoerper)?.label ?? "", highlight: false }
+        : null;
+    case "person-mood":
+      return s.personMood
+        ? { text: PERSON_MOOD_OPTIONS.find((o) => o.code === s.personMood)?.label ?? "", highlight: false }
+        : null;
+    case "gruppe-anzahl":
+      return s.gruppenAnzahl
+        ? { text: `${GRUPPEN_ANZAHL_OPTIONS.find((o) => o.code === s.gruppenAnzahl)?.label ?? ""} Personen`, highlight: false }
+        : null;
+    case "gruppe-typ":
+      return s.gruppenTyp
+        ? { text: GRUPPEN_TYP_OPTIONS.find((o) => o.code === s.gruppenTyp)?.label ?? "", highlight: false }
+        : null;
+    case "gruppe-dynamik":
+      return s.gruppenDynamik
+        ? { text: GRUPPEN_DYNAMIK_OPTIONS.find((o) => o.code === s.gruppenDynamik)?.label ?? "", highlight: false }
+        : null;
+    case "stimmung":
+      return {
+        text: STIMMUNG_OPTIONS.find((o) => o.code === s.stimmungTrend)?.label ?? "",
+        highlight: false,
+      };
+    case "licht":
+      return { text: s.wie.label, highlight: true };
+    case "shot":
+      return {
+        text: SHOT_TYPE_OPTIONS.find((o) => o.code === s.shotType)?.label ?? "",
+        highlight: false,
+      };
+    case "extras":
+      return s.extras.length ? { text: s.extras.join(", "), highlight: false } : null;
+    default:
+      return null;
+  }
+}
+
+function buildPromptSegmentsForMicroSteps(
+  stepIds: string[],
+  stepIndex: number,
+  state: PromptBuildState,
+): PromptSegment[] {
+  const segs: PromptSegment[] = [];
+  for (let i = 0; i <= stepIndex && i < stepIds.length; i += 1) {
+    const id = stepIds[i];
+    if (id === "review" || id === "referenz") continue;
+    const seg = segmentForMicroStep(id, state);
+    if (seg) segs.push(seg);
+  }
+  return segs;
+}
+
+function MarketingChoicePills<T extends { label: string }>({
+  options,
+  selected,
+  onSelect,
+  P,
+}: {
+  options: T[];
+  selected: T;
+  onSelect: (v: T) => void;
+  P: StudioPalette;
+}) {
+  return (
+    <div className="evg-marketing-create__pill-grid">
+      {options.map((opt) => {
+        const active = opt.label === selected.label;
+        return (
+          <button
+            key={opt.label}
+            type="button"
+            onClick={() => onSelect(opt)}
+            className={active ? "evg-marketing-create__pill evg-marketing-create__pill--active" : "evg-marketing-create__pill"}
+            style={{
+              borderColor: active ? "rgba(230,106,43,0.55)" : "rgba(245,237,223,0.12)",
+              color: active ? STUDIO_TOKENS.amber2 : P.ink2,
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function MarketingCodePills<C extends string, T extends { code: C; label: string; hint?: string }>({
+  options,
+  value,
+  onChange,
+  P,
+}: {
+  options: readonly T[];
+  value: C;
+  onChange: (code: C) => void;
+  P: StudioPalette;
+}) {
+  return (
+    <div className="evg-marketing-create__pill-grid">
+      {options.map((opt) => {
+        const active = opt.code === value;
+        return (
+          <button
+            key={opt.code}
+            type="button"
+            onClick={() => onChange(opt.code)}
+            className={active ? "evg-marketing-create__pill evg-marketing-create__pill--active" : "evg-marketing-create__pill"}
+            style={{
+              borderColor: active ? "rgba(230,106,43,0.55)" : "rgba(245,237,223,0.12)",
+              color: active ? STUDIO_TOKENS.amber2 : P.ink2,
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function formatDeNumber(n: number) {
   return n.toLocaleString("de-DE");
@@ -597,12 +823,14 @@ export function InhalteErstellenRedesign({
   initialProfileName,
   initialBreweryName,
   brandProfileComplete = true,
+  brandProfileActive = false,
   brandProfileMode = "skip",
 }: {
   userEmail?: string;
   initialProfileName?: string;
   initialBreweryName?: string;
   brandProfileComplete?: boolean;
+  brandProfileActive?: boolean;
   brandProfileMode?: "undecided" | "guided" | "skip";
 }) {
   const P = useStudioPalette();
@@ -610,12 +838,14 @@ export function InhalteErstellenRedesign({
   const { setBrandProfileActive, setContentPadding } = useStudioShell();
   const [brandProfileSetupOpen, setBrandProfileSetupOpen] = useState(false);
   const [profileComplete, setProfileComplete] = useState(brandProfileComplete);
+  const [profileActive, setProfileActive] = useState(brandProfileActive);
   const [profileMode, setProfileMode] = useState(brandProfileMode);
 
   useEffect(() => {
     setProfileComplete(brandProfileComplete);
+    setProfileActive(brandProfileActive);
     setProfileMode(brandProfileMode);
-  }, [brandProfileComplete, brandProfileMode]);
+  }, [brandProfileComplete, brandProfileActive, brandProfileMode]);
 
   useEffect(() => {
     setContentPadding(`32px ${STUDIO_PAD_X}px 96px`);
@@ -628,6 +858,7 @@ export function InhalteErstellenRedesign({
 
   const applyBrandScanAndPersist = useCallback(async (suggestion: BrandScanSuggestion) => {
     setProfileComplete(true);
+    setProfileActive(true);
     setProfileMode("guided");
     setBreweryName(suggestion.breweryName);
     window.setTimeout(() => router.refresh(), 300);
@@ -659,7 +890,6 @@ export function InhalteErstellenRedesign({
   const [gruppenAnzahl, setGruppenAnzahl] = useState<HyperrealisticInput["gruppenAnzahl"]>("3");
   const [gruppenTyp, setGruppenTyp] = useState<HyperrealisticInput["gruppenTyp"]>("gemischt");
   const [gruppenDynamik, setGruppenDynamik] = useState<HyperrealisticInput["gruppenDynamik"]>("E2");
-  const [gruppenSetting, setGruppenSetting] = useState<HyperrealisticInput["gruppenSetting"]>("biergarten");
   const [stimmungTrend, setStimmungTrend] = useState<NonNullable<HyperrealisticInput["stimmungTrend"]>>("nachhaltig");
   const [shotType, setShotType] = useState<NonNullable<HyperrealisticInput["shotType"]>>("A");
   const [kiPlattform, setKiPlattform] = useState<NonNullable<HyperrealisticInput["kiPlattform"]>>("gpt_image_2");
@@ -780,13 +1010,12 @@ export function InhalteErstellenRedesign({
       variantCount: GENERATION_VARIANT_COUNT,
     });
   }, [customReferenceDataUrl, etikettModus, etikettUrl]);
-  const brandLinked = Boolean((breweryName || initialBreweryName?.trim()) && hasReferenceImage);
   const personenSetUp =
     personenModus === "A" ||
     personenModus === "B" ||
     personenModus === "C" ||
     (personenModus === "D" && Boolean(personGender && personAlter)) ||
-    (personenModus === "E" && Boolean(gruppenDynamik && gruppenSetting));
+    (personenModus === "E" && Boolean(gruppenDynamik && wo));
   const etikettOK = etikettModus === "generisch" || hasReferenceImage;
   const hasDetailExtra = extras.length >= 1;
   const hasManyExtras = extras.length >= 3;
@@ -824,7 +1053,7 @@ export function InhalteErstellenRedesign({
           personenModus === "D"
             ? `Person mit Gesicht — Details ${personGender && personAlter ? "vollständig" : "fehlen"}`
             : personenModus === "E"
-              ? `Gruppe — ${gruppenDynamik && gruppenSetting ? "Dynamik & Setting gesetzt" : "Dynamik/Setting fehlt"}`
+              ? `Gruppe — ${gruppenDynamik && wo ? "Dynamik & Schauplatz gesetzt" : "Dynamik/Schauplatz fehlt"}`
               : `Personen-Modus: ${personenLabel}`,
       },
       { done: Boolean(stimmungTrend), label: `Trend-Stimmung: ${stimmungLabel}` },
@@ -841,7 +1070,6 @@ export function InhalteErstellenRedesign({
       personGender,
       personAlter,
       gruppenDynamik,
-      gruppenSetting,
       personenLabel,
       stimmungTrend,
       stimmungLabel,
@@ -862,21 +1090,130 @@ export function InhalteErstellenRedesign({
   }
 
   const [generationStep, setGenerationStep] = useState<string>("");
+  const [variantProgress, setVariantProgress] = useState<number[]>([]);
 
-  // Wizard: Step-by-Step Flow durch alle Optionen.
-  const [stepIndex, setStepIndex] = useState(0);
-  const currentStepDef = WIZARD_STEPS[stepIndex] ?? WIZARD_STEPS[0];
-  const isLastStep = stepIndex === WIZARD_STEPS.length - 1;
-  const goToStep = useCallback((next: number) => {
-    setStepIndex(Math.max(0, Math.min(WIZARD_STEPS.length - 1, next)));
-    if (typeof window !== "undefined") {
-      window.requestAnimationFrame(() => {
-        document.getElementById("wizard-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    }
+  const microStepIds = useMemo(
+    () => buildMicroStepIds(behaelter, personenModus),
+    [behaelter, personenModus],
+  );
+  const [microStepIndex, setMicroStepIndex] = useState(0);
+
+  useEffect(() => {
+    setMicroStepIndex((i) => Math.min(i, microStepIds.length - 1));
+  }, [microStepIds]);
+
+  const currentMicroStepId = microStepIds[microStepIndex] ?? "bierstil";
+  const isReviewStep = currentMicroStepId === "review";
+  const currentMicroMeta = MICRO_STEP_META[currentMicroStepId] ?? { title: "Motiv" };
+
+  const goMicroNext = useCallback(() => {
+    setMicroStepIndex((i) => Math.min(microStepIds.length - 1, i + 1));
+  }, [microStepIds.length]);
+
+  const goMicroPrev = useCallback(() => {
+    setMicroStepIndex((i) => Math.max(0, i - 1));
   }, []);
-  const goNext = useCallback(() => goToStep(stepIndex + 1), [goToStep, stepIndex]);
-  const goPrev = useCallback(() => goToStep(stepIndex - 1), [goToStep, stepIndex]);
+
+  const flaschenTypLabel = FLASCHEN_OPTIONS.find((o) => o.code === flaschenTyp)?.label ?? "Flasche";
+
+  const promptBuildState: PromptBuildState = useMemo(
+    () => ({
+      was,
+      behaelter,
+      flaschenTyp,
+      flaschenfarbe,
+      wo,
+      wie,
+      wofuer,
+      personenModus,
+      personGender,
+      personAlter,
+      personKoerper,
+      personMood,
+      gruppenAnzahl,
+      gruppenTyp,
+      gruppenDynamik,
+      stimmungTrend,
+      shotType,
+      extras,
+    }),
+    [
+      was,
+      behaelter,
+      flaschenTyp,
+      flaschenfarbe,
+      wo,
+      wie,
+      wofuer,
+      personenModus,
+      personGender,
+      personAlter,
+      personKoerper,
+      personMood,
+      gruppenAnzahl,
+      gruppenTyp,
+      gruppenDynamik,
+      stimmungTrend,
+      shotType,
+      extras,
+    ],
+  );
+
+  const promptSegments = useMemo(
+    () => buildPromptSegmentsForMicroSteps(microStepIds, microStepIndex, promptBuildState),
+    [microStepIds, microStepIndex, promptBuildState],
+  );
+
+  const formatTag = useMemo(() => {
+    const ar = wofuer.aspectRatio;
+    if (ar === "9:16") return "Social · Reels";
+    if (ar === "4:5") return "Social · Feed";
+    if (ar === "1:1") return "Social · Post";
+    return "Landscape · Banner";
+  }, [wofuer.aspectRatio]);
+
+  const brandMetaLine = useMemo(() => {
+    const brand = breweryName || brandLabel;
+    if (behaelter === "G") return `Marke: ${brand}`;
+    return `Marke: ${brand} · ${flaschenTypLabel}`;
+  }, [breweryName, brandLabel, behaelter, flaschenTypLabel]);
+
+  const variantCards = useMemo(() => {
+    if (images.length === 0) return [];
+    return images.map((img, index) => {
+      const src = imageSrc(img);
+      return {
+        index,
+        src: src || undefined,
+        loading: !src,
+        progress: src ? 100 : variantProgress[index] ?? 12,
+      };
+    });
+  }, [images, variantProgress]);
+
+  useEffect(() => {
+    if (currentMicroStepId === "person-gender" && !personGender) setPersonGender("maennlich");
+  }, [currentMicroStepId, personGender]);
+
+  useEffect(() => {
+    if (personenModus === "E" && gruppenDynamik === "E1") {
+      setShotType("H");
+    }
+  }, [personenModus, gruppenDynamik]);
+
+  const canProceedMicro = useMemo(() => {
+    switch (currentMicroStepId) {
+      case "person-gender":
+        return Boolean(personGender);
+      default:
+        return true;
+    }
+  }, [currentMicroStepId, personGender]);
+
+  const handleAspectChange = useCallback((value: string) => {
+    const match = WOFUER_OPTIONS.find((o) => o.aspectRatio === value);
+    if (match) setWofuer(match);
+  }, []);
 
   async function persistMediaItem(item: {
     id: string;
@@ -899,7 +1236,11 @@ export function InhalteErstellenRedesign({
     }
   }
 
-  async function pollKieTask(taskId: string, signal: AbortSignal): Promise<string> {
+  async function pollKieTask(
+    taskId: string,
+    signal: AbortSignal,
+    onProgress?: (progress: number) => void,
+  ): Promise<string> {
     // Gesamt-Deadline: 6 Minuten (Kie kann je nach Modell/Auslastung deutlich länger
     // als die UI-Schätzung brauchen). Wir geben hier eher mehr Spielraum, statt
     // gut laufende Generierungen abzubrechen.
@@ -962,7 +1303,7 @@ export function InhalteErstellenRedesign({
         continue;
       }
 
-      let data: { state?: string; imageUrl?: string | null; error?: string };
+      let data: { state?: string; imageUrl?: string | null; error?: string; progress?: number | null };
       try {
         data = (await res.json()) as typeof data;
       } catch {
@@ -981,21 +1322,25 @@ export function InhalteErstellenRedesign({
       // Erfolgreicher Status-Call → Zähler resetten.
       consecutiveTransientErrors = 0;
 
+      const elapsedMs = Date.now() - startedAt;
+      const progress = estimateGenerationProgress(elapsedMs, data.progress);
+      onProgress?.(progress);
+
       const state = (data.state ?? "").toLowerCase();
       if (["success", "succeeded", "completed", "done"].includes(state) && data.imageUrl) {
+        onProgress?.(100);
         return data.imageUrl;
       }
       if (["failed", "error", "cancelled", "canceled"].includes(state)) {
-        throw new Error("Kie hat die Generierung abgebrochen.");
+        throw new Error("Die KI-Generierung wurde abgebrochen.");
       }
 
-      // Noch laufend (oder unknown) — UI-Status aktualisieren.
       if (elapsedSec > 90) {
-        setGenerationStep(`Noch in Arbeit (~${elapsedSec}s) — Kie braucht heute etwas länger …`);
+        setGenerationStep(`Noch in Arbeit (~${elapsedSec}s) — die KI braucht etwas länger …`);
       } else if (elapsedSec > 50) {
-        setGenerationStep(`Generiert (~${elapsedSec}s) — bitte noch einen Moment …`);
+        setGenerationStep(`KI generiert (~${elapsedSec}s) — bitte noch einen Moment …`);
       } else {
-        setGenerationStep(`Generiert (~${elapsedSec}s) …`);
+        setGenerationStep(`KI generiert (~${elapsedSec}s) …`);
       }
     }
     throw new Error("Generierung dauert ungewoehnlich lange — bitte spaeter erneut versuchen.");
@@ -1005,9 +1350,9 @@ export function InhalteErstellenRedesign({
     setLoading(true);
     setError("");
     setImages([]);
+    setVariantProgress([]);
     setGenerationStep("Brief wird verarbeitet …");
-    // Sicherstellen, dass der User auf dem Review-Step ist (wo das Resultat-Grid sichtbar ist).
-    setStepIndex(WIZARD_STEPS.length - 1);
+    setMicroStepIndex(buildMicroStepIds(behaelter, personenModus).length - 1);
     const controller = new AbortController();
     try {
       // Vorrang: Ad-hoc-Upload > Markenprofil-Etikett.
@@ -1041,7 +1386,6 @@ export function InhalteErstellenRedesign({
         gruppenAnzahl: personenModus === "E" ? gruppenAnzahl : undefined,
         gruppenTyp: personenModus === "E" ? gruppenTyp : undefined,
         gruppenDynamik: personenModus === "E" ? gruppenDynamik : undefined,
-        gruppenSetting: personenModus === "E" ? gruppenSetting : undefined,
         tageszeit: wie.tageszeit,
         stimmungTrend,
         stimmung: "gesellig",
@@ -1062,7 +1406,7 @@ export function InhalteErstellenRedesign({
           `Nicht genug Tokens. Benötigt: ${generationTokenCost}, verfügbar: ${tokensRemaining}.`,
         );
       }
-      setGenerationStep("Sende Brief an Kie.ai …");
+      setGenerationStep("Brief wird gesendet …");
       const res = await fetch("/api/inhalte-erstellen/create-task", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1105,7 +1449,8 @@ export function InhalteErstellenRedesign({
       setImages(initialSlots);
       const totalVariants = taskIds.length;
       let completedCount = 0;
-      setGenerationStep(`Generiere ${totalVariants} Varianten …`);
+      setGenerationStep(`KI generiert ${totalVariants} Varianten …`);
+      setVariantProgress(taskIds.map(() => 12));
 
       const mediaPromptLabel = (() => {
         const base = `${was.label} · ${behaelterLabel} · ${wo.label} · ${wie.label}`.slice(0, 200);
@@ -1116,7 +1461,13 @@ export function InhalteErstellenRedesign({
 
       const polls = taskIds.map(async (taskId, index) => {
         try {
-          const imageUrl = await pollKieTask(taskId, controller.signal);
+          const imageUrl = await pollKieTask(taskId, controller.signal, (progress) => {
+            setVariantProgress((prev) => {
+              const next = prev.length === taskIds.length ? [...prev] : taskIds.map(() => 12);
+              next[index] = progress;
+              return next;
+            });
+          });
           setImages((prev) => {
             const next = [...prev];
             next[index] = { url: imageUrl };
@@ -1158,7 +1509,7 @@ export function InhalteErstellenRedesign({
         );
       } else if (data.partial && data.partialErrors && data.partialErrors.length > 0) {
         setError(
-          `Nur ${totalVariants} Variante(n) erstellt — manche Tasks bei Kie wurden abgelehnt.`,
+          `Nur ${totalVariants} Variante(n) erstellt — manche Generierungen wurden abgelehnt.`,
         );
       }
       setGenerationStep("");
@@ -1170,1678 +1521,322 @@ export function InhalteErstellenRedesign({
     }
   }
 
-  const pad = STUDIO_PAD_X;
   const tokensFreeLabel =
     tokensRemaining !== null ? formatDeNumber(tokensRemaining) : "—";
+  const tokensStatusLabel =
+    tokensRemaining !== null ? `Tokens ${tokensFreeLabel}/100` : "Tokens —";
 
-  return (
-    <>
-      <div style={{ width: "100%", maxWidth: "none" }}>
-        <Eyebrow P={P} className="studio-create-eyebrow">
-          EvGlab · Studio · Brief-Modus · Kalenderwoche {getCalendarWeek()} · {todayLine} · Modell v2.4 · GPU-Pool DE-Süd
-        </Eyebrow>
-
-        {!profileComplete && profileMode !== "skip" ? (
-          <div
-            style={{
-              marginTop: 20,
-              padding: "14px 16px",
-              borderRadius: 12,
-              border: "1px solid rgba(199,105,30,0.25)",
-              background: "rgba(244,216,180,0.45)",
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <div>
-              <div style={{ fontFamily: STUDIO_TOKENS.sans, fontWeight: 650, fontSize: 14, color: P.ink }}>
-                Markenprofil empfohlen
-              </div>
-              <div style={{ marginTop: 4, fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2 }}>
-                Gib die Website deiner Brauerei ein — die KI erstellt Tonality, Farben und Bildregeln für konsistente Motive.
-              </div>
+  const microStepContent = (() => {
+    switch (currentMicroStepId) {
+      case "bierstil":
+        return <MarketingChoicePills options={WAS_OPTIONS} selected={was} onSelect={setWas} P={P} />;
+      case "behaelter":
+        return <MarketingCodePills options={BEHAELTER_OPTIONS} value={behaelter} onChange={setBehaelter} P={P} />;
+      case "flaschentyp":
+        return (
+          <MarketingCodePills
+            options={FLASCHEN_OPTIONS}
+            value={flaschenTyp ?? "nrw_500"}
+            onChange={(c) => setFlaschenTyp(c as HyperrealisticInput["flaschenTyp"])}
+            P={P}
+          />
+        );
+      case "flaschenfarbe":
+        return (
+          <MarketingCodePills
+            options={[
+              { code: "braun" as const, label: "Braun" },
+              { code: "gruen" as const, label: "Grün" },
+              { code: "klar" as const, label: "Klar" },
+            ]}
+            value={flaschenfarbe ?? "braun"}
+            onChange={(c) => setFlaschenfarbe(c as HyperrealisticInput["flaschenfarbe"])}
+            P={P}
+          />
+        );
+      case "schauplatz":
+        return <MarketingChoicePills options={WO_OPTIONS} selected={wo} onSelect={setWo} P={P} />;
+      case "personen":
+        return <MarketingCodePills options={PERSONEN_OPTIONS} value={personenModus} onChange={setPersonenModus} P={P} />;
+      case "person-gender":
+        return (
+          <MarketingCodePills
+            options={PERSON_GENDER_OPTIONS}
+            value={personGender ?? "maennlich"}
+            onChange={setPersonGender}
+            P={P}
+          />
+        );
+      case "person-alter":
+        return <MarketingCodePills options={PERSON_ALTER_OPTIONS} value={personAlter ?? "jung"} onChange={setPersonAlter} P={P} />;
+      case "person-koerper":
+        return (
+          <MarketingCodePills options={PERSON_KOERPER_OPTIONS} value={personKoerper ?? "halbkoerper"} onChange={setPersonKoerper} P={P} />
+        );
+      case "person-mood":
+        return <MarketingCodePills options={PERSON_MOOD_OPTIONS} value={personMood ?? "entspannt"} onChange={setPersonMood} P={P} />;
+      case "gruppe-anzahl":
+        return (
+          <MarketingCodePills options={GRUPPEN_ANZAHL_OPTIONS} value={gruppenAnzahl ?? "3"} onChange={setGruppenAnzahl} P={P} />
+        );
+      case "gruppe-typ":
+        return <MarketingCodePills options={GRUPPEN_TYP_OPTIONS} value={gruppenTyp ?? "gemischt"} onChange={setGruppenTyp} P={P} />;
+      case "gruppe-dynamik":
+        return (
+          <MarketingCodePills options={GRUPPEN_DYNAMIK_OPTIONS} value={gruppenDynamik ?? "E2"} onChange={setGruppenDynamik} P={P} />
+        );
+      case "stimmung":
+        return <MarketingCodePills options={STIMMUNG_OPTIONS} value={stimmungTrend} onChange={setStimmungTrend} P={P} />;
+      case "licht":
+        return <MarketingChoicePills options={WIE_OPTIONS} selected={wie} onSelect={setWie} P={P} />;
+      case "shot":
+        return <MarketingCodePills options={SHOT_TYPE_OPTIONS} value={shotType} onChange={setShotType} P={P} />;
+      case "format":
+        return <MarketingChoicePills options={WOFUER_OPTIONS} selected={wofuer} onSelect={setWofuer} P={P} />;
+      case "referenz":
+        return (
+          <div className="evg-marketing-create__referenz">
+            <p style={{ margin: "0 0 12px", fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>
+              {customReferenceDataUrl
+                ? `${customReferenceName || "Hochgeladenes Bild"} wird für diesen Run genutzt.`
+                : etikettUrl
+                  ? "Markenprofil-Etikett ist verknüpft. Optional kannst du ein anderes Referenzbild hochladen."
+                  : "Optional: Etikett oder Stil-Referenz für diesen Run hochladen."}
+            </p>
+            {uploadError ? (
+              <p style={{ margin: "0 0 10px", fontSize: 12, color: "#B83A2A", fontFamily: STUDIO_TOKENS.sans }}>{uploadError}</p>
+            ) : null}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <label className="evg-marketing-create__pill" style={{ cursor: uploading ? "wait" : "pointer", color: P.ink2 }}>
+                {uploading ? "Komprimiere …" : customReferenceDataUrl ? "Anderes Bild" : "Bild hochladen"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  disabled={uploading}
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleReferenceUpload(file);
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </label>
+              {customReferenceDataUrl ? (
+                <button type="button" className="evg-marketing-create__pill" onClick={clearCustomReference} style={{ color: P.ink3 }}>
+                  Zurücksetzen
+                </button>
+              ) : null}
             </div>
-            <button
-              type="button"
-              onClick={() => setBrandProfileSetupOpen(true)}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "linear-gradient(135deg, #F2A35A 0%, #E66A2B 38%, #C13B1F 100%)",
-                color: "#0A0807",
-                boxShadow: "0 10px 24px -10px rgba(230,106,43,0.55), inset 0 1px 0 rgba(255,255,255,0.18)",
-                fontFamily: STUDIO_TOKENS.sans,
-                fontWeight: 650,
-                fontSize: 13,
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              Markenprofil anlegen
-            </button>
-          </div>
-        ) : null}
-
-        {referenceImagesStale ? (
-          <div
-            style={{
-              marginTop: 12,
-              padding: "12px 16px",
-              borderRadius: 12,
-              border: "1px solid rgba(199,105,30,0.35)",
-              background: "rgba(255,238,210,0.7)",
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <div>
-              <div style={{ fontFamily: STUDIO_TOKENS.sans, fontWeight: 650, fontSize: 13, color: P.ink }}>
-                Referenzbilder veraltet
+            {(customReferenceDataUrl || etikettUrl) && (
+              <div
+                style={{
+                  marginTop: 14,
+                  width: 88,
+                  height: 88,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  border: `1px solid ${P.rule}`,
+                }}
+              >
+                <img
+                  src={customReferenceDataUrl || etikettUrl}
+                  alt="Referenz Vorschau"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
               </div>
-              <div style={{ marginTop: 4, fontFamily: STUDIO_TOKENS.sans, fontSize: 12, color: P.ink2 }}>
-                Deine alten Referenzbilder sind nicht mehr verfügbar. Lade neue Bilder im Markenprofil hoch oder nutze
-                einmalig den manuellen Upload weiter unten.
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setBrandProfileSetupOpen(true)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 10,
-                background: "transparent",
-                color: P.ink,
-                fontFamily: STUDIO_TOKENS.sans,
-                fontWeight: 650,
-                fontSize: 12,
-                border: `1px solid ${P.ruleStrong}`,
-                cursor: "pointer",
-              }}
-            >
-              Referenzen aktualisieren
-            </button>
+            )}
           </div>
-        ) : null}
-
-        <header style={{ marginTop: 32, marginBottom: 22, maxWidth: 780 }}>
-          <div
-            style={{
-              fontFamily: STUDIO_TOKENS.mono,
-              fontSize: 11,
-              letterSpacing: 1.4,
-              textTransform: "uppercase",
-              color: P.ink3,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 14,
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: 999, background: STUDIO_TOKENS.amber, display: "inline-block", boxShadow: `0 0 12px ${STUDIO_TOKENS.amber}` }} />
-            Inhalte erstellen · {brandLabel}
-          </div>
-          <h1
-            style={{
-              fontFamily: STUDIO_TOKENS.sans,
-              fontSize: "clamp(2.4rem, 4.2vw, 3.6rem)",
-              fontWeight: 700,
-              letterSpacing: -2,
-              lineHeight: 1.02,
-              margin: 0,
-            }}
-          >
-            Was zeigen wir{" "}
-            <em
-              style={{
-                fontFamily: STUDIO_TOKENS.accentSerif,
-                fontStyle: "italic",
-                fontWeight: 500,
-                background: STUDIO_TOKENS.gradientBrand,
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
-              heute
-            </em>
-            ?
-          </h1>
-          <p style={{ marginTop: 16, fontSize: 15.5, lineHeight: 1.6, color: P.ink2, maxWidth: 660 }}>
-            Wähle Motiv, Schauplatz und Format — wir bauen daraus einen präzisen Brief für {brandLabel} und generieren drei
-            Varianten im Markenstil.
-          </p>
-        </header>
-
-        {/* Step-Indikator als Progress-Track */}
-        <div style={{ marginTop: 8, marginBottom: 22 }}>
-          <div
-            className="studio-create-wizard"
-            style={{
-              gridTemplateColumns: `repeat(${WIZARD_STEPS.length}, minmax(0, 1fr))`,
-            }}
-          >
-            {/* Verbindungslinie hinten */}
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                top: 18,
-                left: `calc(100% / ${WIZARD_STEPS.length * 2})`,
-                right: `calc(100% / ${WIZARD_STEPS.length * 2})`,
-                height: 2,
-                background: "rgba(245,237,223,0.08)",
-                borderRadius: 999,
-              }}
-            />
-            {/* Progress-Linie */}
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                top: 18,
-                left: `calc(100% / ${WIZARD_STEPS.length * 2})`,
-                width:
-                  stepIndex > 0
-                    ? `calc((100% - (200% / ${WIZARD_STEPS.length})) * ${stepIndex} / ${WIZARD_STEPS.length - 1})`
-                    : 0,
-                height: 2,
-                background: STUDIO_TOKENS.gradientBrand,
-                borderRadius: 999,
-                boxShadow: "0 0 10px rgba(230,106,43,0.45)",
-                transition: "width .35s cubic-bezier(.4,0,.2,1)",
-              }}
-            />
-            {WIZARD_STEPS.map((s, i) => {
-              const done = i < stepIndex;
-              const active = i === stepIndex;
-              const label = s.title.split(" ")[0].replace("?", "").replace(",", "");
+        );
+      case "extras":
+        return (
+          <div className="evg-marketing-create__pill-grid">
+            {EXTRA_OPTIONS.map((label) => {
+              const on = extras.includes(label);
               return (
                 <button
-                  key={s.id}
+                  key={label}
                   type="button"
-                  onClick={() => goToStep(i)}
-                  aria-current={active ? "step" : undefined}
+                  onClick={() => toggleExtra(label)}
+                  className={on ? "evg-marketing-create__pill evg-marketing-create__pill--active" : "evg-marketing-create__pill"}
                   style={{
-                    position: "relative",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "0 4px",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    fontFamily: STUDIO_TOKENS.sans,
+                    borderColor: on ? "rgba(230,106,43,0.55)" : "rgba(245,237,223,0.12)",
+                    color: on ? STUDIO_TOKENS.amber2 : P.ink2,
                   }}
                 >
-                  <span
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 999,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: STUDIO_TOKENS.mono,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      letterSpacing: 0.5,
-                      background: active
-                        ? STUDIO_TOKENS.gradientBrand
-                        : done
-                          ? "rgba(230,106,43,0.18)"
-                          : "rgba(245,237,223,0.04)",
-                      color: active ? "#0A0807" : done ? STUDIO_TOKENS.amber2 : P.ink3,
-                      border: `1px solid ${active ? "transparent" : done ? "rgba(230,106,43,0.35)" : "rgba(245,237,223,0.10)"}`,
-                      boxShadow: active
-                        ? "0 8px 22px -8px rgba(230,106,43,0.65), inset 0 1px 0 rgba(255,255,255,0.2)"
-                        : "none",
-                      transition: "all .25s ease",
-                      transform: active ? "scale(1.05)" : "scale(1)",
-                    }}
-                  >
-                    {done ? (
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                        <path d="M3 7 L6 10 L11 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    ) : (
-                      s.index
-                    )}
-                  </span>
-                  <span
-                    className="studio-create-wizard-label"
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: active ? 650 : 500,
-                      color: active ? P.ink : done ? P.ink2 : P.ink3,
-                      letterSpacing: 0.1,
-                      whiteSpace: "nowrap",
-                      transition: "color .2s ease",
-                    }}
-                  >
-                    {label}
-                  </span>
+                  {label}
                 </button>
               );
             })}
           </div>
-        </div>
+        );
+      case "review":
+        return (
+          <div className="evg-marketing-create__review">
+            <CoachGauge score={coachScore} P={P} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: STUDIO_TOKENS.sans, fontSize: 18, fontWeight: 700, color: P.ink }}>{coachLabel}</div>
+              <p style={{ margin: "6px 0 0", fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>
+                {coachReady ? "Bereit zu generieren — alles Wesentliche da." : "Fast fertig — prüfe die offenen Punkte."}
+              </p>
+              <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                {coachChecks.map((item) => (
+                  <li key={item.label} style={{ display: "flex", gap: 8, fontSize: 12.5, color: item.done ? P.ink2 : P.ink3 }}>
+                    <span style={{ color: item.done ? STUDIO_TOKENS.amber2 : P.ink3 }}>{item.done ? "✓" : "○"}</span>
+                    {item.label}
+                  </li>
+                ))}
+              </ul>
+              <p style={{ margin: "14px 0 0", fontFamily: STUDIO_TOKENS.mono, fontSize: 11, color: P.ink3 }}>
+                {formatDeNumber(generationTokenCost)} Tokens · {tokensFreeLabel} frei
+              </p>
+              {error ? (
+                <p style={{ margin: "10px 0 0", fontSize: 12, color: "#F5A8A8" }} role="alert">
+                  {error}
+                </p>
+              ) : null}
+              {loading && generationStep ? (
+                <p style={{ margin: "10px 0 0", fontSize: 12, color: P.ink2 }}>{generationStep}</p>
+              ) : null}
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  })();
 
-        {/* Wizard-Karte */}
+  return (
+    <>
+      {!profileComplete && profileMode !== "skip" ? (
         <div
-          id="wizard-card"
           style={{
-            background:
-              currentStepDef.id === "review"
-                ? "linear-gradient(180deg, #1B1714 0%, #13100D 100%)"
-                : "linear-gradient(180deg, rgba(245,237,223,0.04) 0%, rgba(245,237,223,0.01) 100%)",
-            color: P.ink,
-            borderRadius: 18,
-            border: `1px solid ${P.rule}`,
-            padding: "30px 30px 24px",
-            boxShadow: "0 1px 0 rgba(245,237,223,0.04), 0 24px 60px -30px rgba(0,0,0,0.7)",
-            position: "relative",
-            overflow: "hidden",
+            marginBottom: 16,
+            padding: "14px 16px",
+            borderRadius: 12,
+            border: "1px solid rgba(199,105,30,0.25)",
+            background: "rgba(244,216,180,0.45)",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
           }}
         >
-          {/* Gradient-Top-Strip */}
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 1,
-              background: STUDIO_TOKENS.gradientBrand,
-              opacity: 0.55,
-            }}
-          />
-          {/* Subtle background glow */}
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              top: -80,
-              right: -60,
-              width: 320,
-              height: 320,
-              background: "radial-gradient(circle, rgba(230,106,43,0.10) 0%, transparent 60%)",
-              pointerEvents: "none",
-            }}
-          />
-          <StudioViewTransition viewKey={currentStepDef.id} variant="tab">
-          {/* Step-Header (PROMPT · 0X) */}
-          <div
-            style={{
-              position: "relative",
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-              gap: 16,
-              marginBottom: 22,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontFamily: STUDIO_TOKENS.mono,
-                  fontSize: 10,
-                  letterSpacing: 1.4,
-                  textTransform: "uppercase",
-                  color: P.ink3,
-                  marginBottom: 8,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: STUDIO_TOKENS.accentSerif,
-                    background: STUDIO_TOKENS.gradientBrand,
-                    WebkitBackgroundClip: "text",
-                    backgroundClip: "text",
-                    color: "transparent",
-                    fontWeight: 700,
-                  }}
-                >
-                  Prompt · {currentStepDef.index}
-                </span>
-              </div>
-              <div
-                style={{
-                  fontFamily: STUDIO_TOKENS.sans,
-                  fontSize: "clamp(1.5rem, 2.6vw, 2.1rem)",
-                  fontWeight: 700,
-                  letterSpacing: -0.6,
-                  lineHeight: 1.15,
-                  color: P.ink,
-                }}
-              >
-                {currentStepDef.title}
-              </div>
-              <p
-                style={{
-                  margin: "10px 0 0",
-                  fontFamily: STUDIO_TOKENS.sans,
-                  fontSize: 13.5,
-                  lineHeight: 1.55,
-                  color: P.ink2,
-                }}
-              >
-                {currentStepDef.subtitle}
-              </p>
-            </div>
-            <div
-              style={{
-                fontFamily: STUDIO_TOKENS.mono,
-                fontSize: 10,
-                letterSpacing: 1,
-                color: P.ink3,
-                whiteSpace: "nowrap",
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: `1px solid ${P.rule}`,
-                background: "rgba(245,237,223,0.03)",
-              }}
-            >
-              {stepIndex + 1} / {WIZARD_STEPS.length}
+          <div>
+            <div style={{ fontFamily: STUDIO_TOKENS.sans, fontWeight: 650, fontSize: 14, color: P.ink }}>Markenprofil empfohlen</div>
+            <div style={{ marginTop: 4, fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2 }}>
+              Gib die Website deiner Brauerei ein — die KI erstellt Tonality, Farben und Bildregeln für konsistente Motive.
             </div>
           </div>
-
-          {/* === STEP 01 · MOTIV === */}
-          {currentStepDef.id === "motiv" ? (
-            <div>
-              <PillRow rowLabel="Bierstil" options={WAS_OPTIONS} selected={was} onSelect={setWas} P={P} />
-              <CodePillRow
-                rowLabel="Behälter"
-                rowHint="Was soll im Bild sein?"
-                options={BEHAELTER_OPTIONS}
-                value={behaelter}
-                onChange={setBehaelter}
-                P={P}
-              />
-              {behaelter !== "G" ? (
-                <>
-                  <SubPillRow
-                    rowLabel="Flaschentyp"
-                    options={FLASCHEN_OPTIONS}
-                    value={flaschenTyp}
-                    onChange={(c) => setFlaschenTyp(c as HyperrealisticInput["flaschenTyp"])}
-                    P={P}
-                  />
-                  <SubPillRow
-                    rowLabel="Flaschenfarbe"
-                    options={[
-                      { code: "braun" as const, label: "Braun" },
-                      { code: "gruen" as const, label: "Grün" },
-                      { code: "klar" as const, label: "Klar" },
-                    ]}
-                    value={flaschenfarbe}
-                    onChange={(c) => setFlaschenfarbe(c as HyperrealisticInput["flaschenfarbe"])}
-                    P={P}
-                  />
-                </>
-              ) : null}
-            </div>
-          ) : null}
-
-          {/* === STEP 02 · SCHAUPLATZ === */}
-          {currentStepDef.id === "schauplatz" ? (
-            <PillRow rowLabel="Schauplatz" options={WO_OPTIONS} selected={wo} onSelect={setWo} P={P} />
-          ) : null}
-
-          {/* === STEP 03 · PERSONEN === */}
-          {currentStepDef.id === "personen" ? (
-            <div>
-              <CodePillRow
-                rowLabel="Modus"
-                rowHint="Mit Mensch, ohne, oder Solo-Produktbild?"
-                options={PERSONEN_OPTIONS}
-                value={personenModus}
-                onChange={setPersonenModus}
-                P={P}
-              />
-              {personenModus === "D" ? (
-                <>
-                  <SubPillRow
-                    rowLabel="Geschlecht"
-                    options={PERSON_GENDER_OPTIONS}
-                    value={personGender}
-                    onChange={(c) => setPersonGender(c)}
-                    P={P}
-                  />
-                  <SubPillRow
-                    rowLabel="Alter"
-                    options={PERSON_ALTER_OPTIONS}
-                    value={personAlter}
-                    onChange={(c) => setPersonAlter(c)}
-                    P={P}
-                  />
-                  <SubPillRow
-                    rowLabel="Körperanteil"
-                    options={PERSON_KOERPER_OPTIONS}
-                    value={personKoerper}
-                    onChange={(c) => setPersonKoerper(c)}
-                    P={P}
-                  />
-                  <SubPillRow
-                    rowLabel="Stimmung"
-                    options={PERSON_MOOD_OPTIONS}
-                    value={personMood}
-                    onChange={(c) => setPersonMood(c)}
-                    P={P}
-                  />
-                </>
-              ) : null}
-              {personenModus === "E" ? (
-                <>
-                  <SubPillRow
-                    rowLabel="Gruppengröße"
-                    options={GRUPPEN_ANZAHL_OPTIONS}
-                    value={gruppenAnzahl}
-                    onChange={(c) => setGruppenAnzahl(c)}
-                    P={P}
-                  />
-                  <SubPillRow
-                    rowLabel="Gruppentyp"
-                    options={GRUPPEN_TYP_OPTIONS}
-                    value={gruppenTyp}
-                    onChange={(c) => setGruppenTyp(c)}
-                    P={P}
-                  />
-                  <SubPillRow
-                    rowLabel="Dynamik"
-                    options={GRUPPEN_DYNAMIK_OPTIONS}
-                    value={gruppenDynamik}
-                    onChange={(c) => setGruppenDynamik(c)}
-                    P={P}
-                  />
-                  <SubPillRow
-                    rowLabel="Setting"
-                    options={GRUPPEN_SETTING_OPTIONS}
-                    value={gruppenSetting}
-                    onChange={(c) => setGruppenSetting(c)}
-                    P={P}
-                  />
-                </>
-              ) : null}
-            </div>
-          ) : null}
-
-          {/* === STEP 04 · STIMMUNG & LICHT === */}
-          {currentStepDef.id === "stimmung" ? (
-            <div>
-              <CodePillRow
-                rowLabel="Stimmung"
-                rowHint="Trend-Profil aus dem Skill"
-                options={STIMMUNG_OPTIONS}
-                value={stimmungTrend}
-                onChange={setStimmungTrend}
-                P={P}
-              />
-              <PillRow rowLabel="Tageslicht" options={WIE_OPTIONS} selected={wie} onSelect={setWie} P={P} />
-              <CodePillRow
-                rowLabel="Shot Type"
-                rowHint="Bildausschnitt & Kamerawinkel"
-                options={SHOT_TYPE_OPTIONS}
-                value={shotType}
-                onChange={setShotType}
-                P={P}
-              />
-            </div>
-          ) : null}
-
-          {/* === STEP 05 · FORMAT, MARKE, EXTRAS === */}
-          {currentStepDef.id === "format" ? (
-            <div>
-              <PillRow rowLabel="Format" options={WOFUER_OPTIONS} selected={wofuer} onSelect={setWofuer} P={P} />
-
-              {/* Referenzbild-Slot */}
-              <div
-                className="studio-create-preview-grid"
-                style={{
-                  marginTop: 22,
-                  padding: "18px 20px",
-                  border: customReferenceDataUrl
-                    ? "1px solid rgba(230,106,43,0.45)"
-                    : `1px dashed ${P.ruleStrong}`,
-                  borderRadius: 16,
-                  background: customReferenceDataUrl
-                    ? "linear-gradient(135deg, rgba(242,163,90,0.10) 0%, rgba(230,106,43,0.04) 100%)"
-                    : "rgba(245,237,223,0.02)",
-                  boxShadow: customReferenceDataUrl
-                    ? "0 0 0 3px rgba(230,106,43,0.06), 0 12px 30px -16px rgba(230,106,43,0.4)"
-                    : "none",
-                  transition: "all .25s ease",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                {customReferenceDataUrl ? (
-                  <div
-                    aria-hidden
-                    style={{
-                      position: "absolute",
-                      top: -40,
-                      right: -40,
-                      width: 160,
-                      height: 160,
-                      background: "radial-gradient(circle, rgba(230,106,43,0.18) 0%, transparent 65%)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                ) : null}
-                <div>
-                  <div
-                    style={{
-                      fontFamily: STUDIO_TOKENS.mono,
-                      fontSize: 10,
-                      letterSpacing: 1.1,
-                      textTransform: "uppercase",
-                      color: P.ink3,
-                      marginBottom: 6,
-                    }}
-                  >
-                    Referenzbild · optional
-                  </div>
-                  <div style={{ fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>
-                    {customReferenceDataUrl ? (
-                      <>
-                        <strong style={{ color: P.ink }}>{customReferenceName || "Hochgeladenes Bild"}</strong> wird fuer diesen Run als
-                        Etikett-/Stil-Referenz genutzt (ueberschreibt das Markenprofil-Etikett).
-                      </>
-                    ) : etikettUrl ? (
-                      <>
-                        Markenprofil-Etikett ist verknuepft. Optional kannst du hier eine{" "}
-                        <em>spezifische</em> Flasche, ein anderes Etikett oder ein Stil-Referenzbild
-                        hochladen — nur fuer diesen Run.
-                      </>
-                    ) : (
-                      <>
-                        Kein Markenprofil-Etikett gefunden. Lade hier ein Referenzbild hoch oder wechsle auf{" "}
-                        <em>Generisch</em> in Advanced.
-                      </>
-                    )}
-                  </div>
-                  {uploadError ? (
-                    <div style={{ marginTop: 8, fontSize: 12, color: "#B83A2A", fontFamily: STUDIO_TOKENS.sans }}>{uploadError}</div>
-                  ) : null}
-                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <label
-                      className={uploading ? undefined : "evg-pill"}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "9px 14px",
-                        borderRadius: 999,
-                        border: customReferenceDataUrl
-                          ? "1px solid rgba(230,106,43,0.55)"
-                          : `1px solid ${P.ruleStrong}`,
-                        background: customReferenceDataUrl
-                          ? "linear-gradient(135deg, rgba(242,163,90,0.18) 0%, rgba(230,106,43,0.14) 100%)"
-                          : "rgba(245,237,223,0.04)",
-                        color: customReferenceDataUrl ? P.ink : P.ink2,
-                        fontFamily: STUDIO_TOKENS.sans,
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        cursor: uploading ? "wait" : "pointer",
-                        opacity: uploading ? 0.6 : 1,
-                        transition: "all .18s ease",
-                      }}
-                    >
-                      {uploading ? (
-                        <>
-                          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ animation: "spin 1.1s linear infinite" }}>
-                            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.8" strokeOpacity="0.25" />
-                            <path d="M12 7 A5 5 0 0 0 7 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                          </svg>
-                          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                          Komprimiere …
-                        </>
-                      ) : (
-                        <>
-                          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M7 3 V11 M3 7 H11" />
-                          </svg>
-                          {customReferenceDataUrl ? "Anderes Bild wählen" : "Bild hochladen"}
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        disabled={uploading}
-                        style={{ display: "none" }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) void handleReferenceUpload(file);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
-                    {customReferenceDataUrl ? (
-                      <button
-                        type="button"
-                        onClick={clearCustomReference}
-                        className="evg-pill"
-                        style={{
-                          padding: "9px 14px",
-                          borderRadius: 999,
-                          border: `1px solid ${P.rule}`,
-                          background: "rgba(245,237,223,0.03)",
-                          color: P.ink3,
-                          fontFamily: STUDIO_TOKENS.sans,
-                          fontSize: 12.5,
-                          fontWeight: 500,
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                          <path d="M3 3 L9 9 M9 3 L3 9" />
-                        </svg>
-                        Zurücksetzen
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    width: 108,
-                    height: 108,
-                    borderRadius: 14,
-                    padding: customReferenceDataUrl ? 2 : 0,
-                    background: customReferenceDataUrl ? STUDIO_TOKENS.gradientBrand : "transparent",
-                    boxShadow: customReferenceDataUrl
-                      ? "0 12px 28px -12px rgba(230,106,43,0.55)"
-                      : "none",
-                    transition: "all .25s ease",
-                    position: "relative",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      borderRadius: customReferenceDataUrl ? 12 : 14,
-                      border: customReferenceDataUrl ? "none" : `1px solid ${P.rule}`,
-                      background: P.surface2,
-                      overflow: "hidden",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: STUDIO_TOKENS.mono,
-                      fontSize: 9,
-                      letterSpacing: 1,
-                      textTransform: "uppercase",
-                      color: P.ink3,
-                    }}
-                  >
-                    {customReferenceDataUrl ? (
-                      <img
-                        src={customReferenceDataUrl}
-                        alt="Referenzbild Vorschau"
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    ) : etikettUrl ? (
-                      <img
-                        src={etikettUrl}
-                        alt="Markenprofil Vorschau"
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                        <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.4 }}>
-                          <rect x="3" y="4" width="16" height="14" rx="2" />
-                          <path d="M3 14 L7 10 L11 14 L14 11 L19 16" />
-                          <circle cx="14" cy="8" r="1.5" />
-                        </svg>
-                        <span>Kein Bild</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Extras */}
-              <div style={{ paddingTop: 20 }}>
-                <div
-                  style={{
-                    fontFamily: STUDIO_TOKENS.mono,
-                    fontSize: 10,
-                    letterSpacing: 1.1,
-                    textTransform: "uppercase",
-                    color: P.ink3,
-                    marginBottom: 10,
-                  }}
-                >
-                  Extras · optional
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {EXTRA_OPTIONS.map((label) => {
-                    const on = extras.includes(label);
-                    return (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => toggleExtra(label)}
-                        className={on ? "evg-pill evg-pill-active" : "evg-pill"}
-                        style={{
-                          padding: "9px 14px",
-                          borderRadius: 999,
-                          border: on
-                            ? "1px solid rgba(230,106,43,0.55)"
-                            : "1px dashed rgba(245,237,223,0.16)",
-                          background: on
-                            ? "linear-gradient(135deg, rgba(242,163,90,0.16) 0%, rgba(230,106,43,0.10) 100%)"
-                            : "transparent",
-                          color: on ? STUDIO_TOKENS.amber2 : P.ink2,
-                          fontFamily: STUDIO_TOKENS.sans,
-                          fontSize: 13,
-                          fontWeight: on ? 600 : 500,
-                          cursor: "pointer",
-                          transition: "all .18s ease",
-                          boxShadow: on ? "0 3px 12px -4px rgba(230,106,43,0.45)" : "none",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        {on ? (
-                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M2.5 6 L5 8.5 L9.5 3.5" />
-                          </svg>
-                        ) : (
-                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                            <path d="M6 2.5 V9.5 M2.5 6 H9.5" />
-                          </svg>
-                        )}
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Advanced */}
-              <div style={{ paddingTop: 16 }}>
-                <button
-                  type="button"
-                  onClick={() => setAdvancedOpen((v) => !v)}
-                  style={{
-                    padding: "6px 0",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: P.ink3,
-                    fontFamily: STUDIO_TOKENS.mono,
-                    fontSize: 10,
-                    letterSpacing: 1.1,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {advancedOpen ? "− Advanced ausblenden" : "+ Advanced: Etikett-Modus, KI-Plattform"}
-                </button>
-                {advancedOpen ? (
-                  <div style={{ marginTop: 4 }}>
-                    <CodePillRow
-                      rowLabel="Etikett-Modus"
-                      rowHint="Mit Markenbezug oder generisch?"
-                      options={ETIKETT_MODUS_OPTIONS}
-                      value={etikettModus}
-                      onChange={setEtikettModus}
-                      P={P}
-                    />
-                    <CodePillRow
-                      rowLabel="KI-Plattform"
-                      rowHint="Ziel-Bildmodell für den Prompt"
-                      options={KI_PLATTFORM_OPTIONS}
-                      value={kiPlattform}
-                      onChange={setKiPlattform}
-                      P={P}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {/* === STEP 06 · REVIEW + GENERIEREN (Mockup-Look, dark) === */}
-          {currentStepDef.id === "review" ? (
-            <div>
-              {/* Prompt-Block im Chat-Style */}
-              <div
-                style={{
-                  position: "relative",
-                  padding: "22px 24px",
-                  borderRadius: 14,
-                  border: "1px solid rgba(245,237,223,0.08)",
-                  background: "linear-gradient(180deg, rgba(245,237,223,0.04) 0%, rgba(245,237,223,0.01) 100%)",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 1,
-                    background: STUDIO_TOKENS.gradientBrand,
-                    opacity: 0.5,
-                  }}
-                />
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    marginBottom: 14,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontFamily: STUDIO_TOKENS.mono,
-                      fontSize: 10,
-                      letterSpacing: 1.4,
-                      textTransform: "uppercase",
-                      color: P.ink3,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <span
-                      style={{
-                        background: STUDIO_TOKENS.gradientBrand,
-                        WebkitBackgroundClip: "text",
-                        backgroundClip: "text",
-                        color: "transparent",
-                        fontWeight: 700,
-                      }}
-                    >
-                      Brief
-                    </span>
-                    <span style={{ opacity: 0.5 }}>·</span>
-                    {breweryName || brandLabel}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: STUDIO_TOKENS.mono,
-                      fontSize: 10,
-                      letterSpacing: 0.8,
-                      color: P.ink3,
-                      padding: "4px 9px",
-                      borderRadius: 999,
-                      border: `1px solid ${P.rule}`,
-                      background: "rgba(245,237,223,0.02)",
-                    }}
-                  >
-                    {ESTIMATED_SECONDS}–{ESTIMATED_SECONDS_MAX}s
-                  </div>
-                </div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontFamily: STUDIO_TOKENS.sans,
-                    fontSize: 20.5,
-                    lineHeight: 1.5,
-                    color: P.ink,
-                    letterSpacing: -0.3,
-                  }}
-                >
-                  {briefSentence}
-                </p>
-                {/* Aspect-Ratio-Tabs */}
-                <div style={{ marginTop: 18, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {WOFUER_OPTIONS.map((opt) => {
-                    const active = wofuer.label === opt.label;
-                    return (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setWofuer(opt)}
-                        className={active ? "evg-pill evg-pill-active" : "evg-pill"}
-                        style={{
-                          padding: "7px 13px",
-                          borderRadius: 8,
-                          border: `1px solid ${active ? "rgba(230,106,43,0.55)" : "rgba(245,237,223,0.10)"}`,
-                          background: active
-                            ? "linear-gradient(135deg, rgba(242,163,90,0.18) 0%, rgba(230,106,43,0.12) 100%)"
-                            : "rgba(245,237,223,0.03)",
-                          color: active ? P.ink : P.ink2,
-                          fontFamily: STUDIO_TOKENS.mono,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          letterSpacing: 0.4,
-                          cursor: "pointer",
-                          transition: "all .18s ease",
-                          boxShadow: active ? "0 3px 12px -4px rgba(230,106,43,0.45)" : "none",
-                        }}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Coach + Generate-Row */}
-              <div className="studio-create-coach-grid">
-                {/* Coach (auf dark) */}
-                <div
-                  className="studio-create-coach-panel"
-                  style={{
-                    padding: "22px 24px",
-                    borderRadius: 14,
-                    border: `1px solid ${P.rule}`,
-                    background: "linear-gradient(180deg, rgba(245,237,223,0.03) 0%, rgba(245,237,223,0.01) 100%)",
-                  }}
-                >
-                  <CoachGauge score={coachScore} P={P} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: STUDIO_TOKENS.mono,
-                        fontSize: 10,
-                        letterSpacing: 1.1,
-                        textTransform: "uppercase",
-                        color: "rgba(244,239,230,0.55)",
-                      }}
-                    >
-                      Coach
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: STUDIO_TOKENS.sans,
-                        fontSize: 24,
-                        fontWeight: 700,
-                        letterSpacing: -0.3,
-                        marginTop: 4,
-                        lineHeight: 1.15,
-                      }}
-                    >
-                      {coachLabel}
-                    </div>
-                    <p
-                      style={{
-                        margin: "8px 0 0",
-                        fontSize: 13,
-                        lineHeight: 1.5,
-                        color: "rgba(244,239,230,0.7)",
-                      }}
-                    >
-                      {coachReady
-                        ? "Bereit zu generieren — alles Wesentliche da."
-                        : "Fast fertig — prüfe die offenen Punkte unten."}
-                    </p>
-                    <ul
-                      style={{
-                        margin: "12px 0 0",
-                        padding: 0,
-                        listStyle: "none",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                      }}
-                    >
-                      {coachChecks.map((item) => (
-                        <li
-                          key={item.label}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            fontSize: 12.5,
-                            color: item.done ? P.ink2 : P.ink3,
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 16,
-                              height: 16,
-                              borderRadius: 999,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              background: item.done
-                                ? "linear-gradient(135deg, rgba(242,163,90,0.25) 0%, rgba(230,106,43,0.18) 100%)"
-                                : "rgba(245,237,223,0.04)",
-                              border: item.done ? "1px solid rgba(230,106,43,0.45)" : `1px solid ${P.rule}`,
-                              flex: "0 0 auto",
-                              boxShadow: item.done ? "0 0 8px rgba(230,106,43,0.30)" : "none",
-                            }}
-                          >
-                            {item.done ? (
-                              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke={STUDIO_TOKENS.amber2} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <path d="M2.5 6 L5 8.5 L9.5 3.5" />
-                              </svg>
-                            ) : null}
-                          </span>
-                          <span>{item.label}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Generate-Karte */}
-                <div
-                  style={{
-                    position: "relative",
-                    padding: "24px 24px 22px",
-                    borderRadius: 14,
-                    background:
-                      "linear-gradient(180deg, rgba(242,163,90,0.06) 0%, rgba(245,237,223,0.02) 100%)",
-                    border: "1px solid rgba(230,106,43,0.18)",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    minHeight: 240,
-                    overflow: "hidden",
-                    boxShadow: "0 24px 60px -30px rgba(230,106,43,0.4)",
-                  }}
-                >
-                  <div
-                    aria-hidden
-                    style={{
-                      position: "absolute",
-                      top: -60,
-                      right: -60,
-                      width: 200,
-                      height: 200,
-                      background: "radial-gradient(circle, rgba(230,106,43,0.20) 0%, transparent 60%)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <div style={{ position: "relative" }}>
-                    <div
-                      style={{
-                        fontFamily: STUDIO_TOKENS.mono,
-                        fontSize: 10,
-                        letterSpacing: 1.4,
-                        textTransform: "uppercase",
-                        color: P.ink3,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 999,
-                          background: STUDIO_TOKENS.amber,
-                          boxShadow: `0 0 10px ${STUDIO_TOKENS.amber}`,
-                        }}
-                      />
-                      Bereit
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: STUDIO_TOKENS.sans,
-                        fontSize: 22,
-                        fontWeight: 700,
-                        marginTop: 10,
-                        lineHeight: 1.2,
-                        letterSpacing: -0.5,
-                        color: P.ink,
-                      }}
-                    >
-                      Drei Varianten in{" "}
-                      <em
-                        style={{
-                          fontFamily: STUDIO_TOKENS.accentSerif,
-                          fontStyle: "italic",
-                          fontWeight: 500,
-                          background: STUDIO_TOKENS.gradientBrand,
-                          WebkitBackgroundClip: "text",
-                          backgroundClip: "text",
-                          color: "transparent",
-                        }}
-                      >
-                        {ESTIMATED_SECONDS}–{ESTIMATED_SECONDS_MAX}s
-                      </em>
-                    </div>
-                    <p
-                      style={{
-                        margin: "8px 0 0",
-                        fontFamily: STUDIO_TOKENS.sans,
-                        fontSize: 12,
-                        color: P.ink3,
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      Bei Peak-Auslastung kann Kie etwas länger brauchen — wir warten geduldig.
-                    </p>
-                    <p
-                      style={{
-                        margin: "14px 0 0",
-                        fontFamily: STUDIO_TOKENS.mono,
-                        fontSize: 11,
-                        letterSpacing: 0.4,
-                        color: P.ink3,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span style={{ color: STUDIO_TOKENS.amber2, fontWeight: 700 }}>
-                        {formatDeNumber(generationTokenCost)}
-                      </span>
-                      Tokens
-                      <span style={{ opacity: 0.4 }}>·</span>
-                      {tokensFreeLabel} frei
-                    </p>
-                  </div>
-
-                  {error ? (
-                    <p style={{ margin: "12px 0 0", fontSize: 12, color: "#F5A8A8" }} role="alert">
-                      {error}
-                    </p>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => void generate()}
-                    className={loading ? "studio-create-generate-btn" : "evg-cta studio-create-generate-btn"}
-                    style={{
-                      marginTop: 20,
-                      width: "100%",
-                      padding: "16px 24px",
-                      borderRadius: 12,
-                      border: "none",
-                      background: "linear-gradient(135deg, #F2A35A 0%, #E66A2B 38%, #C13B1F 100%)",
-                      color: "#0A0807",
-                      boxShadow: loading
-                        ? "0 14px 30px -10px rgba(230,106,43,0.55), inset 0 1px 0 rgba(255,255,255,0.18)"
-                        : "0 14px 30px -10px rgba(230,106,43,0.55), inset 0 1px 0 rgba(255,255,255,0.18)",
-                      fontFamily: STUDIO_TOKENS.sans,
-                      fontSize: 15.5,
-                      fontWeight: 650,
-                      letterSpacing: 0.2,
-                      cursor: loading ? "wait" : "pointer",
-                      opacity: loading ? 0.92 : 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 10,
-                      position: "relative",
-                      overflow: "hidden",
-                      animation: loading ? "evg-pulse-glow 1.6s ease-in-out infinite" : undefined,
-                    }}
-                  >
-                    {loading ? (
-                      <>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ animation: "spin 1.2s linear infinite" }}>
-                          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.25" />
-                          <path d="M14 8 A6 6 0 0 0 8 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                        <span>{generationStep || "Generiere …"}</span>
-                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                      </>
-                    ) : (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
-                          <path d="M6 1 L7.5 4.5 L11 6 L7.5 7.5 L6 11 L4.5 7.5 L1 6 L4.5 4.5 Z" />
-                        </svg>
-                        <span>Jetzt generieren</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Markenstil-Footer-Badge (im Mockup links unten) */}
-              <div
-                style={{
-                  marginTop: 18,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  paddingTop: 16,
-                  borderTop: "1px solid rgba(255,255,255,0.06)",
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 8,
-                      background: profileComplete && profileMode !== "skip" ? P.accent : "rgba(255,255,255,0.08)",
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: STUDIO_TOKENS.mono,
-                        fontSize: 9,
-                        letterSpacing: 1.2,
-                        textTransform: "uppercase",
-                        color: "rgba(244,239,230,0.55)",
-                      }}
-                    >
-                      {profileComplete && profileMode !== "skip" ? "Markenstil aktiv" : "Ohne Markenprofil"}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: STUDIO_TOKENS.sans,
-                        fontSize: 16,
-                        fontWeight: 600,
-                        marginTop: 2,
-                        color: "#F4EFE6",
-                      }}
-                    >
-                      {breweryName || brandLabel}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontFamily: STUDIO_TOKENS.mono,
-                    fontSize: 10,
-                    letterSpacing: 0.4,
-                    color: "rgba(244,239,230,0.5)",
-                  }}
-                >
-                  Tokens {tokensFreeLabel}
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          </StudioViewTransition>
-
-          {/* Navigation: Zurück / Weiter */}
-          <div
+          <button
+            type="button"
+            onClick={() => setBrandProfileSetupOpen(true)}
             style={{
-              position: "relative",
-              marginTop: 28,
-              paddingTop: 20,
-              borderTop: `1px solid ${P.rule}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "linear-gradient(135deg, #F2A35A 0%, #E66A2B 38%, #C13B1F 100%)",
+              color: "#0A0807",
+              fontFamily: STUDIO_TOKENS.sans,
+              fontWeight: 650,
+              fontSize: 13,
+              border: "none",
+              cursor: "pointer",
             }}
           >
-            <button
-              type="button"
-              onClick={goPrev}
-              disabled={stepIndex === 0}
-              className={stepIndex === 0 ? undefined : "evg-pill"}
-              style={{
-                padding: "10px 18px",
-                borderRadius: 10,
-                border: `1px solid ${P.rule}`,
-                background: "rgba(245,237,223,0.03)",
-                color: P.ink2,
-                fontFamily: STUDIO_TOKENS.sans,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: stepIndex === 0 ? "not-allowed" : "pointer",
-                opacity: stepIndex === 0 ? 0.4 : 1,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M8 2 L4 6 L8 10" />
-              </svg>
-              Zurück
-            </button>
-
-            <div
-              style={{
-                fontFamily: STUDIO_TOKENS.sans,
-                fontSize: 13,
-                color: P.ink2,
-                lineHeight: 1.4,
-                flex: "1 1 auto",
-                textAlign: "center",
-                minWidth: 0,
-              }}
-            >
-              {currentStepDef.id !== "review" ? (
-                <em
-                  style={{
-                    fontStyle: "normal",
-                    fontFamily: STUDIO_TOKENS.sans,
-                    fontSize: 14.5,
-                    color: P.ink,
-                  }}
-                >
-                  {briefSentence}
-                </em>
-              ) : null}
-            </div>
-
-            {!isLastStep ? (
-              <button
-                type="button"
-                onClick={goNext}
-                className="evg-cta"
-                style={{
-                  padding: "11px 20px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: "linear-gradient(135deg, #F2A35A 0%, #E66A2B 38%, #C13B1F 100%)",
-                  color: "#0A0807",
-                  boxShadow: "0 10px 24px -10px rgba(230,106,43,0.55), inset 0 1px 0 rgba(255,255,255,0.18)",
-                  fontFamily: STUDIO_TOKENS.sans,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                Weiter
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M4 2 L8 6 L4 10" />
-                </svg>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => goToStep(0)}
-                className="evg-pill"
-                style={{
-                  padding: "10px 18px",
-                  borderRadius: 10,
-                  border: `1px solid ${P.rule}`,
-                  background: "rgba(245,237,223,0.03)",
-                  color: P.ink2,
-                  fontFamily: STUDIO_TOKENS.sans,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M2 5 A5 5 0 1 1 4 11" />
-                  <path d="M2 2 V5 H5" />
-                </svg>
-                Neu beginnen
-              </button>
-            )}
-          </div>
+            Markenprofil anlegen
+          </button>
         </div>
+      ) : null}
 
-        {images.length > 0 ? (
-          <div style={{ marginTop: 32 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                marginBottom: 12,
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: STUDIO_TOKENS.mono,
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  textTransform: "uppercase",
-                  color: P.ink3,
-                }}
-              >
-                Ergebnis · {images.filter((m) => Boolean(imageSrc(m))).length} / {images.length} fertig
-              </div>
-              <div
-                style={{
-                  fontFamily: STUDIO_TOKENS.mono,
-                  fontSize: 10,
-                  letterSpacing: 0.4,
-                  color: P.ink3,
-                }}
-              >
-                {wofuer.label} · {generationStep || (loading ? "Generiere …" : "")}
-              </div>
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${Math.min(images.length, 3)}, minmax(220px, 1fr))`,
-                gap: 14,
-              }}
-            >
-              {images.map((img, i) => {
-                const src = imageSrc(img);
-                return (
-                  <div
-                    key={i}
-                    className={src ? "evg-result-card" : undefined}
-                    style={{
-                      borderRadius: 14,
-                      overflow: "hidden",
-                      border: src ? `1px solid ${P.rule}` : "1px dashed rgba(245,237,223,0.16)",
-                      background: src ? P.surface2 : "rgba(245,237,223,0.04)",
-                      aspectRatio: "1 / 1",
-                      position: "relative",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: src ? "zoom-in" : "default",
-                    }}
-                  >
-                    {src ? (
-                      <>
-                        <img
-                          src={src}
-                          alt={`Variante ${i + 1}`}
-                          className="evg-result-img"
-                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform .5s ease" }}
-                        />
-                        <div
-                          aria-hidden
-                          className="evg-result-overlay"
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            background: "linear-gradient(180deg, rgba(10,8,7,0.0) 50%, rgba(10,8,7,0.7) 100%)",
-                            opacity: 0,
-                            transition: "opacity .25s ease",
-                            pointerEvents: "none",
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 12,
-                            left: 12,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            padding: "5px 10px",
-                            borderRadius: 999,
-                            background: "rgba(10,8,7,0.72)",
-                            color: P.ink,
-                            fontFamily: STUDIO_TOKENS.sans,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            letterSpacing: 0.2,
-                            backdropFilter: "blur(8px)",
-                            WebkitBackdropFilter: "blur(8px)",
-                            border: "1px solid rgba(245,237,223,0.10)",
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: 999,
-                              background: STUDIO_TOKENS.amber,
-                              boxShadow: `0 0 8px ${STUDIO_TOKENS.amber}`,
-                            }}
-                          />
-                          Variante {i + 1}
-                        </div>
-                        <div
-                          className="evg-result-actions"
-                          style={{
-                            position: "absolute",
-                            bottom: 12,
-                            left: 12,
-                            right: 12,
-                            display: "flex",
-                            gap: 8,
-                            opacity: 0,
-                            transform: "translateY(4px)",
-                            transition: "opacity .25s ease, transform .25s ease",
-                          }}
-                        >
-                          <a
-                            href={src}
-                            download={`variante-${i + 1}.png`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="evg-cta"
-                            style={{
-                              flex: 1,
-                              padding: "9px 12px",
-                              borderRadius: 9,
-                              background: STUDIO_TOKENS.gradientBrand,
-                              color: "#0A0807",
-                              fontFamily: STUDIO_TOKENS.sans,
-                              fontSize: 12,
-                              fontWeight: 650,
-                              textDecoration: "none",
-                              textAlign: "center",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: 6,
-                              boxShadow: "0 8px 22px -8px rgba(230,106,43,0.6), inset 0 1px 0 rgba(255,255,255,0.18)",
-                            }}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M7 2 V9 M4 6 L7 9 L10 6 M3 12 H11" />
-                            </svg>
-                            Download
-                          </a>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(src, "_blank", "noopener,noreferrer");
-                            }}
-                            style={{
-                              padding: "9px 12px",
-                              borderRadius: 9,
-                              background: "rgba(10,8,7,0.72)",
-                              color: P.ink,
-                              fontFamily: STUDIO_TOKENS.sans,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              border: "1px solid rgba(245,237,223,0.16)",
-                              cursor: "pointer",
-                              backdropFilter: "blur(8px)",
-                              WebkitBackdropFilter: "blur(8px)",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M8 2 H12 V6" />
-                              <path d="M12 2 L7 7" />
-                              <path d="M12 8 V11 A1 1 0 0 1 11 12 H3 A1 1 0 0 1 2 11 V3 A1 1 0 0 1 3 2 H6" />
-                            </svg>
-                            Öffnen
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: 10,
-                          fontFamily: STUDIO_TOKENS.sans,
-                          color: P.ink2,
-                          fontSize: 12,
-                        }}
-                      >
-                        <svg width="40" height="40" viewBox="0 0 50 50" aria-hidden="true">
-                          <circle cx="25" cy="25" r="20" fill="none" stroke={P.ruleStrong} strokeWidth="4" opacity="0.35" />
-                          <circle
-                            cx="25"
-                            cy="25"
-                            r="20"
-                            fill="none"
-                            stroke={P.accent}
-                            strokeWidth="4"
-                            strokeDasharray="80 60"
-                            strokeLinecap="round"
-                          >
-                            <animateTransform
-                              attributeName="transform"
-                              type="rotate"
-                              from="0 25 25"
-                              to="360 25 25"
-                              dur="1.1s"
-                              repeatCount="indefinite"
-                            />
-                          </circle>
-                        </svg>
-                        <div
-                          style={{
-                            fontFamily: STUDIO_TOKENS.mono,
-                            fontSize: 10,
-                            letterSpacing: 1.2,
-                            textTransform: "uppercase",
-                            color: P.ink3,
-                          }}
-                        >
-                          Rendering
-                        </div>
-                        <div
-                          style={{
-                            fontFamily: STUDIO_TOKENS.sans,
-                            fontWeight: 700,
-                            fontSize: 24,
-                            color: P.ink,
-                            lineHeight: 1,
-                          }}
-                        >
-                          Variante {i + 1}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+      {referenceImagesStale ? (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "12px 16px",
+            borderRadius: 12,
+            border: "1px solid rgba(199,105,30,0.35)",
+            background: "rgba(255,238,210,0.7)",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontFamily: STUDIO_TOKENS.sans, fontWeight: 650, fontSize: 13, color: P.ink }}>Referenzbilder veraltet</div>
+            <div style={{ marginTop: 4, fontFamily: STUDIO_TOKENS.sans, fontSize: 12, color: P.ink2 }}>
+              Lade neue Bilder im Markenprofil hoch oder nutze den manuellen Upload im Prompt-Flow.
             </div>
           </div>
-        ) : null}
-      </div>
+          <button
+            type="button"
+            onClick={() => setBrandProfileSetupOpen(true)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              background: "transparent",
+              color: P.ink,
+              fontFamily: STUDIO_TOKENS.sans,
+              fontWeight: 650,
+              fontSize: 12,
+              border: `1px solid ${P.ruleStrong}`,
+              cursor: "pointer",
+            }}
+          >
+            Referenzen aktualisieren
+          </button>
+        </div>
+      ) : null}
+
+      <MarketingPromptCreateShell
+        P={P}
+        brandMeta={brandMetaLine}
+        promptStepLabel={String(microStepIndex + 1).padStart(2, "0")}
+        promptSegments={promptSegments}
+        showCursor={!isReviewStep || loading}
+        questionTitle={
+          currentMicroStepId === "schauplatz" && personenModus === "E"
+            ? "Wo findet die Gruppenszene statt?"
+            : currentMicroMeta.title
+        }
+        questionSubtitle={
+          currentMicroStepId === "schauplatz" && personenModus === "E"
+            ? "Ein Schauplatz — Kamerawinkel kommt aus der Gruppen-Dynamik."
+            : currentMicroMeta.subtitle
+        }
+        aspectOptions={ASPECT_CHIP_OPTIONS}
+        aspectValue={wofuer.aspectRatio}
+        onAspectChange={handleAspectChange}
+        estimatedLabel={`~${ESTIMATED_SECONDS}s`}
+        primaryLabel={isReviewStep ? (loading ? "Generiere …" : "Generieren") : "Weiter"}
+        primaryMode={isReviewStep ? "generate" : "next"}
+        onPrimary={() => {
+          if (isReviewStep) void generate();
+          else goMicroNext();
+        }}
+        onBack={goMicroPrev}
+        canBack={microStepIndex > 0 && !loading}
+        primaryDisabled={!canProceedMicro || (isReviewStep && loading)}
+        loading={loading && isReviewStep}
+        brandStyleActive={profileActive}
+        brandName={breweryName || brandLabel}
+        formatTag={formatTag}
+        tokensLabel={tokensStatusLabel}
+        variants={variantCards}
+        onSelectVariant={(index) => {
+          const src = variantCards[index]?.src;
+          if (src) window.open(src, "_blank", "noopener,noreferrer");
+        }}
+      >
+        {microStepContent}
+      </MarketingPromptCreateShell>
+
+      {error && !isReviewStep ? (
+        <p style={{ marginTop: 12, fontSize: 13, color: "#F5A8A8" }} role="alert">
+          {error}
+        </p>
+      ) : null}
 
     <BrandProfileSetupModal
       open={brandProfileSetupOpen}
