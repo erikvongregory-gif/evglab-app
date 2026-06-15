@@ -1,13 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 /**
- * Anthropic deprecates `-latest` aliases; use dated / major-version IDs and fall back on 404.
- * Order: env override first, then newer Sonnet, then pinned 3.5, then Haiku.
+ * Anthropic retires dated snapshots — keep fallbacks on active models (see model deprecations docs).
+ * Order: env override first, then Sonnet 4.6, Sonnet 4.5 snapshot, then Haiku 4.5.
  */
 const ANTHROPIC_MODEL_FALLBACKS = [
-  "claude-sonnet-4-20250514",
-  "claude-3-5-sonnet-20241022",
-  "claude-3-5-haiku-20241022",
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-5-20250929",
+  "claude-haiku-4-5-20251001",
 ] as const;
 
 export function getAnthropicModelCandidates(): string[] {
@@ -15,9 +15,21 @@ export function getAnthropicModelCandidates(): string[] {
   return Array.from(new Set([...(env ? [env] : []), ...ANTHROPIC_MODEL_FALLBACKS]));
 }
 
-function isModelNotFoundError(message: string): boolean {
-  const m = message.toLowerCase();
-  return m.includes("not_found") || m.includes("not found") || (m.includes("404") && m.includes("model"));
+function isModelNotFoundError(error: unknown): boolean {
+  if (error && typeof error === "object") {
+    const status = (error as { status?: number }).status;
+    if (status === 404) return true;
+    const nestedType = (error as { error?: { type?: string } }).error?.type;
+    if (nestedType === "not_found_error") return true;
+  }
+  const msg = error instanceof Error ? error.message : String(error);
+  const m = msg.toLowerCase();
+  return (
+    m.includes("not_found") ||
+    m.includes("not found") ||
+    m.includes("not_found_error") ||
+    (m.includes("404") && m.includes("model"))
+  );
 }
 
 /**
@@ -38,8 +50,7 @@ export async function createAnthropicMessageWithModelFallback(
       });
     } catch (error) {
       lastError = error;
-      const msg = error instanceof Error ? error.message : String(error);
-      if (isModelNotFoundError(msg)) continue;
+      if (isModelNotFoundError(error)) continue;
       throw error;
     }
   }
