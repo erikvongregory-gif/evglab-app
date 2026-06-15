@@ -34,6 +34,14 @@ describe("enforceHyperrealisticPromptConstraints", () => {
     expect(out).toMatch(/Paulaner/i);
   });
 
+  it("appends hyperrealism directives for Claude-generated prompts", () => {
+    const out = enforceHyperrealisticPromptConstraints("A beer in a garden.", baseInput, "Paulaner");
+    expect(out).toMatch(/HYPERREALISM LOCK/i);
+    expect(out).toMatch(/LIQUID PHYSICS/i);
+    expect(out).toMatch(/SRM/i);
+    expect(out).toMatch(/HUMAN REALISM/i);
+  });
+
   it("skips image reference for glass-only generation", () => {
     expect(shouldUseImageReferenceForGeneration(baseInput)).toBe(false);
     expect(shouldUseImageReferenceForGeneration({ ...baseInput, behaelter: "B" })).toBe(true);

@@ -3830,20 +3830,34 @@ body:has(.evg-shell) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 18px;
+  padding: 11px 20px;
   border: none;
-  border-radius: 11px;
-  background: linear-gradient(135deg, #f2a35a 0%, #e66a2b 38%, #c13b1f 100%);
-  color: #0a0807;
+  border-radius: var(--r-pill);
+  background: #d3722e;
+  color: #1a1008;
   font-family: var(--studio-sans, system-ui, sans-serif);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 12px 28px -10px rgba(230, 106, 43, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: background 0.14s ease;
+}
+
+.evg-studio .evg-marketing-create__primary:hover:not(:disabled) {
+  background: #db7c38;
+}
+
+.evg-studio .evg-marketing-create__primary:active:not(:disabled) {
+  background: #c46828;
+}
+
+.evg-studio .evg-marketing-create__primary-arrow {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.92;
 }
 
 .evg-studio .evg-marketing-create__primary:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 

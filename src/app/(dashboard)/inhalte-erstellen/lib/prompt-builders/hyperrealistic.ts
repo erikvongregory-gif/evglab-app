@@ -1,5 +1,13 @@
 import { FLASCHEN_TYPEN, GLAS_TYPEN } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
+import {
+  buildBeerPhysicsFragment,
+  buildCameraFragment,
+  buildHumanRealismFragment,
+  buildHyperrealismLockFragment,
+  buildSceneTextureAnchors,
+  HYPERREALISM_NEGATIVE,
+} from "./hyperrealism-blocks";
 
 const SZENE_DESCRIPTIONS = {
   biergarten_sommer:
@@ -145,15 +153,15 @@ function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<
         : "branded beer glasses and bottles";
   switch (input.gruppenDynamik) {
     case "E1":
-      return `Dynamic POV selfie-style group shot, ${n} attractive anonymous young adults in their mid-20s holding ${groupVessel} stretched toward the camera, laughing and cheering directly into lens, one hand extended holding phone, tight energetic framing, spontaneous joyful atmosphere ${setting}.`;
+      return `Candid POV selfie-style group shot, ${n} anonymous adults in their mid-20s holding ${groupVessel} stretched toward the camera, laughing naturally into lens, one hand extended holding phone, tight energetic framing, spontaneous unposed atmosphere ${setting}.`;
     case "E2":
-      return `Group of ${n} anonymous young adults raising and clinking ${groupVessel} together, mid-toast, joyful expressions, ${setting}, celebration energy.`;
+      return `Group of ${n} anonymous adults raising and clinking ${groupVessel} together, mid-toast, genuine joyful expressions, ${setting}, natural celebration energy — not staged stock-photo posing.`;
     case "E3":
-      return `Group of ${n} anonymous young adults ${groupSeatedPhrase(input.szene)} ${setting}, relaxed and laughing, each holding ${groupVessel.replace(" and bottles", "")}, warm social atmosphere.`;
+      return `Group of ${n} anonymous adults ${groupSeatedPhrase(input.szene)} ${setting}, relaxed and laughing candidly, each holding ${groupVessel.replace(" and bottles", "")}, warm authentic social atmosphere with natural body language.`;
     case "E4":
-      return `Group of ${n} anonymous young adults walking ${setting}, casually holding ${groupVessel}, smiling and talking, candid natural movement.`;
+      return `Group of ${n} anonymous adults walking ${setting}, casually holding ${groupVessel}, smiling and talking, candid natural movement with believable stride and hand grip.`;
     default:
-      return `Group of ${n} anonymous young adults enjoying beer together ${setting}, candid lifestyle moment, no specific real persons.`;
+      return `Group of ${n} anonymous adults enjoying beer together ${setting}, candid documentary lifestyle moment, no specific real persons, no catalog-model posing.`;
   }
 }
 
@@ -176,6 +184,10 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
   }[input.flaschenfarbe];
 
   const personPart = buildPersonFragment(input, behaelter);
+  const humanRealismPart = buildHumanRealismFragment(input);
+  const beerPhysicsPart = buildBeerPhysicsFragment(input.bierstil, behaelter);
+  const sceneTexturePart = buildSceneTextureAnchors(input.szene);
+  const cameraPart = buildCameraFragment(input.shotType ?? "A", input.aspectRatio);
 
   const bottlePart =
     behaelter === "G"
@@ -214,23 +226,27 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
       : "";
 
   return `
-PHOTOREALISTIC PRODUCT-IN-SCENE PHOTOGRAPHY.
+${buildHyperrealismLockFragment()}
 
 ${subjectBlock}
 
+${beerPhysicsPart}
+
 ${personPart}
+${humanRealismPart ? `\n${humanRealismPart}` : ""}
 
 ${sceneBlock}
+${sceneTexturePart}
 LIGHTING: ${lighting}.
 MOOD: ${trend}.
 
 ${shotBlock}
 ${brandLock}
 
-STYLE: Editorial commercial photography, shot on full-frame DSLR, 50mm or 85mm lens, f/2.8, shallow depth of field but ${behaelter === "G" ? "glass and glass logo" : "bottle and label"} fully sharp. Natural color grading, no Instagram filters. Authentic, no AI-glossy plastic look.
+CAMERA: ${cameraPart}
 
 ${input.zusatzWunsch ? `ADDITIONAL: ${input.zusatzWunsch}` : ""}
 
-NEGATIVE: ${sceneNegative}${glassOnlyNegative}${etikettModus === "marke" ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, " : ""}generic stock-photo bottle, wrong bottle shape, plastic bottle, illustration style, painting, cartoon, oversaturated, hands with extra fingers, AI face artifacts, glossy unrealistic skin, condensation overdone like sticker droplets.
+NEGATIVE: ${sceneNegative}${glassOnlyNegative}${etikettModus === "marke" ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, " : ""}${HYPERREALISM_NEGATIVE}.
   `.trim();
 }

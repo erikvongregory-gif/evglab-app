@@ -158,7 +158,11 @@ export function MarketingPromptCreateShell({
                   onClick={onPrimary}
                 >
                   {loading ? "…" : primaryLabel}
-                  {primaryMode === "generate" && !loading ? <span aria-hidden="true">↵</span> : null}
+                  {!loading && primaryMode === "generate" ? (
+                    <span className="evg-marketing-create__primary-arrow" aria-hidden="true">
+                      ↵
+                    </span>
+                  ) : null}
                 </button>
               </div>
             </div>

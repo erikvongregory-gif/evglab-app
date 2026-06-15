@@ -8,13 +8,10 @@ import {
   updateByStripeSubscription,
 } from "@/lib/billing/store";
 import { mapPriceIdToPlan as mapPriceIdToPlanFromEnv } from "@/lib/billing/stripePrices";
+import { getStripeClient } from "@/lib/billing/stripeServer";
 import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
-export function getStripeClient() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY fehlt.");
-  return new Stripe(key);
-}
+export { getStripeClient } from "@/lib/billing/stripeServer";
 
 export function mapPriceIdToPlan(priceId?: string | null): SubscriptionPlanKey | null {
   return mapPriceIdToPlanFromEnv(priceId);

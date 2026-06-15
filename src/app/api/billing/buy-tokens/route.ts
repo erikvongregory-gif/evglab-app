@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAppBaseUrlOrigin, isBillingCheckoutEnabled, isKleinunternehmerModeEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { getStripeClient, isStripeConfigured, stripeConfigurationError } from "@/lib/billing/stripeServer";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
 type TokenPackKey = "tokens_500" | "tokens_2000";
-
-function getStripeClient() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY fehlt.");
-  return new Stripe(key);
-}
 
 function getPackConfig(pack: TokenPackKey) {
   const map: Record<TokenPackKey, { priceId?: string; tokens: number }> = {
@@ -43,6 +37,9 @@ export async function POST(req: Request) {
 
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
+    }
+    if (!isStripeConfigured()) {
+      return NextResponse.json({ error: stripeConfigurationError(), code: "STRIPE_NOT_CONFIGURED" }, { status: 503 });
     }
     const supabase = await createClient();
     const {

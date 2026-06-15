@@ -13,12 +13,7 @@ import {
 } from "@/lib/billing/store";
 import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { mapPriceIdToPlan } from "@/lib/billing/stripePrices";
-
-function getStripeClient() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY fehlt.");
-  return new Stripe(key);
-}
+import { getStripeClient } from "@/lib/billing/stripeServer";
 
 function toIsoFromUnix(seconds?: number | null) {
   if (!seconds) return null;

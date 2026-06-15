@@ -18,6 +18,7 @@ import { mapAspectRatioForGptImage2, normalizeResolutionForGptImage2 } from "@/l
 import { withPendingTask } from "@/lib/kie/taskBillingMetadata";
 import { generateBrauereiBildPrompt } from "@/lib/prompts/brauerei-bild/generate-prompt";
 import { buildHyperrealisticClaudeUserMessage } from "@/lib/prompts/brauerei-bild/map-hyperrealistic-brief";
+import { applyContentPresetPrompt } from "@/lib/image-types/policy";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -158,6 +159,8 @@ export async function POST(req: Request) {
     }
     if (prompt.length > MAX_PROMPT_CHARS) prompt = prompt.slice(0, MAX_PROMPT_CHARS);
     prompt = enforceHyperrealisticPromptConstraints(prompt, input, brandProfile.breweryName);
+    prompt = applyContentPresetPrompt(prompt, "hyperreal");
+    if (prompt.length > MAX_PROMPT_CHARS) prompt = prompt.slice(0, MAX_PROMPT_CHARS);
 
     // 2) Referenzbild fuer Kie — NICHT bei „Nur Glas“ (i2i wuerde Flasche aus Referenz kopieren).
     const useImageReference = shouldUseImageReferenceForGeneration(input) && hasEtikettInput;

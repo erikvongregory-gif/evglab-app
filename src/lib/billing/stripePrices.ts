@@ -1,5 +1,5 @@
 import type { BillingInterval } from "@/lib/billing/planCatalog";
-
+import { getStripeSecretKey } from "@/lib/billing/stripeServer";
 import type { SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
 
@@ -119,11 +119,8 @@ export function getStripePriceEnvKey(plan: SubscriptionPlanKey, interval: Billin
 
 
 function getStripeMode(): "test" | "live" {
-
-  const key = process.env.STRIPE_SECRET_KEY ?? "";
-
+  const key = getStripeSecretKey() ?? "";
   return key.startsWith("sk_live_") ? "live" : "test";
-
 }
 
 

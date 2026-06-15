@@ -5,16 +5,19 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { getBillingRow } from "@/lib/billing/store";
+import { getStripeClient } from "@/lib/billing/stripeServer";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
 const deleteSchema = z.object({
   confirmation: z.string().trim(),
 });
 
-function getStripeClient() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return null;
-  return new Stripe(key);
+function getOptionalStripeClient() {
+  try {
+    return getStripeClient();
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: Request) {
@@ -52,7 +55,7 @@ export async function POST(req: Request) {
   const subscriptionId = billing?.stripe_subscription_id ?? null;
 
   if (subscriptionId) {
-    const stripe = getStripeClient();
+    const stripe = getOptionalStripeClient();
     if (stripe) {
       try {
         await stripe.subscriptions.cancel(subscriptionId);

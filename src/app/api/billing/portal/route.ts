@@ -1,15 +1,9 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { getStripeClient, isStripeConfigured, stripeConfigurationError } from "@/lib/billing/stripeServer";
 import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuards";
-
-function getStripeClient() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY fehlt.");
-  return new Stripe(key);
-}
 
 export async function POST(req: Request) {
   try {
@@ -24,6 +18,9 @@ export async function POST(req: Request) {
 
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
+    }
+    if (!isStripeConfigured()) {
+      return NextResponse.json({ error: stripeConfigurationError(), code: "STRIPE_NOT_CONFIGURED" }, { status: 503 });
     }
     const supabase = await createClient();
     const {

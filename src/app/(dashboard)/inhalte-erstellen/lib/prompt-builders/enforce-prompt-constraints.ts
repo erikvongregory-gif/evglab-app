@@ -1,4 +1,5 @@
 import type { HyperrealisticInput } from "../schemas";
+import { ensureHyperrealismDirectives } from "./hyperrealism-blocks";
 
 const GLASS_ONLY_LOCK =
   "CRITICAL COMPOSITION LOCK (MANDATORY): GLASS-ONLY hero shot — absolutely NO beer bottle, NO bottle on table, NO can, NO packaging visible anywhere in frame. Only branded beer glass(es) with beer and foam. Image is INVALID if any bottle or can appears.";
@@ -67,7 +68,7 @@ export function enforceHyperrealisticPromptConstraints(
     }
   }
 
-  return next.trim();
+  return ensureHyperrealismDirectives(next.trim(), input);
 }
 
 /** Bei Nur-Glas darf Kie kein Flaschen-Referenzbild bekommen — sonst kopiert i2i die Flasche in die Szene. */

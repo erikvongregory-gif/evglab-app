@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import Stripe from "stripe";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAppBaseUrlOrigin, isBillingCheckoutEnabled, isKleinunternehmerModeEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow, setStripeCustomerId } from "@/lib/billing/store";
 import { getPriceIdForPlan } from "@/lib/billing/stripePrices";
+import { getStripeClient, isStripeConfigured, stripeConfigurationError } from "@/lib/billing/stripeServer";
 import type { BillingInterval } from "@/lib/billing/planCatalog";
 import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
@@ -13,16 +13,6 @@ const checkoutSchema = z.object({
   plan: z.enum(["start", "growth", "pro"]),
   interval: z.enum(["monthly", "yearly"]).optional().default("yearly"),
 });
-
-function getStripeClient() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error("STRIPE_SECRET_KEY fehlt.");
-  return new Stripe(key);
-}
-
-function getPriceIdForPlanCheckout(plan: SubscriptionPlanKey, interval: BillingInterval) {
-  return getPriceIdForPlan(plan, interval);
-}
 
 function isAutomaticTaxEnabled() {
   return process.env.STRIPE_ENABLE_AUTOMATIC_TAX !== "false";
@@ -45,6 +35,10 @@ export async function POST(req: Request) {
 
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
+    }
+
+    if (!isStripeConfigured()) {
+      return NextResponse.json({ error: stripeConfigurationError(), code: "STRIPE_NOT_CONFIGURED" }, { status: 503 });
     }
 
     const supabase = await createClient();
@@ -79,7 +73,7 @@ export async function POST(req: Request) {
       await setStripeCustomerId(user.id, customer.id);
     }
 
-    const priceId = getPriceIdForPlanCheckout(plan, interval);
+    const priceId = getPriceIdForPlan(plan, interval);
     const origin = getAppBaseUrlOrigin(new URL(req.url).origin);
     const kleinunternehmerMode = isKleinunternehmerModeEnabled();
     const automaticTaxEnabled = isAutomaticTaxEnabled() && !kleinunternehmerMode;

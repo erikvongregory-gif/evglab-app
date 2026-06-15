@@ -278,6 +278,11 @@ export function buildHyperrealisticClaudeUserMessage(
   }
 
   lines.push(
+    "HYPERREALISM (PFLICHT): Das Bild muss wie eine echte Kamera-Aufnahme wirken — keine CGI-, Illustrations- oder AI-Art-Optik.",
+    "Nutze SRM-Farbe + Hex aus der Farbtabelle, Schaumcharakteristik, Kondenswasser-Realismus und mindestens 3 konkrete Umgebungs-Mikrodetails.",
+    "Menschen: natuerliche Hauttextur (Poren, keine waxy plastic skin), korrekte Haende/Finger, keine Stock-Photo-Posen.",
+    "Kamera: explizites Objektiv (35/50/85/100mm), Blende, Bildausschnitt und Tiefenschaerfe.",
+    "Negative am Ende: CGI, cartoon, plastic foam, sticker condensation, waxy skin, generic stock look.",
     "Pruefe intern alle Qualitaetspunkte; gib aber NUR den englischen Prompt aus (inkl. Negative am Ende). Kein deutscher Text, kein Markdown, keine Erklaerung.",
     "",
     "Strukturiertes Briefing (JSON):",

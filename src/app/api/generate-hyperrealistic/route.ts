@@ -9,6 +9,10 @@ import { createReferenceResolverFromMetadata, assertResolvableReferenceUrls, res
 import { buildBrandProfilePromptContext, getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
 import { buildHyperrealisticClaudeUserMessage } from "@/lib/prompts/brauerei-bild/map-hyperrealistic-brief";
 import { generateBrauereiBildPrompt } from "@/lib/prompts/brauerei-bild/generate-prompt";
+import { applyContentPresetPrompt } from "@/lib/image-types/policy";
+import {
+  enforceHyperrealisticPromptConstraints,
+} from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/enforce-prompt-constraints";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -63,6 +67,9 @@ export async function POST(req: Request) {
         console.warn("[generate-hyperrealistic] brauerei-bild skill fallback:", skillError);
       }
     }
+
+    prompt = enforceHyperrealisticPromptConstraints(prompt, input, brandProfile.breweryName);
+    prompt = applyContentPresetPrompt(prompt, "hyperreal");
 
     const images = await generateHyperrealistic({
       prompt,
