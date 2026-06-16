@@ -1550,6 +1550,7 @@ body:has(.evg-shell) {
   position: absolute;
   top: 18px;
   right: 18px;
+  z-index: 30;
   width: 32px;
   height: 32px;
   border-radius: var(--r-xs);

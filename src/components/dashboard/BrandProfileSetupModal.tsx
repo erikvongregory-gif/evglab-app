@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { BrandReviewPanel } from "@/components/dashboard/BrandReviewPanel";
 import { StudioButton } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
@@ -627,15 +627,23 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
               : "Gib die Website deiner Marke ein oder verbinde Instagram — EvGlab erkennt Tonalität, Farben und Bildsprache."}
         </DialogDescription>
 
-        <button
-          type="button"
-          className="studio-modal-close"
-          aria-label="Schließen"
-          disabled={busy}
-          onClick={() => handleOpenChange(false)}
-        >
-          <StudioIcon name="x" size={16} />
-        </button>
+        <DialogClose asChild>
+          <button
+            type="button"
+            className="studio-modal-close"
+            aria-label="Schließen"
+            disabled={busy}
+            onClick={(event) => {
+              if (busy) {
+                event.preventDefault();
+                return;
+              }
+              handleOpenChange(false);
+            }}
+          >
+            <StudioIcon name="x" size={16} />
+          </button>
+        </DialogClose>
 
         {step === "review" ? (
           <>
