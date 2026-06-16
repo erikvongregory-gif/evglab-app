@@ -32,6 +32,12 @@ export function isKleinunternehmerModeEnabled(): boolean {
   return parseBooleanEnv(process.env.BILLING_KLEINUNTERNEHMER ?? process.env.NEXT_PUBLIC_BILLING_KLEINUNTERNEHMER);
 }
 
+/** Stripe Tax nur bei explizitem Opt-in; Kleinunternehmer (§ 19 UStG) immer ohne Tax. */
+export function isStripeAutomaticTaxEnabled(): boolean {
+  if (isKleinunternehmerModeEnabled()) return false;
+  return parseBooleanEnv(process.env.STRIPE_ENABLE_AUTOMATIC_TAX);
+}
+
 function isLocalDevHost(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".local");
 }
@@ -41,12 +47,10 @@ export function getAppBaseUrlOrigin(requestOrigin: string): string {
   if (!configured) return requestOrigin;
   try {
     const configuredOrigin = new URL(configured).origin;
-    if (process.env.NODE_ENV === "development") {
-      const requestHost = new URL(requestOrigin).hostname;
-      const configuredHost = new URL(configuredOrigin).hostname;
-      if (isLocalDevHost(requestHost) && requestHost !== configuredHost) {
-        return requestOrigin;
-      }
+    const requestHost = new URL(requestOrigin).hostname;
+    // Lokal immer die tatsächliche Origin (inkl. Port) — nie auf :3001 o. ä. aus der Env umleiten.
+    if (isLocalDevHost(requestHost)) {
+      return requestOrigin;
     }
     return configuredOrigin;
   } catch {

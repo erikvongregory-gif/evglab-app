@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { getAppBaseUrlOrigin, isBillingCheckoutEnabled, isKleinunternehmerModeEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
+import {
+  getAppBaseUrlOrigin,
+  isBillingCheckoutEnabled,
+  isKleinunternehmerModeEnabled,
+  isStripeAutomaticTaxEnabled,
+  isSupabaseConfigured,
+} from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { getStripeClient, isStripeConfigured, stripeConfigurationError } from "@/lib/billing/stripeServer";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
@@ -14,10 +20,6 @@ function getPackConfig(pack: TokenPackKey) {
     tokens_2000: { priceId: process.env.STRIPE_PRICE_TOKENS_2000, tokens: 2000 },
   };
   return map[pack];
-}
-
-function isAutomaticTaxEnabled() {
-  return process.env.STRIPE_ENABLE_AUTOMATIC_TAX !== "false";
 }
 
 export async function POST(req: Request) {
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
     const stripe = getStripeClient();
     const origin = getAppBaseUrlOrigin(new URL(req.url).origin);
     const kleinunternehmerMode = isKleinunternehmerModeEnabled();
-    const automaticTaxEnabled = isAutomaticTaxEnabled() && !kleinunternehmerMode;
+    const automaticTaxEnabled = isStripeAutomaticTaxEnabled();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer: row.stripe_customer_id,

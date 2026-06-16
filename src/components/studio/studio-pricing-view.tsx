@@ -9,6 +9,7 @@ import {
   type BillingInterval,
   type StudioPlanDefinition,
 } from "@/lib/billing/planCatalog";
+import { startBillingCheckout } from "@/lib/billing/checkoutClient";
 import type { SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { STUDIO_TOKENS } from "@/components/ui/dashboard-studio-shell";
 
@@ -175,18 +176,20 @@ export function StudioPricingView({
   monthlyTokens,
   usedTokens,
   remainingTokens,
+  initialCheckoutError = null,
 }: {
   currentPlan: SubscriptionPlanKey | null;
   monthlyTokens: number;
   usedTokens: number;
   remainingTokens: number;
+  initialCheckoutError?: string | null;
 }) {
   const [yearlyBilling, setYearlyBilling] = useState(true);
   const billing: BillingInterval = yearlyBilling ? "yearly" : "monthly";
   const [checkoutPending, setCheckoutPending] = useState<SubscriptionPlanKey | null>(null);
   const [tokenPackPending, setTokenPackPending] = useState<"tokens_500" | "tokens_2000" | null>(null);
   const [portalPending, setPortalPending] = useState(false);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(initialCheckoutError);
 
   const activePlan = useMemo(
     () => STUDIO_PLANS.find((plan) => plan.id === currentPlan) ?? STUDIO_PLANS[1],
@@ -199,18 +202,10 @@ export function StudioPricingView({
       setCheckoutError(null);
       setCheckoutPending(plan);
       try {
-        const res = await fetch("/api/billing/checkout", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ plan, interval: billing }),
-        });
-        const json = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
-        if (!res.ok || !json?.url) {
-          setCheckoutError(json?.error ?? "Checkout konnte nicht gestartet werden.");
-          return;
+        const result = await startBillingCheckout({ plan, interval: billing });
+        if (!result.ok && !result.redirected) {
+          setCheckoutError(result.error);
         }
-        window.location.href = json.url;
       } catch {
         setCheckoutError("Checkout konnte nicht gestartet werden.");
       } finally {
@@ -369,31 +364,27 @@ export function StudioPricingView({
             Einmalige Token-Packs für mehr Generierungen im aktuellen Abrechnungszeitraum. Gekaufte Tokens bleiben
             erhalten, bis du sie verbrauchst.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-            <div className="studio-pricing-card" style={{ padding: 16 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>+500 Tokens</div>
-              <div className="studio-accent-serif" style={{ fontSize: 22, marginBottom: 12 }}>
-                39 €
-              </div>
+          <div className="studio-pricing-token-packs">
+            <div className="studio-pricing-card studio-pricing-token-pack">
+              <div className="studio-pricing-token-pack-title">+500 Tokens</div>
+              <div className="studio-pricing-token-pack-price studio-accent-serif">39 €</div>
               <StudioButton
                 variant="ghost"
                 size="sm"
-                className="w-full"
+                className="w-full studio-pricing-token-pack-cta"
                 disabled={tokenPackPending !== null}
                 onClick={() => void buyTokenPack("tokens_500")}
               >
                 {tokenPackPending === "tokens_500" ? "Weiterleitung …" : "Jetzt kaufen →"}
               </StudioButton>
             </div>
-            <div className="studio-pricing-card" style={{ padding: 16 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>+2.000 Tokens</div>
-              <div className="studio-accent-serif" style={{ fontSize: 22, marginBottom: 12 }}>
-                119 €
-              </div>
+            <div className="studio-pricing-card studio-pricing-token-pack">
+              <div className="studio-pricing-token-pack-title">+2.000 Tokens</div>
+              <div className="studio-pricing-token-pack-price studio-accent-serif">119 €</div>
               <StudioButton
                 variant="ghost"
                 size="sm"
-                className="w-full"
+                className="w-full studio-pricing-token-pack-cta"
                 disabled={tokenPackPending !== null}
                 onClick={() => void buyTokenPack("tokens_2000")}
               >

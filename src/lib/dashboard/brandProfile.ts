@@ -1,4 +1,4 @@
-import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { getDashboardMetadata, type DashboardSettings } from "@/lib/dashboard/metadata";
 
 export type BrandProfileSource = "url" | "instagram" | "manual" | "skip";
 
@@ -124,6 +124,23 @@ export function isBrandProfileActive(profile: BrandProfile): boolean {
       profile.brandDonts &&
       (profile.breweryName || profile.brandWebsiteUrl),
   );
+}
+
+/** Entfernt gespeichertes Markenprofil und schaltet auf generische Generierung (Modus „skip“). */
+export function buildGenericBrandProfilePatch(): Partial<DashboardSettings> {
+  return {
+    brandProfileMode: "skip",
+    brandProfileSource: "skip",
+    brandInstagramUrl: "",
+    brandWebsiteUrl: "",
+    brandTone: "",
+    brandColors: "",
+    brandDos: "",
+    brandDonts: "",
+    brandReferenceImageUrls: [],
+    brandLockLevel: "strict",
+    brandAnalyzedAt: "",
+  };
 }
 
 export function buildBrandProfilePromptContext(profile: BrandProfile): string {

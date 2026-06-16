@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StudioViewTransition } from "@/components/studio/studio-view-transition";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { useStudioShell } from "@/components/studio/studio-workspace-shell";
@@ -28,7 +28,12 @@ import { BrandProfileView } from "@/components/dashboard/BrandProfileView";
 import { BrandProfileSetupModal, type BrandScanSuggestion } from "@/components/dashboard/BrandProfileSetupModal";
 import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
-import { isBrandProfileCompleteFromSettings } from "@/lib/dashboard/brandProfile";
+import {
+  clearHomepageCheckoutParams,
+  getHomepageCheckoutPlan,
+  startBillingCheckout,
+} from "@/lib/billing/checkoutClient";
+import { buildGenericBrandProfilePatch, isBrandProfileCompleteFromSettings } from "@/lib/dashboard/brandProfile";
 import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
 import { fetchWithRetry } from "@/lib/http/fetchWithRetry";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
@@ -393,6 +398,8 @@ export function DashboardRedesignShell(props: {
   const [brandProfileSetupOpen, setBrandProfileSetupOpen] = useState(false);
   const [showBrandProfileChoice, setShowBrandProfileChoice] = useState(false);
   const [brandProfileNotice, setBrandProfileNotice] = useState("");
+  const [pricingCheckoutError, setPricingCheckoutError] = useState<string | null>(null);
+  const homepageCheckoutStartedRef = useRef(false);
 
   const profileName = settings?.profileName?.trim() || initialProfileName?.trim() || "";
   const breweryName = settings?.breweryName?.trim() || initialBreweryName?.trim() || "";
@@ -471,6 +478,37 @@ export function DashboardRedesignShell(props: {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (homepageCheckoutStartedRef.current || !settingsLoaded) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    const homepagePlan = getHomepageCheckoutPlan(params);
+    if (!homepagePlan) return;
+
+    homepageCheckoutStartedRef.current = true;
+    setShowBrandProfileChoice(false);
+
+    const hasActivePlan = hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus);
+    if (hasActivePlan) {
+      clearHomepageCheckoutParams(params);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      return;
+    }
+
+    changeTab("pricing");
+    void (async () => {
+      const result = await startBillingCheckout({ plan: homepagePlan });
+      if (!result.ok && !result.redirected) {
+        setPricingCheckoutError(result.error);
+      }
+      clearHomepageCheckoutParams(params);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsLoaded, summary, searchParams]);
 
   useEffect(() => {
     const onBillingUpdated = () => {
@@ -564,11 +602,14 @@ export function DashboardRedesignShell(props: {
   const handleSkipBrandProfile = useCallback(async () => {
     setShowBrandProfileChoice(false);
     try {
-      await saveProfileSettings({ brandProfileMode: "skip", brandProfileSource: "skip" });
+      await saveProfileSettings(buildGenericBrandProfilePatch());
+      setBrandProfileNotice("Markenprofil deaktiviert — du generierst jetzt generisch.");
     } catch {
-      setBrandProfileNotice("Skip konnte nicht gespeichert werden.");
+      setBrandProfileNotice("Zurücksetzen konnte nicht gespeichert werden.");
     }
   }, [saveProfileSettings]);
+
+  const handleResetBrandProfile = handleSkipBrandProfile;
 
   useEffect(() => {
     if (!settingsLoaded) return;
@@ -632,6 +673,7 @@ export function DashboardRedesignShell(props: {
           brandProfileNotice={brandProfileNotice}
           onOpenBrandSetup={() => setBrandProfileSetupOpen(true)}
           onSkipBrandProfile={() => void handleSkipBrandProfile()}
+          onResetBrandProfile={handleResetBrandProfile}
           onChange={(patch) => setSettings((s) => (s ? { ...s, ...patch } : s))}
           onSave={async (patch) => {
             if (!settings) throw new Error("Einstellungen noch nicht geladen.");
@@ -654,6 +696,7 @@ export function DashboardRedesignShell(props: {
             setBrandProfileSetupOpen(true);
           }}
           onSkipBrandProfile={() => void handleSkipBrandProfile()}
+          onResetBrandProfile={handleResetBrandProfile}
         />
       ) : null}
       {tab === "pricing" ? (
@@ -662,6 +705,7 @@ export function DashboardRedesignShell(props: {
           monthlyTokens={summary?.tokens.monthly ?? 0}
           usedTokens={summary?.tokens.used ?? 0}
           remainingTokens={summary?.tokens.remaining ?? 0}
+          initialCheckoutError={pricingCheckoutError}
         />
       ) : null}
       </StudioViewTransition>
@@ -1169,6 +1213,7 @@ function SettingsView({
   onOpenBrandTab,
   onOpenBrandSetup,
   onSkipBrandProfile,
+  onResetBrandProfile,
 }: {
   P: StudioPalette;
   value: SettingsPayload | null;
@@ -1180,6 +1225,7 @@ function SettingsView({
   onOpenBrandTab: () => void;
   onOpenBrandSetup: () => void;
   onSkipBrandProfile: () => void;
+  onResetBrandProfile: () => void | Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -1292,10 +1338,27 @@ function SettingsView({
                     </div>
                   </div>
                 </div>
-                <StudioButton type="button" variant="soft" size="sm" onClick={onOpenBrandTab}>
-                  <StudioIcon name="pencil" size={15} />
-                  Profil verwalten
-                </StudioButton>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                  <StudioButton type="button" variant="soft" size="sm" onClick={onOpenBrandTab}>
+                    <StudioIcon name="pencil" size={15} />
+                    Profil verwalten
+                  </StudioButton>
+                  <StudioButton
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    style={{ color: "var(--warn)" }}
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Stil-Vorgaben werden entfernt.",
+                      );
+                      if (!confirmed) return;
+                      void onResetBrandProfile();
+                    }}
+                  >
+                    Generisch nutzen
+                  </StudioButton>
+                </div>
               </div>
             </div>
           ) : (

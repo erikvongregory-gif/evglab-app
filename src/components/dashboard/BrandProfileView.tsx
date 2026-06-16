@@ -112,6 +112,8 @@ export function BrandProfileView({
 
   onSkipBrandProfile,
 
+  onResetBrandProfile,
+
   onChange,
 
   onSave,
@@ -132,6 +134,8 @@ export function BrandProfileView({
 
   onSkipBrandProfile: () => void;
 
+  onResetBrandProfile: () => void | Promise<void>;
+
   onChange: (patch: Partial<BrandSettings>) => void;
 
   onSave: (patch?: Partial<BrandSettings>) => Promise<void>;
@@ -139,6 +143,8 @@ export function BrandProfileView({
 }) {
 
   const [saving, setSaving] = useState(false);
+
+  const [resetting, setResetting] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -264,9 +270,9 @@ export function BrandProfileView({
 
         <StudioCard pad>
 
-          <StudioButton type="button" variant="ghost" size="sm" onClick={onSkipBrandProfile}>
+          <StudioButton type="button" variant="ghost" size="sm" onClick={onOpenBrandSetup}>
 
-            Zurück zu Markenprofil-Einrichtung
+            Markenprofil anlegen
 
           </StudioButton>
 
@@ -595,6 +601,68 @@ export function BrandProfileView({
         </div>
 
       ) : null}
+
+
+
+      <StudioCard pad className="studio-brand-reset-card" style={{ marginTop: 20 }}>
+
+        <div className="studio-brand-rules-title">Generisch weitermachen</div>
+
+        <p className="studio-brand-rules-sub" style={{ marginTop: 6 }}>
+
+          Markenprofil deaktivieren und gespeicherte Stil-Vorgaben entfernen. Neue Bilder werden ohne festes Markenprofil erzeugt.
+
+        </p>
+
+        <StudioButton
+
+          type="button"
+
+          variant="ghost"
+
+          size="sm"
+
+          disabled={resetting || saving}
+
+          style={{ marginTop: 14, color: "var(--warn)" }}
+
+          onClick={() => {
+
+            const confirmed = window.confirm(
+
+              "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Farben, Tonalität und Bildregeln werden entfernt.",
+
+            );
+
+            if (!confirmed) return;
+
+            setResetting(true);
+
+            setError(null);
+
+            void Promise.resolve(onResetBrandProfile())
+
+              .catch((e) => {
+
+                setError(e instanceof Error ? e.message : "Zurücksetzen fehlgeschlagen.");
+
+              })
+
+              .finally(() => {
+
+                setResetting(false);
+
+              });
+
+          }}
+
+        >
+
+          {resetting ? "Wird zurückgesetzt…" : "Markenprofil löschen"}
+
+        </StudioButton>
+
+      </StudioCard>
 
     </div>
 

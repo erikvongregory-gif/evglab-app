@@ -2548,6 +2548,16 @@ body:has(.evg-shell) {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 18%, transparent);
 }
 
+.evg-studio .studio-pricing-yearly-toggle:hover {
+  border-color: var(--line-strong);
+  background: color-mix(in srgb, var(--bg-2) 72%, var(--bg-3));
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on:hover {
+  border-color: color-mix(in srgb, var(--ok) 58%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 22%, transparent);
+}
+
 .evg-studio .studio-pricing-yearly-toggle-copy {
   min-width: 0;
 }
@@ -2697,9 +2707,44 @@ body:has(.evg-shell) {
 
 .evg-studio .studio-pricing-plans .studio-pricing-card {
   transition:
-    border-color 0.38s ease,
-    box-shadow 0.38s ease,
-    background 0.38s ease;
+    border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.evg-studio .studio-pricing-card-wrap:not(:has(.studio-pricing-card.current)):hover .studio-pricing-card {
+  transform: translate3d(0, -3px, 0);
+  border-color: var(--line-accent);
+  box-shadow:
+    var(--sh-2),
+    0 0 0 1px color-mix(in srgb, var(--acc) 16%, transparent),
+    0 0 28px color-mix(in srgb, var(--acc) 8%, transparent);
+}
+
+.evg-studio .studio-pricing-card-wrap.rec:not(:has(.studio-pricing-card.current)):hover .studio-pricing-card {
+  transform: translate3d(0, -4px, 0);
+  border-color: var(--acc-lo);
+  box-shadow:
+    0 0 0 1px var(--acc-lo),
+    0 28px 72px rgba(0, 0, 0, 0.52),
+    0 0 40px color-mix(in srgb, var(--acc) 14%, transparent);
+}
+
+.evg-studio .studio-pricing-card-wrap:not(:has(.studio-pricing-card.current)):hover .studio-pricing-features li {
+  color: var(--tx-0);
+}
+
+.evg-studio .studio-pricing-card-wrap:not(:has(.studio-pricing-card.current)):hover .studio-pricing-check {
+  stroke: var(--acc-hi);
+}
+
+.evg-studio .studio-pricing-card-wrap.rec:not(:has(.studio-pricing-card.current)):hover .studio-pricing-rec-badge {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.42),
+    0 0 22px color-mix(in srgb, var(--acc) 22%, transparent);
 }
 
 .evg-studio .studio-pricing-card-wrap {
@@ -2727,6 +2772,9 @@ body:has(.evg-shell) {
   border-radius: var(--r-pill);
   white-space: nowrap;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .evg-studio .studio-pricing-card {
@@ -2968,11 +3016,13 @@ body:has(.evg-shell) {
   color: var(--tx-1);
   font-size: 13.5px;
   line-height: 1.45;
+  transition: color 0.28s ease;
 }
 
 .evg-studio .studio-pricing-check {
   flex-shrink: 0;
   margin-top: 1px;
+  transition: stroke 0.28s ease;
 }
 
 .evg-studio .studio-pricing-cta {
@@ -3007,6 +3057,62 @@ body:has(.evg-shell) {
 .evg-studio .studio-pricing-footnote {
   margin-top: 36px;
   text-align: center;
+}
+
+.evg-studio .studio-pricing-token-packs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.evg-studio .studio-pricing-token-pack {
+  padding: 16px;
+  transition:
+    border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.evg-studio .studio-pricing-token-pack:hover {
+  transform: translate3d(0, -3px, 0);
+  border-color: var(--line-accent);
+  background: color-mix(in srgb, var(--bg-3) 90%, var(--acc) 10%);
+  box-shadow:
+    var(--sh-2),
+    0 0 0 1px color-mix(in srgb, var(--acc) 14%, transparent),
+    0 0 24px color-mix(in srgb, var(--acc) 10%, transparent);
+}
+
+.evg-studio .studio-pricing-token-pack-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--tx-0);
+  transition: color 0.28s ease;
+}
+
+.evg-studio .studio-pricing-token-pack-price {
+  font-size: 22px;
+  margin-bottom: 12px;
+  color: var(--tx-0);
+  transition: color 0.28s ease;
+}
+
+.evg-studio .studio-pricing-token-pack:hover .studio-pricing-token-pack-price {
+  color: var(--acc-hi);
+}
+
+.evg-studio .studio-pricing-token-pack-cta.studio-btn-ghost {
+  transition:
+    border-color 0.22s ease,
+    background 0.22s ease,
+    color 0.22s ease;
+}
+
+.evg-studio .studio-pricing-token-pack:hover .studio-pricing-token-pack-cta.studio-btn-ghost {
+  border-color: var(--line-accent);
+  background: var(--acc-soft);
+  color: var(--acc-hi);
 }
 
 .evg-studio .studio-pricing-footnote p {
@@ -3053,8 +3159,15 @@ body:has(.evg-shell) {
   .evg-studio .studio-pricing-yearly-toggle-hint p,
   .evg-studio .studio-pricing-yearly-toggle-pill-on,
   .evg-studio .studio-pricing-yearly-toggle-pill-off,
-  .evg-studio .studio-pricing-plans .studio-pricing-card {
+  .evg-studio .studio-pricing-plans .studio-pricing-card,
+  .evg-studio .studio-pricing-token-pack,
+  .evg-studio .studio-pricing-token-pack-price,
+  .evg-studio .studio-pricing-token-pack-cta.studio-btn-ghost {
     transition: none;
+  }
+
+  .evg-studio .studio-pricing-token-pack:hover {
+    transform: none;
   }
 }
 
