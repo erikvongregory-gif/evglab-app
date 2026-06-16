@@ -5,7 +5,8 @@ import {
   PricingCard,
   type PricingCardProps,
 } from "@/components/ui/animated-glassy-pricing";
-import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import { STUDIO_PLANS } from "@/lib/billing/planCatalog";
+import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
 export type { SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
@@ -30,64 +31,20 @@ const DASHBOARD_POPULAR_PLAN_CARD_CLASS =
 const DASHBOARD_ACTIVE_PLAN_CARD_CLASS =
   "!border-[#c65a20] !ring-2 !ring-[#c65a20]/35 !shadow-[0_16px_34px_-20px_rgba(198,90,32,0.28)]";
 
-const BREWERY_SUBSCRIPTION_PLANS: PricingCardProps[] = [
-  {
-    planName: "Brauerei Start",
-    planIcon: Beer,
-    description: "Für kleine Teams, die regelmäßig Content planen und posten.",
-    price: "79 €",
-    currencyPrefix: "",
-    priceSubtext: PLAN_PRICE_SUBTEXT,
-    buttonText: "Plan wählen",
-    buttonVariant: "primary",
-    className: DASHBOARD_PLAN_CARD_CLASS,
-    features: [
-      "1.200 Tokens / Monat",
-      "ca. 60-120 Bilder",
-      "1 Teammitglied inklusive",
-      "E-Mail-Support",
-      "Nicht genutzte Tokens: 30 Tage übertragbar",
-    ],
-  },
-  {
-    planName: "Brauerei Wachstum",
-    planIcon: Rocket,
-    description: "Für aktive Brauereien mit regelmäßigen Kampagnen und Saisonaktionen.",
-    price: "149 €",
-    currencyPrefix: "",
-    priceSubtext: PLAN_PRICE_SUBTEXT,
-    buttonText: "Plan wählen",
-    buttonVariant: "primary",
-    className: DASHBOARD_PLAN_CARD_CLASS,
-    features: [
-      "3.000 Tokens / Monat",
-      "ca. 150-300 Bilder",
-      "3 Teammitglieder inklusive",
-      "Priorisierter Support",
-      "Nicht genutzte Tokens: 60 Tage übertragbar",
-    ],
-  },
-  {
-    planName: "Brauerei Pro",
-    planIcon: Crown,
-    description: "Für Marken mit hohem Content-Bedarf und mehreren Kanälen.",
-    price: "299 €",
-    currencyPrefix: "",
-    priceSubtext: PLAN_PRICE_SUBTEXT,
-    buttonText: "Plan wählen",
-    isPopular: true,
-    popularLabel: "Beliebteste Wahl",
-    buttonVariant: "primary",
-    className: DASHBOARD_POPULAR_PLAN_CARD_CLASS,
-    features: [
-      "7.500 Tokens / Monat",
-      "ca. 375-750 Bilder",
-      "10 Teammitglieder inklusive",
-      "Fast-Lane Rendering + Premium-Support",
-      "Nicht genutzte Tokens: 90 Tage übertragbar",
-    ],
-  },
-];
+const BREWERY_SUBSCRIPTION_PLANS: PricingCardProps[] = STUDIO_PLANS.map((plan) => ({
+  planName: plan.name,
+  planIcon: plan.id === "start" ? Beer : plan.id === "growth" ? Rocket : Crown,
+  description: plan.tag,
+  price: `${plan.monthly} €`,
+  currencyPrefix: "",
+  priceSubtext: PLAN_PRICE_SUBTEXT,
+  buttonText: "Plan wählen",
+  buttonVariant: "primary" as const,
+  className: plan.recommended ? DASHBOARD_POPULAR_PLAN_CARD_CLASS : DASHBOARD_PLAN_CARD_CLASS,
+  isPopular: plan.recommended,
+  popularLabel: plan.recommended ? "Beliebteste Wahl" : undefined,
+  features: plan.features.map((feature) => feature.replace("–", "-")),
+}));
 
 type BrewerySubscriptionPlansProps = {
   activePlan?: SubscriptionPlanKey | null;
@@ -120,7 +77,7 @@ export function BrewerySubscriptionPlans({
         </span>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">Wähle deinen Preisplan</h2>
         <p className="max-w-2xl text-sm text-gray-600 dark:text-gray-400 sm:text-base">
-          Nach dem Login startest du mit einem Plan. Tokens werden für Bild-Generierung
+          Nach dem Login startest du mit einem Plan. Tokens werden für Bild- und Video-Generierung
           verbraucht und monatlich neu aufgefüllt. {SECTION_VAT_NOTE}
         </p>
       </div>

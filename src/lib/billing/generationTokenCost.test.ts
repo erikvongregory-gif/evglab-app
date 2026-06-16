@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateGenerationTokenCost, calculatePerVariantTokenCost } from "./generationTokenCost";
+import { calculateGenerationTokenCost, calculatePerVariantTokenCost, calculateSeedanceVideoTokenCost } from "./generationTokenCost";
 
 describe("generationTokenCost", () => {
   it("berechnet 2K + Referenz + Strict pro Variante", () => {
@@ -30,5 +30,25 @@ describe("generationTokenCost", () => {
         hasReferenceImage: false,
       }),
     ).toBe(10);
+  });
+
+  it("Standard-Video Seedance 720p 8s = 90 Tokens", () => {
+    expect(
+      calculateSeedanceVideoTokenCost({
+        resolution: "720p",
+        duration: 8,
+        generateAudio: false,
+      }),
+    ).toBe(90);
+  });
+
+  it("längeres Video addiert Dauer-Aufschlag", () => {
+    expect(
+      calculateSeedanceVideoTokenCost({
+        resolution: "720p",
+        duration: 12,
+        generateAudio: false,
+      }),
+    ).toBe(106);
   });
 });

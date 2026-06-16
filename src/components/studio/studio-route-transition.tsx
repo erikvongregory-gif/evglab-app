@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 
 const STUDIO_EASE = [0.22, 0.68, 0.2, 1] as const;
 
-/** Übergang zwischen Studio-Routen (z. B. Dashboard ↔ Inhalte erstellen). */
+/** Übergang zwischen Studio-Routen (z. B. Dashboard ↔ Bilder Erstellen). */
 export function StudioRouteTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const reduceMotion = useReducedMotion();

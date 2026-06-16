@@ -1,4 +1,6 @@
 import type { SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import { SUBSCRIPTION_PLAN_TOKENS } from "@/lib/billing/tokenState";
+import { formatPlanImageEstimate, formatPlanVideoEstimate } from "@/lib/billing/generationTokenCost";
 
 export type BillingInterval = "monthly" | "yearly";
 
@@ -16,6 +18,18 @@ export type StudioPlanDefinition = {
   features: string[];
 };
 
+function buildPlanFeatures(planId: SubscriptionPlanKey, carryDays: string, teamLine: string, supportLine: string): string[] {
+  const tokens = SUBSCRIPTION_PLAN_TOKENS[planId];
+  return [
+    `${tokens.toLocaleString("de-DE")} Tokens / Monat`,
+    `${formatPlanImageEstimate(tokens)} · ${formatPlanVideoEstimate(tokens)}`,
+    "Videos Erstellen (Seedance 2)",
+    teamLine,
+    supportLine,
+    carryDays,
+  ];
+}
+
 export const STUDIO_PLANS: StudioPlanDefinition[] = [
   {
     id: "start",
@@ -25,13 +39,12 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     yearly: 65,
     compareAtMonthly: 100,
     savingsLabel: "21% Ersparnis inklusive",
-    features: [
-      "1.200 Tokens / Monat",
-      "ca. 60–120 Bilder",
+    features: buildPlanFeatures(
+      "start",
+      "Tokens 30 Tage übertragbar",
       "1 Teammitglied",
       "E-Mail-Support",
-      "Tokens 30 Tage übertragbar",
-    ],
+    ),
   },
   {
     id: "growth",
@@ -42,13 +55,12 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     compareAtMonthly: 200,
     savingsLabel: "26% Ersparnis inklusive",
     recommended: true,
-    features: [
-      "3.000 Tokens / Monat",
-      "ca. 150–300 Bilder",
+    features: buildPlanFeatures(
+      "growth",
+      "Tokens 60 Tage übertragbar",
       "3 Teammitglieder",
       "Priorisierter Support",
-      "Tokens 60 Tage übertragbar",
-    ],
+    ),
   },
   {
     id: "pro",
@@ -58,13 +70,12 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     yearly: 249,
     compareAtMonthly: 400,
     savingsLabel: "25% Ersparnis inklusive",
-    features: [
-      "7.500 Tokens / Monat",
-      "ca. 375–750 Bilder",
+    features: buildPlanFeatures(
+      "pro",
+      "Tokens 90 Tage übertragbar",
       "10 Teammitglieder",
       "Fast-Lane Rendering + Premium-Support",
-      "Tokens 90 Tage übertragbar",
-    ],
+    ),
   },
 ];
 
@@ -83,3 +94,7 @@ export function getPlanDisplayMonthlyPrice(plan: StudioPlanDefinition, yearlyBil
 export function getPlanAnnualSavingsVsList(plan: StudioPlanDefinition): number {
   return (plan.compareAtMonthly - plan.monthly) * 12;
 }
+
+/** Hinweis für UI: typischer Video-Verbrauch (720p, ~8 s). */
+export const SEEDANCE_VIDEO_TOKEN_HINT =
+  "Ein Standard-Video (Seedance 2 · 720p · ~8 s) kostet 90 Tokens — deutlich mehr als eine Bild-Generierung.";

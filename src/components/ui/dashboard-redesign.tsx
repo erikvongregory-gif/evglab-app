@@ -662,7 +662,14 @@ export function DashboardRedesignShell(props: {
           }}
         />
       ) : null}
-      {tab === "media" ? <MediaView P={P} items={media} hasActivePlan={hasActivePlan} /> : null}
+      {tab === "media" ? (
+        <MediaView
+          P={P}
+          items={media}
+          hasActivePlan={hasActivePlan}
+          initialQuery={searchParams.get("q") ?? ""}
+        />
+      ) : null}
       {tab === "team" ? <TeamView P={P} members={team} onMembersChange={setTeam} /> : null}
       {tab === "brand" ? (
         <BrandProfileView
@@ -929,7 +936,34 @@ function DashboardOverview({
   );
 }
 
-function MediaView({ P, items, hasActivePlan = true }: { P: StudioPalette; items: MediaItem[]; hasActivePlan?: boolean }) {
+function MediaView({
+  P,
+  items,
+  hasActivePlan = true,
+  initialQuery = "",
+}: {
+  P: StudioPalette;
+  items: MediaItem[];
+  hasActivePlan?: boolean;
+  initialQuery?: string;
+}) {
+  const [search, setSearch] = useState(initialQuery);
+
+  useEffect(() => {
+    setSearch(initialQuery);
+  }, [initialQuery]);
+
+  const visibleItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (it) =>
+        it.prompt.toLowerCase().includes(q) ||
+        it.aspectRatio.toLowerCase().includes(q) ||
+        it.resolution.toLowerCase().includes(q),
+    );
+  }, [items, search]);
+
   return (
     <>
       <Eyebrow>Mediathek</Eyebrow>
@@ -939,8 +973,20 @@ function MediaView({ P, items, hasActivePlan = true }: { P: StudioPalette; items
       <p style={{ marginTop: 10, fontFamily: TOKENS.sans, fontSize: 14.5, color: P.ink2 }}>
         Alle generierten Bilder deiner Marke — sortiert nach Datum.
       </p>
+      {items.length > 0 ? (
+        <div style={{ marginTop: 18, maxWidth: 420 }}>
+          <input
+            className="studio-field"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Motive durchsuchen …"
+            aria-label="Mediathek durchsuchen"
+            style={{ width: "100%", height: 40, fontSize: 13 }}
+          />
+        </div>
+      ) : null}
       <div className="studio-media-grid">
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <div
             style={{
               gridColumn: "1 / -1",
@@ -953,7 +999,10 @@ function MediaView({ P, items, hasActivePlan = true }: { P: StudioPalette; items
             }}
           >
             <div aria-hidden style={{ position: "absolute", top: -60, right: -40, width: 220, height: 220, background: `radial-gradient(circle, ${TOKENS.amber}18 0%, transparent 65%)`, pointerEvents: "none" }} />
-            <p style={{ fontFamily: TOKENS.sans, fontSize: 14, color: P.ink2, position: "relative" }}>Noch keine Motive in der Mediathek.</p>
+            <p style={{ fontFamily: TOKENS.sans, fontSize: 14, color: P.ink2, position: "relative" }}>
+              {items.length === 0 ? "Noch keine Motive in der Mediathek." : "Keine Motive passen zur Suche."}
+            </p>
+            {items.length === 0 ? (
             <Link
               href={hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing"}
               className="evg-cta"
@@ -975,9 +1024,10 @@ function MediaView({ P, items, hasActivePlan = true }: { P: StudioPalette; items
             >
               {hasActivePlan ? "Jetzt erstellen →" : "Tarif wählen →"}
             </Link>
+            ) : null}
           </div>
         ) : (
-          items.map((it) => (
+          visibleItems.map((it) => (
             <div
               key={it.id}
               className="evg-card"

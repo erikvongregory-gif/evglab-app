@@ -31,8 +31,8 @@ function fallbackAnswer(question: string): string {
   if (/schweizerdeutsch|schwiizerdutsch|schwiizerdütsch/.test(q)) {
     return "Ja klar, ich cha au Schwiizerdütsch rede. Frag mich eifach öppis — zu EvGlab, Marketing oder allgemeine Themen.";
   }
-  if (/evglab|dashboard|mediathek|markenprofil|inhalte erstellen|abo|tarif/i.test(q)) {
-    return "Gern helfe ich dir in EvGlab weiter: Dashboard, Inhalte erstellen, Markenprofil, Mediathek oder Tarife — was möchtest du wissen?";
+  if (/evglab|dashboard|mediathek|markenprofil|bilder erstellen|inhalte erstellen|abo|tarif/i.test(q)) {
+    return "Gern helfe ich dir in EvGlab weiter: Dashboard, Bilder Erstellen, Markenprofil, Mediathek oder Tarife — was möchtest du wissen?";
   }
   if (/marke|brand|stil|look|prompt|bild|motiv|kampagne|social/i.test(q)) {
     return "Super Thema. Beschreib mir Produkt, Stimmung und Format — ich formuliere dir gern einen Prompt oder eine Idee.";

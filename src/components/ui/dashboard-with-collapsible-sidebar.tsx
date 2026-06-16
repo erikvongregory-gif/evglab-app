@@ -57,7 +57,7 @@ type OptionProps = {
 type DashboardTab =
   | "Dashboard"
   | "Prompt-Erstellung"
-  | "Inhalte erstellen"
+  | "Bilder Erstellen"
   | "Mediathek"
   | "Abo & Tokens"
   | "Team"
@@ -259,9 +259,9 @@ const DASHBOARD_ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: "content",
-    tab: "Inhalte erstellen",
+    tab: "Bilder Erstellen",
     targetSelector: '[data-onboarding-nav="content"]',
-    title: "Inhalte erstellen",
+    title: "Bilder Erstellen",
     description: "Hier startest du neue Bildideen und erzeugst Motive für Kampagnen und Social.",
   },
   {
@@ -311,28 +311,28 @@ const DASHBOARD_ONBOARDING_STEPS: OnboardingStep[] = [
 const CONTENT_CREATION_TOUR_STEPS: OnboardingStep[] = [
   {
     id: "content-tour-workflow",
-    tab: "Inhalte erstellen",
+    tab: "Bilder Erstellen",
     targetSelector: '[data-onboarding="content-workflow"]',
     title: "Kreativbereich",
     description: "Hier startest du deinen Content-Flow und definierst die Bildidee.",
   },
   {
     id: "content-tour-brief",
-    tab: "Inhalte erstellen",
+    tab: "Bilder Erstellen",
     targetSelector: '[data-onboarding="content-brief"]',
     title: "Prompt eingeben & senden",
     description: "Beschreibe Szene, Stil und Ziel und schicke deinen Prompt direkt über den Pfeil-Button ab.",
   },
   {
     id: "content-tour-preflight",
-    tab: "Inhalte erstellen",
+    tab: "Bilder Erstellen",
     targetSelector: '[data-onboarding="content-preflight"]',
     title: "Einstellungen prüfen",
     description: "Wähle Varianten, Format und Perspektive vor dem finalen Render, damit die Ausgabe passt.",
   },
   {
     id: "content-tour-result",
-    tab: "Inhalte erstellen",
+    tab: "Bilder Erstellen",
     targetSelector: '[data-onboarding="content-result"]',
     title: "Ergebnis & Download",
     description: "Deine fertigen Bilder erscheinen hier und lassen sich direkt herunterladen.",
@@ -434,7 +434,7 @@ const Sidebar = ({
 
       <div className="mb-8 space-y-1">
         <Option Icon={Home} title="Dashboard" selected={selected} setSelected={setSelected} open={open} />
-        <Option Icon={Wand2} title="Inhalte erstellen" selected={selected} setSelected={setSelected} open={open} />
+        <Option Icon={Wand2} title="Bilder Erstellen" selected={selected} setSelected={setSelected} open={open} />
         <Option Icon={Image} title="Mediathek" selected={selected} setSelected={setSelected} open={open} />
         <Option Icon={Users} title="Team" selected={selected} setSelected={setSelected} open={open} />
         {isAdmin ? <Option Icon={Settings} title="Admin Center" selected={selected} setSelected={setSelected} open={open} /> : null}
@@ -467,7 +467,7 @@ const MobileTabBar = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const tabs: Array<{ title: DashboardTab; Icon: LucideIcon }> = [
     { title: "Dashboard", Icon: Home },
-    { title: "Inhalte erstellen", Icon: Wand2 },
+    { title: "Bilder Erstellen", Icon: Wand2 },
     { title: "Mediathek", Icon: Image },
     { title: "Team", Icon: Users },
     { title: "Einstellungen", Icon: Settings },
@@ -551,7 +551,7 @@ const Option = ({ Icon, title, selected, setSelected, open, notifs }: OptionProp
   const onboardingKey: Record<DashboardTab, string> = {
     Dashboard: "dashboard",
     "Prompt-Erstellung": "prompt",
-    "Inhalte erstellen": "content",
+    "Bilder Erstellen": "content",
     Mediathek: "library",
     "Abo & Tokens": "billing",
     Team: "team",
@@ -799,12 +799,12 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       Boolean(brandDonts.trim()));
   const campaignBrandOk = brandProfileMode === "guided" && brandProfileComplete;
   const tabTitle = selectedTab;
-  const isCreationTab = selectedTab === "Inhalte erstellen";
+  const isCreationTab = selectedTab === "Bilder Erstellen";
   const selectedContentPreset =
     CONTENT_CREATION_PRESETS.find((preset) => preset.id === contentCreationPreset) ?? CONTENT_CREATION_PRESETS[0];
   const topTabs: Array<{ title: DashboardTab; Icon: LucideIcon; notifs?: number }> = [
     { title: "Dashboard", Icon: Home },
-    { title: "Inhalte erstellen", Icon: Wand2 },
+    { title: "Bilder Erstellen", Icon: Wand2 },
     { title: "Mediathek", Icon: Image },
     { title: "Team", Icon: Users },
     { title: "Einstellungen", Icon: Settings },
@@ -817,7 +817,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const tabIconClassByTitle: Record<DashboardTab, string> = {
     Dashboard: "text-sky-300",
     "Prompt-Erstellung": "text-zinc-400",
-    "Inhalte erstellen": "text-emerald-300",
+    "Bilder Erstellen": "text-emerald-300",
     Mediathek: "text-[#7cff66]",
     Team: "text-cyan-300",
     "Admin Center": "text-amber-300",
@@ -1157,7 +1157,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
   useEffect(() => {
     if (selectedTab !== "Prompt-Erstellung") return;
-    setSelectedTab("Inhalte erstellen");
+    setSelectedTab("Bilder Erstellen");
   }, [selectedTab, setSelectedTab]);
 
   useEffect(() => {
@@ -1541,7 +1541,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const tabDescriptions: Record<DashboardTab, string> = {
     Dashboard: "Hier siehst du alle wichtigen Zahlen für dein Content- und Abo-Management.",
     "Prompt-Erstellung": "Baue deinen Prompt sauber auf, bevor du Bilder generierst.",
-    "Inhalte erstellen": "Plane und erstelle neue Inhalte für Social Media, Events und Kampagnen.",
+    "Bilder Erstellen": "Plane und erstelle neue Bilder für Social Media, Events und Kampagnen.",
     Mediathek: "Verwalte deine Bilder, Vorlagen und exportierten Assets zentral an einem Ort.",
     "Abo & Tokens": "Behalte deinen Tarif, Verbrauch und kommende Aufladungen im Blick.",
     Team: "Lade Kolleginnen und Kollegen ein und verwalte Rollen im Team.",
@@ -1678,7 +1678,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           }
         }
         setShowCreditsOffer(false);
-        setSelectedTab("Inhalte erstellen");
+        setSelectedTab("Bilder Erstellen");
       } catch (error) {
         setGlobalErrorMessage(error instanceof Error ? error.message : "Bonus-Credits konnten nicht freigeschaltet werden.");
       }
@@ -2709,14 +2709,14 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Schnellaktionen</h3>
                 <div className="space-y-4">
                   <button
-                    onClick={() => setSelectedTab("Inhalte erstellen")}
+                    onClick={() => setSelectedTab("Bilder Erstellen")}
                     className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-[#171a20] px-3 py-2 text-left text-sm transition-colors hover:bg-[#1e232b]"
                   >
                     <span>Neuen Social-Post erstellen</span>
                     <Wand2 className="h-4 w-4 text-gray-500" />
                   </button>
                   <button
-                    onClick={() => setSelectedTab("Inhalte erstellen")}
+                    onClick={() => setSelectedTab("Bilder Erstellen")}
                     className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-[#171a20] px-3 py-2 text-left text-sm transition-colors hover:bg-[#1e232b]"
                   >
                     <span>Bild für Event generieren</span>
@@ -2752,7 +2752,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       );
     }
 
-    if (selectedTab === "Inhalte erstellen") {
+    if (selectedTab === "Bilder Erstellen") {
       return (
         <section className="relative min-h-[calc(100vh-5.5rem)] overflow-x-hidden bg-transparent pb-[env(safe-area-inset-bottom)]">
           {contentIsGenerating ? (
@@ -2815,7 +2815,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                     ))}
                   </div>
                   <h2 className="text-2xl font-extrabold uppercase tracking-tight text-white sm:text-3xl">
-                    Inhalte erstellen mit
+                    Bilder Erstellen mit
                     <span className="mt-0.5 block text-white">deinem KI-Studio.</span>
                   </h2>
                   <p className="mt-2 max-w-xl text-sm leading-snug text-zinc-300 sm:text-base">
@@ -3803,7 +3803,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                       ? "dashboard"
                       : title === "Prompt-Erstellung"
                         ? "prompt"
-                      : title === "Inhalte erstellen"
+                      : title === "Bilder Erstellen"
                         ? "content"
                         : title === "Mediathek"
                           ? "library"
@@ -3986,7 +3986,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                     ? "dashboard"
                     : title === "Prompt-Erstellung"
                       ? "prompt"
-                      : title === "Inhalte erstellen"
+                      : title === "Bilder Erstellen"
                         ? "content"
                         : title === "Mediathek"
                           ? "library"
@@ -4026,12 +4026,12 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       <div
         className={cn(
           "mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between",
-          selectedTab !== "Inhalte erstellen" && selectedTab !== "Abo & Tokens"
+          selectedTab !== "Bilder Erstellen" && selectedTab !== "Abo & Tokens"
             ? ""
             : "justify-end",
         )}
       >
-        {selectedTab !== "Inhalte erstellen" && selectedTab !== "Abo & Tokens" ? (
+        {selectedTab !== "Bilder Erstellen" && selectedTab !== "Abo & Tokens" ? (
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 sm:text-3xl">{tabTitle}</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 sm:text-base">{tabDescriptions[selectedTab]}</p>
@@ -4178,7 +4178,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
           <button
             type="button"
             onClick={() => {
-              setSelectedTab("Inhalte erstellen");
+              setSelectedTab("Bilder Erstellen");
               setTopNavMenuOpen(false);
               setProfileMenuOpen(false);
             }}
@@ -4220,12 +4220,12 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
         <button
           type="button"
           onClick={() => {
-            setSelectedTab("Inhalte erstellen");
+            setSelectedTab("Bilder Erstellen");
             setTopNavMenuOpen(false);
             setProfileMenuOpen(false);
           }}
           className="pointer-events-auto absolute left-1/2 top-0 inline-flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-[#c8ff26] text-black shadow-[0_12px_30px_-16px_rgba(200,255,38,0.9)] transition hover:scale-[1.03]"
-          aria-label="Direkt zu Inhalte erstellen"
+          aria-label="Direkt zu Bilder Erstellen"
         >
           <Sparkles className="h-5 w-5" />
         </button>

@@ -3,18 +3,18 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
-import { getDashboardMetadata } from "@/lib/dashboard/metadata";
-import { getBrandProfileFromMetadata, isBrandProfileActive, isBrandProfileComplete } from "@/lib/dashboard/brandProfile";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { hasActiveSubscription } from "@/lib/billing/access";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
+import { isVideosCreateEnabled } from "@/lib/featureFlags";
 import { CreateContentLockedView } from "@/components/studio/create-content-locked-view";
-import { InhalteErstellenRedesign } from "@/components/ui/inhalte-erstellen-redesign";
+import { CreateVideosComingSoonView } from "@/components/studio/create-videos-coming-soon-view";
+import { CreateVideosView } from "@/components/studio/create-videos-view";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab - Bilder Erstellen",
+    absolute: "EvGlab - Videos Erstellen",
   },
   robots: {
     index: false,
@@ -23,11 +23,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function InhalteErstellenPage() {
+export default async function VideosErstellenPage() {
   if (!isSupabaseConfigured()) {
     return (
       <main className="relative z-10 mx-auto max-w-lg px-4 py-16">
-        <h1 className="font-display text-2xl font-semibold text-zinc-900">Bilder Erstellen</h1>
+        <h1 className="font-display text-2xl font-semibold text-zinc-900">Videos Erstellen</h1>
         <p className="mt-4 text-zinc-600">Supabase ist noch nicht konfiguriert.</p>
         <a href={MARKETING_SITE_URL} className="mt-6 inline-block text-sm font-medium text-[#c65a20] hover:underline">
           Zur Startseite
@@ -45,22 +45,9 @@ export default async function InhalteErstellenPage() {
     redirect("/anmelden");
   }
 
-  const dashboard = getDashboardMetadata(user.user_metadata);
-  const settings = dashboard.settings as Record<string, unknown> | undefined;
-  const profileName =
-    typeof settings?.profileName === "string"
-      ? settings.profileName
-      : typeof user.user_metadata?.full_name === "string"
-        ? user.user_metadata.full_name
-        : undefined;
-  const breweryName =
-    typeof settings?.breweryName === "string"
-      ? settings.breweryName
-      : typeof user.user_metadata?.brewery === "string"
-        ? user.user_metadata.brewery
-        : undefined;
-
-  const brandProfile = getBrandProfileFromMetadata(user.user_metadata);
+  if (!isVideosCreateEnabled()) {
+    return <CreateVideosComingSoonView />;
+  }
 
   await ensureBillingRow(user.id);
   let billing = await getBillingRow(user.id);
@@ -80,17 +67,17 @@ export default async function InhalteErstellenPage() {
   }
 
   if (!hasActiveSubscription(billing)) {
-    return <CreateContentLockedView />;
+    return <CreateContentLockedView feature="videos" />;
   }
 
-  return (
-    <InhalteErstellenRedesign
-      userEmail={user.email}
-      initialProfileName={profileName}
-      initialBreweryName={breweryName}
-      brandProfileComplete={isBrandProfileComplete(brandProfile)}
-      brandProfileActive={isBrandProfileActive(brandProfile)}
-      brandProfileMode={brandProfile.brandProfileMode}
-    />
-  );
+  const dashboard = (user.user_metadata?.dashboard ?? {}) as Record<string, unknown>;
+  const settings = dashboard.settings as Record<string, unknown> | undefined;
+  const breweryName =
+    typeof settings?.breweryName === "string"
+      ? settings.breweryName
+      : typeof user.user_metadata?.brewery === "string"
+        ? user.user_metadata.brewery
+        : undefined;
+
+  return <CreateVideosView breweryName={breweryName} />;
 }

@@ -3,7 +3,7 @@ import type { BillingRow } from "@/lib/billing/store";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 
 export const SUBSCRIPTION_REQUIRED_MESSAGE =
-  "Bitte schließe zuerst ein Abo ab, um Inhalte zu erstellen.";
+  "Bitte schließe zuerst ein Abo ab, um Bilder zu erstellen.";
 
 export function hasActiveSubscription(
   row: Pick<BillingRow, "plan" | "subscription_status"> | null | undefined,

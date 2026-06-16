@@ -5,6 +5,7 @@ import { StudioButton, StudioPageHeader } from "@/components/studio/ui";
 import {
   getPlanAnnualSavingsVsList,
   getPlanDisplayMonthlyPrice,
+  SEEDANCE_VIDEO_TOKEN_HINT,
   STUDIO_PLANS,
   type BillingInterval,
   type StudioPlanDefinition,
@@ -261,7 +262,7 @@ export function StudioPricingView({
       <StudioPageHeader
         eyebrow="Abonnement"
         title="Dein Plan"
-        subtitle="Jährliche Zahlung ist standardmäßig aktiv (79 / 149 / 299 €) — ohne Jahresabo gelten die Listenpreise 100 / 200 / 400 €."
+        subtitle="Jährliche Zahlung ist standardmäßig aktiv (79 / 149 / 299 €) — ohne Jahresabo gelten die Listenpreise 100 / 200 / 400 €. Tokens gelten für Bilder und Videos (Seedance 2)."
       />
 
       {checkoutError ? (
@@ -361,8 +362,8 @@ export function StudioPricingView({
             Zusätzliche Tokens
           </div>
           <p className="studio-faint" style={{ fontSize: 13, marginBottom: 16, maxWidth: 520 }}>
-            Einmalige Token-Packs für mehr Generierungen im aktuellen Abrechnungszeitraum. Gekaufte Tokens bleiben
-            erhalten, bis du sie verbrauchst.
+            Einmalige Token-Packs für mehr Bild- und Video-Generierungen im aktuellen Abrechnungszeitraum. Gekaufte Tokens
+            bleiben erhalten, bis du sie verbrauchst. {SEEDANCE_VIDEO_TOKEN_HINT}
           </p>
           <div className="studio-pricing-token-packs">
             <div className="studio-pricing-card studio-pricing-token-pack">
@@ -396,7 +397,7 @@ export function StudioPricingView({
       ) : null}
 
       <div className="studio-pricing-footnote">
-        <p>Alle Preise gemäß § 19 UStG ohne Umsatzsteuer · Monatlich kündbar · Tokens übertragbar je nach Plan</p>
+        <p>Alle Preise gemäß § 19 UStG ohne Umsatzsteuer · Monatlich kündbar · Tokens übertragbar je nach Plan · Videos via Seedance 2</p>
       </div>
     </div>
   );

@@ -283,7 +283,7 @@ export function StudioActivityColumn({
       <div className="studio-activity-list" style={{ marginTop: 4 }}>
         {items.length === 0 ? (
           <p className="studio-faint" style={{ padding: "20px 12px", fontSize: 13 }}>
-            Noch keine Aktivität — starte in „Inhalte erstellen“.
+            Noch keine Aktivität — starte in „Bilder Erstellen“.
           </p>
         ) : (
           items.map((it) => <StudioActivityRow key={it.id} item={it} />)

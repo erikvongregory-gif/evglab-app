@@ -62,7 +62,9 @@ function breadcrumbForNav(nav: StudioNavKey): string {
     case "pricing":
       return "Abonnement";
     case "create":
-      return "Inhalte erstellen";
+      return "Bilder Erstellen";
+    case "create-video":
+      return "Videos Erstellen";
     default:
       return "Dashboard";
   }
@@ -104,11 +106,16 @@ export function StudioWorkspaceShell({
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const isCreateRoute = pathname.startsWith("/inhalte-erstellen");
+  const isVideoCreateRoute = pathname.startsWith("/videos-erstellen");
   const isAdminRoute = pathname.startsWith("/admin");
   const tabParam = (searchParams.get("tab") ?? "dashboard").toLowerCase();
 
-  const activeNav = isCreateRoute ? ("create" as const) : resolveDashboardTab(tabParam);
-  const contentKey = isCreateRoute ? "create" : isAdminRoute ? "admin" : "dashboard";
+  const activeNav = isCreateRoute
+    ? ("create" as const)
+    : isVideoCreateRoute
+      ? ("create-video" as const)
+      : resolveDashboardTab(tabParam);
+  const contentKey = isCreateRoute ? "create" : isVideoCreateRoute ? "create-video" : isAdminRoute ? "admin" : "dashboard";
   const breadcrumbLabel = isAdminRoute ? "Admin-Bereich" : breadcrumbForNav(activeNav);
 
   useEffect(() => {

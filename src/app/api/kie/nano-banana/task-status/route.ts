@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { refundTokens } from "@/lib/billing/store";
 import { parseUpstreamProgress } from "@/lib/kie/generationProgress";
+import { extractTaskMedia } from "@/lib/kie/taskResponse";
 import { getPendingTaskBillingMap, withoutPendingTask } from "@/lib/kie/taskBillingMetadata";
 import { enforceRateLimit, sanitizeTaskId } from "@/lib/security/requestGuards";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -114,21 +115,14 @@ export async function GET(req: Request) {
       "unknown";
     const state = rawState.toLowerCase();
     const upstreamProgress = parseUpstreamProgress(payload, state);
-    let imageUrl = findFirstUrl(data);
-
-    // Kie liefert bei manchen Modellen URLs als JSON-String in resultJson.
-    if (!imageUrl && typeof payload.resultJson === "string") {
-      try {
-        const parsed = JSON.parse(payload.resultJson) as unknown;
-        imageUrl = findFirstUrl(parsed);
-      } catch {
-        // ignore parse errors and keep null
-      }
-    }
+    const media = extractTaskMedia(payload, data);
+    const imageUrl = media.imageUrl ?? findFirstUrl(data);
+    const videoUrl = media.videoUrl;
+    const mediaUrl = media.mediaUrl ?? imageUrl ?? videoUrl;
 
     if (userId) {
       const pending = getPendingTaskBillingMap(currentUserMetadata)[taskId];
-      const finishedSuccess = ["success", "succeeded", "completed", "done"].includes(state) && Boolean(imageUrl);
+      const finishedSuccess = ["success", "succeeded", "completed", "done"].includes(state) && Boolean(mediaUrl);
       const finishedError = ["failed", "error", "cancelled", "canceled"].includes(state);
       if (pending && (finishedSuccess || finishedError)) {
         if (finishedError && pending.consumed > 0) {
@@ -144,7 +138,10 @@ export async function GET(req: Request) {
     return NextResponse.json({
       state,
       imageUrl,
-      progress: upstreamProgress ?? (imageUrl ? 100 : null),
+      videoUrl,
+      mediaUrl,
+      mediaKind: media.mediaKind,
+      progress: upstreamProgress ?? (mediaUrl ? 100 : null),
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

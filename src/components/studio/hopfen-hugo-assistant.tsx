@@ -7,6 +7,7 @@ import { HopfenHugoChat, type HopfenHugoMessage } from "@/components/studio/hopf
 
 function resolveAssistantTab(pathname: string, tabParam: string | null): string {
   if (pathname.startsWith("/inhalte-erstellen")) return "create";
+  if (pathname.startsWith("/videos-erstellen")) return "create-video";
   if (tabParam && tabParam !== "dashboard") return tabParam;
   return "dashboard";
 }

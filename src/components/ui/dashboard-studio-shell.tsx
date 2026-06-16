@@ -10,6 +10,11 @@ import { StudioButton, StudioIconButton } from "@/components/studio/ui";
 import { studioFontClassName } from "@/lib/fonts/studio-fonts";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
+import {
+  StudioSearchProvider,
+  StudioTopbarSearchDesktop,
+  StudioTopbarSearchMobile,
+} from "@/components/studio/studio-global-search";
 import { cn } from "@/lib/utils";
 
 /** Content gutter — matches EvGlab Studio redesign (--gutter) */
@@ -53,7 +58,7 @@ export type StudioPalette = {
   accent2: string;
 };
 
-export type StudioNavKey = "dashboard" | "create" | "media" | "team" | "brand" | "settings" | "pricing";
+export type StudioNavKey = "dashboard" | "create" | "create-video" | "media" | "team" | "brand" | "settings" | "pricing";
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -92,6 +97,12 @@ function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: s
       </>
     ),
     spark: <path d="M10 3 L11.5 8 L16.5 9.5 L11.5 11 L10 16 L8.5 11 L3.5 9.5 L8.5 8 Z" />,
+    video: (
+      <>
+        <rect x="3" y="5" width="14" height="10" rx="2" />
+        <path d="M8 10 L13 12.5 V7.5 Z" fill={color} stroke="none" />
+      </>
+    ),
     media: (
       <>
         <rect x="3" y="3" width="14" height="14" rx="2" />
@@ -192,6 +203,7 @@ function StudioTopbar({
   tokensRemaining,
   tokensMonthly,
   onOpenMobileMenu,
+  mobileMenuOpen = false,
   showCreateCta = true,
   hasActivePlan = true,
 }: {
@@ -199,6 +211,7 @@ function StudioTopbar({
   tokensRemaining?: number;
   tokensMonthly?: number;
   onOpenMobileMenu?: () => void;
+  mobileMenuOpen?: boolean;
   showCreateCta?: boolean;
   hasActivePlan?: boolean;
 }) {
@@ -222,7 +235,6 @@ function StudioTopbar({
         WebkitBackdropFilter: "blur(10px)",
         position: "sticky",
         top: 0,
-        zIndex: 20,
         width: "100%",
         boxSizing: "border-box",
       }}
@@ -230,8 +242,10 @@ function StudioTopbar({
       <StudioIconButton
         type="button"
         className="evg-shell-menu-btn"
-        aria-label="Menü öffnen"
-        onClick={onOpenMobileMenu}
+        aria-label="Navigation öffnen"
+        title="Alle Bereiche — Markenprofil, Einstellungen, Abo …"
+        aria-expanded={mobileMenuOpen}
+        onClick={() => onOpenMobileMenu?.()}
       >
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
           <path d="M3 6 H17 M3 10 H17 M3 14 H17" />
@@ -247,40 +261,12 @@ function StudioTopbar({
         <StudioBreadcrumbLabel label={breadcrumbLabel} />
       </div>
 
-      <div data-tour="search" className="evg-shell-topbar-search">
-        <span style={{ position: "absolute", left: 13, top: 10, color: "var(--tx-3)", pointerEvents: "none" }}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-            <circle cx="7" cy="7" r="4.5" />
-            <path d="M10.5 10.5 L13 13" strokeLinecap="round" />
-          </svg>
-        </span>
-        <input
-          className="studio-field"
-          style={{ height: 38, paddingLeft: 38, fontSize: 13 }}
-          placeholder="Suche · Posts, Bilder, Kampagnen …"
-          aria-label="Suche"
-        />
-        <span
-          className="studio-mono"
-          style={{
-            position: "absolute",
-            right: 10,
-            top: 9,
-            fontSize: 10.5,
-            color: "var(--tx-3)",
-            border: "1px solid var(--line)",
-            borderRadius: 5,
-            padding: "2px 6px",
-            pointerEvents: "none",
-          }}
-        >
-          ⌘K
-        </span>
-      </div>
+      <StudioTopbarSearchDesktop />
 
       <div className="evg-shell-topbar-spacer" style={{ flex: 1, minWidth: 0 }} />
 
       <div className="evg-shell-topbar-actions">
+        <StudioTopbarSearchMobile />
         {free !== null ? (
           <div
             data-tour="tokens"
@@ -397,6 +383,11 @@ function WorkspaceNavItem({
     >
       <SidebarIcon name={item.icon} />
       <span style={{ flex: 1 }}>{item.label}</span>
+      {item.badge ? (
+        <span className="studio-mono studio-faint" style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          {item.badge}
+        </span>
+      ) : null}
       {locked ? (
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
           <rect x="3" y="7" width="10" height="7" rx="1.5" />
@@ -407,11 +398,12 @@ function WorkspaceNavItem({
   );
 }
 
-type NavItemDef = { key: StudioNavKey; label: string; icon: string; href: string };
+type NavItemDef = { key: StudioNavKey; label: string; icon: string; href: string; badge?: string };
 
 const NAV_ITEMS: NavItemDef[] = [
   { key: "dashboard", label: "Dashboard", icon: "dash", href: "/dashboard" },
-  { key: "create", label: "Inhalte erstellen", icon: "spark", href: "/inhalte-erstellen" },
+  { key: "create", label: "Bilder Erstellen", icon: "spark", href: "/inhalte-erstellen" },
+  { key: "create-video", label: "Videos Erstellen", icon: "video", href: "/videos-erstellen", badge: "Bald" },
   { key: "media", label: "Mediathek", icon: "media", href: "/dashboard?tab=media" },
   { key: "team", label: "Team", icon: "team", href: "/dashboard?tab=team" },
   { key: "brand", label: "Markenprofil", icon: "brand", href: "/dashboard?tab=brand" },
@@ -508,9 +500,9 @@ function StudioMobileBottomNav({
 }) {
   const tabs: Array<{ key: StudioNavKey | "menu"; label: string; icon: string; href?: string }> = [
     { key: "dashboard", label: "Home", icon: "dash", href: "/dashboard" },
-    { key: "create", label: "Erstellen", icon: "spark", href: "/inhalte-erstellen" },
+    { key: "create", label: "Bilder", icon: "spark", href: "/inhalte-erstellen" },
     { key: "media", label: "Medien", icon: "media", href: "/dashboard?tab=media" },
-    { key: "menu", label: "Menü", icon: "gear" },
+    { key: "menu", label: "Navigation", icon: "gear" },
   ];
 
   return (
@@ -565,15 +557,17 @@ function StudioMobileDrawer({
   userEmail?: string;
   initials: string;
 }) {
+  if (!open) return null;
+
   return (
     <>
       <button
         type="button"
-        className={cn("evg-shell-mobile-backdrop", open && "evg-shell-mobile-backdrop--open")}
-        aria-label="Menü schließen"
+        className="evg-shell-mobile-backdrop evg-shell-mobile-backdrop--open"
+        aria-label="Navigation schließen"
         onClick={onClose}
       />
-      <aside className={cn("evg-shell-mobile-drawer", open && "evg-shell-mobile-drawer--open")} aria-hidden={!open}>
+      <aside className="evg-shell-mobile-drawer evg-shell-mobile-drawer--open" aria-label="Navigation">
         <div className="evg-shell-mobile-drawer-head">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <StudioBrandMark />
@@ -693,6 +687,7 @@ export function DashboardStudioShell({
   const pad = contentPadding ?? "var(--gutter)";
 
   return (
+    <StudioSearchProvider>
     <div
       className={cn(studioFontClassName, "evg-studio", "evg-shell")}
       style={{
@@ -807,7 +802,8 @@ export function DashboardStudioShell({
           tokensRemaining={tokensRemaining}
           tokensMonthly={tokensMonthly}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
-          showCreateCta={activeNav !== "create"}
+          mobileMenuOpen={mobileMenuOpen}
+          showCreateCta={activeNav !== "create" && activeNav !== "create-video"}
           hasActivePlan={hasActivePlan}
         />
         <main
@@ -841,5 +837,6 @@ export function DashboardStudioShell({
       />
       <StudioMobileBottomNav activeNav={activeNav} onOpenMenu={() => setMobileMenuOpen(true)} hasActivePlan={hasActivePlan} />
     </div>
+    </StudioSearchProvider>
   );
 }

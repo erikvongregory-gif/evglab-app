@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
     (pathname.startsWith("/admin") && pathname !== "/admin/anmelden") ||
     pathname.startsWith("/invite") ||
     pathname.startsWith("/inhalte-erstellen") ||
+    pathname.startsWith("/videos-erstellen") ||
     pathname.startsWith("/auth/finish") ||
     pathname === "/anmelden" ||
     pathname === "/registrieren" ||

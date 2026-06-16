@@ -130,6 +130,7 @@ export const hyperrealisticSchema = z.object({
   zusatzWunsch: z.string().trim().max(300).optional(),
   aspectRatio: aspectRatioSchema,
   quality: imageQualitySchema,
+  variantCount: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
 });
 
 export const productIsolateSchema = z.object({

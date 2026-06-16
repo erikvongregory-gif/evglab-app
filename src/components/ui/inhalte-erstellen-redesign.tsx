@@ -216,7 +216,15 @@ const EXTRA_OPTIONS = [
   "Wassertropfen am Glas",
 ];
 
-const GENERATION_VARIANT_COUNT = 3;
+const DEFAULT_VARIANT_COUNT = 3;
+
+type VariantCount = 1 | 2 | 3;
+
+const VARIANT_COUNT_OPTIONS: Array<{ code: `${VariantCount}`; label: string; hint: string }> = [
+  { code: "1", label: "1 Variante", hint: "Ein Motiv — weniger Tokens" },
+  { code: "2", label: "2 Varianten", hint: "Zwei Motive vergleichen" },
+  { code: "3", label: "3 Varianten", hint: "Maximale Auswahl" },
+];
 // Realistische User-Erwartung: Kie/Banana liefert in der Praxis zwischen
 // ~45s (gute Auslastung) und 2–3 min (Peak-Zeiten). Wir kommunizieren einen
 // Bereich, damit die UI nicht früh wirkt, als sei etwas hängen geblieben.
@@ -261,7 +269,7 @@ const MICRO_STEP_META: Record<string, { title: string; subtitle?: string }> = {
   format: { title: "Für welches Format?", subtitle: "Aspect Ratio für Social oder Print." },
   referenz: { title: "Referenz-Etikett", subtitle: "Optional: eigenes Etikett für diesen Run hochladen." },
   extras: { title: "Extras im Bild?", subtitle: "Optionale Details — mehr Extras = charakteristischer." },
-  review: { title: "Prompt fertig — bereit zum Generieren?", subtitle: "Prüfe den aufgebauten Brief und starte drei Varianten." },
+  review: { title: "Prompt fertig — bereit zum Generieren?", subtitle: "Prüfe den Brief, wähle die Anzahl Varianten und starte." },
 };
 
 function buildMicroStepIds(
@@ -307,12 +315,13 @@ type PromptBuildState = {
   stimmungTrend: NonNullable<HyperrealisticInput["stimmungTrend"]>;
   shotType: NonNullable<HyperrealisticInput["shotType"]>;
   extras: string[];
+  variantCount: VariantCount;
 };
 
 function segmentForMicroStep(stepId: string, s: PromptBuildState): PromptSegment | null {
   switch (stepId) {
     case "format":
-      return { text: `${GENERATION_VARIANT_COUNT}× ${s.wofuer.aspectRatio}-Varianten`, highlight: true };
+      return { text: `${s.variantCount}× ${s.wofuer.aspectRatio}-Varianten`, highlight: true };
     case "flaschentyp": {
       const label = FLASCHEN_OPTIONS.find((o) => o.code === s.flaschenTyp)?.label ?? "Flasche";
       return { text: label, highlight: true };
@@ -845,6 +854,9 @@ export function InhalteErstellenRedesign({
     setProfileComplete(brandProfileComplete);
     setProfileActive(brandProfileActive);
     setProfileMode(brandProfileMode);
+    if (brandProfileMode === "skip") {
+      setEtikettModus("generisch");
+    }
   }, [brandProfileComplete, brandProfileActive, brandProfileMode]);
 
   useEffect(() => {
@@ -893,7 +905,10 @@ export function InhalteErstellenRedesign({
   const [stimmungTrend, setStimmungTrend] = useState<NonNullable<HyperrealisticInput["stimmungTrend"]>>("nachhaltig");
   const [shotType, setShotType] = useState<NonNullable<HyperrealisticInput["shotType"]>>("A");
   const [kiPlattform, setKiPlattform] = useState<NonNullable<HyperrealisticInput["kiPlattform"]>>("gpt_image_2");
-  const [etikettModus, setEtikettModus] = useState<NonNullable<HyperrealisticInput["etikettModus"]>>("marke");
+  const [etikettModus, setEtikettModus] = useState<NonNullable<HyperrealisticInput["etikettModus"]>>(() =>
+    brandProfileMode === "skip" ? "generisch" : "marke",
+  );
+  const [variantCount, setVariantCount] = useState<VariantCount>(DEFAULT_VARIANT_COUNT);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Ad-hoc Referenzbild-Upload (ueberschreibt Markenprofil-Etikett nur fuer diesen Run).
@@ -940,18 +955,33 @@ export function InhalteErstellenRedesign({
         const json = (await settingsRes.json()) as {
           settings?: {
             breweryName?: string;
+            brandProfileMode?: "undecided" | "guided" | "skip";
             brandReferenceImageUrls?: string[];
             brandReferenceImagesStale?: boolean;
           };
         };
         if (json.settings?.breweryName?.trim()) setBreweryName(json.settings.breweryName.trim());
-        if (json.settings?.brandReferenceImagesStale) {
+        const settingsMode = json.settings?.brandProfileMode;
+        if (settingsMode === "guided" || settingsMode === "skip" || settingsMode === "undecided") {
+          setProfileMode(settingsMode);
+        }
+        if (settingsMode === "skip") {
+          setProfileComplete(true);
+          setProfileActive(false);
+          setEtikettModus("generisch");
+          setEtikettUrl("");
+          setReferenceImagesStale(false);
+        } else if (json.settings?.brandReferenceImagesStale) {
           setEtikettUrl("");
           setReferenceImagesStale(true);
         } else {
           const refs = json.settings?.brandReferenceImageUrls;
           if (Array.isArray(refs) && refs[0]) setEtikettUrl(refs[0]);
+          else setEtikettUrl("");
           setReferenceImagesStale(false);
+          if (!refs?.[0] && settingsMode !== "guided") {
+            setEtikettModus("generisch");
+          }
         }
       }
       if (summaryRes.ok) {
@@ -999,24 +1029,25 @@ export function InhalteErstellenRedesign({
   );
 
   const brandLabel = breweryName || initialBreweryName?.trim() || "deiner Brauerei";
+  const effectiveEtikettModus = profileMode === "skip" ? "generisch" : etikettModus;
   const hasReferenceImage = Boolean(customReferenceDataUrl || etikettUrl);
   const generationTokenCost = useMemo(() => {
-    const hasRef = Boolean(customReferenceDataUrl || (etikettModus === "marke" && etikettUrl));
-    const strictLabel = etikettModus === "marke" && hasRef;
+    const hasRef = Boolean(customReferenceDataUrl || (effectiveEtikettModus === "marke" && etikettUrl));
+    const strictLabel = effectiveEtikettModus === "marke" && hasRef;
     return calculateGenerationTokenCost({
       resolution: "2K",
       hasReferenceImage: hasRef,
       strictLabelMode: strictLabel,
-      variantCount: GENERATION_VARIANT_COUNT,
+      variantCount,
     });
-  }, [customReferenceDataUrl, etikettModus, etikettUrl]);
+  }, [customReferenceDataUrl, effectiveEtikettModus, etikettUrl, variantCount]);
   const personenSetUp =
     personenModus === "A" ||
     personenModus === "B" ||
     personenModus === "C" ||
     (personenModus === "D" && Boolean(personGender && personAlter)) ||
     (personenModus === "E" && Boolean(gruppenDynamik && wo));
-  const etikettOK = etikettModus === "generisch" || hasReferenceImage;
+  const etikettOK = effectiveEtikettModus === "generisch" || hasReferenceImage;
   const hasDetailExtra = extras.length >= 1;
   const hasManyExtras = extras.length >= 3;
 
@@ -1040,10 +1071,12 @@ export function InhalteErstellenRedesign({
       {
         done: etikettOK,
         label:
-          etikettModus === "marke"
+          effectiveEtikettModus === "marke"
             ? customReferenceDataUrl
               ? "Eigenes Referenzbild für diesen Run hochgeladen"
-              : `Marken-Etikett ${brandLabel} verknüpft`
+              : etikettUrl
+                ? `Marken-Etikett ${brandLabel} verknüpft`
+                : "Marken-Etikett fehlt — Referenz hochladen oder „Generisch“ wählen"
             : "Generisches Etikett — kein Markenbezug nötig",
       },
       { done: true, label: `Behälter gewählt: ${behaelterLabel}` },
@@ -1062,7 +1095,9 @@ export function InhalteErstellenRedesign({
     ],
     [
       etikettOK,
-      etikettModus,
+      effectiveEtikettModus,
+      customReferenceDataUrl,
+      etikettUrl,
       brandLabel,
       behaelterLabel,
       personenSetUp,
@@ -1136,6 +1171,7 @@ export function InhalteErstellenRedesign({
       stimmungTrend,
       shotType,
       extras,
+      variantCount,
     }),
     [
       was,
@@ -1156,6 +1192,7 @@ export function InhalteErstellenRedesign({
       stimmungTrend,
       shotType,
       extras,
+      variantCount,
     ],
   );
 
@@ -1356,15 +1393,16 @@ export function InhalteErstellenRedesign({
     const controller = new AbortController();
     try {
       // Vorrang: Ad-hoc-Upload > Markenprofil-Etikett.
+      const effectiveEtikettModus = profileMode === "skip" ? "generisch" : etikettModus;
       const effectiveEtikett =
         customReferenceDataUrl ||
-        (etikettModus === "marke"
+        (effectiveEtikettModus === "marke"
           ? etikettUrl
           : etikettUrl || "https://example.com/placeholder.png");
 
-      if (etikettModus === "marke" && !effectiveEtikett) {
+      if (effectiveEtikettModus === "marke" && !effectiveEtikett) {
         throw new Error(
-          "Bitte lade ein Referenzbild hoch (Slot oben) oder verknuepfe ein Markenprofil — oder wechsle auf „Generisch“ in Advanced.",
+          "Bitte lade ein Referenzbild hoch (Schritt „Referenz-Etikett“) oder wähle „Generisch“ als Etikett-Modus.",
         );
       }
 
@@ -1391,10 +1429,11 @@ export function InhalteErstellenRedesign({
         stimmung: "gesellig",
         shotType,
         kiPlattform,
-        etikettModus,
+        etikettModus: effectiveEtikettModus,
         zusatzWunsch,
         aspectRatio: wofuer.aspectRatio,
         quality: "high",
+        variantCount,
       };
       const parsed = hyperrealisticSchema.parse(payload);
       if (
@@ -1596,7 +1635,24 @@ export function InhalteErstellenRedesign({
       case "referenz":
         return (
           <div className="evg-marketing-create__referenz">
-            <p style={{ margin: "0 0 12px", fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>
+            <span className="studio-field-label" style={{ display: "block", marginBottom: 8 }}>
+              Etikett-Modus
+            </span>
+            <MarketingCodePills
+              options={ETIKETT_MODUS_OPTIONS}
+              value={profileMode === "skip" ? "generisch" : etikettModus}
+              onChange={(next) => {
+                if (profileMode === "skip") return;
+                setEtikettModus(next);
+              }}
+              P={P}
+            />
+            {profileMode === "skip" ? (
+              <p style={{ margin: "10px 0 0", fontFamily: STUDIO_TOKENS.sans, fontSize: 12, color: P.ink3, lineHeight: 1.45 }}>
+                Du nutzt EvGlab ohne Markenprofil — Etikett-Modus ist automatisch „Generisch“.
+              </p>
+            ) : null}
+            <p style={{ margin: "14px 0 12px", fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>
               {customReferenceDataUrl
                 ? `${customReferenceName || "Hochgeladenes Bild"} wird für diesen Run genutzt.`
                 : etikettUrl
@@ -1678,6 +1734,20 @@ export function InhalteErstellenRedesign({
               <p style={{ margin: "6px 0 0", fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>
                 {coachReady ? "Bereit zu generieren — alles Wesentliche da." : "Fast fertig — prüfe die offenen Punkte."}
               </p>
+              <div style={{ marginTop: 14 }}>
+                <span className="studio-field-label" style={{ display: "block", marginBottom: 8 }}>
+                  Anzahl Varianten
+                </span>
+                <MarketingCodePills
+                  options={VARIANT_COUNT_OPTIONS}
+                  value={String(variantCount) as `${VariantCount}`}
+                  onChange={(code) => {
+                    if (loading) return;
+                    setVariantCount(Number(code) as VariantCount);
+                  }}
+                  P={P}
+                />
+              </div>
               <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
                 {coachChecks.map((item) => (
                   <li key={item.label} style={{ display: "flex", gap: 8, fontSize: 12.5, color: item.done ? P.ink2 : P.ink3 }}>

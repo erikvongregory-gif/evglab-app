@@ -25,12 +25,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_PROMPT_CHARS = 12_000;
-/**
- * Anzahl Varianten, die pro Generieren-Klick erzeugt werden.
- * Marketing-Versprechen: „drei Varianten im Markenstil“ → 3 parallele Kie-Tasks.
- * Spaeter via UI/Schema konfigurierbar wenn noetig.
- */
-const VARIANT_COUNT = 3;
+const DEFAULT_VARIANT_COUNT = 3;
 
 /**
  * Stellt sicher, dass die Referenz-URL eine fuer Kie zugaengliche HTTPS-URL ist.
@@ -197,7 +192,7 @@ export async function POST(req: Request) {
       hasReferenceImage: hasReferenceForBilling,
       strictLabelMode,
     });
-    const variantsToCreate = VARIANT_COUNT;
+    const variantsToCreate = input.variantCount ?? DEFAULT_VARIANT_COUNT;
     const expectedTotalCost = calculateGenerationTokenCost({
       resolution: billingResolution,
       hasReferenceImage: hasReferenceForBilling,
