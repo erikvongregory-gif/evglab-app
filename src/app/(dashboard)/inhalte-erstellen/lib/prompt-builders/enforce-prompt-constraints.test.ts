@@ -24,6 +24,7 @@ const baseInput: HyperrealisticInput = {
   etikettModus: "marke",
   aspectRatio: "9:16",
   quality: "high",
+  variantCount: 3,
 };
 
 describe("enforceHyperrealisticPromptConstraints", () => {

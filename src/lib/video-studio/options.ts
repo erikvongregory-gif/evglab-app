@@ -178,6 +178,12 @@ export function getStepMeta(step: VideoStudioStepId): { label: string; descripti
         description: "Wer spricht im Video?",
         inputMode: "choice",
       };
+    case "platform":
+      return {
+        label: "Plattform",
+        description: "Für welches KI-Video-Modell optimieren wir den Prompt?",
+        inputMode: "choice",
+      };
     case "aspect":
       return {
         label: "Format",

@@ -24,6 +24,7 @@ const defaultInput: HyperrealisticInput = {
   stimmung: "entspannt",
   aspectRatio: "4:5",
   quality: "medium",
+  variantCount: 3,
 };
 
 function readFile(file: File, onDone: (dataUrl: string) => void) {
