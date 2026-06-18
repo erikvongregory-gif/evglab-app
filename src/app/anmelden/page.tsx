@@ -49,7 +49,7 @@ export default async function AnmeldenPage({
   const allowedPlan = plan === "start" || plan === "growth" || plan === "pro" ? plan : null;
   const shouldAutoCheckout = allowedPlan && checkout === "1" && source === "homepage_pricing";
   const nextPath = shouldAutoCheckout
-    ? `/dashboard?plan=${allowedPlan}&checkout=1&source=homepage_pricing`
+    ? `/dashboard?plan=${allowedPlan}&checkout=1&source=homepage_pricing&tab=pricing`
     : "/dashboard";
   const registerErrors = new Set([
     "invite_required",

@@ -2635,6 +2635,41 @@ body:has(.evg-shell) {
   width: 100%;
 }
 
+.evg-studio .evg-card:hover .studio-media-card-overlay {
+  opacity: 1;
+}
+
+.evg-studio .studio-media-grid .evg-card {
+  transition: transform 0.22s cubic-bezier(0.22, 0.68, 0.2, 1), box-shadow 0.22s cubic-bezier(0.22, 0.68, 0.2, 1);
+}
+
+.evg-studio .studio-media-grid .evg-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.14);
+}
+
+.evg-studio .studio-media-lightbox-backdrop {
+  will-change: opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-studio .studio-media-grid .evg-card {
+    transition: none;
+  }
+
+  .evg-studio .studio-media-grid .evg-card:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .evg-studio .studio-media-lightbox {
+    grid-template-columns: 1fr !important;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 479px) {
   .evg-studio .studio-media-grid {
     grid-template-columns: 1fr;

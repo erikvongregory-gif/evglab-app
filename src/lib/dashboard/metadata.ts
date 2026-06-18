@@ -1,12 +1,21 @@
 export type DashboardMediaItem = {
   id: string;
   imageUrl: string;
+  /** Nutzerdefinierter Motiv-Titel (z. B. „Hefeweizen · Hero-Glas · Public Viewing“). */
+  title?: string;
   prompt: string;
   createdAt: string;
   aspectRatio: string;
   resolution: "1K" | "2K" | "4K";
   outputFormat: "png" | "jpg";
 };
+
+export function getMediaDisplayTitle(item: Pick<DashboardMediaItem, "title" | "prompt">): string {
+  const custom = item.title?.trim();
+  if (custom) return custom;
+  const fallback = item.prompt?.trim();
+  return fallback || "Unbenanntes Motiv";
+}
 
 export type DashboardTeamRole = "owner" | "admin" | "editor" | "viewer";
 
@@ -56,11 +65,16 @@ export function getDashboardMetadata(userMetadata: unknown): DashboardMetadata {
     ? (dashboard.mediaLibrary as DashboardMediaItem[])
     : [];
   const mediaLibrary = rawMedia
-    .map((item) => ({
-      ...item,
-      prompt: String(item.prompt ?? "").slice(0, 240),
-      imageUrl: String(item.imageUrl ?? "").slice(0, 1200),
-    }))
+    .map((item) => {
+      const prompt = String(item.prompt ?? "").slice(0, 240);
+      const titleRaw = String(item.title ?? "").trim().slice(0, 120);
+      return {
+        ...item,
+        prompt,
+        title: titleRaw || undefined,
+        imageUrl: String(item.imageUrl ?? "").slice(0, 1200),
+      };
+    })
     .slice(0, 12);
 
   const rawTeam = Array.isArray(dashboard.teamMembers)

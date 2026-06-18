@@ -47,14 +47,33 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   if (user && (pathname === "/anmelden" || pathname === "/registrieren")) {
-    const redirect = NextResponse.redirect(new URL("/dashboard", request.url));
+    const plan = request.nextUrl.searchParams.get("plan");
+    const checkout = request.nextUrl.searchParams.get("checkout");
+    const source = request.nextUrl.searchParams.get("source");
+    const dashboardUrl = new URL("/dashboard", request.url);
+    if (
+      (plan === "start" || plan === "growth" || plan === "pro") &&
+      checkout === "1" &&
+      source === "homepage_pricing"
+    ) {
+      dashboardUrl.searchParams.set("plan", plan);
+      dashboardUrl.searchParams.set("checkout", "1");
+      dashboardUrl.searchParams.set("source", source);
+      dashboardUrl.searchParams.set("tab", "pricing");
+    }
+    const redirect = NextResponse.redirect(dashboardUrl);
     redirect.headers.set("x-request-id", requestId);
     redirect.headers.set("Cache-Control", "no-store, max-age=0");
     return redirect;
   }
 
   if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/admin"))) {
-    const redirect = NextResponse.redirect(new URL("/anmelden", request.url));
+    const loginUrl = new URL("/anmelden", request.url);
+    for (const key of ["plan", "checkout", "source", "tab"] as const) {
+      const value = request.nextUrl.searchParams.get(key);
+      if (value) loginUrl.searchParams.set(key, value);
+    }
+    const redirect = NextResponse.redirect(loginUrl);
     redirect.headers.set("x-request-id", requestId);
     redirect.headers.set("Cache-Control", "no-store, max-age=0");
     return redirect;

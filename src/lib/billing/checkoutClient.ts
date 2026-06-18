@@ -20,6 +20,25 @@ export function clearHomepageCheckoutParams(params: URLSearchParams) {
   params.delete("source");
 }
 
+export function buildHomepageCheckoutSearchParams(plan: SubscriptionPlanKey): URLSearchParams {
+  return new URLSearchParams({
+    plan,
+    checkout: "1",
+    source: "homepage_pricing",
+  });
+}
+
+export function buildAnmeldenUrlForHomepageCheckout(plan: SubscriptionPlanKey): string {
+  const params = buildHomepageCheckoutSearchParams(plan);
+  return `/anmelden?${params.toString()}`;
+}
+
+export function buildDashboardUrlForHomepageCheckout(plan: SubscriptionPlanKey): string {
+  const params = buildHomepageCheckoutSearchParams(plan);
+  params.set("tab", "pricing");
+  return `/dashboard?${params.toString()}`;
+}
+
 export async function startBillingCheckout(args: {
   plan: SubscriptionPlanKey;
   interval?: BillingInterval;
@@ -33,7 +52,7 @@ export async function startBillingCheckout(args: {
   const json = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
 
   if (res.status === 401) {
-    window.location.href = "/anmelden";
+    window.location.href = buildAnmeldenUrlForHomepageCheckout(args.plan);
     return { ok: false, error: "Anmeldung erforderlich.", redirected: true };
   }
   if (!res.ok || !json?.url) {

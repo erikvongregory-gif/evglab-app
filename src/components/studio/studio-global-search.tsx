@@ -11,10 +11,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { getMediaDisplayTitle } from "@/lib/dashboard/metadata";
 
 type MediaHit = {
   id: string;
   imageUrl: string;
+  title?: string;
   prompt: string;
   aspectRatio: string;
   resolution: string;
@@ -137,6 +139,7 @@ export function StudioSearchProvider({ children }: { children: ReactNode }) {
     () =>
       media.filter(
         (item) =>
+          matchesQuery(getMediaDisplayTitle(item), normalizedQuery) ||
           matchesQuery(item.prompt, normalizedQuery) ||
           matchesQuery(item.aspectRatio, normalizedQuery) ||
           matchesQuery(item.resolution, normalizedQuery),
@@ -222,12 +225,12 @@ function StudioSearchDropdown({ mobile = false }: { mobile?: boolean }) {
               key={item.id}
               type="button"
               className="evg-shell-search-item evg-shell-search-item--media"
-              onClick={() => navigate(`/dashboard?tab=media&q=${encodeURIComponent(item.prompt.slice(0, 80))}`)}
+              onClick={() => navigate(`/dashboard?tab=media&q=${encodeURIComponent(getMediaDisplayTitle(item).slice(0, 80))}`)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={item.imageUrl} alt="" className="evg-shell-search-thumb" />
               <span className="evg-shell-search-media-copy">
-                <span className="evg-shell-search-media-prompt">{item.prompt}</span>
+                <span className="evg-shell-search-media-prompt">{getMediaDisplayTitle(item)}</span>
                 <span className="evg-shell-search-item-hint">
                   {item.resolution} · {item.aspectRatio}
                 </span>

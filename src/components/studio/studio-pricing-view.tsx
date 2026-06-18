@@ -266,9 +266,15 @@ export function StudioPricingView({
       />
 
       {checkoutError ? (
-        <p className="studio-page-sub" style={{ color: STUDIO_TOKENS.amber, marginBottom: 16 }}>
-          {checkoutError}
-        </p>
+        <div
+          className="studio-card studio-card-pad"
+          style={{ marginBottom: 16, borderColor: "var(--warn)", background: "var(--warn-soft)" }}
+          role="alert"
+        >
+          <p className="studio-page-sub" style={{ color: "var(--warn-hi)", margin: 0 }}>
+            {checkoutError}
+          </p>
+        </div>
       ) : null}
 
       <div className="studio-card studio-pricing-summary">

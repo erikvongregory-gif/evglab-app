@@ -18,7 +18,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = (await searchParams) ?? {};
+
   if (!isSupabaseConfigured()) {
     return (
       <main className="relative z-10 mx-auto max-w-lg px-4 py-16">
@@ -42,7 +48,14 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/anmelden");
+    const loginQuery = new URLSearchParams();
+    for (const [key, raw] of Object.entries(params)) {
+      if (raw === undefined) continue;
+      const values = Array.isArray(raw) ? raw : [raw];
+      for (const value of values) loginQuery.append(key, value);
+    }
+    const qs = loginQuery.toString();
+    redirect(qs ? `/anmelden?${qs}` : "/anmelden");
   }
 
   const dashboard = getDashboardMetadata(user.user_metadata);

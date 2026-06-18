@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { StudioViewTransition } from "@/components/studio/studio-view-transition";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { useStudioShell } from "@/components/studio/studio-workspace-shell";
@@ -21,7 +22,7 @@ import {
   type StudioStat,
 } from "@/components/dashboard/studio-reference-ui";
 import { StudioPricingView } from "@/components/studio/studio-pricing-view";
-import { StudioButton, StudioPageHeader } from "@/components/studio/ui";
+import { StudioButton, StudioIconButton, StudioPageHeader } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
 import { brandLockLabel, formatDomain } from "@/lib/brand/brand-profile-display";
 import { BrandProfileView } from "@/components/dashboard/BrandProfileView";
@@ -35,6 +36,7 @@ import {
 } from "@/lib/billing/checkoutClient";
 import { buildGenericBrandProfilePatch, isBrandProfileCompleteFromSettings } from "@/lib/dashboard/brandProfile";
 import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
+import { getMediaDisplayTitle } from "@/lib/dashboard/metadata";
 import { fetchWithRetry } from "@/lib/http/fetchWithRetry";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
 
@@ -63,6 +65,7 @@ type ActivityItem = {
 type MediaItem = {
   id: string;
   imageUrl: string;
+  title?: string;
   prompt: string;
   createdAt: string;
   aspectRatio: string;
@@ -99,6 +102,8 @@ type SettingsPayload = {
 };
 
 const TOKENS = STUDIO_TOKENS;
+const STUDIO_EASE = [0.22, 0.68, 0.2, 1] as const;
+const MEDIA_LIGHTBOX_SPRING = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.85 };
 
 const PLAN_LABELS: Record<string, string> = {
   start: "Brauerei Start",
@@ -142,6 +147,33 @@ function formatRelativeTime(iso: string) {
   return `vor ${days} Tagen`;
 }
 
+function getMediaAssetUrl(item: MediaItem): string {
+  if (item.imageUrl.startsWith("/api/kie/download?")) return item.imageUrl;
+  return `/api/kie/download?url=${encodeURIComponent(item.imageUrl)}&format=${item.outputFormat}&taskId=${encodeURIComponent(item.id)}`;
+}
+
+async function downloadMediaItem(item: MediaItem): Promise<string | null> {
+  const response = await fetch(getMediaAssetUrl(item));
+  if (!response.ok) {
+    try {
+      const payload = (await response.json()) as { error?: string };
+      return payload.error ?? "Download fehlgeschlagen.";
+    } catch {
+      return "Download fehlgeschlagen.";
+    }
+  }
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = `evglab-${item.id}.${item.outputFormat}`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(objectUrl);
+  return null;
+}
+
 function greetingForNow() {
   const h = new Date().getHours();
   if (h < 11) return "Guten Morgen";
@@ -176,7 +208,7 @@ function buildStudioActivities(
   const fromMedia: StudioActivityItem[] = media.map((m, i) => ({
     id: m.id,
     kind: "image" as const,
-    title: clampText(m.prompt, 48) || "Bild generiert",
+    title: clampText(getMediaDisplayTitle(m), 48) || "Bild generiert",
     desc: `${m.resolution} · ${m.aspectRatio} · Markenstil`,
     time: formatRelativeTime(m.createdAt),
     user,
@@ -666,6 +698,7 @@ export function DashboardRedesignShell(props: {
         <MediaView
           P={P}
           items={media}
+          onItemsChange={setMedia}
           hasActivePlan={hasActivePlan}
           initialQuery={searchParams.get("q") ?? ""}
         />
@@ -939,25 +972,108 @@ function DashboardOverview({
 function MediaView({
   P,
   items,
+  onItemsChange,
   hasActivePlan = true,
   initialQuery = "",
 }: {
   P: StudioPalette;
   items: MediaItem[];
+  onItemsChange: (next: MediaItem[]) => void;
   hasActivePlan?: boolean;
   initialQuery?: string;
 }) {
+  const reduceMotion = useReducedMotion();
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState(initialQuery);
+  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [titleSaving, setTitleSaving] = useState(false);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     setSearch(initialQuery);
   }, [initialQuery]);
+
+  useEffect(() => {
+    if (!selectedItem) return;
+    setTitleDraft(getMediaDisplayTitle(selectedItem));
+    setTitleError(null);
+    const focusTimer = window.setTimeout(() => titleInputRef.current?.focus(), reduceMotion ? 0 : 180);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedItem(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [selectedItem, reduceMotion]);
+
+  const openMediaItem = useCallback((item: MediaItem) => {
+    setDownloadError(null);
+    setTitleError(null);
+    setSelectedItem(item);
+  }, []);
+
+  const saveMediaTitle = useCallback(
+    async (item: MediaItem, nextTitle: string) => {
+      const trimmed = nextTitle.trim();
+      if (!trimmed) {
+        setTitleError("Bitte einen Titel eingeben.");
+        return;
+      }
+      if (trimmed === getMediaDisplayTitle(item)) return;
+
+      setTitleSaving(true);
+      setTitleError(null);
+      try {
+        const res = await fetch("/api/dashboard/media", {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: item.id, title: trimmed }),
+        });
+        const json = (await res.json().catch(() => null)) as { error?: string; items?: MediaItem[] } | null;
+        if (!res.ok) {
+          setTitleError(json?.error ?? "Titel konnte nicht gespeichert werden.");
+          return;
+        }
+        const nextItems = Array.isArray(json?.items) ? json.items : items.map((entry) => (entry.id === item.id ? { ...entry, title: trimmed } : entry));
+        onItemsChange(nextItems);
+        setSelectedItem((current) => (current?.id === item.id ? { ...current, title: trimmed } : current));
+      } catch {
+        setTitleError("Titel konnte nicht gespeichert werden.");
+      } finally {
+        setTitleSaving(false);
+      }
+    },
+    [items, onItemsChange],
+  );
+
+  const handleDownload = useCallback(async (item: MediaItem) => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const error = await downloadMediaItem(item);
+      if (error) setDownloadError(error);
+    } catch {
+      setDownloadError("Download fehlgeschlagen.");
+    } finally {
+      setDownloading(false);
+    }
+  }, []);
 
   const visibleItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
     return items.filter(
       (it) =>
+        getMediaDisplayTitle(it).toLowerCase().includes(q) ||
         it.prompt.toLowerCase().includes(q) ||
         it.aspectRatio.toLowerCase().includes(q) ||
         it.resolution.toLowerCase().includes(q),
@@ -985,6 +1101,7 @@ function MediaView({
           />
         </div>
       ) : null}
+      <LayoutGroup id="studio-media-library">
       <div className="studio-media-grid">
         {visibleItems.length === 0 ? (
           <div
@@ -1036,24 +1153,296 @@ function MediaView({
                 border: `1px solid ${P.rule}`,
                 borderRadius: 16,
                 overflow: "hidden",
-                cursor: "pointer",
               }}
             >
-              <div style={{ aspectRatio: "4 / 3", background: P.surface }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={it.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              </div>
+              <button
+                type="button"
+                onClick={() => openMediaItem(it)}
+                aria-label="Bild in Großansicht öffnen"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ position: "relative", aspectRatio: "4 / 3", background: P.surface, overflow: "hidden" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <motion.img
+                    layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
+                    src={getMediaAssetUrl(it)}
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
+                  />
+                  <div
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.35)",
+                      opacity: 0,
+                      transition: "opacity 0.18s ease",
+                    }}
+                    className="studio-media-card-overlay"
+                  >
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 12px",
+                        borderRadius: 999,
+                        background: "rgba(0,0,0,0.55)",
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        color: "#fff",
+                        fontFamily: TOKENS.sans,
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <StudioIcon name="image" size={14} />
+                      Großansicht
+                    </span>
+                  </div>
+                </div>
+              </button>
               <div style={{ padding: 14 }}>
                 <div style={{ fontFamily: TOKENS.mono, fontSize: 10.5, letterSpacing: 1.1, textTransform: "uppercase", color: P.ink3 }}>
                   {it.resolution} · {it.aspectRatio}
                 </div>
-                <div style={{ marginTop: 6, fontFamily: TOKENS.sans, fontSize: 13.5, color: P.ink2 }}>{clampText(it.prompt, 140)}</div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontFamily: TOKENS.sans,
+                    fontSize: 15,
+                    fontWeight: 650,
+                    color: P.ink,
+                    lineHeight: 1.35,
+                  }}
+                >
+                  {clampText(getMediaDisplayTitle(it), 96)}
+                </div>
                 <div style={{ marginTop: 8, fontFamily: TOKENS.mono, fontSize: 10.5, color: P.ink3 }}>{formatRelativeTime(it.createdAt)}</div>
+                <div style={{ marginTop: 12 }}>
+                  <StudioButton size="sm" variant="soft" onClick={() => openMediaItem(it)}>
+                    Ansehen & herunterladen
+                  </StudioButton>
+                </div>
               </div>
             </div>
           ))
         )}
       </div>
+      <AnimatePresence>
+        {selectedItem ? (
+          <motion.div
+            key="studio-media-lightbox"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Bild in Großansicht"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
+            onClick={() => setSelectedItem(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 120,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 24,
+            }}
+            className="studio-media-lightbox-backdrop"
+          >
+            <motion.div
+              aria-hidden
+              initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+              animate={{ opacity: 1, backdropFilter: "blur(10px)" }}
+              exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+              transition={{ duration: reduceMotion ? 0.12 : 0.28, ease: STUDIO_EASE }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,0.72)",
+              }}
+            />
+            <motion.div
+              onClick={(event) => event.stopPropagation()}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
+              transition={
+                reduceMotion
+                  ? { duration: 0.12 }
+                  : { duration: 0.32, ease: STUDIO_EASE, delay: 0.03 }
+              }
+              style={{
+                position: "relative",
+                width: "min(1100px, 100%)",
+                maxHeight: "min(92vh, 900px)",
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(240px, 320px)",
+                gap: 16,
+                background: P.surface,
+                border: `1px solid ${P.rule}`,
+                borderRadius: 18,
+                overflow: "hidden",
+                boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
+              }}
+              className="studio-media-lightbox"
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: P.surface2,
+                  padding: 20,
+                  minHeight: 280,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <motion.img
+                  layoutId={reduceMotion ? undefined : `studio-media-${selectedItem.id}`}
+                  src={getMediaAssetUrl(selectedItem)}
+                  alt={getMediaDisplayTitle(selectedItem)}
+                  style={{ maxWidth: "100%", maxHeight: "min(78vh, 760px)", objectFit: "contain", borderRadius: 12 }}
+                  transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
+                />
+              </div>
+              <motion.aside
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
+                transition={
+                  reduceMotion
+                    ? { duration: 0.12 }
+                    : { duration: 0.28, ease: STUDIO_EASE, delay: 0.1 }
+                }
+                style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}
+              >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <label
+                    htmlFor={`media-title-${selectedItem.id}`}
+                    style={{
+                      display: "block",
+                      fontFamily: TOKENS.mono,
+                      fontSize: 10.5,
+                      letterSpacing: 1.1,
+                      textTransform: "uppercase",
+                      color: P.ink3,
+                    }}
+                  >
+                    Motiv-Titel
+                  </label>
+                  <input
+                    id={`media-title-${selectedItem.id}`}
+                    ref={titleInputRef}
+                    className="studio-field"
+                    value={titleDraft}
+                    onChange={(event) => setTitleDraft(event.target.value)}
+                    onBlur={() => {
+                      if (selectedItem) void saveMediaTitle(selectedItem, titleDraft);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        if (selectedItem) void saveMediaTitle(selectedItem, titleDraft);
+                      }
+                    }}
+                    maxLength={120}
+                    disabled={titleSaving}
+                    placeholder="z. B. Hefeweizen · Hero-Glas · Public Viewing"
+                    style={{
+                      marginTop: 8,
+                      width: "100%",
+                      height: 42,
+                      fontSize: 14,
+                      fontWeight: 650,
+                      color: P.ink,
+                    }}
+                  />
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontFamily: TOKENS.sans, fontSize: 11.5, color: P.ink3 }}>Enter oder Speichern</span>
+                    <StudioButton
+                      size="sm"
+                      variant="soft"
+                      disabled={titleSaving || titleDraft.trim() === getMediaDisplayTitle(selectedItem)}
+                      onClick={() => void saveMediaTitle(selectedItem, titleDraft)}
+                    >
+                      Titel speichern
+                    </StudioButton>
+                  </div>
+                  <div style={{ marginTop: 8, fontFamily: TOKENS.mono, fontSize: 10.5, letterSpacing: 1.1, textTransform: "uppercase", color: P.ink3 }}>
+                    {selectedItem.resolution} · {selectedItem.aspectRatio} · {selectedItem.outputFormat.toUpperCase()}
+                  </div>
+                  <div style={{ marginTop: 8, fontFamily: TOKENS.mono, fontSize: 10.5, color: P.ink3 }}>
+                    {formatRelativeTime(selectedItem.createdAt)}
+                  </div>
+                </div>
+                <StudioIconButton aria-label="Schließen" onClick={() => setSelectedItem(null)}>
+                  <StudioIcon name="x" size={16} />
+                </StudioIconButton>
+              </div>
+              {titleError ? (
+                <p
+                  style={{
+                    margin: 0,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid rgba(239,68,68,0.35)",
+                    background: "rgba(239,68,68,0.08)",
+                    color: "#fecaca",
+                    fontFamily: TOKENS.sans,
+                    fontSize: 12.5,
+                  }}
+                >
+                  {titleError}
+                </p>
+              ) : null}
+              {titleSaving ? (
+                <p style={{ margin: 0, fontFamily: TOKENS.sans, fontSize: 12.5, color: P.ink3 }}>Titel wird gespeichert …</p>
+              ) : null}
+              {downloadError ? (
+                <p
+                  style={{
+                    margin: 0,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid rgba(239,68,68,0.35)",
+                    background: "rgba(239,68,68,0.08)",
+                    color: "#fecaca",
+                    fontFamily: TOKENS.sans,
+                    fontSize: 12.5,
+                  }}
+                >
+                  {downloadError}
+                </p>
+              ) : null}
+              <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                <StudioButton disabled={downloading} onClick={() => void handleDownload(selectedItem)}>
+                  {downloading ? "Wird heruntergeladen …" : "Herunterladen"}
+                </StudioButton>
+                <StudioButton variant="ghost" onClick={() => setSelectedItem(null)}>
+                  Schließen
+                </StudioButton>
+              </div>
+              </motion.aside>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+      </LayoutGroup>
     </>
   );
 }
