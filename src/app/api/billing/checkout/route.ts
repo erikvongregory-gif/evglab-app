@@ -8,7 +8,8 @@ import {
   isStripeAutomaticTaxEnabled,
   isSupabaseConfigured,
 } from "@/lib/supabase/env";
-import { ensureBillingRow, getBillingRow, setStripeCustomerId } from "@/lib/billing/store";
+import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { resolveStripeCustomerId } from "@/lib/billing/stripeCustomer";
 import { getPriceIdForPlan } from "@/lib/billing/stripePrices";
 import { getStripeClient, isStripeConfigured, stripeConfigurationError } from "@/lib/billing/stripeServer";
 import type { BillingInterval } from "@/lib/billing/planCatalog";
@@ -65,15 +66,12 @@ export async function POST(req: Request) {
     await ensureBillingRow(user.id);
     const billing = await getBillingRow(user.id);
 
-    let customerId = billing?.stripe_customer_id ?? null;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: user.email ?? undefined,
-        metadata: { user_id: user.id },
-      });
-      customerId = customer.id;
-      await setStripeCustomerId(user.id, customer.id);
-    }
+    const customerId = await resolveStripeCustomerId({
+      stripe,
+      userId: user.id,
+      email: user.email,
+      existingCustomerId: billing?.stripe_customer_id ?? null,
+    });
 
     const priceId = getPriceIdForPlan(plan, interval);
     const origin = getAppBaseUrlOrigin(new URL(req.url).origin);

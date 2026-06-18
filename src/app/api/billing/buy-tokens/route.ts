@@ -9,6 +9,7 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { resolveStripeCustomerId } from "@/lib/billing/stripeCustomer";
 import { getStripeClient, isStripeConfigured, stripeConfigurationError } from "@/lib/billing/stripeServer";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
@@ -68,12 +69,18 @@ export async function POST(req: Request) {
     }
 
     const stripe = getStripeClient();
+    const customerId = await resolveStripeCustomerId({
+      stripe,
+      userId: user.id,
+      email: user.email,
+      existingCustomerId: row.stripe_customer_id,
+    });
     const origin = getAppBaseUrlOrigin(new URL(req.url).origin);
     const kleinunternehmerMode = isKleinunternehmerModeEnabled();
     const automaticTaxEnabled = isStripeAutomaticTaxEnabled();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      customer: row.stripe_customer_id,
+      customer: customerId,
       line_items: [{ price: packConfig.priceId, quantity: 1 }],
       success_url: `${origin}/dashboard?billing=success_tokens&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/dashboard?billing=cancel_tokens`,

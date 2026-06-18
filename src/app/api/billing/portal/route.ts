@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { resolveStripeCustomerId } from "@/lib/billing/stripeCustomer";
 import { getStripeClient, isStripeConfigured, stripeConfigurationError } from "@/lib/billing/stripeServer";
 import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuards";
 
@@ -37,9 +38,15 @@ export async function POST(req: Request) {
     }
 
     const stripe = getStripeClient();
+    const customerId = await resolveStripeCustomerId({
+      stripe,
+      userId: user.id,
+      email: user.email,
+      existingCustomerId: row.stripe_customer_id,
+    });
     const { origin } = new URL(req.url);
     const session = await stripe.billingPortal.sessions.create({
-      customer: row.stripe_customer_id,
+      customer: customerId,
       return_url: `${origin}/dashboard`,
     });
 
