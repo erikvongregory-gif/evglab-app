@@ -391,21 +391,6 @@ function segmentForMicroStep(stepId: string, s: PromptBuildState): PromptSegment
   }
 }
 
-function buildPromptSegmentsForMicroSteps(
-  stepIds: string[],
-  stepIndex: number,
-  state: PromptBuildState,
-): PromptSegment[] {
-  const segs: PromptSegment[] = [];
-  for (let i = 0; i <= stepIndex && i < stepIds.length; i += 1) {
-    const id = stepIds[i];
-    if (id === "review" || id === "referenz") continue;
-    const seg = segmentForMicroStep(id, state);
-    if (seg) segs.push(seg);
-  }
-  return segs;
-}
-
 function MarketingChoicePills<T extends { label: string }>({
   options,
   selected,
@@ -886,6 +871,7 @@ export function InhalteErstellenRedesign({
   const [etikettUrl, setEtikettUrl] = useState("");
   const [referenceImagesStale, setReferenceImagesStale] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
   const [error, setError] = useState("");
   const [images, setImages] = useState<ImageResponse[]>([]);
   const [tokensRemaining, setTokensRemaining] = useState<number | null>(null);
@@ -1197,9 +1183,40 @@ export function InhalteErstellenRedesign({
     ],
   );
 
-  const promptSegments = useMemo(
-    () => buildPromptSegmentsForMicroSteps(microStepIds, microStepIndex, promptBuildState),
-    [microStepIds, microStepIndex, promptBuildState],
+  // Nach der ersten Generierung (oder auf dem Review-Step) alle Schritte als
+  // klickbare Segmente freischalten — so muss man sich nicht mehr Schritt für
+  // Schritt zurueckklicken, sondern springt direkt zum gewuenschten Punkt.
+  const promptNav = useMemo(() => {
+    const revealAll = isReviewStep || hasGenerated;
+    const segments: PromptSegment[] = [];
+    const targets: number[] = [];
+    const upper = revealAll ? microStepIds.length - 1 : microStepIndex;
+    for (let i = 0; i <= upper && i < microStepIds.length; i += 1) {
+      const id = microStepIds[i];
+      if (id === "referenz") continue;
+      if (id === "review") {
+        if (revealAll) {
+          segments.push({ text: "Übersicht", highlight: false });
+          targets.push(i);
+        }
+        continue;
+      }
+      const seg = segmentForMicroStep(id, promptBuildState);
+      if (seg) {
+        segments.push(seg);
+        targets.push(i);
+      }
+    }
+    return { segments, targets };
+  }, [microStepIds, microStepIndex, promptBuildState, isReviewStep, hasGenerated]);
+  const promptSegments = promptNav.segments;
+
+  const jumpToStep = useCallback(
+    (idx: number) => {
+      if (loading) return;
+      setMicroStepIndex(Math.max(0, Math.min(microStepIds.length - 1, idx)));
+    },
+    [loading, microStepIds.length],
   );
 
   const formatTag = useMemo(() => {
@@ -1387,9 +1404,12 @@ export function InhalteErstellenRedesign({
 
   async function generate() {
     setLoading(true);
+    setHasGenerated(true);
     setError("");
-    setImages([]);
-    setVariantProgress([]);
+    // Loading-Kacheln sofort anzeigen (noch bevor der langsame create-task-Call
+    // zurueckkommt), damit sichtbar ist: es geht jetzt los.
+    setImages(Array.from({ length: variantCount }, () => ({}) as ImageResponse));
+    setVariantProgress(Array.from({ length: variantCount }, () => 5));
     setGenerationStep("Brief wird verarbeitet …");
     setMicroStepIndex(buildMicroStepIds(behaelter, personenModus, flaschenTyp).length - 1);
     const controller = new AbortController();
@@ -1558,6 +1578,8 @@ export function InhalteErstellenRedesign({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generierung fehlgeschlagen.");
       setGenerationStep("");
+      // Nur leere Platzhalter entfernen — fertige Varianten bleiben erhalten.
+      setImages((prev) => prev.filter((img) => Boolean(img.url || img.b64_json)));
     } finally {
       setLoading(false);
     }
@@ -1867,6 +1889,8 @@ export function InhalteErstellenRedesign({
         brandMeta={brandMetaLine}
         promptStepLabel={String(microStepIndex + 1).padStart(2, "0")}
         promptSegments={promptSegments}
+        segmentTargets={promptNav.targets}
+        onSegmentClick={jumpToStep}
         showCursor={!isReviewStep || loading}
         questionTitle={
           currentMicroStepId === "schauplatz" && personenModus === "E"

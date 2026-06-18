@@ -20,6 +20,8 @@ type MarketingPromptCreateShellProps = {
   brandMeta: string;
   promptStepLabel: string;
   promptSegments: PromptSegment[];
+  segmentTargets?: number[];
+  onSegmentClick?: (target: number) => void;
   showCursor?: boolean;
   questionTitle: string;
   questionSubtitle?: string;
@@ -55,6 +57,8 @@ export function MarketingPromptCreateShell({
   brandMeta,
   promptStepLabel,
   promptSegments,
+  segmentTargets,
+  onSegmentClick,
   showCursor = true,
   questionTitle,
   questionSubtitle,
@@ -106,14 +110,42 @@ export function MarketingPromptCreateShell({
               {promptSegments.length === 0 ? (
                 <span style={{ color: P.ink3 }}>Dein Motiv entsteht Schritt für Schritt …</span>
               ) : (
-                promptSegments.map((seg, i) => (
-                  <React.Fragment key={`${seg.text}-${i}`}>
-                    {i > 0 ? <span style={{ color: P.ink2 }}> · </span> : null}
-                    <span style={{ color: seg.highlight ? STUDIO_TOKENS.amber2 : P.ink, fontWeight: seg.highlight ? 650 : 400 }}>
-                      {seg.text}
-                    </span>
-                  </React.Fragment>
-                ))
+                promptSegments.map((seg, i) => {
+                  const target = segmentTargets?.[i];
+                  const clickable = Boolean(onSegmentClick) && typeof target === "number";
+                  const color = seg.highlight ? STUDIO_TOKENS.amber2 : P.ink;
+                  const weight = seg.highlight ? 650 : 400;
+                  return (
+                    <React.Fragment key={`${seg.text}-${i}`}>
+                      {i > 0 ? <span style={{ color: P.ink2 }}> · </span> : null}
+                      {clickable ? (
+                        <button
+                          type="button"
+                          title="Zu diesem Schritt springen"
+                          onClick={() => onSegmentClick?.(target as number)}
+                          style={{
+                            color,
+                            fontWeight: weight,
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            margin: 0,
+                            font: "inherit",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                            textDecorationStyle: "dotted",
+                            textUnderlineOffset: 3,
+                            textDecorationColor: P.ink3,
+                          }}
+                        >
+                          {seg.text}
+                        </button>
+                      ) : (
+                        <span style={{ color, fontWeight: weight }}>{seg.text}</span>
+                      )}
+                    </React.Fragment>
+                  );
+                })
               )}
               {showCursor ? (
                 <span className="evg-marketing-create__cursor" aria-hidden="true">
