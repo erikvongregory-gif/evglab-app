@@ -4,6 +4,7 @@ import {
   buildBeerPhysicsFragment,
   buildBottleShapeLockFragment,
   buildCameraFragment,
+  buildClosureLogicFragment,
   buildHumanRealismFragment,
   buildHyperrealismLockFragment,
   buildSceneTextureAnchors,
@@ -219,6 +220,7 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
       : `SUBJECT: ${bottlePart}\n\n${glasPart}`.trim();
 
   const bottleShapeLock = behaelter === "G" ? "" : buildBottleShapeLockFragment(input);
+  const closureLogic = behaelter === "G" ? "" : buildClosureLogicFragment(input);
 
   const sceneBlock = `SCENE: ${szene}.`;
   const shotBlock = personenModus === "E" ? "" : `SHOT: ${shot}.`;
@@ -240,11 +242,23 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
         ? "glass bottle, crown-cap bottle, swing-top bottle, bottle neck, wrong container shape, wrong container size, slim tall energy-drink can, mismatched can volume, "
         : "wrong bottle shape, wrong bottle size, short stubby Steinie when a tall bottle is required, tall bottle when a stubby Steinie is required, swing-top closure when a crown cap is required, crown cap when a swing-top is required, aluminium can, mismatched bottle volume, ";
 
+  // Unlogische Verschluss-Situationen verbieten (versiegelt trotz vollem Glas / beim Trinken).
+  const closureNegative =
+    behaelter === "B"
+      ? istDose
+        ? "sealed unopened can with stay-tab still closed next to a full poured glass, "
+        : "sealed bottle with crown cap still on next to a full poured glass, capped bottle beside an already poured glass, "
+      : behaelter === "F" && personenModus !== "A"
+        ? istDose
+          ? "person drinking from a sealed unopened can, "
+          : "person drinking from a sealed bottle with the crown cap still on, capped bottle held to the mouth, "
+        : "";
+
   return `
 ${buildHyperrealismLockFragment()}
 
 ${subjectBlock}
-${bottleShapeLock ? `\n${bottleShapeLock}\n` : ""}
+${bottleShapeLock ? `\n${bottleShapeLock}\n` : ""}${closureLogic ? `\n${closureLogic}\n` : ""}
 ${beerPhysicsPart}
 
 ${personPart}
@@ -262,6 +276,6 @@ CAMERA: ${cameraPart}
 
 ${input.zusatzWunsch ? `ADDITIONAL: ${input.zusatzWunsch}` : ""}
 
-NEGATIVE: ${sceneNegative}${bottleShapeNegative}${glassOnlyNegative}${etikettModus === "marke" ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, " : ""}${HYPERREALISM_NEGATIVE}.
+NEGATIVE: ${sceneNegative}${bottleShapeNegative}${closureNegative}${glassOnlyNegative}${etikettModus === "marke" ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, " : ""}${HYPERREALISM_NEGATIVE}.
   `.trim();
 }

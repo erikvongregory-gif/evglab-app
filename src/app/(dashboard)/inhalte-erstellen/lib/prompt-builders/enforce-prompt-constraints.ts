@@ -2,6 +2,8 @@ import type { HyperrealisticInput } from "../schemas";
 import {
   BOTTLE_SHAPE_LOCK_MARKER,
   buildBottleShapeLockFragment,
+  CLOSURE_LOGIC_MARKER,
+  buildClosureLogicFragment,
   ensureHyperrealismDirectives,
 } from "./hyperrealism-blocks";
 
@@ -78,6 +80,15 @@ export function enforceHyperrealisticPromptConstraints(
     const shapeLock = buildBottleShapeLockFragment(input);
     if (shapeLock) {
       next = `${next}\n\n${shapeLock}`;
+    }
+  }
+
+  // Verschluss-Konsistenz erzwingen: offene Flasche/Dose, wenn ein Glas eingeschenkt
+  // ist oder jemand trinkt — kein Kronkorken/Tab auf einem "benutzten" Gebinde.
+  if (behaelter !== "G" && !next.includes(CLOSURE_LOGIC_MARKER)) {
+    const closureLogic = buildClosureLogicFragment(input);
+    if (closureLogic) {
+      next = `${next}\n\n${closureLogic}`;
     }
   }
 

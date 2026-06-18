@@ -252,6 +252,50 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
   ].join(" ");
 }
 
+/** Marker, damit die Verschluss-Logik nicht doppelt angehängt wird. */
+export const CLOSURE_LOGIC_MARKER = "CLOSURE LOGIC (MANDATORY)";
+
+/**
+ * Physikalische Konsistenz des Verschlusses:
+ * - Steht ein bereits eingeschenktes Glas daneben, ODER trinkt jemand aus der
+ *   Flasche/Dose, MUSS das Gebinde geöffnet sein (kein Kronkorken / Tab offen).
+ * - Eine versiegelte Flasche neben einem vollen Glas oder jemand, der aus einer
+ *   verschlossenen Flasche trinkt, ist unlogisch und wird verboten.
+ */
+export function buildClosureLogicFragment(input: HyperrealisticInput): string {
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  if (behaelter === "G") return "";
+  const istDose = isDoseTyp(input.flaschenTyp);
+  const istBuegel = input.flaschenTyp.startsWith("buegel");
+  const noun = istDose ? "can" : "bottle";
+  const closureWord = istDose
+    ? "stay-tab still unopened"
+    : istBuegel
+      ? "swing-top porcelain stopper still clamped shut"
+      : "crown cap still on the mouth";
+  const openState = istDose
+    ? "the stay-tab popped open at the top of the can"
+    : istBuegel
+      ? "the swing-top porcelain stopper flipped open and lifted clear of the mouth"
+      : "the crown cap removed — no cap on the bottle mouth";
+
+  const lines: string[] = [`${CLOSURE_LOGIC_MARKER}, physical drinking consistency:`];
+
+  // Glas eingeschenkt + Flasche → Gebinde wurde bereits geöffnet.
+  if (behaelter === "B") {
+    lines.push(
+      `The adjacent beer glass is already poured, therefore the ${noun} MUST be shown ALREADY OPENED with ${openState} (someone has clearly opened it to pour). Never show a sealed ${noun} (${closureWord}) standing next to a full poured glass.`,
+    );
+  }
+
+  lines.push(
+    `If a person is drinking from or lifting the ${noun} toward their lips, the ${noun} MUST already be OPEN — show ${openState}. A person drinking from a still-sealed ${noun} (${closureWord}) is physically impossible and FORBIDDEN.`,
+    `Only show a fully sealed/closed ${noun} for an untouched unopened product shot where nobody is drinking and no poured glass is present.`,
+  );
+
+  return lines.join(" ");
+}
+
 export function buildHyperrealismLockFragment(): string {
   return [
     "HYPERREALISM LOCK:",

@@ -287,6 +287,19 @@ export function buildHyperrealisticClaudeUserMessage(
         ? "Es ist eine ALUMINIUM-DOSE: KEIN Glas, KEINE Flaschenfarbe, KEIN Flaschenhals, KEIN Kronkorken. Das Referenzbild liefert das Wrap-around-Dosen-Artwork (rund um den Dosenkoerper), nicht die Form."
         : "Es ist eine GLASFLASCHE in der angegebenen Glasfarbe.",
     );
+    // Verschluss-Konsistenz (offen, wenn getrunken / Glas eingeschenkt).
+    const offen = istDose
+      ? "die Dose ist GEOEFFNET (Stay-Tab aufgezogen)"
+      : input.flaschenTyp.startsWith("buegel")
+        ? "die Flasche ist GEOEFFNET (Buegelverschluss aufgeklappt, Porzellanstopfen weg vom Mund)"
+        : "die Flasche ist GEOEFFNET (KEIN Kronkorken auf der Muendung)";
+    lines.push(
+      "KRITISCH VERSCHLUSS-LOGIK (PFLICHT, physikalisch konsistent):",
+      behaelter === "B"
+        ? `Da ein bereits eingeschenktes Glas daneben steht, MUSS ${offen} sein — niemand schenkt aus einer verschlossenen ${gebinde} ein. Eine versiegelte ${gebinde} (Kronkorken/Tab drauf) neben einem vollen Glas ist VERBOTEN.`
+        : `Wenn eine Person aus der ${gebinde} trinkt oder sie zum Mund fuehrt, MUSS ${offen} sein. Jemand, der aus einer verschlossenen ${gebinde} trinkt, ist unlogisch und VERBOTEN.`,
+      `Nur fuer einen unberuehrten, ungeoeffneten Produktshot (niemand trinkt, kein eingeschenktes Glas) darf die ${gebinde} versiegelt/verschlossen sein. Ergaenze am Promptende einen 'CLOSURE LOGIC (MANDATORY)'-Satz, der genau das erzwingt.`,
+    );
   }
 
   if (input.szene === "fussball_public_viewing") {
