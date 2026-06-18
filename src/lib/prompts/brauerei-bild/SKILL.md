@@ -126,18 +126,26 @@ Nutze die folgenden eingebetteten Wissensdatenbanken, um basierend auf den Nutze
 
 ### Flaschentypen & Prompt-Vokabular
 
+> ⚠️ **WICHTIG — die drei Hauptverwechslungen NIEMALS vertauschen:**
+> - **NRW-Flasche (0,5 l):** schlanke, TALL Longneck-Mehrwegflasche mit langem Hals — deutscher Standard für Pils/Helles/Lager.
+> - **Euroflasche / Euro-Bierflasche (0,5 l):** gedrungener, KURZER Hals, runde Schulter, stämmiger Körper — NICHT der NRW-Longneck.
+> - **Stubbi / Steinie (0,33 l):** kurze, runde, gedrungene Kleinflasche.
+>
+> Formen real verankert am Hillebrandt-Glas-Sortiment (Kronkorken = CC, Bügelverschluss = BV).
+
 | Flaschentyp | Volumen | Prompt-Vokabular (englisch) | Typisch für |
 |-------------|---------|----------------------------|-------------|
-| Longneck | 330ml | `"long-neck glass bottle with crown cap, slender profile"` | Craft Beer, IPA, Pale Ale |
-| Longneck | 500ml | `"long-neck glass bottle with crown cap, standard size"` | Craft Beer |
-| Stubbi / NRW | 330ml | `"short squat NRW-style returnable bottle with crown cap, wide shoulder"` | Klassische deutsche Biere |
-| Euroflasche | 500ml | `"classic Euro-norm returnable beer bottle with crown cap, traditional German profile"` | Helles, Pils, Lager |
-| Bügelflaschen | 330ml | `"swing-top Bügel bottle with ceramic stopper and wire bail closure, compact size"` | Craft, Premium |
-| Bügelflaschen | 500ml | `"swing-top Bügel bottle with ceramic stopper and wire bail closure, standard size"` | Craft, Premium |
-| Bügelflaschen | 750ml | `"large swing-top Bügelflaschen with ceramic stopper, sharing-size format"` | Spezialbiere |
-| Weizenbierflasche | 500ml | `"tall slender Weizen bottle with long neck and slightly curved body, crown cap"` | Weizen, Hefeweizen |
+| Ale-Longneck | 330ml | `"a small 0.33 L Ale long-neck beer bottle, slim slender body with a distinctly long thin neck, gently sloping shoulder, 26 mm metal crown cap, height ~24 cm"` | Craft Beer, IPA, Pale Ale |
+| Steinie / Stubbi | 330ml | `"a short squat 0.33 L Steinie (Stubbi) beer bottle, compact stout chubby body, very short stubby neck, broad rounded shoulders, metal crown cap, height only ~17–19 cm"` | Klassische deutsche Biere (kurz/gedrungen) |
+| **NRW-Flasche** | **500ml** | `"a TALL slim 0.5 L German NRW returnable long-neck beer bottle (standard 'NRW-Mehrwegflasche' / pool bottle), fairly long slim neck, soft sloping shoulder, elongated slender body, 26 mm metal crown cap, height ~26–27 cm — clearly a large half-litre long-neck, taller and slimmer than a stocky Euroflasche, much bigger than any 0.33 L bottle"` | Helles, Pils, Lager (deutscher Standard) |
+| Euroflasche / Vichy | 500ml | `"a 0.5 L traditional German Euroflasche / Euro-Bierflasche, stocky returnable bottle with a SHORT neck, pronounced rounded shoulder and straight vertical body walls, 26 mm metal crown cap, height ~25–26 cm — clearly stockier and shorter-necked than the slim NRW long-neck"` | Helles, Pils, Lager |
+| Bügelflasche | 330ml | `"a compact 0.33 L German swing-top Bügelflasche with white ceramic/porcelain stopper and hinged metal wire bail closure (NO crown cap), height ~20–22 cm"` | Craft, Premium |
+| Bügelflasche | 500ml | `"a 0.5 L German swing-top Bügelflasche (Bügelverschluss, e.g. Lochmund/Flensburger style), sturdy heavy body, white ceramic/porcelain stopper held by a hinged metal wire bail (NO crown cap), height ~25–26 cm"` | Craft, Premium |
+| Weizenbierflasche | 500ml | `"a tall slender 0.5 L Weizen bottle with long neck and slightly curved body, metal crown cap"` | Weizen, Hefeweizen |
 | Dose / Can | 330ml | `"aluminum can with pull-tab, compact format"` | Craft, Events |
 | Dose / Can | 500ml | `"tall aluminum can with pull-tab, standard can format"` | Craft, Events |
+
+**Grundregel Flaschenform:** Die im Briefing gewählte Flaschenform + Volumen ist VERBINDLICH. Übernimm die Flaschenform NIEMALS aus einem Referenzbild — das Referenzbild liefert ausschließlich das Etikett/Logo/Text. Ergänze bei Flasche im Bild immer einen `BOTTLE SHAPE LOCK (MANDATORY)`-Satz am Promptende, der Form, Volumen und Verschluss erzwingt.
 
 ---
 
@@ -419,9 +427,10 @@ Analysiere das hochgeladene Bild vollständig und extrahiere ALLE visuellen Elem
 4. MIKROTEXT: Alle weiteren sichtbaren Textelemente (z.B. "Seit 1634", "Original Münchner Bierspezialität")
 5. HINTERGRUNDFARBE des Etiketts
 6. DEKORELEMENTE: Rahmen, Verzierungen, Illustrationen (z.B. "Biergarten-Illustration mit Frauenkirche", "grüner Hopfenblatt-Rand")
-7. FLASCHENFORM: Farbe des Glases, Kronkorken-Farbe, Flaschentyp
-8. FARBPALETTE: Dominante Farben des Etiketts (z.B. "navyblau, cremeweiß, rot")
+7. FARBPALETTE: Dominante Farben des Etiketts (z.B. "navyblau, cremeweiß, rot")
 ```
+
+> ⚠️ **NICHT aus dem Referenzbild übernehmen:** Flaschenform, Flaschenvolumen und Verschlusstyp. Diese sind im Briefing (`flaschenForm`/Flaschentyp) verbindlich vorgegeben. Selbst wenn das Referenzbild eine andere Flasche zeigt, wird ausschließlich die Briefing-Vorgabe verwendet. Das Referenzbild dient NUR dem Etikett/Logo/Text.
 
 **SCHRITT B — Ausgabe der Analyse an den Nutzer (kurz, auf Deutsch):**
 ```

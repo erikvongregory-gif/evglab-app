@@ -12,6 +12,7 @@ import {
   type StudioPalette,
 } from "@/components/ui/dashboard-studio-shell";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
+import { FLASCHEN_TYPEN, isDoseTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { calculateGenerationTokenCost } from "@/lib/billing/generationTokenCost";
 import { estimateGenerationProgress } from "@/lib/kie/generationProgress";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
@@ -111,14 +112,9 @@ const BEHAELTER_OPTIONS: BehaelterOption[] = [
   { code: "F", label: "Nur Flasche / Dose", hint: "Produktshot ohne eingeschenktes Glas" },
 ];
 
-const FLASCHEN_OPTIONS: FlaschenOption[] = [
-  { code: "euro_longneck_330", label: "Longneck 0,33 l" },
-  { code: "euro_steinie_330", label: "Steinie 0,33 l" },
-  { code: "nrw_500", label: "NRW 0,5 l" },
-  { code: "vichy_500", label: "Euroflasche 0,5 l" },
-  { code: "buegel_330", label: "Bügel 0,33 l" },
-  { code: "buegel_500", label: "Bügel 0,5 l" },
-];
+const FLASCHEN_OPTIONS: FlaschenOption[] = (
+  Object.entries(FLASCHEN_TYPEN) as [FlaschenOption["code"], (typeof FLASCHEN_TYPEN)[FlaschenOption["code"]]][]
+).map(([code, item]) => ({ code, label: item.pillLabel }));
 
 /** Skill SCHRITT 1, Frage 8 — Personen [A–E]. */
 const PERSONEN_OPTIONS: PersonenOption[] = [
@@ -275,10 +271,15 @@ const MICRO_STEP_META: Record<string, { title: string; subtitle?: string }> = {
 function buildMicroStepIds(
   behaelter: NonNullable<HyperrealisticInput["behaelter"]>,
   personenModus: NonNullable<HyperrealisticInput["personenModus"]>,
+  flaschenTyp: HyperrealisticInput["flaschenTyp"],
 ): string[] {
   const ids = ["bierstil", "behaelter"];
   if (behaelter !== "G") {
-    ids.push("flaschentyp", "flaschenfarbe");
+    ids.push("flaschentyp");
+    // Aluminium-Dose hat keine Glasfarbe — Frage überspringen.
+    if (!isDoseTyp(flaschenTyp)) {
+      ids.push("flaschenfarbe");
+    }
   }
   ids.push("personen");
   ids.push("schauplatz");
@@ -1128,8 +1129,8 @@ export function InhalteErstellenRedesign({
   const [variantProgress, setVariantProgress] = useState<number[]>([]);
 
   const microStepIds = useMemo(
-    () => buildMicroStepIds(behaelter, personenModus),
-    [behaelter, personenModus],
+    () => buildMicroStepIds(behaelter, personenModus, flaschenTyp),
+    [behaelter, personenModus, flaschenTyp],
   );
   const [microStepIndex, setMicroStepIndex] = useState(0);
 
@@ -1255,6 +1256,7 @@ export function InhalteErstellenRedesign({
   async function persistMediaItem(item: {
     id: string;
     imageUrl: string;
+    title: string;
     prompt: string;
     createdAt: string;
     aspectRatio: string;
@@ -1389,7 +1391,7 @@ export function InhalteErstellenRedesign({
     setImages([]);
     setVariantProgress([]);
     setGenerationStep("Brief wird verarbeitet …");
-    setMicroStepIndex(buildMicroStepIds(behaelter, personenModus).length - 1);
+    setMicroStepIndex(buildMicroStepIds(behaelter, personenModus, flaschenTyp).length - 1);
     const controller = new AbortController();
     try {
       // Vorrang: Ad-hoc-Upload > Markenprofil-Etikett.
@@ -1517,6 +1519,7 @@ export function InhalteErstellenRedesign({
           void persistMediaItem({
             id: `${taskId}-${index}`,
             imageUrl,
+            title: mediaPromptLabel,
             prompt: mediaPromptLabel,
             createdAt: new Date().toISOString(),
             aspectRatio: parsed.aspectRatio,

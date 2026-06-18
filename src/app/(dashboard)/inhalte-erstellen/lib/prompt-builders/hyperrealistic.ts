@@ -1,7 +1,8 @@
-import { FLASCHEN_TYPEN, GLAS_TYPEN } from "../brewing-knowledge";
+import { FLASCHEN_TYPEN, GLAS_TYPEN, isDoseTyp } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 import {
   buildBeerPhysicsFragment,
+  buildBottleShapeLockFragment,
   buildCameraFragment,
   buildHumanRealismFragment,
   buildHyperrealismLockFragment,
@@ -84,10 +85,12 @@ GLASS BRAND LOCK (MANDATORY): Every beer glass in frame MUST display the "${bran
 FORBIDDEN: plain unbranded glasses, wrong brewery names on glass, fictional brands, missing logos.
 COMPOSITION: GLASS ONLY — no bottle, no can, no packaging anywhere in the image.`;
   }
+  const brandSurface = isDoseTyp(input.flaschenTyp) ? "can wrap-around artwork" : "bottle label";
+  const brandVessel = isDoseTyp(input.flaschenTyp) ? "can" : "bottle";
   return `
-BRAND IDENTITY LOCK (MANDATORY): Every visible brand touchpoint — bottle label, glass logo/etching, coasters, napkins, signage — MUST show "${brand}" only, matching the reference label artwork.
-FORBIDDEN: any other brewery names, fictional brands, wrong logos on glasses (e.g. random text like "Brauhaus Weißbach"), unbranded glasses when a branded bottle is present, or mixed competing brands in one frame.
-All beer glasses in frame must carry the same "${brand}" branding as the bottle — consistent logo placement, legible, not distorted.`;
+BRAND IDENTITY LOCK (MANDATORY): Every visible brand touchpoint — ${brandSurface}, glass logo/etching, coasters, napkins, signage — MUST show "${brand}" only, matching the reference label artwork.
+FORBIDDEN: any other brewery names, fictional brands, wrong logos on glasses (e.g. random text like "Brauhaus Weißbach"), unbranded glasses when a branded ${brandVessel} is present, or mixed competing brands in one frame.
+All beer glasses in frame must carry the same "${brand}" branding as the ${brandVessel} — consistent logo placement, legible, not distorted.`;
 }
 
 function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<HyperrealisticInput["behaelter"]>): string {
@@ -182,6 +185,9 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
     gruen: "green glass",
     klar: "clear flint glass",
   }[input.flaschenfarbe];
+  const istDose = isDoseTyp(input.flaschenTyp);
+  const gebindeNoun = istDose ? "can" : "bottle";
+  const materialClause = istDose ? "" : `, made of ${flaschenfarbeText}`;
 
   const personPart = buildPersonFragment(input, behaelter);
   const humanRealismPart = buildHumanRealismFragment(input);
@@ -193,24 +199,26 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
     behaelter === "G"
       ? ""
       : etikettModus === "marke"
-        ? `A ${flaschenfarbeText} ${flasche.promptDescription}. The label on the bottle MUST be reproduced 1:1 EXACTLY from the reference image — same artwork, same typography, same colors, same proportions, no reinterpretation, no stylization. Treat the label as a fixed graphic asset to be applied flat-perspective-corrected onto the bottle.`
-        : `A ${flaschenfarbeText} ${flasche.promptDescription}. Generic unbranded bottle — no label text, plain bottle surface.`;
+        ? `${flasche.promptDescription}${materialClause}. The ${istDose ? "wrap-around artwork on the can" : "label on the bottle"} MUST be reproduced 1:1 EXACTLY from the reference image — same artwork, same typography, same colors, same proportions, no reinterpretation, no stylization. Treat the ${istDose ? "can artwork as a fixed graphic asset wrapped around the cylindrical can body" : "label as a fixed graphic asset to be applied flat-perspective-corrected onto the bottle"}.`
+        : `${flasche.promptDescription}${materialClause}. Generic unbranded ${gebindeNoun} — no label text, plain ${istDose ? "can surface" : "bottle surface"}.`;
 
   const glasPart =
     behaelter === "F"
       ? ""
       : glas
-        ? `HERO SUBJECT: A poured ${glas.promptDescription} ${behaelter === "B" ? "stands next to the bottle" : "in centered hero position — ONLY the glass, absolutely NO bottle or can anywhere in frame"}. The beer color matches the style "${input.bierstil}".${
+        ? `HERO SUBJECT: A poured ${glas.promptDescription} ${behaelter === "B" ? `stands next to the ${gebindeNoun}` : "in centered hero position — ONLY the glass, absolutely NO bottle or can anywhere in frame"}. The beer color matches the style "${input.bierstil}".${
             etikettModus === "marke" && options?.breweryName?.trim()
               ? ` EXACT TEXT on the glass: "${options.breweryName.trim()}". The glass MUST show this logo/branding clearly on the glass surface — never plain/unbranded, never a different brewery name.`
               : ""
-          }${behaelter === "B" ? ' Maintain correct proportional scale: "bottle and glass shown in correct proportional scale, glass volume visually matches bottle content".' : ""}`
+          }${behaelter === "B" ? ` Maintain correct proportional scale: "${gebindeNoun} and glass shown in correct proportional scale, glass volume visually matches ${gebindeNoun} content".` : ""}`
         : "";
 
   const subjectBlock =
     behaelter === "G"
       ? `SUBJECT: ${glasPart || "Branded beer glass hero shot — glass only, no bottle."}`
       : `SUBJECT: ${bottlePart}\n\n${glasPart}`.trim();
+
+  const bottleShapeLock = behaelter === "G" ? "" : buildBottleShapeLockFragment(input);
 
   const sceneBlock = `SCENE: ${szene}.`;
   const shotBlock = personenModus === "E" ? "" : `SHOT: ${shot}.`;
@@ -225,11 +233,18 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
       ? "biergarten, beer garden, chestnut tree shade, wirtshaus interior, cozy tavern, alpine hut, "
       : "";
 
+  const bottleShapeNegative =
+    behaelter === "G"
+      ? ""
+      : istDose
+        ? "glass bottle, crown-cap bottle, swing-top bottle, bottle neck, wrong container shape, wrong container size, slim tall energy-drink can, mismatched can volume, "
+        : "wrong bottle shape, wrong bottle size, short stubby Steinie when a tall bottle is required, tall bottle when a stubby Steinie is required, swing-top closure when a crown cap is required, crown cap when a swing-top is required, aluminium can, mismatched bottle volume, ";
+
   return `
 ${buildHyperrealismLockFragment()}
 
 ${subjectBlock}
-
+${bottleShapeLock ? `\n${bottleShapeLock}\n` : ""}
 ${beerPhysicsPart}
 
 ${personPart}
@@ -247,6 +262,6 @@ CAMERA: ${cameraPart}
 
 ${input.zusatzWunsch ? `ADDITIONAL: ${input.zusatzWunsch}` : ""}
 
-NEGATIVE: ${sceneNegative}${glassOnlyNegative}${etikettModus === "marke" ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, " : ""}${HYPERREALISM_NEGATIVE}.
+NEGATIVE: ${sceneNegative}${bottleShapeNegative}${glassOnlyNegative}${etikettModus === "marke" ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, " : ""}${HYPERREALISM_NEGATIVE}.
   `.trim();
 }

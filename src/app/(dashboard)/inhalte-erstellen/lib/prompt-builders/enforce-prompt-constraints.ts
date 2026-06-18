@@ -1,5 +1,9 @@
 import type { HyperrealisticInput } from "../schemas";
-import { ensureHyperrealismDirectives } from "./hyperrealism-blocks";
+import {
+  BOTTLE_SHAPE_LOCK_MARKER,
+  buildBottleShapeLockFragment,
+  ensureHyperrealismDirectives,
+} from "./hyperrealism-blocks";
 
 const GLASS_ONLY_LOCK =
   "CRITICAL COMPOSITION LOCK (MANDATORY): GLASS-ONLY hero shot — absolutely NO beer bottle, NO bottle on table, NO can, NO packaging visible anywhere in frame. Only branded beer glass(es) with beer and foam. Image is INVALID if any bottle or can appears.";
@@ -65,6 +69,15 @@ export function enforceHyperrealisticPromptConstraints(
     const hasGlass = /(glass|willibecher|weizen|pilsner|snifter|goblet|pokal|stein|tulpe)/i.test(lower);
     if (!hasBottle || !hasGlass) {
       next = `${next}\n\n${BOTH_LOCK}`;
+    }
+  }
+
+  // Flaschenform/-volumen hart erzwingen (nicht bei Nur-Glas). Wird spät angehängt,
+  // damit gpt-image-2 die exakte Form gewichtet und der Claude-Rewrite sie nicht verwässert.
+  if (behaelter !== "G" && !next.includes(BOTTLE_SHAPE_LOCK_MARKER)) {
+    const shapeLock = buildBottleShapeLockFragment(input);
+    if (shapeLock) {
+      next = `${next}\n\n${shapeLock}`;
     }
   }
 

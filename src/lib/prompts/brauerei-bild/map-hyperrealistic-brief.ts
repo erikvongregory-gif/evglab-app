@@ -1,4 +1,4 @@
-import { FLASCHEN_TYPEN, GLAS_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
+import { FLASCHEN_TYPEN, GLAS_TYPEN, isDoseTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 
 const SZENE_LABELS: Record<HyperrealisticInput["szene"], string> = {
@@ -197,7 +197,10 @@ export function hyperrealisticInputToBrauereiBrief(
     behaelter: BEHAELTER_LABELS[behaelter],
     behaelterCode: behaelter,
     flaschenTyp: behaelter === "G" ? null : flasche.label,
-    flaschenfarbe: behaelter === "G" ? null : input.flaschenfarbe,
+    flaschenForm: behaelter === "G" ? null : flasche.promptDescription,
+    flaschenFormVerbot: behaelter === "G" ? null : flasche.forbidden,
+    gebindeMaterial: behaelter === "G" ? null : isDoseTyp(input.flaschenTyp) ? "Aluminium-Dose" : "Glasflasche",
+    flaschenfarbe: behaelter === "G" || isDoseTyp(input.flaschenTyp) ? null : input.flaschenfarbe,
     glasTyp: glas?.label ?? null,
     markenname: options?.breweryName?.trim() || "generisch",
     zielgruppe: input.zielgruppe ? ZIELGRUPPE_LABELS[input.zielgruppe] : null,
@@ -256,7 +259,8 @@ export function buildHyperrealisticClaudeUserMessage(
     lines.push(
       "WICHTIG: Im ersten Content-Block dieser Nachricht ist das Referenzbild der Flasche/des Etiketts der Brauerei eingebettet.",
       "Fuehre den REFERENZBILD-WORKFLOW (Schritt A–D) aus dem Skill aus, BEVOR du den Prompt schreibst:",
-      "  A) Lies aus dem Bild AKTIV aus: Logo (Form, Farbe, Inhalt), Primaertext (Markenname), Sekundaertext (Produktname/Bierstil), Mikrotext (Slogans, Jahreszahlen, Adressen), Etikett-Hintergrundfarbe, Dekorelemente (Rahmen, Illustrationen), Flaschenform und -farbe, Kronkorken-Farbe, dominante Farbpalette.",
+      "  A) Lies aus dem Bild NUR die ETIKETT-/MARKEN-Elemente aus: Logo (Form, Farbe, Inhalt), Primaertext (Markenname), Sekundaertext (Produktname/Bierstil), Mikrotext (Slogans, Jahreszahlen, Adressen), Etikett-Hintergrundfarbe, Dekorelemente (Rahmen, Illustrationen), dominante Farbpalette.",
+      "  A-WICHTIG: Die FLASCHENFORM, das VOLUMEN und der VERSCHLUSS werden NICHT aus dem Referenzbild uebernommen — sie sind im Briefing (`flaschenForm`) verbindlich vorgegeben. Selbst wenn das Referenzbild eine andere Flasche zeigt: ignoriere deren Form/Groesse komplett und nutze ausschliesslich die Briefing-Vorgabe. Das Referenzbild dient AUSSCHLIESSLICH dem Etikett/Logo/Text.",
       "  B) Integriere ALLE klar lesbaren Textelemente als `EXACT TEXT '...'` Bausteine in den finalen englischen Prompt (GPT-Image-2-Syntax).",
       "  C) Beschreibe Logo und Dekorelemente praezise in Englisch und fordere 1:1-Treue zur Referenz: `preserve the exact label design from the reference image, no text modifications, no logo alterations`.",
       "  D) Wenn Behaelter = B (Flasche + Glas) und das Glas im Referenzbild ebenfalls ein Logo zeigt: explizit fordern, dass auch das Glas-Logo 1:1 uebernommen wird.",
@@ -268,6 +272,21 @@ export function buildHyperrealisticClaudeUserMessage(
     );
   } else {
     lines.push("Generischer Look ohne Marken-Etikett — keine EXACT-TEXT-Syntax verwenden.");
+  }
+
+  if (behaelter !== "G") {
+    const flasche = FLASCHEN_TYPEN[input.flaschenTyp];
+    const istDose = isDoseTyp(input.flaschenTyp);
+    const gebinde = istDose ? "Dose" : "Flasche";
+    lines.push(
+      `KRITISCH GEBINDE-FORM (PFLICHT, woertlich uebernehmen): Die ${gebinde} MUSS sein: ${flasche.promptDescription}.`,
+      `VERBOTEN: ${flasche.forbidden}.`,
+      `Baue diese exakte ${gebinde}-Form + Volumen explizit in den englischen Prompt ein und ergaenze am Promptende einen 'BOTTLE SHAPE LOCK (MANDATORY)'-Satz, der genau diese Form/Groesse erzwingt und Verwechslungen (z. B. 0,5-l-NRW-Longneck vs. 0,33-l-Stubbi, oder Glasflasche vs. Aluminium-Dose) ausschliesst.`,
+      "Die Gebindegroesse muss in real-world Massstab erkennbar sein (0,33 l vs 0,5 l klar unterscheidbar).",
+      istDose
+        ? "Es ist eine ALUMINIUM-DOSE: KEIN Glas, KEINE Flaschenfarbe, KEIN Flaschenhals, KEIN Kronkorken. Das Referenzbild liefert das Wrap-around-Dosen-Artwork (rund um den Dosenkoerper), nicht die Form."
+        : "Es ist eine GLASFLASCHE in der angegebenen Glasfarbe.",
+    );
   }
 
   if (input.szene === "fussball_public_viewing") {

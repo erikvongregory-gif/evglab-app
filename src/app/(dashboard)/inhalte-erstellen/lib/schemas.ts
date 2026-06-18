@@ -1,12 +1,23 @@
 import { z } from "zod";
 
 export const flaschenTypSchema = z.enum([
+  // 0,33 l
   "euro_longneck_330",
   "euro_steinie_330",
+  "vichy_330",
+  "buegel_330",
+  // 0,5 l
+  "longneck_500",
   "nrw_500",
   "vichy_500",
+  "weizen_500",
   "buegel_500",
-  "buegel_330",
+  // 0,75 l
+  "buegel_750",
+  "belgien_750",
+  // Dosen
+  "dose_330",
+  "dose_500",
 ]);
 
 export const glasTypSchema = z.enum(["pils_tulpe", "weizen", "willibecher", "masskrug", "ipa_teku", "schwenker", "stange"]);

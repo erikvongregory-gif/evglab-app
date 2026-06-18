@@ -1,3 +1,4 @@
+import { FLASCHEN_TYPEN, isDoseTyp } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 
 type BeerPhysicsProfile = {
@@ -214,6 +215,40 @@ export function buildHumanRealismFragment(input: HyperrealisticInput): string {
     "Faces must be artifact-free: no extra fingers, no fused fingers, no warped teeth, no uncanny asymmetry, no beauty-filter smoothing.",
     "Wardrobe and hair should look worn-in and candid, not catalog-styled. Expressions spontaneous, not posed stock-photo smiles.",
     "Keep person scale physically plausible relative to bottle, glass, table, and environment.",
+  ].join(" ");
+}
+
+/** Eindeutiger Marker, damit der Lock nicht doppelt angehängt wird. */
+export const BOTTLE_SHAPE_LOCK_MARKER = "BOTTLE SHAPE LOCK (MANDATORY)";
+
+const FLASCHENFARBE_TEXT: Record<HyperrealisticInput["flaschenfarbe"], string> = {
+  braun: "amber-brown glass",
+  gruen: "green glass",
+  klar: "clear flint glass",
+};
+
+/**
+ * Erzwingt exakt den vom Nutzer gewählten Flaschentyp (Form + Volumen) und
+ * verbietet typische Verwechslungen (z. B. NRW-0,5-l vs. Stubbi-0,33-l).
+ * Wird bewusst spät im Prompt platziert, da gpt-image-2 spätere Anweisungen
+ * stärker gewichtet — und überlebt so auch den Claude-Rewrite.
+ */
+export function buildBottleShapeLockFragment(input: HyperrealisticInput): string {
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  if (behaelter === "G") return "";
+  const flasche = FLASCHEN_TYPEN[input.flaschenTyp];
+  if (!flasche) return "";
+  const istDose = isDoseTyp(input.flaschenTyp);
+  const noun = istDose ? "aluminium beverage can" : "bottle";
+  const nounCap = istDose ? "Can" : "Bottle";
+  const colorClause = istDose ? "" : `, made of ${FLASCHENFARBE_TEXT[input.flaschenfarbe]}`;
+  const referenceArtwork = istDose ? "wrap-around can artwork" : "LABEL artwork";
+  return [
+    `${BOTTLE_SHAPE_LOCK_MARKER}:`,
+    `The ${noun} MUST be ${flasche.promptDescription}${colorClause}.`,
+    `${nounCap} shape and size are defined ONLY by this specification — ${flasche.forbidden}.`,
+    `Do NOT copy the ${noun} silhouette, proportions or closure from any reference image; the reference image only defines the ${referenceArtwork}, never the ${noun} shape or volume.`,
+    `Render the ${noun} at physically correct real-world scale so its size class (0.33 L vs 0.5 L) is unmistakable.`,
   ].join(" ");
 }
 
