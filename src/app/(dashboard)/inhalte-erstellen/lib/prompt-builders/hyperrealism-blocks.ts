@@ -279,6 +279,8 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
       ? "the swing-top porcelain stopper flipped open and lifted clear of the mouth"
       : "the crown cap removed — no cap on the bottle mouth";
 
+  const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
+  const pluralNoun = istDose ? "cans" : "bottles";
   const lines: string[] = [`${CLOSURE_LOGIC_MARKER}, physical drinking consistency:`];
 
   // Glas eingeschenkt + Flasche → Gebinde wurde bereits geöffnet.
@@ -288,9 +290,16 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
     );
   }
 
+  // Gruppe, die anstößt/prostet → alle hochgehaltenen Gebinde sind offen.
+  if (modus === "E") {
+    lines.push(
+      `When people raise, clink or toast (Anstoßen / Prost / cheers) the ${pluralNoun} together, EVERY raised and clinked ${noun} MUST be OPEN — show ${openState}. Toasting or clinking with sealed, unopened ${pluralNoun} (${closureWord}) is physically wrong and FORBIDDEN.`,
+    );
+  }
+
   lines.push(
-    `If a person is drinking from or lifting the ${noun} toward their lips, the ${noun} MUST already be OPEN — show ${openState}. A person drinking from a still-sealed ${noun} (${closureWord}) is physically impossible and FORBIDDEN.`,
-    `Only show a fully sealed/closed ${noun} for an untouched unopened product shot where nobody is drinking and no poured glass is present.`,
+    `If a person is drinking from, lifting, raising, clinking or toasting the ${noun} toward their lips or with others, the ${noun} MUST already be OPEN — show ${openState}. Drinking from, or toasting/clinking with, a still-sealed ${noun} (${closureWord}) is physically impossible and FORBIDDEN.`,
+    `Only show a fully sealed/closed ${noun} for an untouched unopened product shot where nobody is drinking, raising or clinking and no poured glass is present.`,
   );
 
   return lines.join(" ");

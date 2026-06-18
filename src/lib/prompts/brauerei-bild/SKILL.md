@@ -180,8 +180,9 @@ Der Verschluss-Zustand des Gebindes MUSS zur Szene passen. Ergänze bei Flasche/
 
 - **Glas bereits eingeschenkt + Flasche/Dose im Bild (Behälter = B):** Das Gebinde MUSS **geöffnet** sein (Kronkorken ab / Bügelverschluss aufgeklappt / Stay-Tab aufgezogen). Niemand schenkt aus einer verschlossenen Flasche ein → eine versiegelte Flasche neben einem vollen Glas ist VERBOTEN.
 - **Person trinkt aus der Flasche/Dose / führt sie zum Mund:** Gebinde MUSS **geöffnet** sein. Jemand, der aus einer verschlossenen Flasche (Kronkorken drauf) trinkt, ist unlogisch und VERBOTEN.
-- **Reiner, ungeöffneter Produktshot (niemand trinkt, kein eingeschenktes Glas):** Gebinde darf versiegelt/verschlossen dargestellt werden (Kronkorken/Tab drauf ist hier korrekt).
-- Englische Promptbausteine: offene Flasche → `opened beer bottle, crown cap removed, no cap on the bottle mouth`; offene Dose → `opened can, stay-tab popped`; Bügel → `swing-top flipped open`. Negative: `sealed crown-cap bottle next to a full poured glass, person drinking from a sealed unopened bottle`.
+- **Anstoßen / Prost / Cheers (Gruppe hebt Flaschen/Dosen hoch & stößt an):** JEDE angestoßene Flasche/Dose MUSS **geöffnet** sein. Anstoßen/Klirren mit verschlossenen, ungeöffneten Flaschen (Kronkorken/Tab drauf) ist physikalisch falsch und VERBOTEN.
+- **Reiner, ungeöffneter Produktshot (niemand trinkt, hebt an oder stößt an, kein eingeschenktes Glas):** Gebinde darf versiegelt/verschlossen dargestellt werden (Kronkorken/Tab drauf ist hier korrekt).
+- Englische Promptbausteine: offene Flasche → `opened beer bottle, crown cap removed, no cap on the bottle mouth`; offene Dose → `opened can, stay-tab popped`; Bügel → `swing-top flipped open`. Negative: `sealed crown-cap bottle next to a full poured glass, person drinking from a sealed unopened bottle, toasting or clinking with sealed bottles`.
 
 ---
 

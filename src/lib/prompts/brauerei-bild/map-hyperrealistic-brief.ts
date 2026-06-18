@@ -298,7 +298,10 @@ export function buildHyperrealisticClaudeUserMessage(
       behaelter === "B"
         ? `Da ein bereits eingeschenktes Glas daneben steht, MUSS ${offen} sein — niemand schenkt aus einer verschlossenen ${gebinde} ein. Eine versiegelte ${gebinde} (Kronkorken/Tab drauf) neben einem vollen Glas ist VERBOTEN.`
         : `Wenn eine Person aus der ${gebinde} trinkt oder sie zum Mund fuehrt, MUSS ${offen} sein. Jemand, der aus einer verschlossenen ${gebinde} trinkt, ist unlogisch und VERBOTEN.`,
-      `Nur fuer einen unberuehrten, ungeoeffneten Produktshot (niemand trinkt, kein eingeschenktes Glas) darf die ${gebinde} versiegelt/verschlossen sein. Ergaenze am Promptende einen 'CLOSURE LOGIC (MANDATORY)'-Satz, der genau das erzwingt.`,
+      input.personenModus === "E"
+        ? `BEIM ANSTOSSEN (Prost/Cheers): Wenn die Gruppe ${gebinde}n hochhebt und anstoesst, MUSS JEDE angestossene ${gebinde} GEOEFFNET sein (${offen}). Anstossen/Klirren mit verschlossenen, ungeoeffneten ${gebinde}n (Kronkorken/Tab drauf) ist physikalisch falsch und VERBOTEN.`
+        : "",
+      `Nur fuer einen unberuehrten, ungeoeffneten Produktshot (niemand trinkt, hebt an oder stoesst an, kein eingeschenktes Glas) darf die ${gebinde} versiegelt/verschlossen sein. Ergaenze am Promptende einen 'CLOSURE LOGIC (MANDATORY)'-Satz, der genau das erzwingt.`,
     );
   }
 

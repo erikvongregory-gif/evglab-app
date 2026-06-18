@@ -242,8 +242,8 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
         ? "glass bottle, crown-cap bottle, swing-top bottle, bottle neck, wrong container shape, wrong container size, slim tall energy-drink can, mismatched can volume, "
         : "wrong bottle shape, wrong bottle size, short stubby Steinie when a tall bottle is required, tall bottle when a stubby Steinie is required, swing-top closure when a crown cap is required, crown cap when a swing-top is required, aluminium can, mismatched bottle volume, ";
 
-  // Unlogische Verschluss-Situationen verbieten (versiegelt trotz vollem Glas / beim Trinken).
-  const closureNegative =
+  // Unlogische Verschluss-Situationen verbieten (versiegelt trotz vollem Glas / beim Trinken / beim Anstoßen).
+  const closureBase =
     behaelter === "B"
       ? istDose
         ? "sealed unopened can with stay-tab still closed next to a full poured glass, "
@@ -253,6 +253,13 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
           ? "person drinking from a sealed unopened can, "
           : "person drinking from a sealed bottle with the crown cap still on, capped bottle held to the mouth, "
         : "";
+  const toastNegative =
+    personenModus === "E" && behaelter !== "G"
+      ? istDose
+        ? "toasting or clinking with sealed unopened cans, "
+        : "toasting or clinking with sealed bottles, clinking capped crown-cap bottles together, "
+      : "";
+  const closureNegative = `${closureBase}${toastNegative}`;
 
   return `
 ${buildHyperrealismLockFragment()}
