@@ -680,9 +680,33 @@ export function DashboardStudioShell({
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileMenuOpen]);
 
-  const profileName = initialProfileName?.trim() || "";
-  const breweryName = initialBreweryName?.trim() || "";
-  const accountName = breweryName || profileName || "EvGlab";
+  // Live-State, damit die Fußzeile (Avatar + Name) sofort aktualisiert, wenn der
+  // Markenname in den Einstellungen geändert wird (per evglab-profile-updated-Event),
+  // ohne auf einen Server-Reload zu warten.
+  const [liveBreweryName, setLiveBreweryName] = useState(initialBreweryName?.trim() || "");
+  const [liveProfileName, setLiveProfileName] = useState(initialProfileName?.trim() || "");
+
+  useEffect(() => {
+    setLiveBreweryName(initialBreweryName?.trim() || "");
+  }, [initialBreweryName]);
+  useEffect(() => {
+    setLiveProfileName(initialProfileName?.trim() || "");
+  }, [initialProfileName]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | { breweryName?: string; profileName?: string }
+        | undefined;
+      if (!detail) return;
+      if (typeof detail.breweryName === "string") setLiveBreweryName(detail.breweryName.trim());
+      if (typeof detail.profileName === "string") setLiveProfileName(detail.profileName.trim());
+    };
+    window.addEventListener("evglab-profile-updated", handler);
+    return () => window.removeEventListener("evglab-profile-updated", handler);
+  }, []);
+
+  const accountName = liveBreweryName || liveProfileName || "EvGlab";
   const initials = initialsFromName(accountName);
   const pad = contentPadding ?? "var(--gutter)";
 

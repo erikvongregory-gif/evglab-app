@@ -66,7 +66,7 @@ Bitte beantworte folgende Fragen (oder gib alles in einem Satz an):
 
 7. ETIKETT/FLASCHE: Soll das Marken-Etikett sichtbar und korrekt dargestellt werden?
    → Ja – Bitte lade ein Referenzfoto des Etiketts/der Flasche hoch (PFLICHT fuer 1:1-Wiedergabe)
-   → Generisch – Kein spezifisches Etikett, Flasche bleibt unbranded
+   → Generisch – Kein Referenzbild: Die KI gestaltet SELBST ein passendes, professionelles Etikett mit einem FIKTIVEN Markennamen + Logo (keine echte Brauerei). Die Flasche/Dose darf NICHT leer/unbranded bleiben; bei Generisch DARF ein fiktiver Markenname via EXACT TEXT erfunden werden.
 
    WICHTIG: Wenn "Ja" gewaehlt wird, frage den Nutzer:
    "Bitte lade ein Foto deines Etiketts oder deiner Flasche hoch. Es wird als Referenzbild verwendet."
@@ -182,7 +182,7 @@ Der Verschluss-Zustand des Gebindes MUSS zur Szene passen. Ergänze bei Flasche/
 - **Person trinkt aus der Flasche/Dose / führt sie zum Mund:** Gebinde MUSS **geöffnet** sein. Jemand, der aus einer verschlossenen Flasche (Kronkorken drauf) trinkt, ist unlogisch und VERBOTEN.
 - **Anstoßen / Prost / Cheers (Gruppe hebt Flaschen/Dosen hoch & stößt an):** JEDE angestoßene Flasche/Dose MUSS **geöffnet** sein. Anstoßen/Klirren mit verschlossenen, ungeöffneten Flaschen (Kronkorken/Tab drauf) ist physikalisch falsch und VERBOTEN.
 - **Reiner, ungeöffneter Produktshot (niemand trinkt, hebt an oder stößt an, kein eingeschenktes Glas):** Gebinde darf versiegelt/verschlossen dargestellt werden (Kronkorken/Tab drauf ist hier korrekt).
-- Englische Promptbausteine: offene Flasche → `opened beer bottle, crown cap removed, no cap on the bottle mouth`; offene Dose → `opened can, stay-tab popped`; Bügel → `swing-top flipped open`. Negative: `sealed crown-cap bottle next to a full poured glass, person drinking from a sealed unopened bottle, toasting or clinking with sealed bottles`.
+- Englische Promptbausteine: offene Flasche → `opened beer bottle, crown cap removed, no cap on the bottle mouth`; offene Dose → `opened can, stay-tab popped`; Bügel → `swing-top open, porcelain stopper and wire bail neatly flipped back resting tidily against the bottle neck, clean intact mechanism`. Negative: `sealed crown-cap bottle next to a full poured glass, person drinking from a sealed unopened bottle, toasting or clinking with sealed bottles`. Bügel-Negative (PFLICHT bei Bügelflaschen): `messy tangled dangling swing-top wire bail, floating porcelain stopper, swing-top mechanism hanging awkwardly across the bottle, stopper covering the label`.
 
 ---
 

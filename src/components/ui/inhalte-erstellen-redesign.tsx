@@ -200,7 +200,7 @@ const KI_PLATTFORM_OPTIONS: KiPlattformOption[] = [
 
 const ETIKETT_MODUS_OPTIONS: EtikettModusOption[] = [
   { code: "marke", label: "Mit Marken-Etikett", hint: "Etikett 1:1 aus Referenzbild übernehmen" },
-  { code: "generisch", label: "Generisch", hint: "Unbranded — kein spezifisches Etikett" },
+  { code: "generisch", label: "Generisch", hint: "KI gestaltet selbst ein passendes Etikett (fiktive Marke)" },
 ];
 
 const EXTRA_OPTIONS = [

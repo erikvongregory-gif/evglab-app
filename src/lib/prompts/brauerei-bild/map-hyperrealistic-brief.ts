@@ -217,12 +217,12 @@ export function hyperrealisticInputToBrauereiBrief(
     etikettModus:
       etikettModus === "marke"
         ? "Ja, Marken-Etikett 1:1 (Referenzbild wird mitgesendet)"
-        : "Generisch / unbranded",
+        : "Generisch — KI erfindet ein passendes, professionelles Etikett (fiktive Marke)",
     referenzStaerke: etikettModus === "marke" ? "Strikt 85%" : "Frei",
     referenzHinweis:
       etikettModus === "marke"
         ? "Separates Referenzbild der Flasche/Etikett wird an die Bild-KI uebergeben."
-        : "Keine Etikett-Referenz, Flasche bleibt unbranded.",
+        : "Keine Etikett-Referenz: Die KI gestaltet selbst ein stimmiges, professionelles Etikett mit fiktivem Markennamen + Logo (keine echte Brauerei). Flasche/Dose NICHT leer/unbranded lassen.",
     zusatzWunsch: input.zusatzWunsch ?? null,
     qualitaet: input.quality,
   };
@@ -271,7 +271,11 @@ export function buildHyperrealisticClaudeUserMessage(
       "Das Etikett/die Flasche kommt als separates Referenzbild zur Bild-KI — beschreibe 1:1-Etikett-Treue mit EXACT TEXT Syntax.",
     );
   } else {
-    lines.push("Generischer Look ohne Marken-Etikett — keine EXACT-TEXT-Syntax verwenden.");
+    lines.push(
+      "GENERISCHES ETIKETT (PFLICHT): Es gibt KEIN Referenzbild. Die Bild-KI soll selbst ein originelles, professionell wirkendes Etikett (bei Dose: Wrap-around-Artwork) gestalten, das zum Bierstil und zur Stimmung passt.",
+      "Erfinde dafuer einen plausiblen FIKTIVEN Markennamen + passendes Logo (KEINE echte, real existierende Brauerei, keine fremden Marken) und beschreibe ihn konkret im englischen Prompt: klare, gut lesbare Typografie, stimmige Farbpalette, sauberes realistisches Layout.",
+      "Die Flasche/Dose darf NICHT leer oder unbranded sein. Du DARFST hier einen fiktiven Markennamen via EXACT TEXT vorgeben (im Gegensatz zum Referenzbild-Workflow, wo nichts erfunden wird).",
+    );
   }
 
   if (behaelter !== "G") {
@@ -291,7 +295,7 @@ export function buildHyperrealisticClaudeUserMessage(
     const offen = istDose
       ? "die Dose ist GEOEFFNET (Stay-Tab aufgezogen)"
       : input.flaschenTyp.startsWith("buegel")
-        ? "die Flasche ist GEOEFFNET (Buegelverschluss aufgeklappt, Porzellanstopfen weg vom Mund)"
+        ? "die Flasche ist GEOEFFNET — Buegelverschluss offen, Porzellanstopfen + Drahtbuegel SAUBER nach hinten geklappt und ordentlich am Flaschenhals anliegend (intakt, natuerlich; NICHT chaotisch baumelnd, NICHT verheddert, NICHT frei schwebend, NICHT das Etikett verdeckend)"
         : "die Flasche ist GEOEFFNET (KEIN Kronkorken auf der Muendung)";
     lines.push(
       "KRITISCH VERSCHLUSS-LOGIK (PFLICHT, physikalisch konsistent):",

@@ -201,7 +201,7 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
       ? ""
       : etikettModus === "marke"
         ? `${flasche.promptDescription}${materialClause}. The ${istDose ? "wrap-around artwork on the can" : "label on the bottle"} MUST be reproduced 1:1 EXACTLY from the reference image — same artwork, same typography, same colors, same proportions, no reinterpretation, no stylization. Treat the ${istDose ? "can artwork as a fixed graphic asset wrapped around the cylindrical can body" : "label as a fixed graphic asset to be applied flat-perspective-corrected onto the bottle"}.`
-        : `${flasche.promptDescription}${materialClause}. Generic unbranded ${gebindeNoun} — no label text, plain ${istDose ? "can surface" : "bottle surface"}.`;
+        : `${flasche.promptDescription}${materialClause}. Design an original, professionally branded ${istDose ? "wrap-around can artwork" : "beer label"} that fits the beer style "${input.bierstil}" and the overall mood — invent a plausible FICTIONAL brand name and matching logo (NOT any real existing brewery), with clean legible typography, a coherent color palette and a tasteful, realistic layout. The ${gebindeNoun} MUST look professionally ${istDose ? "printed" : "labelled"}, never blank, never unlabelled.`;
 
   const glasPart =
     behaelter === "F"
@@ -259,7 +259,22 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
         ? "toasting or clinking with sealed unopened cans, "
         : "toasting or clinking with sealed bottles, clinking capped crown-cap bottles together, "
       : "";
-  const closureNegative = `${closureBase}${toastNegative}`;
+  // Bügelverschluss sauber halten — kein chaotisch baumelnder Drahtbügel/Stopfen.
+  const istBuegel = !istDose && input.flaschenTyp.startsWith("buegel");
+  const buegelNegative =
+    istBuegel && behaelter !== "G"
+      ? "messy tangled dangling swing-top wire bail, chaotic floating porcelain stopper, swing-top mechanism hanging awkwardly across the bottle, deformed or bent wire clip, stopper covering the label, duplicated swing-top parts, "
+      : "";
+  const closureNegative = `${closureBase}${toastNegative}${buegelNegative}`;
+
+  // Etikett-Negatives: bei "marke" Label-Verzerrung vermeiden; bei "generisch"
+  // ein nacktes Gebinde verhindern (die KI soll ein Etikett designen).
+  const labelNegative =
+    etikettModus === "marke"
+      ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, "
+      : behaelter === "G"
+        ? ""
+        : "blank unlabelled container, plain label-less bottle or can, missing label, missing can artwork, real existing brewery logo or trademark, floating bottle, unrealistic bottle placement, ";
 
   return `
 ${buildHyperrealismLockFragment()}
@@ -283,6 +298,6 @@ CAMERA: ${cameraPart}
 
 ${input.zusatzWunsch ? `ADDITIONAL: ${input.zusatzWunsch}` : ""}
 
-NEGATIVE: ${sceneNegative}${bottleShapeNegative}${closureNegative}${glassOnlyNegative}${etikettModus === "marke" ? "distorted label, warped text on label, wrong brewery name on glass, unbranded glass with branded product, mixed competing beer brands, floating bottle, unrealistic bottle placement, " : ""}${HYPERREALISM_NEGATIVE}.
+NEGATIVE: ${sceneNegative}${bottleShapeNegative}${closureNegative}${glassOnlyNegative}${labelNegative}${HYPERREALISM_NEGATIVE}.
   `.trim();
 }

@@ -1695,6 +1695,16 @@ function SettingsView({
         return;
       }
       if (json?.settings) onChange(json.settings);
+      // Sidebar-Fußzeile (Avatar + Name) sofort aktualisieren, ohne Server-Reload.
+      const savedSettings = json?.settings ?? draft;
+      window.dispatchEvent(
+        new CustomEvent("evglab-profile-updated", {
+          detail: {
+            breweryName: savedSettings.breweryName ?? "",
+            profileName: savedSettings.profileName ?? "",
+          },
+        }),
+      );
       setNotice("Gespeichert.");
     } catch {
       setError("Einstellungen konnten nicht gespeichert werden.");

@@ -276,7 +276,7 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
   const openState = istDose
     ? "the stay-tab popped open at the top of the can"
     : istBuegel
-      ? "the swing-top porcelain stopper flipped open and lifted clear of the mouth"
+      ? "the swing-top closure OPEN with the porcelain/ceramic stopper and its metal wire bail neatly flipped back and resting tidily against the bottle neck (clean, natural, intact mechanism — NOT dangling messily, NOT tangled, NOT floating in mid-air, NOT covering the label)"
       : "the crown cap removed — no cap on the bottle mouth";
 
   const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
