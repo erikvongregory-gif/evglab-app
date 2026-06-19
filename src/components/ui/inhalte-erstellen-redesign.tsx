@@ -14,7 +14,6 @@ import {
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { FLASCHEN_TYPEN, isDoseTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { calculateGenerationTokenCost } from "@/lib/billing/generationTokenCost";
-import { estimateGenerationProgress } from "@/lib/kie/generationProgress";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import {
   MarketingPromptCreateShell,
@@ -1292,116 +1291,6 @@ export function InhalteErstellenRedesign({
     }
   }
 
-  async function pollKieTask(
-    taskId: string,
-    signal: AbortSignal,
-    onProgress?: (progress: number) => void,
-  ): Promise<string> {
-    // Gesamt-Deadline: 6 Minuten (Kie kann je nach Modell/Auslastung deutlich länger
-    // als die UI-Schätzung brauchen). Wir geben hier eher mehr Spielraum, statt
-    // gut laufende Generierungen abzubrechen.
-    const deadlineMs = Date.now() + 6 * 60 * 1000;
-
-    // Adaptiver Delay: erste 30s schnell (2s), danach gemächlicher (3.5s),
-    // um Rate-Limit-Druck zu reduzieren und trotzdem responsive zu wirken.
-    const delayFor = (elapsedSec: number) => {
-      if (elapsedSec < 30) return 2000;
-      if (elapsedSec < 120) return 3500;
-      return 5000;
-    };
-
-    // Bei transienten Fehlern (429/5xx/Netzwerk) nicht abbrechen, sondern
-    // mit progressivem Backoff erneut versuchen. Erst nach mehreren Fehlern
-    // in Folge oder Deadline aufgeben.
-    let consecutiveTransientErrors = 0;
-    const maxTransientInARow = 6;
-    const startedAt = Date.now();
-
-    while (Date.now() < deadlineMs) {
-      if (signal.aborted) throw new Error("Generierung abgebrochen.");
-
-      const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
-      const waitMs = delayFor(elapsedSec) * (1 + consecutiveTransientErrors * 0.5);
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
-      if (signal.aborted) throw new Error("Generierung abgebrochen.");
-
-      let res: Response;
-      try {
-        res = await fetch(`/api/kie/nano-banana/task-status?taskId=${encodeURIComponent(taskId)}`, {
-          cache: "no-store",
-          signal,
-        });
-      } catch (networkError) {
-        // Netzwerkfehler (z.B. Offline/Aborted) → transient behandeln,
-        // ausser explizit vom User abgebrochen.
-        if (signal.aborted) throw new Error("Generierung abgebrochen.");
-        consecutiveTransientErrors += 1;
-        if (consecutiveTransientErrors >= maxTransientInARow) {
-          throw networkError instanceof Error
-            ? networkError
-            : new Error("Statusabfrage fehlgeschlagen (Netzwerk).");
-        }
-        continue;
-      }
-
-      // Rate-Limit oder Upstream-5xx → kurz warten und erneut versuchen.
-      // Niemals hart abbrechen wegen transienten Fehlern.
-      if (res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504) {
-        consecutiveTransientErrors += 1;
-        const retryAfterHeader = res.headers.get("Retry-After");
-        const retryAfterMs = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) * 1000 : 0;
-        if (Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, Math.min(retryAfterMs, 15_000)));
-        }
-        if (consecutiveTransientErrors >= maxTransientInARow) {
-          throw new Error(`Statusabfrage wiederholt fehlgeschlagen (HTTP ${res.status}).`);
-        }
-        continue;
-      }
-
-      let data: { state?: string; imageUrl?: string | null; error?: string; progress?: number | null };
-      try {
-        data = (await res.json()) as typeof data;
-      } catch {
-        consecutiveTransientErrors += 1;
-        if (consecutiveTransientErrors >= maxTransientInARow) {
-          throw new Error("Statusabfrage unverständlich.");
-        }
-        continue;
-      }
-
-      if (!res.ok) {
-        // Andere Client-Fehler (z.B. 400/401/403) sind echte Fehler — sofort abbrechen.
-        throw new Error(data.error ?? "Statusabfrage fehlgeschlagen.");
-      }
-
-      // Erfolgreicher Status-Call → Zähler resetten.
-      consecutiveTransientErrors = 0;
-
-      const elapsedMs = Date.now() - startedAt;
-      const progress = estimateGenerationProgress(elapsedMs, data.progress);
-      onProgress?.(progress);
-
-      const state = (data.state ?? "").toLowerCase();
-      if (["success", "succeeded", "completed", "done"].includes(state) && data.imageUrl) {
-        onProgress?.(100);
-        return data.imageUrl;
-      }
-      if (["failed", "error", "cancelled", "canceled"].includes(state)) {
-        throw new Error("Die KI-Generierung wurde abgebrochen.");
-      }
-
-      if (elapsedSec > 90) {
-        setGenerationStep(`Noch in Arbeit (~${elapsedSec}s) — die KI braucht etwas länger …`);
-      } else if (elapsedSec > 50) {
-        setGenerationStep(`KI generiert (~${elapsedSec}s) — bitte noch einen Moment …`);
-      } else {
-        setGenerationStep(`KI generiert (~${elapsedSec}s) …`);
-      }
-    }
-    throw new Error("Generierung dauert ungewoehnlich lange — bitte spaeter erneut versuchen.");
-  }
-
   async function generate() {
     setLoading(true);
     setHasGenerated(true);
@@ -1412,7 +1301,6 @@ export function InhalteErstellenRedesign({
     setVariantProgress(Array.from({ length: variantCount }, () => 5));
     setGenerationStep("Brief wird verarbeitet …");
     setMicroStepIndex(buildMicroStepIds(behaelter, personenModus, flaschenTyp).length - 1);
-    const controller = new AbortController();
     try {
       // Vorrang: Ad-hoc-Upload > Markenprofil-Etikett.
       const effectiveEtikettModus = profileMode === "skip" ? "generisch" : etikettModus;
@@ -1467,111 +1355,83 @@ export function InhalteErstellenRedesign({
           `Nicht genug Tokens. Benötigt: ${generationTokenCost}, verfügbar: ${tokensRemaining}.`,
         );
       }
-      setGenerationStep("Brief wird gesendet …");
-      const res = await fetch("/api/inhalte-erstellen/create-task", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed),
-      });
-      const data = (await res.json()) as {
+      setGenerationStep(`KI generiert ${variantCount} Variante(n) …`);
+
+      // OpenAI rendert synchron — wir simulieren waehrend des Wartens einen
+      // sanften Fortschritt, damit die Lade-Kacheln lebendig wirken.
+      const progressTimer = window.setInterval(() => {
+        setVariantProgress((prev) =>
+          (prev.length ? prev : Array.from({ length: variantCount }, () => 5)).map((p) =>
+            Math.min(92, p + Math.random() * 7 + 1),
+          ),
+        );
+      }, 1100);
+
+      let data: {
         error?: string;
-        taskId?: string;
-        taskIds?: string[];
+        images?: { imageUrl: string }[];
         variantCount?: number;
+        expectedVariants?: number;
         partial?: boolean;
         partialErrors?: string[];
         prompt?: string;
+        outputFormat?: "png" | "jpg";
         billing?: {
           freeTrial?: boolean;
           consumed?: number;
           remainingTokens?: number;
         };
       };
-      const taskIds: string[] = Array.isArray(data.taskIds) && data.taskIds.length > 0
-        ? data.taskIds
-        : data.taskId
-          ? [data.taskId]
-          : [];
-      if (!res.ok || taskIds.length === 0) {
-        throw new Error(data.error ?? "Task-Erstellung fehlgeschlagen.");
+      try {
+        const res = await fetch("/api/inhalte-erstellen/create-task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(parsed),
+        });
+        data = (await res.json()) as typeof data;
+        if (!res.ok) {
+          throw new Error(data.error ?? "Bildgenerierung fehlgeschlagen.");
+        }
+      } finally {
+        window.clearInterval(progressTimer);
+      }
+
+      const resultImages = Array.isArray(data.images) ? data.images : [];
+      if (resultImages.length === 0) {
+        throw new Error(data.error ?? "Keine Variante konnte generiert werden.");
       }
 
       if (typeof data.billing?.remainingTokens === "number") {
         setTokensRemaining(data.billing.remainingTokens);
         window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
-      } else if (data.billing?.freeTrial) {
-        setTokensRemaining(0);
-        window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
       }
 
-      // Progressives Befuellen: jede Variante erscheint, sobald sie fertig ist.
-      // Reihenfolge stabil via Index → wir reservieren erst Slots mit Placeholders.
-      const initialSlots: ImageResponse[] = taskIds.map(() => ({}));
-      setImages(initialSlots);
-      const totalVariants = taskIds.length;
-      let completedCount = 0;
-      setGenerationStep(`KI generiert ${totalVariants} Varianten …`);
-      setVariantProgress(taskIds.map(() => 12));
+      setImages(resultImages.map((img) => ({ url: img.imageUrl })));
+      setVariantProgress(resultImages.map(() => 100));
 
       const mediaPromptLabel = (() => {
         const base = `${was.label} · ${behaelterLabel} · ${wo.label} · ${wie.label}`.slice(0, 200);
         return base.trim().length > 0 ? base : "EvGlab-Motiv";
       })();
-      const mediaResolution: "1K" | "2K" =
-        parsed.quality === "high" ? "2K" : "1K";
+      const mediaResolution: "1K" | "2K" = parsed.quality === "high" ? "2K" : "1K";
+      const outputFormat = data.outputFormat ?? "png";
 
-      const polls = taskIds.map(async (taskId, index) => {
-        try {
-          const imageUrl = await pollKieTask(taskId, controller.signal, (progress) => {
-            setVariantProgress((prev) => {
-              const next = prev.length === taskIds.length ? [...prev] : taskIds.map(() => 12);
-              next[index] = progress;
-              return next;
-            });
-          });
-          setImages((prev) => {
-            const next = [...prev];
-            next[index] = { url: imageUrl };
-            return next;
-          });
-          completedCount += 1;
-          setGenerationStep(`${completedCount} von ${totalVariants} Varianten fertig …`);
-          void persistMediaItem({
-            id: `${taskId}-${index}`,
-            imageUrl,
-            title: mediaPromptLabel,
-            prompt: mediaPromptLabel,
-            createdAt: new Date().toISOString(),
-            aspectRatio: parsed.aspectRatio,
-            resolution: mediaResolution,
-            outputFormat: imageUrl.toLowerCase().endsWith(".jpg") || imageUrl.toLowerCase().endsWith(".jpeg") ? "jpg" : "png",
-          });
-          return { ok: true as const, index };
-        } catch (e) {
-          completedCount += 1;
-          setGenerationStep(`${completedCount} von ${totalVariants} Varianten fertig …`);
-          return { ok: false as const, index, error: e instanceof Error ? e.message : "Unbekannter Fehler." };
-        }
+      resultImages.forEach((img, index) => {
+        void persistMediaItem({
+          id: `openai-${Date.now()}-${index}`,
+          imageUrl: img.imageUrl,
+          title: mediaPromptLabel,
+          prompt: mediaPromptLabel,
+          createdAt: new Date().toISOString(),
+          aspectRatio: parsed.aspectRatio,
+          resolution: mediaResolution,
+          outputFormat,
+        });
       });
-      const results = await Promise.all(polls);
-      const successCount = results.filter((r) => r.ok).length;
-      const failures = results.filter((r) => !r.ok);
 
-      // Leere Slots (Failures) am Ende entfernen, damit das Grid sauber bleibt.
-      setImages((prev) => prev.filter((img) => Boolean(img.url || img.b64_json)));
-
-      if (successCount === 0) {
-        throw new Error(
-          failures[0] && !failures[0].ok ? failures[0].error : "Keine Variante konnte generiert werden.",
-        );
-      }
-      if (failures.length > 0) {
+      if (data.partial && data.partialErrors && data.partialErrors.length > 0) {
         setError(
-          `${successCount} von ${totalVariants} Varianten erfolgreich. Restliche fehlgeschlagen — bitte ggf. erneut versuchen.`,
-        );
-      } else if (data.partial && data.partialErrors && data.partialErrors.length > 0) {
-        setError(
-          `Nur ${totalVariants} Variante(n) erstellt — manche Generierungen wurden abgelehnt.`,
+          `${resultImages.length} von ${data.expectedVariants ?? variantCount} Variante(n) erstellt — manche Generierungen wurden abgelehnt.`,
         );
       }
       setGenerationStep("");
