@@ -624,7 +624,7 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
             ? "Passe den KI-Vorschlag an, bevor du dein Markenprofil aktivierst."
             : step === "analyzing"
               ? analysisSteps[analysisStepIndex]
-              : "Gib die Website deiner Marke ein oder verbinde Instagram — EvGlab erkennt Tonalität, Farben und Bildsprache."}
+              : "Gib die Website deiner Marke ein oder verbinde Instagram — BrewAI erkennt Tonalität, Farben und Bildsprache."}
         </DialogDescription>
 
         <DialogClose asChild>
@@ -671,7 +671,7 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
               </div>
               <h2 className="studio-modal-title">{modalTitle}</h2>
               <p className="studio-modal-sub">
-                Website einlesen oder Instagram verbinden — EvGlab erkennt Tonalität, Farben und Bildsprache für konsistente Motive.
+                Website einlesen oder Instagram verbinden — BrewAI erkennt Tonalität, Farben und Bildsprache für konsistente Motive.
               </p>
 
               <div className="studio-modal-tabs" role="tablist">
@@ -744,7 +744,7 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
                           @{instagramStatus.username ?? "instagram"}
                         </p>
                         <p className="studio-faint" style={{ marginTop: 6, fontSize: 11.5, lineHeight: 1.45 }}>
-                          Verbunden — EvGlab liest deine letzten Posts über die Meta Graph API aus.
+                          Verbunden — BrewAI liest deine letzten Posts über die Meta Graph API aus.
                         </p>
                       </div>
                       <button

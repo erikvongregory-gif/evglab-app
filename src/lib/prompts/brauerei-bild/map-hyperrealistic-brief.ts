@@ -244,7 +244,7 @@ export function buildHyperrealisticClaudeUserMessage(
           : "GPT Image 2";
 
   const lines: string[] = [
-    "Erstelle einen kopierfertigen englischen Bildgenerierungs-Prompt fuer den EvGlab Dashboard-Modus „Hyperrealistisch“.",
+    "Erstelle einen kopierfertigen englischen Bildgenerierungs-Prompt fuer den BrewAI Dashboard-Modus „Hyperrealistisch“.",
     `Zielmodell: ${targetModel} — nutze die plattform-spezifische Prompt-Struktur aus dem Skill und SRM-Farbtabelle.`,
   ];
 

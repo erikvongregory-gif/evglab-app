@@ -6,7 +6,7 @@ import { SITE } from "@/lib/siteConfig";
 import { resolveAuthCallbackRedirect } from "@/lib/supabase/authEntryRedirect";
 
 export const metadata: Metadata = {
-  title: { absolute: "EvGlab · Passwort zurücksetzen" },
+  title: { absolute: "BrewAI · Passwort zurücksetzen" },
   alternates: { canonical: `${SITE.baseUrl}/passwort-zuruecksetzen` },
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
 };

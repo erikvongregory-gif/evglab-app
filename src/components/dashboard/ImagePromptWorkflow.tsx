@@ -2838,7 +2838,7 @@ export function ImagePromptWorkflow({
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectUrl;
-      a.download = `evglab-${lastTaskId || Date.now()}.${imageOutputFormat}`;
+      a.download = `brewai-${lastTaskId || Date.now()}.${imageOutputFormat}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -2892,7 +2892,7 @@ export function ImagePromptWorkflow({
           ))}
         </div>
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Pflicht: EvGlab Prompt-Briefing</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Pflicht: BrewAI Prompt-Briefing</h3>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             Schritt-für-Schritt-Abfrage. Erst am Ende wird der finale englische Prompt generiert.
           </p>

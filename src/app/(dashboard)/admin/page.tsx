@@ -6,7 +6,7 @@ import { StudioPageHeader } from "@/components/studio/ui";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab · Admin-Bereich",
+    absolute: "BrewAI · Admin-Bereich",
   },
   robots: {
     index: false,

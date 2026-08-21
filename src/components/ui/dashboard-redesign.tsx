@@ -166,7 +166,7 @@ async function downloadMediaItem(item: MediaItem): Promise<string | null> {
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
-  anchor.download = `evglab-${item.id}.${item.outputFormat}`;
+  anchor.download = `brewai-${item.id}.${item.outputFormat}`;
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
@@ -435,7 +435,7 @@ export function DashboardRedesignShell(props: {
 
   const profileName = settings?.profileName?.trim() || initialProfileName?.trim() || "";
   const breweryName = settings?.breweryName?.trim() || initialBreweryName?.trim() || "";
-  const accountName = breweryName || profileName || "EvGlab";
+  const accountName = breweryName || profileName || "BrewAI";
   const initials = initialsFromName(accountName);
   const brandProfileComplete = isBrandProfileComplete(settings);
   const brandProfileMode = settings?.brandProfileMode ?? "undecided";
@@ -1817,7 +1817,7 @@ function SettingsView({
                   <div style={{ fontFamily: TOKENS.sans, fontWeight: 650, fontSize: 15 }}>Markenprofil</div>
                   <p style={{ marginTop: 6, maxWidth: 520, fontFamily: TOKENS.sans, fontSize: 13, color: P.ink2 }}>
                     {draft.brandProfileMode === "skip"
-                      ? "Du nutzt EvGlab ohne Markenprofil. Über den Button kannst du jederzeit ein Profil aus deiner Website anlegen."
+                      ? "Du nutzt BrewAI ohne Markenprofil. Über den Button kannst du jederzeit ein Profil aus deiner Website anlegen."
                       : "Lege dein Markenprofil fest: Website-Link eingeben, KI wertet Stil und Vorgaben aus."}
                   </p>
                   {draft.brandWebsiteUrl ? (

@@ -9,7 +9,7 @@ export function messageForForgotPassword(
     case "sent":
       return {
         notice:
-          "Wenn ein Konto mit dieser E-Mail existiert, erhältst du in Kürze eine E-Mail von EvGlab mit dem Link zum Zurücksetzen.",
+          "Wenn ein Konto mit dieser E-Mail existiert, erhältst du in Kürze eine E-Mail von BrewAI mit dem Link zum Zurücksetzen.",
       };
     case "missing":
       return { error: "Bitte gib deine E-Mail-Adresse ein." };
@@ -31,14 +31,14 @@ export function messageForForgotPassword(
     case "resend_domain_unverified":
       return {
         error:
-          "Die Absender-Domain evglab.com ist bei Resend noch nicht verifiziert. Unter resend.com/domains DNS-Einträge setzen — oder lokal testweise nur an deine Resend-Account-E-Mail senden (Sandbox: onboarding@resend.dev).",
+          "Die Absender-Domain brewai.de ist bei Resend noch nicht verifiziert. Unter resend.com/domains DNS-Einträge setzen — oder lokal testweise nur an deine Resend-Account-E-Mail senden (Sandbox: onboarding@resend.dev).",
       };
     case "resend_sandbox_recipient": {
       const allowed = detail?.trim();
       return {
         error: allowed
-          ? `Resend-Testmodus: Mails können aktuell nur an ${allowed} gesendet werden. Nutze diese E-Mail zum Testen — oder verifiziere evglab.com bei Resend.`
-          : "Resend-Testmodus: Mails können nur an deine bei Resend registrierte E-Mail gesendet werden. Alternativ evglab.com unter resend.com/domains verifizieren.",
+          ? `Resend-Testmodus: Mails können aktuell nur an ${allowed} gesendet werden. Nutze diese E-Mail zum Testen — oder verifiziere brewai.de bei Resend.`
+          : "Resend-Testmodus: Mails können nur an deine bei Resend registrierte E-Mail gesendet werden. Alternativ brewai.de unter Resend.com/domains verifizieren.",
       };
     }
     case "reset_rate_limited":

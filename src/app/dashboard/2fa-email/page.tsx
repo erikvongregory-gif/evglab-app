@@ -6,7 +6,7 @@ import { StudioButton, StudioCard } from "@/components/studio/ui";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab · Admin-Sicherheitscode",
+    absolute: "BrewAI · Admin-Sicherheitscode",
   },
   robots: {
     index: false,

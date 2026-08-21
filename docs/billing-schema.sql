@@ -1,4 +1,4 @@
--- EvGlab Billing & Launch Schema
+-- BrewAI Billing & Launch Schema
 -- Run in Supabase SQL Editor BEFORE stripe-webhook-events-schema.sql
 
 -- ============================================================================

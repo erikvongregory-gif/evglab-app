@@ -29,10 +29,10 @@ const requestSchema = z
 function fallbackAnswer(question: string): string {
   const q = question.toLowerCase();
   if (/schweizerdeutsch|schwiizerdutsch|schwiizerdütsch/.test(q)) {
-    return "Ja klar, ich cha au Schwiizerdütsch rede. Frag mich eifach öppis — zu EvGlab, Marketing oder allgemeine Themen.";
+    return "Ja klar, ich cha au Schwiizerdütsch rede. Frag mich eifach öppis — zu BrewAI, Marketing oder allgemeine Themen.";
   }
-  if (/evglab|dashboard|mediathek|markenprofil|bilder erstellen|inhalte erstellen|abo|tarif/i.test(q)) {
-    return "Gern helfe ich dir in EvGlab weiter: Dashboard, Bilder Erstellen, Markenprofil, Mediathek oder Tarife — was möchtest du wissen?";
+  if (/brewai|evglab|dashboard|mediathek|markenprofil|bilder erstellen|inhalte erstellen|abo|tarif/i.test(q)) {
+    return "Gern helfe ich dir in BrewAI weiter: Dashboard, Bilder Erstellen, Markenprofil, Mediathek oder Tarife — was möchtest du wissen?";
   }
   if (/marke|brand|stil|look|prompt|bild|motiv|kampagne|social/i.test(q)) {
     return "Super Thema. Beschreib mir Produkt, Stimmung und Format — ich formuliere dir gern einen Prompt oder eine Idee.";
@@ -40,7 +40,7 @@ function fallbackAnswer(question: string): string {
   if (/token|billing|budget|kosten sparen|umgeh|hack/i.test(q)) {
     return policyRefusalAnswer();
   }
-  return "Prost! Ich bin Hopfen Hugo — frag mich zu EvGlab, Marketing, Brauerei oder allgemeinen Themen. Bei Bild-Prompts bin ich besonders stark.";
+  return "Prost! Ich bin Hopfen Hugo — frag mich zu BrewAI, Marketing, Brauerei oder allgemeinen Themen. Bei Bild-Prompts bin ich besonders stark.";
 }
 
 function hasUsableAnthropicKey(value: string | undefined): value is string {
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
       return {
         role: "user" as const,
         content: [
-          `Kontext: EvGlab Studio, Tab „${currentTab ?? "unbekannt"}“, Persona „${assistantPersona ?? "hopfen-hugo"}“.`,
+          `Kontext: BrewAI Studio, Tab „${currentTab ?? "unbekannt"}“, Persona „${assistantPersona ?? "hopfen-hugo"}“.`,
           "Halte dich an die Nutzungsrichtlinien im System-Prompt.",
           "",
           msg.text,

@@ -54,9 +54,9 @@ export function CreateContentLockedView({ feature = "images" }: CreateContentLoc
 
           {isVideo
 
-            ? "„Videos Erstellen“ ist Teil deines EvGlab-Abos. Wähle einen Tarif — danach kannst du Story-Videos für Reels, TikTok und Shorts generieren."
+            ? "„Videos Erstellen“ ist Teil deines BrewAI-Abos. Wähle einen Tarif — danach kannst du Story-Videos für Reels, TikTok und Shorts generieren."
 
-            : "„Bilder Erstellen“ ist Teil deines EvGlab-Abos. Wähle einen Tarif — danach kannst du Motive, Posts und Kampagnen im Markenstil generieren."}
+            : "„Bilder Erstellen“ ist Teil deines BrewAI-Abos. Wähle einen Tarif — danach kannst du Motive, Posts und Kampagnen im Markenstil generieren."}
 
         </p>
 
@@ -110,9 +110,9 @@ export function CreateContentLockedView({ feature = "images" }: CreateContentLoc
 
           Fragen?{" "}
 
-          <Link href="mailto:support@evglab.com" style={{ color: "var(--tx-2)", textDecoration: "underline" }}>
+          <Link href="mailto:kontakt@brewai.de" style={{ color: "var(--tx-2)", textDecoration: "underline" }}>
 
-            support@evglab.com
+            kontakt@brewai.de
 
           </Link>
 

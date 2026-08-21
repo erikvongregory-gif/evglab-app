@@ -9,7 +9,7 @@ import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab · Anmelden",
+    absolute: "BrewAI · Anmelden",
   },
   alternates: {
     canonical: `${SITE.baseUrl}/anmelden`,

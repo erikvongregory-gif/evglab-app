@@ -91,4 +91,4 @@ Write-Host ""
 Write-Host "Redeploy auslösen …" -ForegroundColor Green
 npx vercel deploy --prod --yes
 Write-Host ""
-Write-Host "Fertig. Plan-Checkout auf https://app.evglab.com sollte jetzt funktionieren." -ForegroundColor Green
+Write-Host "Fertig. Plan-Checkout auf https://app.brewai.de sollte jetzt funktionieren." -ForegroundColor Green

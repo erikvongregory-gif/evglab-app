@@ -147,9 +147,9 @@ export function LoginHero({ mode }: { mode: AuthMode }) {
       <div className={styles.glow} aria-hidden />
       <div className={styles.mesh} aria-hidden />
 
-      <a href={MARKETING_SITE_URL} className={styles.brand} aria-label="EvGlab Startseite">
+      <a href={MARKETING_SITE_URL} className={styles.brand} aria-label="BrewAI Startseite">
         <EvglabMark className={styles.brandMark} />
-        <span className={styles.brandName}>EvGlab</span>
+        <span className={styles.brandName}>BrewAI</span>
       </a>
 
       <div className={`${styles.heroBody} ${styles.stagger}`}>
@@ -191,7 +191,7 @@ export function LoginHero({ mode }: { mode: AuthMode }) {
 
       <div className={`${styles.heroFoot} ${styles.eyebrow}`}>
         <span className={styles.dotOk} aria-hidden />
-        app.evglab.com · v2.4 · live
+        app.brewai.de · v2.4 · live
       </div>
     </section>
   );
@@ -379,7 +379,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
           <h2 className={styles.formTitle}>{signInOnly ? "Admin-Anmeldung" : isRegister ? "Konto erstellen" : "Willkommen zurück"}</h2>
           <p className={styles.lead}>
             {signInOnly ? (
-              <>Nur für EvGlab-Administratoren. Nach dem Login folgt ein E-Mail-Sicherheitscode.</>
+              <>Nur für BrewAI-Administratoren. Nach dem Login folgt ein E-Mail-Sicherheitscode.</>
             ) : isRegister ? (
               <>
                 Bereits Konto?{" "}

@@ -5,7 +5,7 @@ import { AdminLoginForm } from "./admin-login-form";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab · Admin-Anmeldung",
+    absolute: "BrewAI · Admin-Anmeldung",
   },
   alternates: {
     canonical: `${SITE.baseUrl}/admin/anmelden`,

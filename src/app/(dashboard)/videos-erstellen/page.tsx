@@ -14,7 +14,7 @@ import { CreateVideosView } from "@/components/studio/create-videos-view";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab - Videos Erstellen",
+    absolute: "BrewAI - Videos Erstellen",
   },
   robots: {
     index: false,

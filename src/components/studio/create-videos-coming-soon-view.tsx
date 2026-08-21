@@ -33,8 +33,8 @@ export function CreateVideosComingSoonView() {
         </div>
         <p style={{ margin: "18px 0 0", fontSize: 12.5, color: "var(--tx-3)" }}>
           Fragen?{" "}
-          <Link href="mailto:support@evglab.com" style={{ color: "var(--tx-2)", textDecoration: "underline" }}>
-            support@evglab.com
+          <Link href="mailto:kontakt@brewai.de" style={{ color: "var(--tx-2)", textDecoration: "underline" }}>
+            kontakt@brewai.de
           </Link>
         </p>
       </div>

@@ -2,6 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAnonKey, getSupabaseUrl, isInviteOnlyEnabled } from "@/lib/supabase/env";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
+import { getSharedCookieDomain } from "@/lib/siteConfig";
+
+function withSharedCookieDomain<T extends { domain?: string }>(options: T): T {
+  const domain = getSharedCookieDomain();
+  if (!domain) return options;
+  return { ...options, domain };
+}
 
 export async function updateSession(request: NextRequest) {
   const requestId = getOrCreateRequestId(request);
@@ -15,13 +22,19 @@ export async function updateSession(request: NextRequest) {
   }
 
   const supabase = createServerClient(url, key, {
+    cookieOptions: {
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      ...(getSharedCookieDomain() ? { domain: getSharedCookieDomain() } : {}),
+    },
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          supabaseResponse.cookies.set(name, value, options);
+          supabaseResponse.cookies.set(name, value, withSharedCookieDomain(options));
         });
         Object.entries(headers).forEach(([k, v]) => {
           if (k.toLowerCase() === "set-cookie") return;

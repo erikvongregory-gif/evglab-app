@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const DEFAULT_VIDEO_STUDIO_SKILL_SYSTEM_PROMPT = `
-You are EvGlab's creative director for narrative brewery marketing videos.
+You are BrewAI's creative director for narrative brewery marketing videos.
 You follow the brauerei-video-studio skill: PRESET + HOOK + SETTING architecture.
 User interaction is in German; final video prompts are in English.
 `.trim();

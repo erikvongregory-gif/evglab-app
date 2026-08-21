@@ -1,10 +1,13 @@
-# EvGlab App Go-live Runbook
+# BrewAI App Go-live Runbook
 
 ## 1) Pflicht-Env in Produktion
 
 - `NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED=0` — **Pflicht für Go-live** (Login/Registrierung freigeben). Solange `1` oder unset, blockiert die Middleware neue Nutzer.
-- `NEXT_PUBLIC_APP_BASE_URL=https://app.evglab.com`
-- `NEXT_PUBLIC_MARKETING_SITE_URL=https://evglab.com`
+- `NEXT_PUBLIC_APP_BASE_URL=https://app.brewai.de`
+- `NEXT_PUBLIC_MARKETING_SITE_URL=https://brewai.de` (Alias: `NEXT_PUBLIC_SITE_URL`)
+- `NEXT_PUBLIC_SITE_NAME=BrewAI`
+- `NEXT_PUBLIC_PRODUCT_NAME=BrewAI`
+- `NEXT_PUBLIC_COOKIE_DOMAIN=brewai.de` — Shared Cookies Marketing ↔ App (nur Production setzen)
 - `NEXT_PUBLIC_SUPABASE_URL=...`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY=...`
 - `SUPABASE_SERVICE_ROLE_KEY=...`
@@ -30,9 +33,9 @@
 2. SQL aus `docs/stripe-webhook-events-schema.sql` ausführen.
 3. Prüfen, dass `billing_subscriptions` und `stripe_webhook_events` existieren.
 4. **Authentication → URL Configuration** (sonst hängt Google-Login in Production):
-   - **Site URL:** `https://app.evglab.com` (nicht `http://localhost:3001`)
+   - **Site URL:** `https://app.brewai.de` (nicht `http://localhost:3001`)
    - **Redirect URLs** (alle eintragen):
-     - `https://app.evglab.com/**`
+     - `https://app.brewai.de/**`
      - `http://localhost:3001/**`
 5. **Authentication → Providers → Google:** aktiviert, Client ID/Secret aus Google Cloud.
 6. **Google Cloud Console** → OAuth-Client → Authorized redirect URI (exakt):
@@ -65,7 +68,7 @@ STRIPE_SECRET_KEY=sk_live_... node scripts/sync-stripe-plan-prices.mjs
 2. **Env in Produktion** (Vercel o. ä.) mit den neuen Live-`price_…`-IDs aus dem Sync-Skript befüllen (nicht die alten 79/149/299-Monatspreise).
 3. **Stripe Tax** aktivieren und Regionen konfigurieren (oder `STRIPE_ENABLE_AUTOMATIC_TAX=false` bei Kleinunternehmer).
 4. **Customer Portal** aktivieren (Settings → Billing → Customer portal), damit „Abo verwalten“ funktioniert.
-5. **Webhook** auf `https://app.evglab.com/api/stripe/webhook` anlegen.
+5. **Webhook** auf `https://app.brewai.de/api/stripe/webhook` anlegen.
 6. Events abonnieren:
    - `checkout.session.completed`
    - `customer.subscription.created`
@@ -76,7 +79,7 @@ STRIPE_SECRET_KEY=sk_live_... node scripts/sync-stripe-plan-prices.mjs
 
 ## 4) Smoke-Test (Live-Readiness)
 
-1. `https://evglab.com` öffnen, Dashboard-Abo wählen, auf App-Login weiterleiten.
+1. `https://brewai.de` öffnen, Dashboard-Abo wählen, auf App-Login weiterleiten.
 2. Mit Google anmelden.
 3. Checkout starten, Zahlung abschließen.
 4. Nach Redirect prüfen:
@@ -86,7 +89,19 @@ STRIPE_SECRET_KEY=sk_live_... node scripts/sync-stripe-plan-prices.mjs
 6. Stripe-Portal öffnen (`Abo verwalten`) und Abo-Änderung testen.
 7. Webhook-Retries simulieren (Stripe CLI) und prüfen, dass kein doppelte Gutschrift entsteht.
 
-## 5) Rollback-Option
+## 6) BrewAI Domains (manuell)
+
+Nach Domain-Umstellung prüfen:
+
+1. **Vercel** → Domains: `app.brewai.de` (Primary). Legacy `app.evglab.com` / `ki.evglab.com` dürfen auf dasselbe Projekt zeigen (Middleware → 308 auf `app.brewai.de`).
+2. **Env Production:** `NEXT_PUBLIC_APP_BASE_URL`, `NEXT_PUBLIC_MARKETING_SITE_URL`, `NEXT_PUBLIC_COOKIE_DOMAIN=brewai.de`, `NEXT_PUBLIC_SITE_NAME` / `PRODUCT_NAME`.
+3. **Supabase Auth** Site URL + Redirect URLs auf `https://app.brewai.de` (alte URLs optional behalten für Übergangszeit).
+4. **Stripe** Webhook-Endpoint auf `https://app.brewai.de/api/stripe/webhook` (alten Endpoint deaktivieren, wenn Legacy-Host weg ist).
+5. **Meta Instagram** Redirect URI + App-Domain auf `app.brewai.de`.
+6. **Resend** Domain `brewai.de` verifizieren; From/Reply z. B. `kontakt@brewai.de`.
+7. **Google OAuth** (falls Client-IDs an Domains gebunden): Authorized JS origins / redirect URIs prüfen.
+
+## 7) Rollback-Option
 
 - Bei Problemen Checkout sofort per `NEXT_PUBLIC_BILLING_CHECKOUT_ENABLED=false` deaktivieren.
 - Danach nur Login/Bestandskundenzugriff aktiv lassen und Logs prüfen.

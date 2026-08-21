@@ -1,6 +1,16 @@
-# https://evglab.com/robots.txt
+# https://app.brewai.de/robots.txt — siehe auch src/app/robots.ts
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /anmelden
+Disallow: /registrieren
+Disallow: /passwort-vergessen
+Disallow: /passwort-zuruecksetzen
+Disallow: /inhalte-erstellen
+Disallow: /videos-erstellen
+Disallow: /invite/
+Disallow: /auth/
 
-# Sitemap (wird beim Build aktualisiert)
-Sitemap: https://evglab.com/sitemap.xml
+Sitemap: https://app.brewai.de/sitemap.xml

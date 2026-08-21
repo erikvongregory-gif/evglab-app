@@ -121,7 +121,7 @@ export function StudioMasthead({ P }: { P: StudioPalette }) {
         color: P.ink3,
       }}
     >
-      <span>EvGlab · Studio · Ausgabe №{issue}</span>
+      <span>BrewAI · Studio · Ausgabe №{issue}</span>
       <span className="studio-masthead-meta">
         <span>Kalenderwoche {week}</span>
         <span style={{ color: P.muted }}>·</span>

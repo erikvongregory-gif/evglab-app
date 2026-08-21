@@ -160,7 +160,7 @@ export async function GET(req: Request) {
     }
 
     const inputBuffer = await readWithLimit(upstream, MAX_IMAGE_BYTES);
-    const fileBase = `evglab-${taskId}`;
+    const fileBase = `brewai-${taskId}`;
 
     if (formatParam === "svg") {
       const metadata = await sharp(inputBuffer).metadata();

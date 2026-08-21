@@ -4,7 +4,7 @@ import { SITE } from "@/lib/siteConfig";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab · Registrierung",
+    absolute: "BrewAI · Registrierung",
   },
   alternates: {
     canonical: `${SITE.baseUrl}/registrieren`,

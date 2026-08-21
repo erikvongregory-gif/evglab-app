@@ -136,10 +136,10 @@ export function secureCookieOptions(request: Request): {
 } {
   const url = new URL(request.url);
   const secure = process.env.NODE_ENV === "production";
-  const domain =
-    secure && (url.hostname === "evglab.com" || url.hostname.endsWith(".evglab.com"))
-      ? "evglab.com"
-      : undefined;
+  const configuredDomain = process.env.NEXT_PUBLIC_COOKIE_DOMAIN?.trim()?.replace(/^\./, "");
+  const host = url.hostname;
+  const onBrewAi = host === "brewai.de" || host.endsWith(".brewai.de");
+  const domain = secure && onBrewAi ? configuredDomain || "brewai.de" : undefined;
   return {
     secure,
     ...(domain ? { domain } : {}),

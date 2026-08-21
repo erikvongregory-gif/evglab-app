@@ -17,7 +17,7 @@ import {
 } from "@/components/studio/studio-global-search";
 import { cn } from "@/lib/utils";
 
-/** Content gutter — matches EvGlab Studio redesign (--gutter) */
+/** Content gutter — matches BrewAI Studio redesign (--gutter) */
 export const STUDIO_PAD_X = 40;
 
 /** Studio design tokens (CSS vars on .evg-studio) */
@@ -340,9 +340,9 @@ function StudioTopbar({
         ) : null}
 
         <div className="evg-shell-topbar-divider evg-shell-topbar-brand-divider" style={{ width: 1, height: 24, background: "var(--line)" }} />
-        <Link href={MARKETING_SITE_URL} className="evg-shell-topbar-brand" aria-label="EvGlab Startseite">
+        <Link href={MARKETING_SITE_URL} className="evg-shell-topbar-brand" aria-label="BrewAI Startseite">
           <EvglabMark size={26} />
-          <span className="evg-shell-topbar-brand-name studio-serif">EvGlab</span>
+          <span className="evg-shell-topbar-brand-name studio-serif">BrewAI</span>
         </Link>
       </div>
     </header>
@@ -573,7 +573,7 @@ function StudioMobileDrawer({
             <StudioBrandMark />
             <div>
               <div className="studio-serif" style={{ fontSize: 17, fontWeight: 600 }}>
-                EvGlab
+                BrewAI
               </div>
               <div className="studio-mono studio-faint" style={{ fontSize: 9, letterSpacing: "0.14em", marginTop: 2 }}>
                 STUDIO
@@ -610,7 +610,7 @@ function StudioMobileDrawer({
               <span>Admin</span>
             </Link>
           ) : null}
-          <Link href="mailto:support@evglab.com" className="studio-nav-item" onClick={onClose}>
+          <Link href="mailto:kontakt@brewai.de" className="studio-nav-item" onClick={onClose}>
             <SidebarIcon name="help" />
             <span>Hilfe & Support</span>
           </Link>
@@ -706,7 +706,7 @@ export function DashboardStudioShell({
     return () => window.removeEventListener("evglab-profile-updated", handler);
   }, []);
 
-  const accountName = liveBreweryName || liveProfileName || "EvGlab";
+  const accountName = liveBreweryName || liveProfileName || "BrewAI";
   const initials = initialsFromName(accountName);
   const pad = contentPadding ?? "var(--gutter)";
 
@@ -760,7 +760,7 @@ export function DashboardStudioShell({
             <StudioBrandMark />
             <div>
               <div className="studio-serif" style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1 }}>
-                EvGlab
+                BrewAI
               </div>
               <div className="studio-mono studio-faint" style={{ fontSize: 9.5, letterSpacing: "0.16em", marginTop: 4 }}>
                 STUDIO · V2.4
@@ -812,7 +812,7 @@ export function DashboardStudioShell({
               <span>Admin</span>
             </Link>
           ) : null}
-          <Link href="mailto:support@evglab.com" className="studio-nav-item" style={{ marginBottom: 12 }}>
+          <Link href="mailto:kontakt@brewai.de" className="studio-nav-item" style={{ marginBottom: 12 }}>
             <SidebarIcon name="help" />
             <span>Hilfe & Support</span>
           </Link>

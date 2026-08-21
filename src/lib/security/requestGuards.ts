@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ALLOWED_WEB_ORIGINS } from "@/lib/siteConfig";
 
 type RateLimitRule = {
   keyPrefix: string;
@@ -134,9 +135,11 @@ export function sanitizeTaskId(taskId: string): string {
 
 export function enforceSameOrigin(req: Request): NextResponse | null {
   const targetOrigin = new URL(req.url).origin;
+  const allowed = new Set<string>([targetOrigin, ...ALLOWED_WEB_ORIGINS]);
+
   const requestOrigin = req.headers.get("origin");
   if (requestOrigin) {
-    if (requestOrigin !== targetOrigin) {
+    if (!allowed.has(requestOrigin)) {
       return NextResponse.json({ error: "Ungültige Herkunft." }, { status: 403 });
     }
     return null;
@@ -145,7 +148,7 @@ export function enforceSameOrigin(req: Request): NextResponse | null {
   const referer = req.headers.get("referer");
   if (referer) {
     try {
-      if (new URL(referer).origin === targetOrigin) return null;
+      if (allowed.has(new URL(referer).origin)) return null;
     } catch {
       return NextResponse.json({ error: "Ungültige Herkunft." }, { status: 403 });
     }

@@ -129,7 +129,7 @@ export function ForgotPasswordPage({ notice, error }: FeedbackProps) {
     <PasswordResetShell>
       <h2 className={styles.formTitle}>Passwort vergessen</h2>
       <p className={styles.lead}>
-        Gib deine E-Mail ein. Du erhältst einen Link von EvGlab, mit dem du ein neues Passwort setzen kannst.
+        Gib deine E-Mail ein. Du erhältst einen Link von BrewAI, mit dem du ein neues Passwort setzen kannst.
       </p>
 
       <Feedback notice={notice} error={error} />

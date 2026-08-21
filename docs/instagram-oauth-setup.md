@@ -5,7 +5,7 @@ Markenprofil-Scan über verbundenes Instagram Business/Creator-Konto (Option A).
 **Produktions-Callback (exakt so in Meta eintragen):**
 
 ```
-https://app.evglab.com/api/brand/instagram/callback
+https://app.brewai.de/api/brand/instagram/callback
 ```
 
 **Lokal (Dev-Port 3001):**
@@ -30,7 +30,7 @@ Ohne gekoppelte Facebook-Seite kommt nach OAuth der Fehler: *„Kein Instagram B
 
 1. Öffne [developers.facebook.com/apps](https://developers.facebook.com/apps).
 2. **App erstellen** → Use case: **Andere** oder **Business** (je nach Meta-Oberfläche).
-3. App-Name z. B. `EvGlab`, Kontakt-E-Mail deiner Wahl.
+3. App-Name z. B. `BrewAI`, Kontakt-E-Mail deiner Wahl.
 4. App erstellen und im Dashboard öffnen.
 
 Notiere sofort:
@@ -55,20 +55,20 @@ Im App-Dashboard unter **Produkte hinzufügen**:
 2. **Valid OAuth Redirect URIs** — beide Zeilen eintragen (eine pro Zeile):
 
    ```
-   https://app.evglab.com/api/brand/instagram/callback
+   https://app.brewai.de/api/brand/instagram/callback
    http://localhost:3001/api/brand/instagram/callback
    ```
 
 3. Speichern.
 
-Wichtig: Kein trailing slash, exakt `https://app.evglab.com`, Pfad `/api/brand/instagram/callback`.
+Wichtig: Kein trailing slash, exakt `https://app.brewai.de`, Pfad `/api/brand/instagram/callback`.
 
 ### A5. App-Domains (optional, empfohlen)
 
 **Einstellungen → Basis:**
 
-- **App-Domains:** `app.evglab.com`
-- **Datenschutzrichtlinien-URL:** z. B. `https://evglab.com/datenschutz` (falls vorhanden)
+- **App-Domains:** `app.brewai.de`
+- **Datenschutzrichtlinien-URL:** z. B. `https://brewai.de/datenschutz` (falls vorhanden)
 - **Nutzungsbedingungen-URL:** optional
 
 ### A6. Berechtigungen (Scopes)
@@ -124,7 +124,7 @@ Vercel → Projekt **evglab-app** → **Settings** → **Environment Variables**
 | `META_APP_ID` | App-ID aus Meta (Ziffern) | **Production** |
 | `META_APP_SECRET` | App-Geheimnis aus Meta | **Production** |
 | `META_GRAPH_API_VERSION` | `v22.0` (optional, Default im Code) | Production |
-| `NEXT_PUBLIC_APP_BASE_URL` | `https://app.evglab.com` | **Production** (prüfen, nicht überschreiben falls schon gesetzt) |
+| `NEXT_PUBLIC_APP_BASE_URL` | `https://app.brewai.de` | **Production** (prüfen, nicht überschreiben falls schon gesetzt) |
 
 `META_APP_SECRET` nur als **Secret** markieren (Standard in Vercel).
 
@@ -179,7 +179,7 @@ Ohne Redeploy kennt die laufende Instanz die neuen Variablen nicht.
 
 ### B5. Verifikation in Produktion
 
-1. `https://app.evglab.com/dashboard?tab=brand` → **Marke einlesen** → Tab **Instagram**.
+1. `https://app.brewai.de/dashboard?tab=brand` → **Marke einlesen** → Tab **Instagram**.
 2. Kein Hinweis *„noch nicht konfiguriert“* → Env ist geladen.
 3. Optional API (eingeloggt): `GET /api/brand/instagram/status` → `"configured": true`.
 4. **Instagram verbinden** → Meta-Login → Redirect zurück mit `instagram=connected`.
@@ -189,9 +189,9 @@ Ohne Redeploy kennt die laufende Instanz die neuen Variablen nicht.
 
 - [ ] `META_APP_ID` in Production gesetzt
 - [ ] `META_APP_SECRET` in Production gesetzt (Secret)
-- [ ] `NEXT_PUBLIC_APP_BASE_URL=https://app.evglab.com` in Production
+- [ ] `NEXT_PUBLIC_APP_BASE_URL=https://app.brewai.de` in Production
 - [ ] Redeploy durchgeführt
-- [ ] OAuth-Test auf app.evglab.com erfolgreich
+- [ ] OAuth-Test auf app.brewai.de erfolgreich
 
 ---
 

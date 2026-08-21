@@ -113,7 +113,7 @@ export function composeVideoPrompt(brief: VideoStudioBrief): ComposedVideoPrompt
     audioHint:
       "Audio optional: Seedance 2 generiert ohne Audio (günstiger). Voiceover separat mit ElevenLabs möglich.",
     workflowHint: [
-      "Video direkt in EvGlab mit Seedance 2 generieren",
+      "Video direkt in BrewAI mit Seedance 2 generieren",
       "Etikett-Asset als reference_image_urls in späteren Versionen",
       "Optional: Soul Character für wiederkehrenden Sprecher",
       "Upscaling mit Topaz Video AI für 4K-Final",

@@ -101,7 +101,7 @@ export function HopfenHugoChat({
                   <h3 id={widgetId} className="evg-hopfenhugo-name">
                     Hopfen Hugo
                   </h3>
-                  <p className="evg-hopfenhugo-role">KI-Assistent · EvGlab Studio</p>
+                  <p className="evg-hopfenhugo-role">KI-Assistent · BrewAI Studio</p>
                 </div>
                 <button type="button" className="evg-hopfenhugo-close" onClick={onToggle} aria-label="Chat schließen">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">

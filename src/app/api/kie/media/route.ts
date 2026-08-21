@@ -129,8 +129,8 @@ export async function GET(req: Request) {
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": download
-          ? `attachment; filename="evglab-${taskId}.${extension}"`
-          : `inline; filename="evglab-${taskId}.${extension}"`,
+          ? `attachment; filename="brewai-${taskId}.${extension}"`
+          : `inline; filename="brewai-${taskId}.${extension}"`,
         "Cache-Control": "no-store",
       },
     });

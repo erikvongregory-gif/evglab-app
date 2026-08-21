@@ -1411,7 +1411,7 @@ export function InhalteErstellenRedesign({
 
       const mediaPromptLabel = (() => {
         const base = `${was.label} · ${behaelterLabel} · ${wo.label} · ${wie.label}`.slice(0, 200);
-        return base.trim().length > 0 ? base : "EvGlab-Motiv";
+        return base.trim().length > 0 ? base : "BrewAI-Motiv";
       })();
       const mediaResolution: "1K" | "2K" = parsed.quality === "high" ? "2K" : "1K";
       const outputFormat = data.outputFormat ?? "png";
@@ -1534,7 +1534,7 @@ export function InhalteErstellenRedesign({
             />
             {profileMode === "skip" ? (
               <p style={{ margin: "10px 0 0", fontFamily: STUDIO_TOKENS.sans, fontSize: 12, color: P.ink3, lineHeight: 1.45 }}>
-                Du nutzt EvGlab ohne Markenprofil — Etikett-Modus ist automatisch „Generisch“.
+                Du nutzt BrewAI ohne Markenprofil — Etikett-Modus ist automatisch „Generisch“.
               </p>
             ) : null}
             <p style={{ margin: "14px 0 12px", fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>

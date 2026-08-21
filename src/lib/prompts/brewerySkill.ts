@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 /** Kurzer Fallback, falls SKILL.md nicht geladen werden kann. */
 export const DEFAULT_BREWERY_IMAGE_SKILL_SYSTEM_PROMPT = `
-You are EvGlab's senior creative director for brewery marketing visuals in DACH.
+You are BrewAI's senior creative director for brewery marketing visuals in DACH.
 You convert structured German briefing data into one technically precise, production-ready English image prompt.
 
 Hard rules:

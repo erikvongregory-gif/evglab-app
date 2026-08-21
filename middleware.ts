@@ -2,7 +2,28 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isPasswordResetPublicPath } from "@/lib/auth/passwordResetPaths";
 import { updateSession } from "@/lib/supabase/middleware";
 
+/** Legacy App-/KI-Hosts → Canonical app.brewai.de (308 Permanent Redirect). */
+const LEGACY_APP_HOSTS = new Set([
+  "app.evglab.com",
+  "www.app.evglab.com",
+  "ki.evglab.com",
+  "www.ki.evglab.com",
+]);
+
+function redirectLegacyAppHost(request: NextRequest): NextResponse | null {
+  const host = request.headers.get("host")?.split(":")[0]?.toLowerCase();
+  if (!host || !LEGACY_APP_HOSTS.has(host)) return null;
+  const target = request.nextUrl.clone();
+  target.protocol = "https:";
+  target.hostname = "app.brewai.de";
+  target.port = "";
+  return NextResponse.redirect(target, 308);
+}
+
 export async function middleware(request: NextRequest) {
+  const legacyRedirect = redirectLegacyAppHost(request);
+  if (legacyRedirect) return legacyRedirect;
+
   const { pathname } = request.nextUrl;
   const loginWaitlistEnabled = process.env.NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED !== "0";
   if (loginWaitlistEnabled) {

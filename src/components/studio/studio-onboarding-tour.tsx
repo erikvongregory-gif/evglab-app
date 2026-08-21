@@ -57,7 +57,7 @@ type TourStep = {
 const TOUR: TourStep[] = [
   {
     sel: null,
-    title: "Willkommen bei EvGlab Studio",
+    title: "Willkommen bei BrewAI Studio",
     body: "Lass uns kurz zeigen, was möglich ist — dauert unter einer Minute.",
     primary: "Tour starten",
     isWelcome: true,
@@ -153,7 +153,7 @@ function MiniDash({ glow }: { glow: boolean }) {
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 12 }}>
           <div style={{ width: 15, height: 15, borderRadius: 4, background: V.acc, flexShrink: 0 }} />
           <span className="studio-accent-serif" style={{ color: V.tx0, fontSize: 11, fontWeight: 500 }}>
-            EvGlab
+            BrewAI
           </span>
         </div>
         {["Dashboard", "Erstellen", "Mediathek", "Team"].map((n, i) => (

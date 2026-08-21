@@ -1,6 +1,6 @@
 {
-  "name": "EvGlab – KI für Brauereien",
-  "short_name": "EvGlab",
+  "name": "BrewAI – KI für Brauereien",
+  "short_name": "BrewAI",
   "description": "KI für Brauereien – Automatisierte Marketing, Content & Verkauf. Kostenloses Erstgespräch.",
   "start_url": "/",
   "display": "standalone",

@@ -9,7 +9,7 @@ import { DashboardRedesignShell } from "@/components/ui/dashboard-redesign";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab - Dashboard",
+    absolute: "BrewAI - Dashboard",
   },
   robots: {
     index: false,

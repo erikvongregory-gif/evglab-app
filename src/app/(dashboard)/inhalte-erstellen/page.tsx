@@ -14,7 +14,7 @@ import { InhalteErstellenRedesign } from "@/components/ui/inhalte-erstellen-rede
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: {
-    absolute: "EvGlab - Bilder Erstellen",
+    absolute: "BrewAI - Bilder Erstellen",
   },
   robots: {
     index: false,

@@ -302,7 +302,7 @@ export function BrandProfileView({
 
             <p className="studio-brand-sub">
 
-              Gib die Website deiner Marke ein — EvGlab erkennt Tonalität, Farben und Bildsprache für konsistente Motive.
+              Gib die Website deiner Marke ein — BrewAI erkennt Tonalität, Farben und Bildsprache für konsistente Motive.
 
             </p>
 
@@ -376,7 +376,7 @@ export function BrandProfileView({
 
           <p className="studio-brand-sub">
 
-            EvGlab hat deine Website analysiert. Diese Vorgaben fließen automatisch in jede Generierung ein.
+            BrewAI hat deine Website analysiert. Diese Vorgaben fließen automatisch in jede Generierung ein.
 
           </p>
 
@@ -516,7 +516,7 @@ export function BrandProfileView({
 
           <div className="studio-brand-lock-label">Brand-Lock</div>
 
-          <p className="studio-brand-lock-desc">Wie streng EvGlab sich an dein Markenprofil hält.</p>
+          <p className="studio-brand-lock-desc">Wie streng BrewAI sich an dein Markenprofil hält.</p>
 
           <div className="studio-brand-lock-list studio-brand-lock-list--flat" role="radiogroup" aria-label="Brand-Lock Stufe">
 

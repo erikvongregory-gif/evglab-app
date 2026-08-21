@@ -597,7 +597,7 @@ const TitleSection = ({ open, userEmail, planLabel }: { open: boolean; userEmail
 
   const handleRestartOnboarding = () => {
     if (typeof window === "undefined") return;
-    const onboardingStorageKey = `evglab-dashboard-onboarding-v1:${userEmail ?? "default"}`;
+    const onboardingStorageKey = `brewai-dashboard-onboarding-v1:${userEmail ?? "default"}`;
     try {
       window.localStorage.removeItem(onboardingStorageKey);
     } catch {
@@ -761,7 +761,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
   const [assistantMessages, setAssistantMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
     {
       role: "assistant",
-      text: "Prost! Ich bin Hopfen Hugo — ich helfe nur bei KI-Bildern in EvGlab: Prompts, Stil, Markenlook, Formate, Mediathek und Token. Frag mich zu eurem nächsten Motiv.",
+      text: "Prost! Ich bin Hopfen Hugo — ich helfe nur bei KI-Bildern in BrewAI: Prompts, Stil, Markenlook, Formate, Mediathek und Token. Frag mich zu eurem nächsten Motiv.",
     },
   ]);
   const [contentDraftPrompt, setContentDraftPrompt] = useState("");
@@ -1029,7 +1029,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
 
   const onboardingStorageKey =
     typeof window !== "undefined"
-      ? `evglab-dashboard-onboarding-v1:${userEmail ?? "default"}`
+      ? `brewai-dashboard-onboarding-v1:${userEmail ?? "default"}`
       : "evglab-dashboard-onboarding-v1:default";
 
   useEffect(() => {
@@ -1461,7 +1461,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectUrl;
-      a.download = `evglab-${item.id}.${item.outputFormat}`;
+      a.download = `brewai-${item.id}.${item.outputFormat}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1488,7 +1488,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectUrl;
-      a.download = `evglab-generiert-${index + 1}.png`;
+      a.download = `brewai-generiert-${index + 1}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -3289,7 +3289,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Markenprofil</h2>
                 <p className="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-300">
                   {brandProfileMode === "skip"
-                    ? "Du nutzt EvGlab ohne Markenprofil. Ueber den Button kannst du jederzeit ein Profil aus fuenf Instagram-Post-Screenshots anlegen — die KI uebernimmt Tonality, Farben und Regeln fuer Texte auf Bildern."
+                    ? "Du nutzt BrewAI ohne Markenprofil. Ueber den Button kannst du jederzeit ein Profil aus fuenf Instagram-Post-Screenshots anlegen — die KI uebernimmt Tonality, Farben und Regeln fuer Texte auf Bildern."
                     : brandProfileComplete
                       ? "Dein Markenprofil ist aktiv. Zum Anpassen erneut fuenf aktuelle Instagram-Posts hochladen und auswerten lassen."
                       : "Lege dein Markenprofil fest: fuenf Screenshots deiner Instagram-Posts, dann wertet die KI Stil und Vorgaben aus."}
@@ -3556,9 +3556,9 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
             Erreiche den Support direkt oder nutze die Schnellhilfe für typische Fragen.
           </p>
           <div className="grid gap-3 md:grid-cols-2">
-            <a href="mailto:support@evglab.ai" className="rounded-lg border border-gray-200 p-4 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+            <a href="mailto:kontakt@brewai.de" className="rounded-lg border border-gray-200 p-4 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
               <p className="font-semibold text-gray-900 dark:text-gray-100">E-Mail Support</p>
-              <p className="mt-1 text-gray-600 dark:text-gray-400">support@evglab.ai</p>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">kontakt@brewai.de</p>
             </a>
             <a href="/impressum" className="rounded-lg border border-gray-200 p-4 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
               <p className="font-semibold text-gray-900 dark:text-gray-100">Kontakt & Impressum</p>
@@ -3587,7 +3587,7 @@ const ExampleContent = ({ userEmail, userName, selectedTab, setSelectedTab, isAd
                     setSupportInfoMessage("Bitte Betreff und Nachricht ausfüllen.");
                     return;
                   }
-                  const mailto = `mailto:support@evglab.ai?subject=${encodeURIComponent(supportSubject)}&body=${encodeURIComponent(supportMessage)}`;
+                  const mailto = `mailto:kontakt@brewai.de?subject=${encodeURIComponent(supportSubject)}&body=${encodeURIComponent(supportMessage)}`;
                   window.location.href = mailto;
                   setSupportInfoMessage("Mail-App wurde geöffnet.");
                 }}

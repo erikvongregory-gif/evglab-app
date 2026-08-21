@@ -92,7 +92,7 @@ export function MarketingPromptCreateShell({
             <span />
             <span />
           </div>
-          <div className="evg-marketing-create__url">app.evglab.com</div>
+          <div className="evg-marketing-create__url">app.brewai.de</div>
           <div className="evg-marketing-create__meta">{brandMeta}</div>
         </div>
 

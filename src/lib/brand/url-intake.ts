@@ -15,7 +15,7 @@ export const URL_MAX_BODY_BYTES = 2 * 1024 * 1024;
 export const URL_MAX_REDIRECTS = 3;
 
 export const BROWSER_USER_AGENT =
-  "Mozilla/5.0 (compatible; EvGlabBrandBot/1.0; +https://evglab.de) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (compatible; BrewAIBrandBot/1.0; +https://brewai.de) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
 
 export function normalizeWebsiteUrl(input: string): string | null {
   const trimmed = input.trim();

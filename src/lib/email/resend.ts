@@ -14,7 +14,7 @@ function getFromAddress() {
     process.env.ADMIN_2FA_FROM_EMAIL;
   if (!from || isPlaceholderValue(from)) return null;
   if (from.includes("<")) return from;
-  return `EvGlab <${from}>`;
+  return `BrewAI <${from}>`;
 }
 
 function isPlaceholderValue(value: string) {
@@ -34,7 +34,7 @@ export function getResendConfig() {
   return { apiKey: apiKey!, from };
 }
 
-export const RESEND_SANDBOX_FROM = "EvGlab <onboarding@resend.dev>";
+export const RESEND_SANDBOX_FROM = "BrewAI <onboarding@resend.dev>";
 
 export function parseResendErrorMessage(body: string): string | null {
   try {
@@ -94,7 +94,7 @@ async function postResendEmail(
       subject: input.subject,
       html: input.html,
       text: input.text,
-      reply_to: input.replyTo ?? "support@evglab.com",
+      reply_to: input.replyTo ?? "kontakt@brewai.de",
       tags: input.tag ? [{ name: input.tag, value: "transactional" }] : undefined,
     }),
   });

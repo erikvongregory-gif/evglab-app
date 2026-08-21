@@ -3,7 +3,20 @@ import { SITE } from "@/lib/siteConfig";
 
 export const dynamic = "force-static";
 
-const disallow = ["/api/", "/_next/", "/dashboard", "/admin", "/invite/", "/registrieren", "/auth/"];
+const disallow = [
+  "/api/",
+  "/_next/",
+  "/dashboard",
+  "/admin",
+  "/invite/",
+  "/registrieren",
+  "/anmelden",
+  "/passwort-vergessen",
+  "/passwort-zuruecksetzen",
+  "/inhalte-erstellen",
+  "/videos-erstellen",
+  "/auth/",
+];
 
 const defaultRule = {
   allow: "/" as const,
