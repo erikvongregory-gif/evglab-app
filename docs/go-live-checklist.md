@@ -2,7 +2,8 @@
 
 ## 1) Pflicht-Env in Produktion
 
-- `NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED=0` — **Pflicht für Go-live** (Login/Registrierung freigeben). Solange `1` oder unset, blockiert die Middleware neue Nutzer.
+- Soft-Launch: Warteliste ist im Code aktiv (`LOGIN_WAITLIST_ENABLED = true` in `src/lib/featureFlags.ts`).
+- Go-live: Flag wieder an Env koppeln (`!== "0"`), in Vercel `NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED=0` setzen und redeployen.
 - `NEXT_PUBLIC_APP_BASE_URL=https://app.brewai.de`
 - `NEXT_PUBLIC_MARKETING_SITE_URL=https://brewai.de` (Alias: `NEXT_PUBLIC_SITE_URL`)
 - `NEXT_PUBLIC_SITE_NAME=BrewAI`

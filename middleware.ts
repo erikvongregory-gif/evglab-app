@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isPasswordResetPublicPath } from "@/lib/auth/passwordResetPaths";
+import { LOGIN_WAITLIST_ENABLED } from "@/lib/featureFlags";
 import { updateSession } from "@/lib/supabase/middleware";
 
 /** Legacy App-/KI-Hosts → Canonical app.brewai.de (308 Permanent Redirect). */
@@ -25,8 +26,7 @@ export async function middleware(request: NextRequest) {
   if (legacyRedirect) return legacyRedirect;
 
   const { pathname } = request.nextUrl;
-  const loginWaitlistEnabled = process.env.NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED !== "0";
-  if (loginWaitlistEnabled) {
+  if (LOGIN_WAITLIST_ENABLED) {
     const passwordResetAllowed = isPasswordResetPublicPath(pathname, request.nextUrl.searchParams);
     const oauthPathsAllowedDuringWaitlist = new Set([
       "/auth/google",
