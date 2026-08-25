@@ -62,6 +62,35 @@
   overflow-y: auto;
 }
 
+/* Waitlist: single focused panel — visible above the fold on mobile + desktop */
+.shellWaitlist {
+  position: relative;
+  grid-template-columns: 1fr;
+  place-items: center;
+  padding: 32px 24px;
+  overflow-y: auto;
+}
+
+.shellWaitlist .glow {
+  left: 15%;
+  top: 28%;
+}
+
+.shellWaitlist .mesh {
+  mask-image: radial-gradient(80% 70% at 50% 45%, #000 12%, transparent 72%);
+}
+
+.waitlistPanel {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: var(--colw);
+}
+
+.shellWaitlist .brand {
+  margin-bottom: 28px;
+}
+
 /* ---- Hero ---- */
 .hero {
   position: relative;
@@ -611,7 +640,7 @@
 /* Waitlist */
 .waitlistTitle {
   font-family: var(--headline);
-  font-size: 32px;
+  font-size: clamp(26px, 5vw, 32px);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 10px;

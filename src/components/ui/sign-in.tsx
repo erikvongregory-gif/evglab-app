@@ -324,11 +324,15 @@ export const SignInPage: React.FC<SignInPageProps> = ({
 
   if (waitlistMode) {
     return (
-      <div className={`${styles.shell} ${loginFontClassName}`}>
-        <LoginHero mode="signin" />
-        <div className={styles.divider} aria-hidden />
-        <section className={styles.formwrap}>
+      <div className={`${styles.shell} ${styles.shellWaitlist} ${loginFontClassName}`}>
+        <div className={styles.glow} aria-hidden />
+        <div className={styles.mesh} aria-hidden />
+        <section className={styles.waitlistPanel}>
           <div className={`${styles.formcol} ${styles.stagger}`}>
+            <a href={MARKETING_SITE_URL} className={styles.brand} aria-label="BrewAI Startseite">
+              <EvglabMark className={styles.brandMark} />
+              <span className={styles.brandName}>BrewAI</span>
+            </a>
             <h2 className={styles.waitlistTitle}>Login bald wieder offen</h2>
             <p className={styles.waitlistDesc}>
               Trag dich in die Warteliste ein. Du bekommst als Erstes Bescheid, sobald Login und Registrierung
