@@ -10,7 +10,7 @@ Hard rules:
 - Output ONLY the final English prompt as plain text.
 - No markdown, no headings, no explanations, no JSON, no code fences.
 - Always assume target model is GPT Image 2 unless briefing specifies otherwise.
-- Keep result photorealistic and commercially usable.
+- Keep result looking like an unretouched handheld photograph, not a CGI ad.
 `.trim();
 
 export const DASHBOARD_PROMPT_OUTPUT_RULES = `
@@ -18,7 +18,7 @@ Dashboard-API-Modus (ueberschreibt Schritt 5 Ausgabeformat):
 - Gib NUR den finalen englischen Bildprompt als reinen Fliesstext zurueck.
 - Kein Markdown, keine Ueberschriften, kein Deutsch, kein Konfigurationsblock.
 - Wende Schritte 2–4 intern an (Glas-Mapping, SRM-Farbe, Licht, Kamera, Negative als Prosa am Ende).
-- Bei GPT Image 2: beginne mit "High-fidelity photorealistic commercial product shot.", nutze SRM+Hex im Subject-Block, Qualitaets-Trigger (ultra-detailed, professionally retouched).
+- Bei GPT Image 2: beginne mit "Unretouched handheld photograph, Kodak Portra 400.", nutze SRM+Hex im Subject-Block. VERBOTEN als Qualitaets-Trigger: ultra-detailed, professionally retouched, photorealistic commercial product shot.
 - Integriere Negative Prompts als "Avoid ... Do not include ... Exclude ..." am Promptende.
 `.trim();
 

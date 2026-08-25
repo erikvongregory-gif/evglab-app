@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isOwnerUserId } from "@/lib/auth/owner";
 import type { BillingRow } from "@/lib/billing/store";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 
@@ -17,8 +18,9 @@ export function hasActiveSubscriptionFromState(plan: string | null | undefined, 
   return status !== "none" && status !== "canceled";
 }
 
-/** Server/API: 402 wenn kein aktives Abo. */
+/** Server/API: 402 wenn kein aktives Abo. Owner-Konten sind ausgenommen. */
 export async function requireActiveSubscription(userId: string): Promise<NextResponse | null> {
+  if (await isOwnerUserId(userId)) return null;
   await ensureBillingRow(userId);
   const row = await getBillingRow(userId);
   if (!hasActiveSubscription(row)) {

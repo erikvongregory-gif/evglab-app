@@ -9,7 +9,8 @@
     "start": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next start",
     "lint": "eslint",
     "test": "vitest run",
-    "check:instagram-oauth": "node scripts/check-instagram-oauth-env.mjs"
+    "check:instagram-oauth": "node scripts/check-instagram-oauth-env.mjs",
+    "setup:owner": "node scripts/setup-owner-account.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",

@@ -1,6 +1,6 @@
 import {
-  createBrandReferenceUrlResolver,
-  isLegacyKieTempUrl,
+  parseBrandReferenceIdFromUrl,
+  readBrandReferenceImageBuffer,
 } from "@/lib/brand/reference-image-store";
 
 export type VisionReferenceImage = { base64: string; mime: string };
@@ -47,6 +47,13 @@ function normalizeMime(mime: string): string {
   return lower;
 }
 
+function fromBuffer(buf: Buffer): VisionReferenceImage | null {
+  if (buf.byteLength === 0) return null;
+  const mime = normalizeMime(detectMimeFromBuffer(buf));
+  if (!CLAUDE_VISION_MIMES.has(mime)) return null;
+  return { mime, base64: buf.toString("base64") };
+}
+
 /**
  * Resolves any reference-image string the dashboard might send (data: URL,
  * internal /api/brand/reference-image/<id>, external https) to a base64+mime
@@ -71,29 +78,28 @@ export async function resolveReferenceImageForVision(
     return { mime, base64 };
   }
 
-  const resolver = createBrandReferenceUrlResolver(userMetadata);
-  const buffer = await resolver(rawUrl, 0).catch(() => null);
-  if (buffer && buffer.byteLength > 0) {
-    const mime = normalizeMime(detectMimeFromBuffer(buffer));
-    if (!CLAUDE_VISION_MIMES.has(mime)) return null;
-    return { mime, base64: buffer.toString("base64") };
+  const id = parseBrandReferenceIdFromUrl(rawUrl);
+  if (id) {
+    const entry = readBrandReferenceImageBuffer(userMetadata, id);
+    if (entry) return fromBuffer(entry.buffer);
   }
 
-  if (/^https?:\/\//i.test(rawUrl) && !isLegacyKieTempUrl(rawUrl)) {
+  if (/^https?:\/\//i.test(rawUrl)) {
     try {
       const res = await fetch(rawUrl, { cache: "no-store" });
       if (!res.ok) return null;
       const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.byteLength === 0) return null;
+      const detected = fromBuffer(buf);
+      if (!detected) return null;
       const headerMime = (res.headers.get("content-type") ?? "")
         .split(";")[0]
         ?.trim()
         .toLowerCase();
-      const mime = normalizeMime(
-        headerMime && headerMime.startsWith("image/") ? headerMime : detectMimeFromBuffer(buf),
-      );
-      if (!CLAUDE_VISION_MIMES.has(mime)) return null;
-      return { mime, base64: buf.toString("base64") };
+      if (headerMime && headerMime.startsWith("image/")) {
+        const mime = normalizeMime(headerMime);
+        if (CLAUDE_VISION_MIMES.has(mime)) return { mime, base64: detected.base64 };
+      }
+      return detected;
     } catch {
       return null;
     }

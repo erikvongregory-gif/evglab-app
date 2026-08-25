@@ -3,11 +3,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import {
-  type DashboardMediaItem,
-  getDashboardMetadata,
-  mergeDashboardMetadata,
-} from "@/lib/dashboard/metadata";
+import { type DashboardMediaItem } from "@/lib/dashboard/metadata";
+import { readDashboardMedia, writeDashboardMedia } from "@/lib/dashboard/media-store";
 
 const mediaSchema = z.object({
   id: z.string().min(1).max(120),
@@ -25,7 +22,7 @@ const mediaPatchSchema = z.object({
   title: z.string().min(1).max(120),
 });
 
-export async function GET() {
+async function requireUserId(): Promise<string | NextResponse> {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
   }
@@ -34,13 +31,21 @@ export async function GET() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+  return user.id;
+}
 
-  const dashboard = getDashboardMetadata(user.user_metadata);
-  const media = (dashboard.mediaLibrary ?? [])
-    .slice()
-    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-    .slice(0, 12);
-  return NextResponse.json({ items: media });
+export async function GET() {
+  const userId = await requireUserId();
+  if (typeof userId !== "string") return userId;
+  try {
+    const items = await readDashboardMedia(userId);
+    return NextResponse.json({ items });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Mediathek konnte nicht geladen werden." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(req: Request) {
@@ -53,36 +58,32 @@ export async function POST(req: Request) {
   const originError = enforceSameOrigin(req);
   if (originError) return originError;
 
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
-  }
-
   const parsed = mediaSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "Ungültiges Mediathek-Element." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+  const userId = await requireUserId();
+  if (typeof userId !== "string") return userId;
 
   const payload = parsed.data;
   const item: DashboardMediaItem = {
     ...payload,
-    title: payload.title?.trim() || payload.prompt.trim().slice(0, 120),
+    title: (payload.title?.trim() || payload.prompt.trim()).slice(0, 120),
+    prompt: payload.prompt.trim().slice(0, 240),
   };
-  const current = getDashboardMetadata(user.user_metadata).mediaLibrary ?? [];
-  const next = [item, ...current.filter((entry) => entry.id !== item.id)]
-    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-    .slice(0, 12);
-  const merged = mergeDashboardMetadata(user.user_metadata, { mediaLibrary: next });
-  const { error } = await supabase.auth.updateUser({ data: merged });
-  if (error) {
+
+  try {
+    const current = await readDashboardMedia(userId);
+    const next = await writeDashboardMedia(userId, [
+      item,
+      ...current.filter((entry) => entry.id !== item.id),
+    ]);
+    return NextResponse.json({ ok: true, items: next });
+  } catch (error) {
+    console.warn("[dashboard/media] POST failed:", error);
     return NextResponse.json({ error: "Mediathek konnte nicht gespeichert werden." }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, items: next });
 }
 
 export async function PATCH(req: Request) {
@@ -95,34 +96,29 @@ export async function PATCH(req: Request) {
   const originError = enforceSameOrigin(req);
   if (originError) return originError;
 
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
-  }
-
   const parsed = mediaPatchSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "Ungültiger Motiv-Titel." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+  const userId = await requireUserId();
+  if (typeof userId !== "string") return userId;
 
   const { id, title } = parsed.data;
-  const current = getDashboardMetadata(user.user_metadata).mediaLibrary ?? [];
-  if (!current.some((entry) => entry.id === id)) {
-    return NextResponse.json({ error: "Motiv nicht gefunden." }, { status: 404 });
-  }
-
-  const next = current.map((entry) => (entry.id === id ? { ...entry, title: title.trim() } : entry));
-  const merged = mergeDashboardMetadata(user.user_metadata, { mediaLibrary: next });
-  const { error } = await supabase.auth.updateUser({ data: merged });
-  if (error) {
+  try {
+    const current = await readDashboardMedia(userId);
+    if (!current.some((entry) => entry.id === id)) {
+      return NextResponse.json({ error: "Motiv nicht gefunden." }, { status: 404 });
+    }
+    const next = await writeDashboardMedia(
+      userId,
+      current.map((entry) => (entry.id === id ? { ...entry, title: title.trim() } : entry)),
+    );
+    return NextResponse.json({ ok: true, items: next });
+  } catch (error) {
+    console.warn("[dashboard/media] PATCH failed:", error);
     return NextResponse.json({ error: "Titel konnte nicht gespeichert werden." }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, items: next });
 }
 
 export async function DELETE(req: Request) {
@@ -135,25 +131,22 @@ export async function DELETE(req: Request) {
   const originError = enforceSameOrigin(req);
   if (originError) return originError;
 
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
-  }
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id fehlt." }, { status: 400 });
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+  const userId = await requireUserId();
+  if (typeof userId !== "string") return userId;
 
-  const current = getDashboardMetadata(user.user_metadata).mediaLibrary ?? [];
-  const next = current.filter((entry) => entry.id !== id);
-  const merged = mergeDashboardMetadata(user.user_metadata, { mediaLibrary: next });
-  const { error } = await supabase.auth.updateUser({ data: merged });
-  if (error) {
+  try {
+    const current = await readDashboardMedia(userId);
+    const next = await writeDashboardMedia(
+      userId,
+      current.filter((entry) => entry.id !== id),
+    );
+    return NextResponse.json({ ok: true, items: next });
+  } catch (error) {
+    console.warn("[dashboard/media] DELETE failed:", error);
     return NextResponse.json({ error: "Mediathek konnte nicht aktualisiert werden." }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, items: next });
 }

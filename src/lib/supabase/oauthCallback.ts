@@ -1,6 +1,6 @@
 import type { EmailOtpType, User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { redirectWithAdminEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
+import { redirectWithEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
 import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import {
   acquireOAuthCode,
@@ -85,15 +85,16 @@ async function redirectAfterOAuthSuccess(
   }
 
   if (!isPasswordRecovery && user) {
-    const admin2fa = await redirectWithAdminEmail2FAIfNeeded(request, {
+    const twoFactor = await redirectWithEmail2FAIfNeeded(request, {
       user,
       requestId,
       origin: appOrigin,
       cookieSource: redirectResponse,
       startedAt,
-      logEvent: opts.logEvent ?? "oauth_admin_2fa_required",
+      logEvent: opts.logEvent ?? "oauth_2fa_required",
+      next: postAuthNext,
     });
-    if (admin2fa) return admin2fa;
+    if (twoFactor) return twoFactor;
   }
 
   logAuthEvent({

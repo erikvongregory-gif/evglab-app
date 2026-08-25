@@ -13,6 +13,8 @@ import { applyContentPresetPrompt } from "@/lib/image-types/policy";
 import {
   enforceHyperrealisticPromptConstraints,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/enforce-prompt-constraints";
+import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
+import { calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -30,6 +32,15 @@ export async function POST(req: Request) {
     }
 
     const input = parsed.data;
+    const hasReferenceImage = input.etikettModus !== "generisch" && Boolean(input.etikettBild);
+    const perImageCost = calculatePerVariantTokenCost({
+      resolution: input.quality === "high" ? "2K" : "1K",
+      hasReferenceImage,
+      strictLabelMode: input.etikettModus === "marke" && hasReferenceImage,
+    });
+    const budgetError = await requireTokenBudget(guard.userId, perImageCost);
+    if (budgetError) return budgetError;
+
     const origin = new URL(req.url).origin;
     assertResolvableReferenceUrls(guard.userMetadata, origin, [input.etikettBild]);
     const etikettUrl = resolveReferenceUrlsForGeneration(guard.userMetadata, origin, [input.etikettBild])[0] ?? input.etikettBild;
@@ -79,12 +90,16 @@ export async function POST(req: Request) {
       resolveReferenceUrl: createReferenceResolverFromMetadata(guard.userMetadata),
     });
 
+    const charge = await chargeGeneratedTokens(guard.userId, perImageCost * Math.max(images.length, 1));
+    if (!charge.ok) return charge.response;
+
     return NextResponse.json({
       mode: "hyperrealistic",
       prompt,
       images,
       model: "gpt-image-2-2026-04-21",
       userId: guard.userId,
+      billing: charge.billing,
     });
   } catch (error) {
     return NextResponse.json(

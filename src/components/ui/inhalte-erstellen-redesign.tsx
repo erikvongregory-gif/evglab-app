@@ -13,8 +13,13 @@ import {
 } from "@/components/ui/dashboard-studio-shell";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { FLASCHEN_TYPEN, isDoseTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
+import { BEER_STYLE_OPTIONS, findBeerStyle, beerStyleLabel, type BeerStyleOption } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
+import type { OccasionTemplate } from "@/app/(dashboard)/inhalte-erstellen/lib/occasion-templates";
 import { calculateGenerationTokenCost } from "@/lib/billing/generationTokenCost";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
+import { hasUsableBeerEtikett, type DashboardBeer } from "@/lib/dashboard/metadata";
+import { readAndCompressImage } from "@/lib/images/compress-image";
+import { InhalteErstellenStart } from "@/components/ui/inhalte-erstellen-start";
 import {
   MarketingPromptCreateShell,
   type PromptSegment,
@@ -22,7 +27,7 @@ import {
 
 type ImageResponse = { b64_json?: string; url?: string };
 
-type WasOption = { label: string; bierstil: string; glasTyp: HyperrealisticInput["glasTyp"] };
+type WasOption = BeerStyleOption;
 type WoOption = { label: string; szene: HyperrealisticInput["szene"] };
 type WieOption = { label: string; tageszeit: HyperrealisticInput["tageszeit"] };
 type WofuerOption = { label: string; aspectRatio: HyperrealisticInput["aspectRatio"] };
@@ -59,24 +64,7 @@ type EtikettModusOption = {
   hint: string;
 };
 
-const WAS_OPTIONS: WasOption[] = [
-  { label: "Helles", bierstil: "helles", glasTyp: "willibecher" },
-  { label: "Pils", bierstil: "pils", glasTyp: "pils_tulpe" },
-  { label: "Hefeweizen", bierstil: "hefeweizen", glasTyp: "weizen" },
-  { label: "Kristallweizen", bierstil: "kristallweizen", glasTyp: "weizen" },
-  { label: "Märzen", bierstil: "maerzen", glasTyp: "masskrug" },
-  { label: "Kellerbier", bierstil: "kellerbier", glasTyp: "willibecher" },
-  { label: "Bock", bierstil: "bock", glasTyp: "masskrug" },
-  { label: "Kölsch", bierstil: "koelsch", glasTyp: "stange" },
-  { label: "Altbier", bierstil: "altbier", glasTyp: "stange" },
-  { label: "IPA", bierstil: "ipa", glasTyp: "ipa_teku" },
-  { label: "NEIPA / Hazy IPA", bierstil: "neipa", glasTyp: "ipa_teku" },
-  { label: "Stout", bierstil: "stout", glasTyp: "schwenker" },
-  { label: "Porter", bierstil: "porter", glasTyp: "schwenker" },
-  { label: "Saison", bierstil: "saison", glasTyp: "ipa_teku" },
-  { label: "Radler", bierstil: "radler", glasTyp: "willibecher" },
-  { label: "Alkoholfrei", bierstil: "alkoholfrei_pilsner", glasTyp: "pils_tulpe" },
-];
+const WAS_OPTIONS: WasOption[] = BEER_STYLE_OPTIONS;
 
 const WO_OPTIONS: WoOption[] = [
   { label: "Biergarten", szene: "biergarten_sommer" },
@@ -220,9 +208,10 @@ const VARIANT_COUNT_OPTIONS: Array<{ code: `${VariantCount}`; label: string; hin
   { code: "2", label: "2 Varianten", hint: "Zwei Motive vergleichen" },
   { code: "3", label: "3 Varianten", hint: "Maximale Auswahl" },
 ];
-// Realistische User-Erwartung: Kie/Banana liefert in der Praxis zwischen
-// ~45s (gute Auslastung) und 2–3 min (Peak-Zeiten). Wir kommunizieren einen
-// Bereich, damit die UI nicht früh wirkt, als sei etwas hängen geblieben.
+// Realistische User-Erwartung: OpenAI gpt-image-2 (quality: medium) liefert in
+// der Praxis zwischen ~45s und 2–3 min (je nach Auslastung/Varianten-Anzahl).
+// Wir kommunizieren einen Bereich, damit die UI nicht früh wirkt, als sei etwas
+// hängen geblieben.
 const ESTIMATED_SECONDS = 60;
 const ESTIMATED_SECONDS_MAX = 180;
 
@@ -538,37 +527,6 @@ function imageSrc(image: ImageResponse) {
   return image.url ?? (image.b64_json ? `data:image/png;base64,${image.b64_json}` : "");
 }
 
-/** Liest eine Datei, komprimiert auf max 1024×1024 und liefert eine JPEG-DataURL fuer den Upload. */
-async function readAndCompressImage(file: File): Promise<string> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("Datei konnte nicht gelesen werden."));
-    reader.readAsDataURL(file);
-  });
-
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Bild konnte nicht dekodiert werden."));
-    image.src = dataUrl;
-  });
-
-  const maxDim = 1024;
-  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-  const targetW = Math.max(1, Math.round(img.width * scale));
-  const targetH = Math.max(1, Math.round(img.height * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = targetW;
-  canvas.height = targetH;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas-Kontext fehlt.");
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, targetW, targetH);
-  ctx.drawImage(img, 0, 0, targetW, targetH);
-  return canvas.toDataURL("image/jpeg", 0.85);
-}
 
 function Eyebrow({ children, P, className }: { children: React.ReactNode; P: StudioPalette; className?: string }) {
   return (
@@ -897,6 +855,13 @@ export function InhalteErstellenRedesign({
   const [variantCount, setVariantCount] = useState<VariantCount>(DEFAULT_VARIANT_COUNT);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
+  // Neuer Einstieg: Start-Screen (Bier + Anlass) vor dem Wizard.
+  const [flowMode, setFlowMode] = useState<"start" | "wizard">("start");
+  const [fromTemplate, setFromTemplate] = useState(false);
+  const [selectedBeer, setSelectedBeer] = useState<DashboardBeer | null>(null);
+  // Anlass-Zusatz der Vorlage bzw. freier Wunsch des Users — fliesst in zusatzWunsch.
+  const [occasionNote, setOccasionNote] = useState("");
+
   // Ad-hoc Referenzbild-Upload (ueberschreibt Markenprofil-Etikett nur fuer diesen Run).
   const [customReferenceDataUrl, setCustomReferenceDataUrl] = useState<string>("");
   const [customReferenceName, setCustomReferenceName] = useState<string>("");
@@ -943,6 +908,7 @@ export function InhalteErstellenRedesign({
             breweryName?: string;
             brandProfileMode?: "undecided" | "guided" | "skip";
             brandReferenceImageUrls?: string[];
+            brandLabelReferenceUrl?: string;
             brandReferenceImagesStale?: boolean;
           };
         };
@@ -961,11 +927,15 @@ export function InhalteErstellenRedesign({
           setEtikettUrl("");
           setReferenceImagesStale(true);
         } else {
+          // Etikett-Referenz MUSS der Packshot (Etikett-Traeger) sein — die
+          // brandReferenceImageUrls sind seit der Szenen-zuerst-Auswahl
+          // Stimmungsbilder und taugen nicht als Etikett-Vorlage.
+          const labelRef = json.settings?.brandLabelReferenceUrl?.trim();
           const refs = json.settings?.brandReferenceImageUrls;
-          if (Array.isArray(refs) && refs[0]) setEtikettUrl(refs[0]);
-          else setEtikettUrl("");
+          const effectiveLabel = labelRef || (Array.isArray(refs) ? refs[0] : "") || "";
+          setEtikettUrl(effectiveLabel);
           setReferenceImagesStale(false);
-          if (!refs?.[0] && settingsMode !== "guided") {
+          if (!effectiveLabel && settingsMode !== "guided") {
             setEtikettModus("generisch");
           }
         }
@@ -1016,17 +986,22 @@ export function InhalteErstellenRedesign({
 
   const brandLabel = breweryName || initialBreweryName?.trim() || "deiner Brauerei";
   const effectiveEtikettModus = profileMode === "skip" ? "generisch" : etikettModus;
-  const hasReferenceImage = Boolean(customReferenceDataUrl || etikettUrl);
+  // Etikett-Prioritaet: Ad-hoc-Upload > Sorten-Etikett aus "Meine Biere" > Markenprofil.
+  const beerEtikettUrl = selectedBeer?.etikettUrl?.trim() || "";
+  const profileEtikettUrl = beerEtikettUrl || etikettUrl;
+  const hasReferenceImage = Boolean(customReferenceDataUrl || profileEtikettUrl);
   const generationTokenCost = useMemo(() => {
-    const hasRef = Boolean(customReferenceDataUrl || (effectiveEtikettModus === "marke" && etikettUrl));
+    const hasRef = Boolean(customReferenceDataUrl || (effectiveEtikettModus === "marke" && profileEtikettUrl));
     const strictLabel = effectiveEtikettModus === "marke" && hasRef;
+    // Server rendert mit gpt-image-2 quality "medium" → Abrechnung als 1K.
+    // Die Anzeige muss zur tatsächlichen Server-Abrechnung passen.
     return calculateGenerationTokenCost({
-      resolution: "2K",
+      resolution: "1K",
       hasReferenceImage: hasRef,
       strictLabelMode: strictLabel,
       variantCount,
     });
-  }, [customReferenceDataUrl, effectiveEtikettModus, etikettUrl, variantCount]);
+  }, [customReferenceDataUrl, effectiveEtikettModus, profileEtikettUrl, variantCount]);
   const personenSetUp =
     personenModus === "A" ||
     personenModus === "B" ||
@@ -1060,9 +1035,11 @@ export function InhalteErstellenRedesign({
           effectiveEtikettModus === "marke"
             ? customReferenceDataUrl
               ? "Eigenes Referenzbild für diesen Run hochgeladen"
-              : etikettUrl
-                ? `Marken-Etikett ${brandLabel} verknüpft`
-                : "Marken-Etikett fehlt — Referenz hochladen oder „Generisch“ wählen"
+              : beerEtikettUrl
+                ? `Etikett von „${selectedBeer?.name ?? "Sorte"}“ verknüpft`
+                : etikettUrl
+                  ? `Marken-Etikett ${brandLabel} verknüpft`
+                  : "Marken-Etikett fehlt — Referenz hochladen oder „Generisch“ wählen"
             : "Generisches Etikett — kein Markenbezug nötig",
       },
       { done: true, label: `Behälter gewählt: ${behaelterLabel}` },
@@ -1084,6 +1061,8 @@ export function InhalteErstellenRedesign({
       effectiveEtikettModus,
       customReferenceDataUrl,
       etikettUrl,
+      beerEtikettUrl,
+      selectedBeer,
       brandLabel,
       behaelterLabel,
       personenSetUp,
@@ -1133,6 +1112,64 @@ export function InhalteErstellenRedesign({
 
   const goMicroPrev = useCallback(() => {
     setMicroStepIndex((i) => Math.max(0, i - 1));
+  }, []);
+
+  // Bier aus dem Sortiment vorbelegen: Stil, Flasche, Farbe (Etikett via selectedBeer).
+  const applyBeer = useCallback((beer: DashboardBeer | null) => {
+    setSelectedBeer(beer);
+    if (!beer) return;
+    const style = findBeerStyle(beer.bierstil);
+    setWas(style ?? { label: beerStyleLabel(beer.bierstil), bierstil: beer.bierstil, glasTyp: "willibecher" });
+    if (beer.flaschenTyp in FLASCHEN_TYPEN) {
+      setFlaschenTyp(beer.flaschenTyp as HyperrealisticInput["flaschenTyp"]);
+    }
+    setFlaschenfarbe(beer.flaschenfarbe);
+    if (beer.etikettUrl && profileMode !== "skip") {
+      setEtikettModus("marke");
+    }
+  }, [profileMode]);
+
+  // Anlass-Vorlage anwenden und direkt zum finalen Check springen.
+  const applyTemplate = useCallback((template: OccasionTemplate) => {
+    const p = template.preset;
+    const nextBehaelter = p.behaelter ?? "B";
+    setBehaelter(nextBehaelter);
+    const woMatch = WO_OPTIONS.find((o) => o.szene === p.szene);
+    if (woMatch) setWo(woMatch);
+    const wieMatch = WIE_OPTIONS.find((o) => o.tageszeit === p.tageszeit);
+    if (wieMatch) setWie(wieMatch);
+    const wofuerMatch = WOFUER_OPTIONS.find((o) => o.aspectRatio === p.aspectRatio);
+    if (wofuerMatch) setWofuer(wofuerMatch);
+    setStimmungTrend(p.stimmungTrend);
+    setPersonenModus(p.personenModus);
+    if (p.personenModus === "E") {
+      setGruppenAnzahl(p.gruppenAnzahl ?? "3");
+      setGruppenTyp(p.gruppenTyp ?? "gemischt");
+      setGruppenDynamik(p.gruppenDynamik ?? "E2");
+    }
+    setShotType(p.shotType);
+    setExtras(p.extras);
+    setOccasionNote(p.promptNote);
+    setFromTemplate(true);
+    setFlowMode("wizard");
+    // Direkt zum Review — Micro-Step-Liste haengt von Behaelter/Personen ab.
+    setMicroStepIndex(buildMicroStepIds(nextBehaelter, p.personenModus, flaschenTyp).length - 1);
+  }, [flaschenTyp]);
+
+  const startCustomWizard = useCallback(() => {
+    setOccasionNote("");
+    setFromTemplate(false);
+    setFlowMode("wizard");
+    setMicroStepIndex(0);
+  }, []);
+
+  const backToStart = useCallback(() => {
+    setFlowMode("start");
+    setHasGenerated(false);
+    setImages([]);
+    setError("");
+    setGenerationStep("");
+    setVariantProgress([]);
   }, []);
 
   const flaschenTypLabel = FLASCHEN_OPTIONS.find((o) => o.code === flaschenTyp)?.label ?? "Flasche";
@@ -1228,9 +1265,10 @@ export function InhalteErstellenRedesign({
 
   const brandMetaLine = useMemo(() => {
     const brand = breweryName || brandLabel;
+    if (selectedBeer) return `Marke: ${brand} · ${selectedBeer.name}`;
     if (behaelter === "G") return `Marke: ${brand}`;
     return `Marke: ${brand} · ${flaschenTypLabel}`;
-  }, [breweryName, brandLabel, behaelter, flaschenTypLabel]);
+  }, [breweryName, brandLabel, behaelter, flaschenTypLabel, selectedBeer]);
 
   const variantCards = useMemo(() => {
     if (images.length === 0) return [];
@@ -1280,12 +1318,20 @@ export function InhalteErstellenRedesign({
     outputFormat: "png" | "jpg";
   }): Promise<void> {
     try {
-      await fetch("/api/dashboard/media", {
+      const res = await fetch("/api/dashboard/media", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item),
+        body: JSON.stringify({
+          ...item,
+          title: item.title.trim().slice(0, 120),
+          prompt: item.prompt.trim().slice(0, 240),
+        }),
       });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        console.warn("[inhalte-erstellen] media persist failed:", res.status, json?.error);
+      }
     } catch (persistError) {
       console.warn("[inhalte-erstellen] media persist failed:", persistError);
     }
@@ -1302,21 +1348,35 @@ export function InhalteErstellenRedesign({
     setGenerationStep("Brief wird verarbeitet …");
     setMicroStepIndex(buildMicroStepIds(behaelter, personenModus, flaschenTyp).length - 1);
     try {
-      // Vorrang: Ad-hoc-Upload > Markenprofil-Etikett.
+      // Gewähltes Bier: nur DESSEN Etikett (oder Ad-hoc-Upload). Kein stilles Fallback auf ein anderes Markenbild.
       const effectiveEtikettModus = profileMode === "skip" ? "generisch" : etikettModus;
+      const beerLabel = selectedBeer?.etikettUrl?.trim() || "";
       const effectiveEtikett =
         customReferenceDataUrl ||
-        (effectiveEtikettModus === "marke"
-          ? etikettUrl
-          : etikettUrl || "https://example.com/placeholder.png");
+        (selectedBeer
+          ? beerLabel
+          : effectiveEtikettModus === "marke"
+            ? profileEtikettUrl
+            : profileEtikettUrl || "https://example.com/placeholder.png");
 
-      if (effectiveEtikettModus === "marke" && !effectiveEtikett) {
+      if (
+        selectedBeer &&
+        effectiveEtikettModus === "marke" &&
+        !customReferenceDataUrl &&
+        !hasUsableBeerEtikett(beerLabel)
+      ) {
         throw new Error(
-          "Bitte lade ein Referenzbild hoch (Schritt „Referenz-Etikett“) oder wähle „Generisch“ als Etikett-Modus.",
+          `Für „${selectedBeer.name}“ fehlt das Etikett. Bitte unter „Dein Bier“ ein Flaschenfoto mit Etikett hochladen — das wird 1:1 übernommen.`,
+        );
+      }
+      if (!selectedBeer && effectiveEtikettModus === "marke" && !effectiveEtikett) {
+        throw new Error(
+          "Bitte wähle ein Bier mit Etikett oder lade ein Referenzbild hoch.",
         );
       }
 
-      const zusatzWunsch = extras.length ? extras.join(", ") : undefined;
+      const zusatzParts = [occasionNote.trim(), ...extras].filter(Boolean);
+      const zusatzWunsch = zusatzParts.length ? zusatzParts.join(", ").slice(0, 300) : undefined;
       const payload: HyperrealisticInput = {
         etikettBild: effectiveEtikett,
         flaschenTyp,
@@ -1340,9 +1400,12 @@ export function InhalteErstellenRedesign({
         shotType,
         kiPlattform,
         etikettModus: effectiveEtikettModus,
+        beerName: selectedBeer?.name?.trim() || undefined,
         zusatzWunsch,
         aspectRatio: wofuer.aspectRatio,
-        quality: "high",
+        // Server rendert mit gpt-image-2 quality "medium" (1K) als Standard —
+        // wir halten Payload + Abrechnung + gespeicherte Auflösung konsistent.
+        quality: "medium",
         variantCount,
       };
       const parsed = hyperrealisticSchema.parse(payload);
@@ -1357,15 +1420,22 @@ export function InhalteErstellenRedesign({
       }
       setGenerationStep(`KI generiert ${variantCount} Variante(n) …`);
 
-      // OpenAI rendert synchron — wir simulieren waehrend des Wartens einen
-      // sanften Fortschritt, damit die Lade-Kacheln lebendig wirken.
+      // OpenAI rendert synchron (kann je nach Qualitaet ~40-120s/Variante dauern).
+      // Wir lassen den Fortschritt asymptotisch weiterkriechen + zeigen die
+      // vergangene Zeit, damit nichts „eingefroren" wirkt.
+      const startedAt = Date.now();
       const progressTimer = window.setInterval(() => {
-        setVariantProgress((prev) =>
-          (prev.length ? prev : Array.from({ length: variantCount }, () => 5)).map((p) =>
-            Math.min(92, p + Math.random() * 7 + 1),
-          ),
+        const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+        setVariantProgress((prev) => {
+          const base = prev.length ? prev : Array.from({ length: variantCount }, () => 5);
+          return base.map((p) => (p >= 96 ? p : p + Math.max(0.4, (96 - p) * 0.05)));
+        });
+        setGenerationStep(
+          elapsedSec < 75
+            ? `KI generiert ${variantCount} Variante(n) … (~${elapsedSec}s)`
+            : `Hochwertige Bilder brauchen etwas — noch in Arbeit … (~${elapsedSec}s)`,
         );
-      }, 1100);
+      }, 1000);
 
       let data: {
         error?: string;
@@ -1410,24 +1480,26 @@ export function InhalteErstellenRedesign({
       setVariantProgress(resultImages.map(() => 100));
 
       const mediaPromptLabel = (() => {
-        const base = `${was.label} · ${behaelterLabel} · ${wo.label} · ${wie.label}`.slice(0, 200);
+        const base = `${was.label} · ${behaelterLabel} · ${wo.label} · ${wie.label}`.slice(0, 120);
         return base.trim().length > 0 ? base : "BrewAI-Motiv";
       })();
       const mediaResolution: "1K" | "2K" = parsed.quality === "high" ? "2K" : "1K";
       const outputFormat = data.outputFormat ?? "png";
 
-      resultImages.forEach((img, index) => {
-        void persistMediaItem({
-          id: `openai-${Date.now()}-${index}`,
-          imageUrl: img.imageUrl,
-          title: mediaPromptLabel,
-          prompt: mediaPromptLabel,
-          createdAt: new Date().toISOString(),
-          aspectRatio: parsed.aspectRatio,
-          resolution: mediaResolution,
-          outputFormat,
-        });
-      });
+      void (async () => {
+        for (const [index, img] of resultImages.entries()) {
+          await persistMediaItem({
+            id: `openai-${Date.now()}-${index}`,
+            imageUrl: img.imageUrl,
+            title: mediaPromptLabel,
+            prompt: mediaPromptLabel,
+            createdAt: new Date().toISOString(),
+            aspectRatio: parsed.aspectRatio,
+            resolution: mediaResolution,
+            outputFormat,
+          });
+        }
+      })();
 
       if (data.partial && data.partialErrors && data.partialErrors.length > 0) {
         setError(
@@ -1540,9 +1612,11 @@ export function InhalteErstellenRedesign({
             <p style={{ margin: "14px 0 12px", fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>
               {customReferenceDataUrl
                 ? `${customReferenceName || "Hochgeladenes Bild"} wird für diesen Run genutzt.`
-                : etikettUrl
-                  ? "Markenprofil-Etikett ist verknüpft. Optional kannst du ein anderes Referenzbild hochladen."
-                  : "Optional: Etikett oder Stil-Referenz für diesen Run hochladen."}
+                : beerEtikettUrl
+                  ? `Etikett von „${selectedBeer?.name ?? "deiner Sorte"}“ ist verknüpft. Optional kannst du ein anderes Referenzbild hochladen.`
+                  : etikettUrl
+                    ? "Markenprofil-Etikett ist verknüpft. Optional kannst du ein anderes Referenzbild hochladen."
+                    : "Optional: Etikett oder Stil-Referenz für diesen Run hochladen."}
             </p>
             {uploadError ? (
               <p style={{ margin: "0 0 10px", fontSize: 12, color: "#B83A2A", fontFamily: STUDIO_TOKENS.sans }}>{uploadError}</p>
@@ -1568,7 +1642,7 @@ export function InhalteErstellenRedesign({
                 </button>
               ) : null}
             </div>
-            {(customReferenceDataUrl || etikettUrl) && (
+            {(customReferenceDataUrl || profileEtikettUrl) && (
               <div
                 style={{
                   marginTop: 14,
@@ -1580,7 +1654,7 @@ export function InhalteErstellenRedesign({
                 }}
               >
                 <img
-                  src={customReferenceDataUrl || etikettUrl}
+                  src={customReferenceDataUrl || profileEtikettUrl}
                   alt="Referenz Vorschau"
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
@@ -1633,6 +1707,33 @@ export function InhalteErstellenRedesign({
                   P={P}
                 />
               </div>
+              <div style={{ marginTop: 14 }}>
+                <span className="studio-field-label" style={{ display: "block", marginBottom: 8 }}>
+                  Dein Wunsch (optional)
+                </span>
+                <textarea
+                  className="studio-create-wish"
+                  value={occasionNote}
+                  maxLength={280}
+                  rows={2}
+                  disabled={loading}
+                  placeholder="z. B. „mit Blick auf unseren Kirchturm“ oder „Etikett zur Kamera gedreht“"
+                  onChange={(e) => setOccasionNote(e.target.value)}
+                />
+              </div>
+              {effectiveEtikettModus === "marke" && (customReferenceDataUrl || profileEtikettUrl) ? (
+                <div className="studio-create-label-lock">
+                  <img src={customReferenceDataUrl || profileEtikettUrl} alt="" />
+                  <div>
+                    <strong>Etikett 1:1</strong>
+                    <span>
+                      {selectedBeer
+                        ? `„${selectedBeer.name}“ — dieses Etikett wird unverändert ins Bild übernommen.`
+                        : "Dieses Referenz-Etikett wird unverändert ins Bild übernommen."}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
               <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
                 {coachChecks.map((item) => (
                   <li key={item.label} style={{ display: "flex", gap: 8, fontSize: 12.5, color: item.done ? P.ink2 : P.ink3 }}>
@@ -1744,6 +1845,16 @@ export function InhalteErstellenRedesign({
         </div>
       ) : null}
 
+      {flowMode === "start" ? (
+        <InhalteErstellenStart
+          P={P}
+          breweryName={breweryName || initialBreweryName?.trim() || ""}
+          selectedBeerId={selectedBeer?.id ?? null}
+          onSelectBeer={applyBeer}
+          onPickTemplate={applyTemplate}
+          onPickCustom={startCustomWizard}
+        />
+      ) : (
       <MarketingPromptCreateShell
         P={P}
         brandMeta={brandMetaLine}
@@ -1772,8 +1883,12 @@ export function InhalteErstellenRedesign({
           if (isReviewStep) void generate();
           else goMicroNext();
         }}
-        onBack={goMicroPrev}
-        canBack={microStepIndex > 0 && !loading}
+        onBack={() => {
+          if (hasGenerated || (isReviewStep && fromTemplate) || microStepIndex === 0) backToStart();
+          else goMicroPrev();
+        }}
+        backLabel={hasGenerated || (isReviewStep && fromTemplate) ? "Zurück zur Auswahl" : "Zurück"}
+        canBack={!loading}
         primaryDisabled={!canProceedMicro || (isReviewStep && loading)}
         loading={loading && isReviewStep}
         brandStyleActive={profileActive}
@@ -1788,8 +1903,9 @@ export function InhalteErstellenRedesign({
       >
         {microStepContent}
       </MarketingPromptCreateShell>
+      )}
 
-      {error && !isReviewStep ? (
+      {flowMode === "wizard" && error && !isReviewStep ? (
         <p style={{ marginTop: 12, fontSize: 13, color: "#F5A8A8" }} role="alert">
           {error}
         </p>

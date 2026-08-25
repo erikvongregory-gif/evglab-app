@@ -7,6 +7,8 @@ import { createReferenceResolverFromMetadata, assertResolvableReferenceUrls, res
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { canUseCampaignWithTextProfile, getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
+import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
+import { calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,7 +29,7 @@ export async function POST(req: Request) {
           return NextResponse.json(
             {
               error:
-                "Kampagnenbild mit Text ist nur mit einem angelegten Markenprofil moeglich. Bitte lege zuerst dein Markenprofil im Dashboard an.",
+                "Kampagnenbild mit Text ist nur mit aktivem Markenprofil möglich. Lege es im Dashboard unter „Markenprofil“ an — ein Website-Link genügt.",
               code: "campaign_requires_guided_brand_profile",
             },
             { status: 403 },
@@ -44,6 +46,13 @@ export async function POST(req: Request) {
     }
 
     const input = parsed.data;
+    const perImageCost = calculatePerVariantTokenCost({
+      resolution: input.quality === "high" ? "2K" : "1K",
+      hasReferenceImage: (input.referenzBilder?.length ?? 0) > 0,
+    });
+    const budgetError = await requireTokenBudget(guard.userId, perImageCost);
+    if (budgetError) return budgetError;
+
     const prompt = buildCampaignTextPrompt(input);
     const origin = new URL(req.url).origin;
     assertResolvableReferenceUrls(guard.userMetadata, origin, input.referenzBilder);
@@ -56,12 +65,16 @@ export async function POST(req: Request) {
       resolveReferenceUrl: createReferenceResolverFromMetadata(guard.userMetadata),
     });
 
+    const charge = await chargeGeneratedTokens(guard.userId, perImageCost * Math.max(images.length, 1));
+    if (!charge.ok) return charge.response;
+
     return NextResponse.json({
       mode: "campaign_text",
       prompt,
       images,
       model: "gpt-image-2-2026-04-21",
       userId: guard.userId,
+      billing: charge.billing,
     });
   } catch (error) {
     return NextResponse.json(

@@ -4,9 +4,13 @@ import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-er
 import { removeBackground } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/background-removal";
 import { buildProductIsolatePrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/product-isolate";
 import { productIsolateSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
+import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+/** Freisteller laufen ueber Photoroom/remove.bg — deutlich guenstiger als ein Bildmodell. */
+const ISOLATE_TOKEN_COST = 5;
 
 const BG_COLOR = {
   transparent: "transparent",
@@ -27,6 +31,9 @@ export async function POST(req: Request) {
     }
 
     const input = parsed.data;
+    const budgetError = await requireTokenBudget(guard.userId, ISOLATE_TOKEN_COST);
+    if (budgetError) return budgetError;
+
     const prompt = buildProductIsolatePrompt(input);
     const cutout = await removeBackground({
       imageUrl: input.inputBild,
@@ -37,12 +44,16 @@ export async function POST(req: Request) {
       input.outputFormat === "webp" ? await sharp(cutout).webp({ quality: 95 }).toBuffer() : await sharp(cutout).png().toBuffer();
     const mime = input.outputFormat === "webp" ? "image/webp" : "image/png";
 
+    const charge = await chargeGeneratedTokens(guard.userId, ISOLATE_TOKEN_COST);
+    if (!charge.ok) return charge.response;
+
     return NextResponse.json({
       mode: "product_isolate",
       prompt,
       image: `data:${mime};base64,${output.toString("base64")}`,
       model: process.env.PHOTOROOM_API_KEY ? "photoroom-segment" : "remove.bg",
       userId: guard.userId,
+      billing: charge.billing,
     });
   } catch (error) {
     return NextResponse.json(

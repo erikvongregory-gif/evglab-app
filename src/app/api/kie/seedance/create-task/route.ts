@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { classifyProviderError, classifyProviderResponse } from "@/lib/ai/providerErrors";
+import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { consumeTokens, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -73,7 +75,7 @@ export async function POST(req: Request) {
     if (subscriptionError) return subscriptionError;
 
     await ensureBillingRow(userId);
-    const currentState = await getBillingRow(userId);
+    const currentState = await getEffectiveBillingRow(userId);
 
     const resolution = (body.resolution ?? "720p") as SeedanceResolution;
     const duration = body.duration ?? durationForPreset(body.presetId);
@@ -112,33 +114,24 @@ export async function POST(req: Request) {
     });
 
     const data = (await upstream.json()) as Record<string, unknown>;
+    const upstreamMessage = () =>
+      (data.msg as string | undefined) ||
+      (data.error as string | undefined) ||
+      ((data.data as Record<string, unknown> | undefined)?.msg as string | undefined);
+
+    // Kein Token-Abzug: die Buchung erfolgt erst nach erfolgreicher Task-Anlage.
     if (!upstream.ok) {
-      const upstreamMessage =
-        (data.msg as string | undefined) ||
-        (data.error as string | undefined) ||
-        ((data.data as Record<string, unknown> | undefined)?.msg as string | undefined);
-      return NextResponse.json(
-        {
-          error: upstreamMessage ? `Video-Generierung fehlgeschlagen: ${upstreamMessage}` : "Video-Generierung fehlgeschlagen.",
-          raw: data,
-        },
-        { status: upstream.status },
-      );
+      const classified = classifyProviderResponse("kie", upstream, data);
+      logProviderFailure(classified, { label: "kie-seedance-create-task", userId });
+      return providerErrorResponse(classified);
     }
 
     const code = data.code as number | undefined;
     if (typeof code === "number" && code !== 200) {
-      const upstreamMessage =
-        (data.msg as string | undefined) ||
-        (data.error as string | undefined) ||
-        ((data.data as Record<string, unknown> | undefined)?.msg as string | undefined);
-      return NextResponse.json(
-        {
-          error: upstreamMessage ? `Video-Task abgelehnt: ${upstreamMessage}` : "Video-Task wurde abgelehnt.",
-          raw: data,
-        },
-        { status: 502 },
-      );
+      // Kie liefert Geschaeftsfehler mit HTTP 200 und eigenem `code`.
+      const classified = classifyProviderError({ provider: "kie", status: code, message: upstreamMessage() });
+      logProviderFailure(classified, { label: "kie-seedance-create-task", userId });
+      return providerErrorResponse(classified);
     }
 
     const taskId = extractTaskId(data);

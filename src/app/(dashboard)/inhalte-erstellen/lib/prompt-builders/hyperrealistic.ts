@@ -1,12 +1,14 @@
-import { FLASCHEN_TYPEN, GLAS_TYPEN, isDoseTyp } from "../brewing-knowledge";
+import { FLASCHEN_TYPEN, GLAS_TYPEN, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 import {
   buildBeerPhysicsFragment,
   buildBottleShapeLockFragment,
   buildCameraFragment,
   buildClosureLogicFragment,
+  buildGlassShapeLockFragment,
   buildHumanRealismFragment,
   buildHyperrealismLockFragment,
+  buildAuthenticityFragment,
   buildSceneTextureAnchors,
   HYPERREALISM_NEGATIVE,
 } from "./hyperrealism-blocks";
@@ -19,47 +21,47 @@ const SZENE_DESCRIPTIONS = {
   wiese_picknick: "summer meadow picnic, blanket, wildflowers, soft natural light",
   strand_sonnenuntergang: "beach at sunset, warm golden light, gentle waves in background",
   alpenpanorama: "alpine mountain hut terrace, snow-capped peaks in background, crisp blue sky",
-  stadtbalkon_abend: "urban rooftop balcony at dusk, city lights bokeh background",
+  stadtbalkon_abend: "urban balcony at dusk, city in the background, mixed evening light",
   brauereihof: "brewery courtyard, copper brewing kettles visible in background, industrial-rustic atmosphere",
   fussball_public_viewing:
     "outdoor football public viewing party (German Fanmeile / WM or EM watch event), large LED screen or projector showing a live football match clearly visible in background, fans in jerseys or scarves cheering, standing and seated crowd, screen glow on faces — NOT a Biergarten, NOT a cozy Wirtshaus interior",
 } as const;
 
 const TAGESZEIT_LIGHTING = {
-  goldene_stunde: "golden hour lighting, warm 3200K tones, long soft shadows",
-  mittag: "bright midday sunlight, slight haze for softness",
-  abend_warm: "warm evening light, candle or lantern fill",
-  blaue_stunde: "blue hour twilight, cool ambient + warm artificial fill",
+  goldene_stunde: "late-afternoon sunlight with natural color temperature, long soft shadows — not a cinematic orange grade",
+  mittag: "bright midday sunlight, slight haze, hard-ish shadows",
+  abend_warm: "warm evening mixed light from sky and nearby lamps, not studio fill",
+  blaue_stunde: "blue-hour twilight, cool ambient with a bit of warm practical light",
 } as const;
 
 const STIMMUNG_TREND_PROMPT = {
   nachhaltig:
-    "rustic sustainable craft atmosphere, warm earth tones, muted greens, natural brown, honey-yellow palette, farm-to-brew authenticity",
+    "rustic craft atmosphere, earth tones, muted greens, natural brown, honey-yellow palette, farm-to-brew authenticity",
   modern:
-    "clean minimalist contemporary mood, concrete grey, brilliant whites, single brand accent, geometric shadow play, architectural calm",
+    "quiet contemporary mood, concrete grey, daylight whites, one brand accent, calm interior — not a geometry catalog",
   nostalgie:
-    "nostalgic vintage Bavarian beer hall mood, sepia warmth, vintage typography, deep gold accents, slight film-grain aesthetic",
+    "nostalgic Bavarian beer-hall mood, slight sepia warmth, deep gold accents, analog grain",
   aktiv:
-    "high-key fresh active outdoor vibe, bright daylight, citrus yellow and sky blue, energetic and vital",
+    "fresh outdoor daylight, citrus yellow and sky blue, energetic but unstyled",
   premium:
-    "premium luxury atmosphere, deep blacks, gold leaf accents, dark marble, chiaroscuro spotlight, exclusive sophistication",
+    "quiet premium interior, dark materials, restrained color, real room light — not a jewelry-ad spotlight",
 } as const;
 
 const SHOT_TYPE_PROMPT = {
-  A: "classic 45° hero shot, balanced commercial framing",
-  B: "eye-level frontal shot, neutral classic perspective",
-  C: "low angle from below, imposing heroic look",
-  D: "flat lay / top-down view, organized graphic composition",
-  E: "extreme close-up detail of foam, condensation and label, razor-thin focal plane",
-  F: "wide environmental shot showing the brewery / venue as narrative context",
+  A: "slight 45° angle, ordinary documentary framing — not a commercial hero poster",
+  B: "eye-level frontal shot, natural perspective",
+  C: "slight low angle, physically plausible, not superhero",
+  D: "top-down view, naturally arranged, not a graphic poster",
+  E: "close-up of foam, condensation and label",
+  F: "wide environmental shot of the real venue",
   G: "drone / aerial top-down perspective",
-  H: "POV / over-the-shoulder perspective, immersive first-person framing",
+  H: "over-the-shoulder handheld, first-person hold",
 } as const;
 
 const PERSON_FRAGMENTS = {
-  A: "No people, no hands, no human presence — pure product shot.",
-  B: "Anonymous hands holding the glass or bottle, cropped at wrist level, no face visible, no body.",
-  C: "A person visible from behind, face fully turned away from camera, body silhouette only, anonymous.",
+  A: "No people, no hands, no human presence — product only.",
+  B: "Real adult hands holding the glass or bottle, cropped at the wrist, no face — knuckles and skin texture visible, believable grip.",
+  C: "A person visible from behind, face turned away, body silhouette only.",
 } as const;
 
 function groupSettingPhrase(input: HyperrealisticInput): string {
@@ -140,7 +142,7 @@ function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<
             ? "active and dynamic"
             : "relaxed and natural";
     const freitext = input.personBeschreibung ? `, ${input.personBeschreibung}` : "";
-    return `Anonymous lifestyle model — a fictional ${gender} ${age}, ${body}, ${mood}${freitext}. No specific real person, no celebrity likeness.`;
+    return `An ordinary adult — a fictional ${gender} ${age}, ${body}, ${mood}${freitext}. No model-agency look, no specific real person, no celebrity likeness.`;
   }
   const n =
     input.gruppenAnzahl === "2"
@@ -203,15 +205,21 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
         ? `${flasche.promptDescription}${materialClause}. The ${istDose ? "wrap-around artwork on the can" : "label on the bottle"} MUST be reproduced 1:1 EXACTLY from the reference image — same artwork, same typography, same colors, same proportions, no reinterpretation, no stylization. Treat the ${istDose ? "can artwork as a fixed graphic asset wrapped around the cylindrical can body" : "label as a fixed graphic asset to be applied flat-perspective-corrected onto the bottle"}.`
         : `${flasche.promptDescription}${materialClause}. Design an original, professionally branded ${istDose ? "wrap-around can artwork" : "beer label"} that fits the beer style "${input.bierstil}" and the overall mood — invent a plausible FICTIONAL brand name and matching logo (NOT any real existing brewery), with clean legible typography, a coherent color palette and a tasteful, realistic layout. The ${gebindeNoun} MUST look professionally ${istDose ? "printed" : "labelled"}, never blank, never unlabelled.`;
 
+  const glasFillMl =
+    behaelter !== "F" && input.glasTyp ? pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter) : 0;
+  const glasPour = input.glasTyp && glasFillMl ? glassPourPromptDescription(input.glasTyp, glasFillMl) : "";
+
   const glasPart =
     behaelter === "F"
       ? ""
       : glas
-        ? `HERO SUBJECT: A poured ${glas.promptDescription} ${behaelter === "B" ? `stands next to the ${gebindeNoun}` : "in centered hero position — ONLY the glass, absolutely NO bottle or can anywhere in frame"}. The beer color matches the style "${input.bierstil}".${
+        ? `HERO SUBJECT: A poured ${glasPour} ${behaelter === "B" ? `stands next to the ${gebindeNoun}` : "in centered hero position — ONLY the glass, absolutely NO bottle or can anywhere in frame"}. The beer color matches the style "${input.bierstil}".${
             etikettModus === "marke" && options?.breweryName?.trim()
               ? ` EXACT TEXT on the glass: "${options.breweryName.trim()}". The glass MUST show this logo/branding clearly on the glass surface — never plain/unbranded, never a different brewery name.`
-              : ""
-          }${behaelter === "B" ? ` Maintain correct proportional scale: "${gebindeNoun} and glass shown in correct proportional scale, glass volume visually matches ${gebindeNoun} content".` : ""}`
+              : etikettModus !== "marke"
+                ? ` Design an original, professionally branded glass: invent a plausible FICTIONAL brewery name and matching logo (NOT any real existing brewery) and show it tastefully etched or printed on the glass surface with clean legible typography — the glass MUST look professionally branded, never a plain unbranded glass.`
+                : ""
+          }${behaelter === "B" ? ` Maintain correct proportional scale: the glass is a single pour from this ${flascheVolumeMl(input.flaschenTyp) / 1000} L ${gebindeNoun} (${glasFillMl} ml) — never a larger mug than the container.` : ""}`
         : "";
 
   const subjectBlock =
@@ -220,6 +228,7 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
       : `SUBJECT: ${bottlePart}\n\n${glasPart}`.trim();
 
   const bottleShapeLock = behaelter === "G" ? "" : buildBottleShapeLockFragment(input);
+  const glassShapeLock = buildGlassShapeLockFragment(input);
   const closureLogic = behaelter === "G" ? "" : buildClosureLogicFragment(input);
 
   const sceneBlock = `SCENE: ${szene}.`;
@@ -280,7 +289,7 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
 ${buildHyperrealismLockFragment()}
 
 ${subjectBlock}
-${bottleShapeLock ? `\n${bottleShapeLock}\n` : ""}${closureLogic ? `\n${closureLogic}\n` : ""}
+${bottleShapeLock ? `\n${bottleShapeLock}\n` : ""}${glassShapeLock ? `\n${glassShapeLock}\n` : ""}${closureLogic ? `\n${closureLogic}\n` : ""}
 ${beerPhysicsPart}
 
 ${personPart}
@@ -300,4 +309,55 @@ ${input.zusatzWunsch ? `ADDITIONAL: ${input.zusatzWunsch}` : ""}
 
 NEGATIVE: ${sceneNegative}${bottleShapeNegative}${closureNegative}${glassOnlyNegative}${labelNegative}${HYPERREALISM_NEGATIVE}.
   `.trim();
+}
+
+const PEOPLE_PLACEMENT: Record<NonNullable<HyperrealisticInput["personenModus"]>, string> = {
+  A: "No people and no hands — only the product in the scene.",
+  B: "One ordinary adult hand holding a matching beer glass; the bottle from Image 1 stands next to it. Real skin, knuckles, pores. No beauty retouch, no plastic CGI hands.",
+  C: "A person seen from behind, face away from camera.",
+  D: "One ordinary adult in the scene, unposed, not a model.",
+  E: "A small group of ordinary adults, candid, not posing for an ad.",
+};
+
+/**
+ * Kurzer i2i-Prompt: das Produktfoto bleibt, nur die Szene wechselt.
+ * Bewusst ohne Markenname/Etikett-Beschreibung — die Bild-KI soll das Foto kopieren,
+ * nicht ein Label aus Text erfinden.
+ */
+export function buildProductPlacementPrompt(input: HyperrealisticInput): string {
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  const personenModus = input.personenModus ?? (input.personImBild ? "D" : "A");
+  const scene = SZENE_DESCRIPTIONS[input.szene];
+  const light = TAGESZEIT_LIGHTING[input.tageszeit];
+  const people = PEOPLE_PLACEMENT[personenModus] ?? PEOPLE_PLACEMENT.A;
+  const vessel =
+    behaelter === "G" ? "glass only, no bottle" : behaelter === "F" ? "the bottle from Image 1 only, no poured glass" : "the bottle from Image 1 plus a poured beer glass beside it";
+  const extra = input.zusatzWunsch?.trim();
+  const glassPour =
+    behaelter !== "F" && input.glasTyp
+      ? glassPourPromptDescription(input.glasTyp, pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter))
+      : "";
+  const bottleLitres = flascheVolumeMl(input.flaschenTyp) / 1000;
+  const pourLock =
+    behaelter === "B" && glassPour
+      ? `Beside it: one poured ${glassPour}. The glass is a single pour from this ${bottleLitres} L bottle — never a larger mug than the bottle (no 0.5 L Seidel next to a 0.33 L bottle, no 1 L Maß).`
+      : "";
+
+  return [
+    "Image 1 is a photograph of the real beer bottle. Place that exact same physical bottle into a new photograph — preserve the product, invent only the environment (product-preservation, not a redraw).",
+    "Keep unchanged from Image 1: bottle silhouette, glass color, and the entire printed label — logo, crest, pattern, colors, layout, and every letter. Do not redraw, restyle, recolor, or invent a different label. Do not add new brand names or badges.",
+    "The bottle sits on a real surface with a natural contact shadow. Bottle glass reflects THIS room, not a white studio cove.",
+    `Composition: ${vessel}.`,
+    pourLock,
+    people,
+    `Setting: ${scene}.`,
+    `Light: ${light}. Large soft source on the packaging (window or overcast sky), not a beauty dish, not rim-light hero glow. Some shadow remains.`,
+    extra ? `Scene detail: ${extra}` : "",
+    "Camera: handheld Canon EOS R6, 50mm f/4, Kodak Portra 400, ISO 400, fine analog grain. Slightly muted color. Not centered. Not everything razor-sharp.",
+    "This is not an advertisement, not CGI, not cinematic orange glow, not beauty-filtered skin.",
+    "Forbidden look: Octane/Unreal, catalog packshot, HDR, photorealistic commercial product shot, ultra-detailed, professionally retouched, plastic foam, uniform condensation stickers, floating product.",
+    buildAuthenticityFragment(input),
+  ]
+    .filter(Boolean)
+    .join(" ");
 }

@@ -23,6 +23,7 @@ const bodySchema = z.object({
   brandWebsiteUrl: z.string().max(1200).optional().default(""),
   brandProfileSource: z.enum(["url", "instagram", "manual"]),
   brandReferenceImageUrls: z.array(z.string().max(1200)).max(10).optional().default([]),
+  brandLabelReferenceUrl: z.string().max(1200).optional().default(""),
   referenceImagePayloads: z
     .array(
       z.object({

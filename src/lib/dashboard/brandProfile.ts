@@ -14,6 +14,8 @@ export type BrandProfile = {
   brandDos: string;
   brandDonts: string;
   brandReferenceImageUrls: string[];
+  /** Bester Packshot/Etikett-Traeger aus der Analyse — Quelle fuer Etikett-Treue, NICHT fuer Bildsprache. */
+  brandLabelReferenceUrl: string;
 };
 
 function asString(value: unknown): string {
@@ -58,6 +60,7 @@ export function getBrandProfileFromMetadata(userMetadata: unknown): BrandProfile
     brandDos: asString(settings?.brandDos),
     brandDonts: asString(settings?.brandDonts),
     brandReferenceImageUrls: asStringArray(settings?.brandReferenceImageUrls),
+    brandLabelReferenceUrl: asString(settings?.brandLabelReferenceUrl),
   };
 }
 
@@ -138,25 +141,48 @@ export function buildGenericBrandProfilePatch(): Partial<DashboardSettings> {
     brandDos: "",
     brandDonts: "",
     brandReferenceImageUrls: [],
+    brandLabelReferenceUrl: "",
     brandLockLevel: "strict",
     brandAnalyzedAt: "",
   };
 }
 
+/**
+ * Baut den Markenprofil-Block fuer Generierungs-Prompts (Claude-Prompt-Erzeugung
+ * UND direkte Bild-Prompts). Grundsaetze:
+ * - Nur Modus `guided` liefert Kontext. `skip`/`undecided` => leerer String,
+ *   damit generische Generierungen keinen leeren "MANDATORY"-Block bekommen.
+ * - Nur gefuellte Felder werden aufgenommen (keine leeren Zeilen wie "Brand tone: ").
+ * - `brandLockLevel` steuert die Verbindlichkeit (vorher stand immer MANDATORY da).
+ * - Keine URLs im Prompt: Bildmodelle koennen sie nicht abrufen, sie sind Rauschen.
+ */
 export function buildBrandProfilePromptContext(profile: BrandProfile): string {
-  return [
-    "Brand profile lock (MANDATORY):",
-    `- Brand lock level: ${profile.brandLockLevel.toUpperCase()}`,
-    `- Brand/Brewery: ${profile.breweryName}`,
-    profile.brandInstagramUrl ? `- Brand Instagram: ${profile.brandInstagramUrl}` : "",
-    profile.brandWebsiteUrl ? `- Brand website: ${profile.brandWebsiteUrl}` : "",
-    `- Brand tone: ${profile.brandTone}`,
-    `- Brand colors/style cues: ${profile.brandColors}`,
-    `- Must include style rules: ${profile.brandDos}`,
-    `- Must avoid style rules: ${profile.brandDonts}`,
-    `- Reference image URLs available: ${profile.brandReferenceImageUrls.join(", ")}`,
-    "- Keep all generated outputs aligned with this brand profile unless the user explicitly overrides it.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  if (profile.brandProfileMode !== "guided") return "";
+
+  const facts = [
+    profile.breweryName ? `- Brand/Brewery: ${profile.breweryName}` : "",
+    profile.brandTone ? `- Brand tone & character: ${profile.brandTone}` : "",
+    profile.brandColors ? `- Brand color palette: ${profile.brandColors}` : "",
+    profile.brandDos ? `- Visual style, always: ${profile.brandDos}` : "",
+    profile.brandDonts ? `- Visual style, never: ${profile.brandDonts}` : "",
+  ].filter(Boolean);
+  if (facts.length === 0) return "";
+
+  const level = profile.brandLockLevel;
+  const header =
+    level === "strict"
+      ? "Brand profile (STRICT lock, mandatory): every output must match this brand profile exactly."
+      : level === "balanced"
+        ? "Brand profile (BALANCED lock, guardrails): keep tone, colors and overall look clearly on-brand; scene and composition may vary creatively."
+        : "Brand profile (LOOSE lock, inspiration): use this profile as loose stylistic inspiration; the creative brief takes priority.";
+  const conflictRule =
+    level === "strict"
+      ? "If the creative brief conflicts with this brand profile, the brand profile wins."
+      : level === "balanced"
+        ? "If the creative brief conflicts with this profile, keep brand tone and colors intact and follow the brief otherwise."
+        : profile.brandDonts
+          ? 'Only the "never" rules above are binding; adapt everything else freely to the brief.'
+          : "Nothing here is strictly binding; the creative brief always wins.";
+
+  return [header, ...facts, conflictRule].join("\n");
 }

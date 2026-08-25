@@ -98,6 +98,7 @@ type SettingsPayload = {
   brandDos: string;
   brandDonts: string;
   brandReferenceImageUrls: string[];
+  brandLabelReferenceUrl: string;
   brandAnalyzedAt?: string;
 };
 
@@ -423,11 +424,14 @@ export function DashboardRedesignShell(props: {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [mediaLoaded, setMediaLoaded] = useState(false);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [settings, setSettings] = useState<SettingsPayload | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [brandProfileSetupOpen, setBrandProfileSetupOpen] = useState(false);
+  const [brandQuickStartUrl, setBrandQuickStartUrl] = useState("");
+  const [brandAutoAnalyzeSignal, setBrandAutoAnalyzeSignal] = useState(0);
   const [showBrandProfileChoice, setShowBrandProfileChoice] = useState(false);
   const [brandProfileNotice, setBrandProfileNotice] = useState("");
   const [pricingCheckoutError, setPricingCheckoutError] = useState<string | null>(null);
@@ -465,39 +469,65 @@ export function DashboardRedesignShell(props: {
   useEffect(() => {
     let ignore = false;
 
-    (async () => {
+    const load = async (url: string) => {
+      const res = await fetch(url, { cache: "no-store", credentials: "include" });
+      if (res.status === 401) {
+        window.location.href = "/anmelden";
+        return null;
+      }
+      return res;
+    };
+
+    void (async () => {
       try {
-        const [summaryRes, mediaRes, teamRes, settingsRes] = await Promise.all([
-          fetch("/api/dashboard/summary", { cache: "no-store", credentials: "include" }),
-          fetch("/api/dashboard/media", { cache: "no-store" }),
-          fetch("/api/dashboard/team", { cache: "no-store" }),
-          fetch("/api/dashboard/settings", { cache: "no-store", credentials: "include" }),
-        ]);
-        if (ignore) return;
-        if (summaryRes.ok) {
-          const json = (await summaryRes.json()) as { summary?: DashboardSummary; activities?: ActivityItem[] };
-          if (json.summary) setSummary(json.summary);
-          if (Array.isArray(json.activities)) setActivities(json.activities);
-        }
-        if (mediaRes.ok) {
-          const json = (await mediaRes.json()) as { items?: MediaItem[] };
+        const res = await load("/api/dashboard/media");
+        if (!res || ignore) return;
+        if (res.ok) {
+          const json = (await res.json()) as { items?: MediaItem[] };
           if (Array.isArray(json.items)) setMedia(json.items);
         }
-        if (teamRes.ok) {
-          const json = (await teamRes.json()) as { members?: TeamMember[] };
-          if (Array.isArray(json.members)) setTeam(json.members);
-        }
-        if (settingsRes.ok) {
-          const json = (await settingsRes.json()) as { settings?: SettingsPayload };
+      } catch {
+        /* Mediathek separat — Fehler nicht als Dashboard-Totalschaden */
+      } finally {
+        if (!ignore) setMediaLoaded(true);
+      }
+    })();
+
+    void (async () => {
+      try {
+        const res = await load("/api/dashboard/summary");
+        if (!res || ignore || !res.ok) return;
+        const json = (await res.json()) as { summary?: DashboardSummary; activities?: ActivityItem[] };
+        if (json.summary) setSummary(json.summary);
+        if (Array.isArray(json.activities)) setActivities(json.activities);
+      } catch {
+        /* Summary darf langsam/fehlend sein, ohne Settings zu blockieren */
+      }
+    })();
+
+    void (async () => {
+      try {
+        const res = await load("/api/dashboard/team");
+        if (!res || ignore || !res.ok) return;
+        const json = (await res.json()) as { members?: TeamMember[] };
+        if (Array.isArray(json.members)) setTeam(json.members);
+      } catch {
+        /* Team optional */
+      }
+    })();
+
+    void (async () => {
+      try {
+        const res = await load("/api/dashboard/settings");
+        if (!res || ignore) return;
+        if (res.ok) {
+          const json = (await res.json()) as { settings?: SettingsPayload };
           if (json.settings) {
             setSettings(normalizeSettings(json.settings));
             setSettingsError(null);
           }
-        } else if (settingsRes.status === 401) {
-          if (!ignore) window.location.href = "/anmelden";
-          return;
         } else {
-          const fallback = (await settingsRes.json().catch(() => null)) as { error?: string } | null;
+          const fallback = (await res.json().catch(() => null)) as { error?: string } | null;
           setSettingsError(fallback?.error ?? "Einstellungen konnten nicht geladen werden.");
         }
       } catch {
@@ -506,6 +536,7 @@ export function DashboardRedesignShell(props: {
         if (!ignore) setSettingsLoaded(true);
       }
     })();
+
     return () => {
       ignore = true;
     };
@@ -612,6 +643,7 @@ export function DashboardRedesignShell(props: {
         brandWebsiteUrl: suggestion.brandWebsiteUrl,
         brandProfileSource: suggestion.brandProfileSource,
         brandReferenceImageUrls: suggestion.referenceImageUrls,
+        brandLabelReferenceUrl: suggestion.brandLabelReferenceUrl ?? "",
         brandAnalyzedAt: analyzedAt,
       };
 
@@ -698,6 +730,7 @@ export function DashboardRedesignShell(props: {
         <MediaView
           P={P}
           items={media}
+          loaded={mediaLoaded}
           onItemsChange={setMedia}
           hasActivePlan={hasActivePlan}
           initialQuery={searchParams.get("q") ?? ""}
@@ -712,6 +745,11 @@ export function DashboardRedesignShell(props: {
           brandProfileComplete={brandProfileComplete}
           brandProfileNotice={brandProfileNotice}
           onOpenBrandSetup={() => setBrandProfileSetupOpen(true)}
+          onQuickAnalyze={(url) => {
+            setBrandQuickStartUrl(url);
+            setBrandAutoAnalyzeSignal((n) => n + 1);
+            setBrandProfileSetupOpen(true);
+          }}
           onSkipBrandProfile={() => void handleSkipBrandProfile()}
           onResetBrandProfile={handleResetBrandProfile}
           onChange={(patch) => setSettings((s) => (s ? { ...s, ...patch } : s))}
@@ -755,6 +793,8 @@ export function DashboardRedesignShell(props: {
       onOpenChange={setBrandProfileSetupOpen}
       title="Marke einlesen"
       onSaved={applyBrandScanAndPersist}
+      initialWebsiteUrl={brandQuickStartUrl}
+      autoAnalyzeSignal={brandAutoAnalyzeSignal}
     />
 
     {showBrandProfileChoice ? (
@@ -972,12 +1012,14 @@ function DashboardOverview({
 function MediaView({
   P,
   items,
+  loaded = true,
   onItemsChange,
   hasActivePlan = true,
   initialQuery = "",
 }: {
   P: StudioPalette;
   items: MediaItem[];
+  loaded?: boolean;
   onItemsChange: (next: MediaItem[]) => void;
   hasActivePlan?: boolean;
   initialQuery?: string;
@@ -1117,9 +1159,13 @@ function MediaView({
           >
             <div aria-hidden style={{ position: "absolute", top: -60, right: -40, width: 220, height: 220, background: `radial-gradient(circle, ${TOKENS.amber}18 0%, transparent 65%)`, pointerEvents: "none" }} />
             <p style={{ fontFamily: TOKENS.sans, fontSize: 14, color: P.ink2, position: "relative" }}>
-              {items.length === 0 ? "Noch keine Motive in der Mediathek." : "Keine Motive passen zur Suche."}
+              {!loaded
+                ? "Motive werden geladen …"
+                : items.length === 0
+                  ? "Noch keine Motive in der Mediathek."
+                  : "Keine Motive passen zur Suche."}
             </p>
-            {items.length === 0 ? (
+            {loaded && items.length === 0 ? (
             <Link
               href={hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing"}
               className="evg-cta"

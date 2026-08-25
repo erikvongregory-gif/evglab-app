@@ -93,6 +93,7 @@ export function sanitizeDashboardSettings(input: unknown): DashboardSettings {
     brandDos: asString(cleaned.brandDos),
     brandDonts: asString(cleaned.brandDonts),
     brandReferenceImageUrls: asReferenceUrls(cleaned.brandReferenceImageUrls),
+    brandLabelReferenceUrl: asString(cleaned.brandLabelReferenceUrl).trim(),
     ...(analyzedAt ? { brandAnalyzedAt: analyzedAt } : {}),
   };
 }

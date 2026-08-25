@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { isProviderError, withProviderRetry } from "@/lib/ai/providerRequest";
 
 /**
  * Anthropic retires dated snapshots — keep fallbacks on active models (see model deprecations docs).
@@ -16,14 +17,23 @@ export function getAnthropicModelCandidates(): string[] {
 }
 
 function isModelNotFoundError(error: unknown): boolean {
-  if (error && typeof error === "object") {
-    const status = (error as { status?: number }).status;
-    if (status === 404) return true;
-    const nestedType = (error as { error?: { type?: string } }).error?.type;
-    if (nestedType === "not_found_error") return true;
+  let status: number | undefined;
+  let message: string;
+
+  if (isProviderError(error)) {
+    status = error.classified.providerStatus ?? undefined;
+    message = error.classified.rawMessage;
+  } else {
+    if (error && typeof error === "object") {
+      status = (error as { status?: number }).status;
+      const nestedType = (error as { error?: { type?: string } }).error?.type;
+      if (nestedType === "not_found_error") return true;
+    }
+    message = error instanceof Error ? error.message : String(error);
   }
-  const msg = error instanceof Error ? error.message : String(error);
-  const m = msg.toLowerCase();
+
+  if (status === 404) return true;
+  const m = message.toLowerCase();
   return (
     m.includes("not_found") ||
     m.includes("not found") ||
@@ -33,8 +43,9 @@ function isModelNotFoundError(error: unknown): boolean {
 }
 
 /**
- * Tries `messages.create` with each candidate until one succeeds.
- * On unknown model (404), continues with the next candidate; other errors are rethrown.
+ * Tries `messages.create` with each candidate until one succeeds. Unknown models
+ * (404) fall through to the next candidate; transient failures (429, 5xx,
+ * timeouts) are retried with backoff before the candidate is given up on.
  */
 export async function createAnthropicMessageWithModelFallback(
   client: Anthropic,
@@ -43,11 +54,16 @@ export async function createAnthropicMessageWithModelFallback(
   let lastError: unknown;
   for (const model of getAnthropicModelCandidates()) {
     try {
-      return await client.messages.create({
-        ...paramsWithoutModel,
-        model,
-        stream: false,
-      });
+      return await withProviderRetry(
+        "anthropic",
+        () =>
+          client.messages.create({
+            ...paramsWithoutModel,
+            model,
+            stream: false,
+          }),
+        { label: `messages:${model}` },
+      );
     } catch (error) {
       lastError = error;
       if (isModelNotFoundError(error)) continue;

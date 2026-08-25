@@ -1,10 +1,12 @@
 import type { BrandReferenceImagePayload, BrandScanSuggestion } from "./BrandProfileSetupModal";
 
 export {
+  computeProfileStrength,
   formatConfidenceLabel,
   parseHexSwatches,
   parseRuleSentences,
   parseToneTags,
+  type ProfileStrength,
 } from "@/lib/brand/brand-profile-display";
 
 export function reviewReferencePreviews(review: BrandScanSuggestion): string[] {

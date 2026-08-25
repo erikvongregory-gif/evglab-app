@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { isOwnerUser } from "@/lib/auth/owner";
+import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { readDashboardMedia } from "@/lib/dashboard/media-store";
 
 export async function GET() {
   if (!isSupabaseConfigured()) {
@@ -17,10 +19,15 @@ export async function GET() {
 
   let billing = null as Awaited<ReturnType<typeof getBillingRow>>;
   let degradedBilling = false;
+  const isOwner = isOwnerUser(user);
   try {
-    await ensureBillingRow(user.id);
-    billing = await getBillingRow(user.id);
-    if (!billing?.plan || billing.subscription_status === "none" || billing.subscription_status === "canceled") {
+    if (isOwner) {
+      billing = buildOwnerBillingRow(user.id);
+    } else {
+      await ensureBillingRow(user.id);
+      billing = await getBillingRow(user.id);
+    }
+    if (!isOwner && (!billing?.plan || billing.subscription_status === "none" || billing.subscription_status === "canceled")) {
       try {
         const syncResult = await syncBillingFromStripe({
           userId: user.id,
@@ -39,7 +46,7 @@ export async function GET() {
     console.error("dashboard.summary: billing fallback aktiv", error);
   }
   const dashboard = getDashboardMetadata(user.user_metadata);
-  const media = dashboard.mediaLibrary ?? [];
+  const media = await readDashboardMedia(user.id).catch(() => dashboard.mediaLibrary ?? []);
   const team = dashboard.teamMembers ?? [];
   const activeCampaigns = media.length === 0 ? 0 : Math.min(6, Math.ceil(media.length / 5));
 

@@ -139,6 +139,8 @@ export const hyperrealisticSchema = z.object({
   /** Zielgruppe — optional, kommt sonst aus Markenprofil. */
   zielgruppe: zielgruppeSchema.optional(),
   zusatzWunsch: z.string().trim().max(300).optional(),
+  /** Sortenname aus „Meine Biere“ — fuer den 1:1-Etikett-Lock. */
+  beerName: z.string().trim().max(80).optional(),
   aspectRatio: aspectRatioSchema,
   quality: imageQualitySchema,
   variantCount: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),

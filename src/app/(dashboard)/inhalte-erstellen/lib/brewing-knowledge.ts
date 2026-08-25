@@ -22,9 +22,9 @@ export const FLASCHEN_TYPEN = {
     label: "Vichy 0,33 l",
     pillLabel: "Vichy 0,33 l",
     promptDescription:
-      "a 0.33 litre German Vichy beer bottle: straight vertical cylindrical body walls, a fairly high steep shoulder and a short neck, sealed with a 26 mm metal crown cap, total height roughly 21–22 cm — a compact straight-sided small bottle",
+      "a 0.33 litre German Vichy/NRW returnable beer bottle (the 0.33 L version of the slim German NRW-Mehrwegflasche): total height roughly 22 cm — a slender, elegant small bottle whose LONG neck flows through a SMOOTH, GENTLE, GRADUAL sloping shoulder (no abrupt step, no sharp edge) into a slim, nearly straight body, sealed with a 26 mm metal crown cap — like a small NRW: slim and smooth-shouldered",
     forbidden:
-      "NOT a long-neck bottle, NOT a stout round Steinie/Stubbi, NOT a 0.5 L bottle, NOT a swing-top bottle, NOT an aluminium can",
+      "NOT a 0.5 L bottle, NOT a stocky short-necked bottle, NOT an abrupt or stepped shoulder, NOT a short stubby Steinie/Stubbi, NOT a swing-top bottle, NOT an aluminium can — it MUST be the slim 0.33 L German NRW/Vichy returnable with a long neck and a smooth gradual sloping shoulder",
     typicalColors: ["braun", "grün"],
   },
   buegel_330: {
@@ -41,27 +41,27 @@ export const FLASCHEN_TYPEN = {
     label: "Longneck 0,5 l",
     pillLabel: "Longneck 0,5 l",
     promptDescription:
-      "a 0.5 litre Ale long-neck beer bottle (American craft 'Longneck' style in half-litre size): a tall slender cylindrical body with a LONG thin neck and a smooth gently sloping shoulder, sealed with a 26 mm metal crown cap, total height roughly 26–27 cm — a large half-litre bottle with an elegant elongated neck",
+      "a 0.5 litre Ale long-neck beer bottle (English / international 'Longneck' style, typical for Pale Ale and craft beer, ~27 cm tall): a comparatively FULLER, slightly more rounded cylindrical body carrying a long slim neck that meets the body at a MORE PRONOUNCED, clearly ROUNDED SHOULDER, sealed with a 26 mm metal crown cap — its shoulder is more defined and its body rounder/fuller than on the smooth, slim German NRW returnable",
     forbidden:
-      "NOT a small 0.33 L bottle, NOT a short stubby Steinie/Stubbi, NOT a short-necked Euroflasche, NOT a swing-top bottle, NOT an aluminium can",
+      "NOT a German NRW returnable (the NRW is taller, slimmer and has a SMOOTH gradual sloping shoulder with a long slender nearly-straight body), NOT a short stocky Euroflasche, NOT a short stubby Steinie/Stubbi, NOT a small 0.33 L bottle, NOT a swing-top bottle, NOT an aluminium can — it MUST be the Ale long-neck with a more pronounced rounded shoulder",
     typicalColors: ["braun", "grün"],
   },
   nrw_500: {
     label: "NRW-Flasche 0,5 l",
     pillLabel: "NRW 0,5 l",
     promptDescription:
-      "a tall slender 0.5 litre German NRW returnable long-neck beer bottle (the standard German 'NRW-Mehrwegflasche' / NRW pool bottle used by most German breweries for Pils, Helles and Lager): a clearly LARGE half-litre bottle with a fairly LONG slim neck, a soft gently sloping shoulder and an elongated slender cylindrical body, sealed with a 26 mm metal crown cap, total height roughly 26–27 cm — a tall full-size half-litre long-neck, visibly taller and slimmer than a stout Euroflasche and much bigger than any 0.33 L bottle",
+      "a 0.5 litre German NRW-Mehrwegflasche (VLB standard pool bottle — the everyday German beer bottle, often called NRW05): height ~26 cm, slim cylindrical body ~6.7 cm diameter, a MEDIUM-LENGTH neck that is shorter and thicker than an ale longneck, a smooth gradual shoulder with no abrupt step, 26 mm crown finish",
     forbidden:
-      "NOT a short stubby Steinie/Stubbi, NOT a small 0.33 L bottle, NOT a chubby short-necked Euroflasche, NOT a wide-shouldered stocky bottle, NOT a swing-top/Bügel bottle, NOT an aluminium can — it MUST be a tall slim 0.5 L long-neck bottle",
+      "NOT an American/English ale longneck (those have a longer thinner neck and a fuller rounded shoulder), NOT a short-necked stocky Euroflasche, NOT a Steinie/Stubbi, NOT a 0.33 L bottle, NOT a swing-top/Bügel bottle, NOT an aluminium can",
     typicalColors: ["braun"],
   },
   vichy_500: {
     label: "Euroflasche 0,5 l",
     pillLabel: "Euroflasche 0,5 l",
     promptDescription:
-      "a 0.5 litre traditional German Euroflasche / Euro-Bierflasche (the classic stocky returnable beer bottle): a full-size half-litre bottle with a SHORT neck, a pronounced rounded shoulder and straight vertical cylindrical body walls, sealed with a 26 mm metal crown cap, total height roughly 25–26 cm — noticeably stockier and shorter-necked than the slim NRW long-neck",
+      "a 0.5 litre traditional German Euroflasche / Euro-Bierflasche (the classic stocky returnable beer bottle): a full-size half-litre bottle with a VERY SHORT neck, a strongly pronounced rounded shoulder and straight vertical cylindrical body walls, sealed with a 26 mm metal crown cap, total height roughly 25–26 cm — noticeably stockier and far shorter-necked than the slim NRW returnable or the long-neck",
     forbidden:
-      "NOT a long slim NRW long-neck, NOT a short stubby Steinie/Stubbi, NOT a small 0.33 L bottle, NOT a swing-top bottle, NOT an aluminium can — it MUST be the stocky short-necked 0.5 L Euroflasche",
+      "NOT a slim NRW returnable, NOT an Ale long-neck, NOT a short stubby Steinie/Stubbi, NOT a small 0.33 L bottle, NOT a swing-top bottle, NOT an aluminium can — it MUST be the stocky, very short-necked 0.5 L Euroflasche",
     typicalColors: ["braun", "grün"],
   },
   weizen_500: {
@@ -130,7 +130,8 @@ export function isDoseTyp(flaschenTyp: keyof typeof FLASCHEN_TYPEN): boolean {
 export const GLAS_TYPEN = {
   pils_tulpe: {
     label: "Pilstulpe",
-    promptDescription: "tall slender Pils tulip glass with thin stem, narrow opening, fine white foam head ca. 2cm",
+    promptDescription:
+      "stemmed German Pilstulpe: tall slender tulip bowl on a thin stem with a foot, narrow opening, fine white foam ~2 cm — NOT a stemless Willibecher tumbler",
     bierstile: ["pils", "helles_lager"],
   },
   weizen: {
@@ -140,7 +141,8 @@ export const GLAS_TYPEN = {
   },
   willibecher: {
     label: "Willibecher",
-    promptDescription: "classic German Willibecher beer mug (straight tapered glass), 0.5L, with creamy white foam",
+    promptDescription:
+      "classic German Willibecher: handle-less 0.5 L straight-sided slightly conical tumbler (wider at the rim than a Stange), thick sham bottom, NO stem, NO foot, NO waist, NO vase curve, modest white foam cap",
     bierstile: ["helles", "export", "kellerbier"],
   },
   masskrug: {
@@ -184,3 +186,69 @@ export const STUDIO_PROPS_BY_BIERSTIL = {
 export type Bierstil = keyof typeof STUDIO_PROPS_BY_BIERSTIL;
 export type FlaschenTyp = keyof typeof FLASCHEN_TYPEN;
 export type GlasTyp = keyof typeof GLAS_TYPEN;
+
+export function flascheVolumeMl(flaschenTyp: string): number {
+  if (flaschenTyp.includes("750")) return 750;
+  if (flaschenTyp.includes("500")) return 500;
+  return 330;
+}
+
+const GLAS_NOMINAL_ML: Record<GlasTyp, number> = {
+  pils_tulpe: 300,
+  weizen: 500,
+  willibecher: 500,
+  masskrug: 1000,
+  ipa_teku: 300,
+  schwenker: 250,
+  stange: 200,
+};
+
+/** Bei Flasche+Glas: Glas fasst hoechstens eine Fuellung aus diesem Gebinde. Nur-Glas bleibt Nennvolumen. */
+export function pouredGlassFillMl(
+  glasTyp: GlasTyp,
+  flaschenTyp: string,
+  behaelter: "G" | "F" | "B",
+): number {
+  const nominal = GLAS_NOMINAL_ML[glasTyp];
+  if (behaelter === "G") return nominal;
+  return Math.min(nominal, flascheVolumeMl(flaschenTyp));
+}
+
+function litersLabel(ml: number): string {
+  if (ml >= 1000) return "1.0";
+  if (ml >= 500) return "0.5";
+  if (ml >= 300) return "0.3";
+  if (ml >= 250) return "0.25";
+  return "0.2";
+}
+
+function volumeForbidden(fillMl: number): string {
+  if (fillMl < 500) {
+    return "NOT a 0.5 litre Seidel or Willibecher, NOT a 0.5 litre dimpled mug, NOT a 1 litre Maßkrug";
+  }
+  if (fillMl < 1000) return "NOT a 1 litre Maßkrug";
+  return "";
+}
+
+/** Glasbeschreibung inkl. realer Fuellmenge neben der gewaehlten Flasche/Dose. */
+export function glassPourPromptDescription(
+  glasTyp: GlasTyp,
+  fillMl: number,
+): string {
+  const litres = litersLabel(fillMl);
+  const tooBig = volumeForbidden(fillMl);
+  switch (glasTyp) {
+    case "masskrug":
+      if (fillMl >= 1000) return GLAS_TYPEN.masskrug.promptDescription;
+      return `a small ${litres} litre dimpled glass beer mug (Seidel) with one handle and modest foam — a single pour from the bottle beside it. ${tooBig}`;
+    case "willibecher":
+      return `classic German Willibecher: handle-less ${litres} litre straight-sided slightly conical tumbler (wider at the rim than a Stange), thick sham bottom, NO stem, NO foot, NO waist, modest white foam cap. ${tooBig}`;
+    case "weizen":
+      if (fillMl < 500) {
+        return `a smaller ${litres} litre wheat-beer tumbler, not the tall 0.5 L Weizen vase, modest foam. ${tooBig}`;
+      }
+      return GLAS_TYPEN.weizen.promptDescription;
+    default:
+      return `${GLAS_TYPEN[glasTyp].promptDescription}. Serving size ${litres} litre. ${tooBig}`.trim();
+  }
+}

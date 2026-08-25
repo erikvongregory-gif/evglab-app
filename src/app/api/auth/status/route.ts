@@ -2,10 +2,13 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import {
   getPendingCookieName,
+  getTrustedDeviceCookieName,
   getVerifiedCookieName,
   hasValidPending2FAForUser,
+  isTrustedDeviceForUser,
   isVerified2FAForUser,
 } from "@/lib/admin/emailTwoFactor";
+import { hasAdminAccess } from "@/lib/auth/owner";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
 import { withRequestIdJson } from "@/lib/security/authResponses";
@@ -23,34 +26,28 @@ export async function GET(request: Request) {
 
   if (!user) {
     return withRequestIdJson(
-      { authenticated: false, admin: false, admin2faRequired: false },
+      { authenticated: false, admin: false, admin2faRequired: false, twoFactorRequired: false },
       requestId,
       { status: 200 },
     );
   }
 
-  const role =
-    typeof user.user_metadata?.role === "string"
-      ? String(user.user_metadata.role).toLowerCase()
-      : "";
-
-  const isAdmin = role === "admin";
-  let admin2faRequired = false;
-
-  if (isAdmin) {
-    const cookieStore = await cookies();
-    const pending = cookieStore.get(getPendingCookieName())?.value ?? null;
-    const verified = cookieStore.get(getVerifiedCookieName())?.value ?? null;
-    const hasPending = hasValidPending2FAForUser(pending, user.id);
-    const isVerified = isVerified2FAForUser(verified, user.id);
-    admin2faRequired = hasPending && !isVerified;
-  }
+  const cookieStore = await cookies();
+  const verified = isVerified2FAForUser(cookieStore.get(getVerifiedCookieName())?.value ?? null, user.id);
+  const trustedDevice = isTrustedDeviceForUser(
+    cookieStore.get(getTrustedDeviceCookieName())?.value ?? null,
+    user.id,
+  );
+  const hasPending = hasValidPending2FAForUser(cookieStore.get(getPendingCookieName())?.value ?? null, user.id);
+  const twoFactorRequired = !verified && !trustedDevice && hasPending;
 
   return withRequestIdJson(
     {
       authenticated: true,
-      admin: isAdmin,
-      admin2faRequired,
+      admin: hasAdminAccess(user),
+      // Legacy-Feldname: der inline Session-Poller liest weiterhin `admin2faRequired`.
+      admin2faRequired: twoFactorRequired,
+      twoFactorRequired,
     },
     requestId,
   );

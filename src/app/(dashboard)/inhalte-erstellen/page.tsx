@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 import { getBrandProfileFromMetadata, isBrandProfileActive, isBrandProfileComplete } from "@/lib/dashboard/brandProfile";
+import { isOwnerUser } from "@/lib/auth/owner";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { hasActiveSubscription } from "@/lib/billing/access";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
@@ -62,25 +63,28 @@ export default async function InhalteErstellenPage() {
 
   const brandProfile = getBrandProfileFromMetadata(user.user_metadata);
 
-  await ensureBillingRow(user.id);
-  let billing = await getBillingRow(user.id);
-  if (!hasActiveSubscription(billing)) {
-    try {
-      const syncResult = await syncBillingFromStripe({
-        userId: user.id,
-        userEmail: user.email,
-        currentRow: billing,
-      });
-      if (syncResult.synced) {
-        billing = await getBillingRow(user.id);
+  // Owner brauchen kein Stripe-Abo — Tokens und API-Guards sind separat freigeschaltet.
+  if (!isOwnerUser(user)) {
+    await ensureBillingRow(user.id);
+    let billing = await getBillingRow(user.id);
+    if (!hasActiveSubscription(billing)) {
+      try {
+        const syncResult = await syncBillingFromStripe({
+          userId: user.id,
+          userEmail: user.email,
+          currentRow: billing,
+        });
+        if (syncResult.synced) {
+          billing = await getBillingRow(user.id);
+        }
+      } catch {
+        /* Stripe optional */
       }
-    } catch {
-      /* Stripe optional */
     }
-  }
 
-  if (!hasActiveSubscription(billing)) {
-    return <CreateContentLockedView />;
+    if (!hasActiveSubscription(billing)) {
+      return <CreateContentLockedView />;
+    }
   }
 
   return (

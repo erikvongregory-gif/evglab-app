@@ -37,8 +37,10 @@ export async function generateBrauereiBildPrompt(params: {
   referenceImages?: VisionReferenceImage[];
 }): Promise<string> {
   const system = getDashboardBrauereiBildSystemPrompt();
+  // Die Verbindlichkeit (strict/balanced/loose) steht im Kontext-Block selbst —
+  // hier nicht pauschal "PFLICHT" erzwingen, sonst ist der Lock-Level wirkungslos.
   const brandBlock = params.brandProfileContext?.trim()
-    ? `\n\nMarkenprofil (PFLICHT beruecksichtigen, ins Englische uebersetzen wo noetig):\n${params.brandProfileContext}`
+    ? `\n\nMarkenprofil-Kontext (Verbindlichkeit wie im Block angegeben; ins Englische uebersetzen wo noetig):\n${params.brandProfileContext}`
     : "";
 
   const imageBlocks = buildImageBlocks(params.referenceImages);

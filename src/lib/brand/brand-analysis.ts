@@ -48,10 +48,10 @@ function buildImageParts(images: BrandAnalysisImage[], maxImages = 6): Anthropic
 const JSON_SCHEMA =
   '{"breweryName":"string","brandTone":"string","brandColors":"string","brandDos":"string","brandDonts":"string"}';
 
-function buildInstagramSystemPrompt(): string {
+function buildInstagramSystemPrompt(imageCount: number): string {
   return [
     "Du bist eine Marken-Analystin fuer Brauereien und Getraenkemarken.",
-    "Du siehst genau 5 Bilder — typischerweise Screenshots von Instagram-Posts derselben Marke.",
+    `Du siehst ${imageCount === 1 ? "genau 1 Bild" : `genau ${imageCount} Bilder`} — typischerweise Screenshots von Instagram-Posts derselben Marke.`,
     "Antworte AUSSCHLIESSLICH mit einem einzigen JSON-Objekt (kein Fliesstext, keine Codefence). Schema:",
     JSON_SCHEMA,
     "Alle Textwerte auf Deutsch, knapp aber konkret (je 1-3 Saetze wo sinnvoll).",
@@ -71,14 +71,15 @@ function buildWebsiteSystemPrompt(): string {
     JSON_SCHEMA,
     "Alle Textwerte auf Deutsch, knapp aber konkret (je 1-3 Saetze wo sinnvoll).",
     "Analysiere Website-Texte fuer Tonality, Wortwahl, Zielgruppe, Regionalitaet, Craft vs. Tradition.",
-    "Fuer die Bildanalyse NUR permanente Markenidentitaet nutzen: Bierflaschen, Etiketten, Glaeser, Produktfotos, Biergarten-/Genussmomente mit sichtbarem Markenlogo auf Glas oder Flasche.",
-    "Social-Wall-Motive, Freunde mit Bier, Anstoßen und authentische Markenstimmung sind PREMIUM-Referenzen — nutze sie fuer Tonality und Bildsprache.",
+    "WICHTIG — Bildsprache kommt aus SZENEN, nicht aus Packshots:",
+    "Szenische Bilder mit echtem Hintergrund (Biergarten, Gastronomie, Brauerei, Natur, Menschen mit Bier der Marke, Anstossen) definieren die Bildsprache — leite daraus Bildlicht, Stimmung, Umgebung und Komposition ab.",
+    "Freigestellte Produktfotos (weisser/transparenter Hintergrund) nutzt du AUSSCHLIESSLICH fuer Farbpalette und Etikett-Details — niemals als Vorbild fuer Licht, Hintergrund oder Komposition.",
     "IGNORIERE temporaere Kampagnen (WM, EM, Sport-Sponsoring, Events, Prominente, News-Banner) — die gehoeren NICHT zur dauerhaften Bildsprache.",
     "breweryName: erkennbare Marken-/Brauereibezeichnung.",
     "brandTone: 4-6 Stichworte, kommagetrennt (z.B. Bodenständig, Handwerklich, Warm, Regional).",
     "brandColors: genau 5 Hex-Farbcodes der Markenpalette, kommagetrennt (z.B. #E8772E, #6B4423) — aus Etikett/Logo/Produktfotos, keine Event-Kampagnenfarben.",
-    "brandDos: zwei kurze Saetze — erster fuer Bildlicht, zweiter fuer Komposition/Produktanordnung.",
-    "brandDonts: was vermieden werden soll — explizit temporaere Kampagnenoptik, Sport-Event-Banner, fremde Event-Farben.",
+    "brandDos: zwei kurze Saetze — erster fuer Bildlicht und Stimmung, zweiter fuer Komposition und typische Szenerie der Markenwelt (z.B. Biergarten, Holztisch, Natur).",
+    "brandDonts: was vermieden werden soll — explizit sterile freigestellte Produktoptik ohne Umgebung, temporaere Kampagnenoptik, Sport-Event-Banner, fremde Event-Farben.",
   ].join(" ");
 }
 
@@ -116,11 +117,13 @@ export async function selectBeerProductImageIndices(params: {
 
   const system = [
     "Du filterst Website-Bilder einer Brauerei fuer ein dauerhaftes Markenprofil.",
+    "ZIEL: Bilder, die die MARKENWELT zeigen — daraus lernt die Bild-KI den Look der Marke (Licht, Stimmung, Umgebung, Szenerie).",
     "BEVORZUGE (hoechste Prioritaet):",
-    "- Lifestyle-/Genussmotive: Menschen mit markenbeschriftetem Bierglas, Anstoßen, Biergarten, Terrasse, authentische Markenstimmung",
+    "- Szenen mit echtem Hintergrund: Biergarten, Gastronomie, Brauerei, Natur/Heimat, gedeckter Tisch, Menschen mit markenbeschriftetem Bierglas oder Flasche, Anstoßen",
     "- Social-Wall-Collagen und Moodboards mit mehreren Bierszenen (auch als ein Bild)",
-    "- Produktfotos: Flaschen, Dosen, Etiketten, Gläser, Sortiment",
-    "LEHNE AB: WM/EM/Sport-Kampagnen, Event-Banner, Sponsoring-Key-Visuals ohne Produkt, reine Prominente ohne Bier, News-Teaser.",
+    "- Produkt IN Szene: Flasche/Glas auf Holztisch, im Sudhaus, am See — mit Umgebung und Lichtstimmung",
+    "NUR NOTFALLS (max 1, nur wenn kaum Szenen existieren): freigestellte Produktfotos/Packshots auf weissem oder transparentem Hintergrund.",
+    "LEHNE AB: WM/EM/Sport-Kampagnen, Event-Banner, Sponsoring-Key-Visuals ohne Produkt, reine Prominente ohne Bier, News-Teaser, Logos, Icons.",
     "WICHTIG: Ein Social-Wall-Mosaik mit mehreren Bierszenen ist SEHR wertvoll — waehle es mit, auch wenn es ein Collage-Bild ist.",
     "Antworte AUSSCHLIESSLICH mit JSON (keine Codefence):",
     IMAGE_SELECTION_SCHEMA,
@@ -131,7 +134,7 @@ export async function selectBeerProductImageIndices(params: {
   const userText = [
     `Es liegen ${params.images.length} Website-Bilder vor (Index 0 bis ${params.images.length - 1}).`,
     hints ? `\nHTML-Hinweise:\n${hints}` : "",
-    "\nWaehle dauerhafte Marken-Referenzen: Produkt UND/ODER authentische Genuss-/Social-Motive mit sichtbarem Bier der Marke.",
+    "\nWaehle Markenwelt-Referenzen: authentische Szenen und Genussmomente mit sichtbarem Bier der Marke — freigestellte Packshots nur als letzte Option.",
   ].join("\n");
 
   const imageParts = buildImageParts(params.images, 12);
@@ -187,14 +190,15 @@ export async function analyzeInstagramPosts(params: {
   images: BrandAnalysisImage[];
   instagramUrl?: string;
 }): Promise<BrandScanJson> {
+  const imageCount = Math.max(1, params.images.length);
   const userText = params.instagramUrl
     ? `Zusaetzlicher Hinweis — Instagram-Profil-URL der Marke (falls passend): ${params.instagramUrl}`
-    : "Keine zusaetzliche Instagram-URL angegeben — leite alles aus den 5 Bildern ab.";
+    : `Keine zusaetzliche Instagram-URL angegeben — leite alles aus ${imageCount === 1 ? "dem Bild" : `den ${imageCount} Bildern`} ab.`;
 
   try {
     return await runClaudeAnalysis({
       apiKey: params.apiKey,
-      system: buildInstagramSystemPrompt(),
+      system: buildInstagramSystemPrompt(imageCount),
       userText,
       images: params.images,
       temperature: 0.3,
@@ -203,7 +207,7 @@ export async function analyzeInstagramPosts(params: {
     try {
       return await runClaudeAnalysis({
         apiKey: params.apiKey,
-        system: buildInstagramSystemPrompt(),
+        system: buildInstagramSystemPrompt(imageCount),
         userText,
         images: params.images,
         temperature: 0.1,
@@ -219,15 +223,31 @@ export async function analyzeWebsiteBrand(params: {
   websiteUrl: string;
   textExcerpt: string;
   images: BrandAnalysisImage[];
+  /** Anzahl freigestellter Packshots am ENDE des Bilder-Arrays (nur fuer Farben/Etikett nutzen). */
+  packshotImageCount?: number;
 }): Promise<BrandScanJson> {
+  const packshotCount = Math.min(params.packshotImageCount ?? 0, params.images.length);
+  const sceneCount = params.images.length - packshotCount;
+  const imageNote = params.images.length
+    ? [
+        `\nEs wurden ${params.images.length} Referenzbilder mitgeliefert (bereits gefiltert, keine Kampagnen-Banner):`,
+        sceneCount > 0
+          ? `- Die ersten ${sceneCount} sind szenische Markenwelt-Bilder — daraus leitest du Bildlicht, Stimmung und Komposition ab.`
+          : "- Keine szenischen Bilder verfuegbar — leite die Bildsprache vorsichtig aus den Texten ab.",
+        packshotCount > 0
+          ? `- Die letzten ${packshotCount} sind freigestellte Produktfotos — NUR fuer Farbpalette und Etikett nutzen, nicht fuer die Bildsprache.`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "\nKeine passenden Bilder verfuegbar — analysiere primaer anhand der Website-Texte.";
+
   const userText = [
     `Website-URL: ${params.websiteUrl}`,
     "",
     "Extrahierte Website-Texte:",
     params.textExcerpt || "(Keine Texte gefunden — leite soweit moeglich aus Bildern ab.)",
-    params.images.length
-      ? `\nEs wurden ${params.images.length} Bier-/Produkt-Referenzbilder mitgeliefert (bereits gefiltert, keine Kampagnen-Banner).`
-      : "\nKeine passenden Produktbilder verfuegbar — analysiere primaer anhand der Website-Texte.",
+    imageNote,
   ].join("\n");
 
   try {

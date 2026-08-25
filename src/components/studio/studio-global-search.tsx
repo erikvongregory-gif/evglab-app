@@ -253,7 +253,7 @@ function StudioSearchField() {
   const { query, setQuery, setOpen, openSearch, inputRef, isMac, open } = useStudioSearch();
 
   return (
-    <div className="evg-shell-topbar-search-field">
+    <div className="evg-shell-topbar-search-field studio-field-with-icon">
       <span className="evg-shell-topbar-search-icon" aria-hidden="true">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
           <circle cx="7" cy="7" r="4.5" />

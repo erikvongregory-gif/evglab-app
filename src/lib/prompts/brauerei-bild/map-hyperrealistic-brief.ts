@@ -39,13 +39,6 @@ const SHOT_TYPE_LABELS: Record<NonNullable<HyperrealisticInput["shotType"]>, str
   H: "POV / Over-Shoulder",
 };
 
-const KI_PLATTFORM_LABELS: Record<NonNullable<HyperrealisticInput["kiPlattform"]>, string> = {
-  gpt_image_2: "GPT Image 2",
-  nano_banana_pro: "Nano Banana Pro",
-  nano_banana_2: "Nano Banana 2",
-  midjourney: "Midjourney",
-};
-
 const BEHAELTER_LABELS: Record<NonNullable<HyperrealisticInput["behaelter"]>, string> = {
   G: "Nur Glas – kein Flaschenprodukt sichtbar",
   F: "Nur Flasche / Dose – kein eingeschenktes Glas",
@@ -188,7 +181,6 @@ export function hyperrealisticInputToBrauereiBrief(
   const glas = input.glasTyp ? GLAS_TYPEN[input.glasTyp] : null;
   const behaelter = input.behaelter ?? (glas ? "B" : "F");
   const personen = describePersonenModus(input);
-  const kiPlattform = input.kiPlattform ?? "gpt_image_2";
   const etikettModus = input.etikettModus ?? "marke";
 
   return {
@@ -213,12 +205,13 @@ export function hyperrealisticInputToBrauereiBrief(
     personenDetail: personen.detail,
     shotType: fallbackShotType(input),
     shotTypeCode: input.shotType ?? "A",
-    kiPlattform: KI_PLATTFORM_LABELS[kiPlattform],
+    kiPlattform: "GPT Image 2 (OpenAI gpt-image-2)",
     etikettModus:
       etikettModus === "marke"
         ? "Ja, Marken-Etikett 1:1 (Referenzbild wird mitgesendet)"
         : "Generisch — KI erfindet ein passendes, professionelles Etikett (fiktive Marke)",
-    referenzStaerke: etikettModus === "marke" ? "Strikt 85%" : "Frei",
+    beerName: input.beerName?.trim() || null,
+    referenzStaerke: etikettModus === "marke" ? "Strikt 100% 1:1" : "Frei",
     referenzHinweis:
       etikettModus === "marke"
         ? "Separates Referenzbild der Flasche/Etikett wird an die Bild-KI uebergeben."
@@ -233,19 +226,14 @@ export function buildHyperrealisticClaudeUserMessage(
   options?: { breweryName?: string; hasReferenceImage?: boolean },
 ): string {
   const brief = hyperrealisticInputToBrauereiBrief(input, options);
-  const kiPlattform = input.kiPlattform ?? "gpt_image_2";
-  const targetModel =
-    kiPlattform === "midjourney"
-      ? "Midjourney v6.1"
-      : kiPlattform === "nano_banana_pro"
-        ? "Nano Banana Pro"
-        : kiPlattform === "nano_banana_2"
-          ? "Nano Banana 2"
-          : "GPT Image 2";
+  // Das Bild wird IMMER mit OpenAI gpt-image-2 gerendert. Wir zwingen den
+  // Prompt-Stil hart auf dieses Modell — unabhängig von etwaigen Alt-Werten in
+  // `kiPlattform` (UI bietet keine Plattform-Auswahl mehr).
+  const targetModel = "GPT Image 2 (OpenAI gpt-image-2)";
 
   const lines: string[] = [
     "Erstelle einen kopierfertigen englischen Bildgenerierungs-Prompt fuer den BrewAI Dashboard-Modus „Hyperrealistisch“.",
-    `Zielmodell: ${targetModel} — nutze die plattform-spezifische Prompt-Struktur aus dem Skill und SRM-Farbtabelle.`,
+    `Zielmodell: ${targetModel} — schreibe einen natürlichsprachlichen, beschreibenden englischen Prompt (KEINE Midjourney-/Nano-Banana-Parameter wie --ar, --v, --style, --no, KEINE Seitenverhältnis-Flags). Nutze SRM-Farbtabelle und Schaumcharakteristik aus dem Skill.`,
   ];
 
   const hasReferenceImage = Boolean(options?.hasReferenceImage) && input.etikettModus === "marke";
@@ -257,14 +245,16 @@ export function buildHyperrealisticClaudeUserMessage(
     );
   } else if (hasReferenceImage) {
     lines.push(
-      "WICHTIG: Im ersten Content-Block dieser Nachricht ist das Referenzbild der Flasche/des Etiketts der Brauerei eingebettet.",
+      "WICHTIG: Im ersten Content-Block dieser Nachricht ist das Produktfoto (Etikett der gewaehlten Sorte) eingebettet.",
       "Fuehre den REFERENZBILD-WORKFLOW (Schritt A–D) aus dem Skill aus, BEVOR du den Prompt schreibst:",
-      "  A) Lies aus dem Bild NUR die ETIKETT-/MARKEN-Elemente aus: Logo (Form, Farbe, Inhalt), Primaertext (Markenname), Sekundaertext (Produktname/Bierstil), Mikrotext (Slogans, Jahreszahlen, Adressen), Etikett-Hintergrundfarbe, Dekorelemente (Rahmen, Illustrationen), dominante Farbpalette.",
-      "  A-WICHTIG: Die FLASCHENFORM, das VOLUMEN und der VERSCHLUSS werden NICHT aus dem Referenzbild uebernommen — sie sind im Briefing (`flaschenForm`) verbindlich vorgegeben. Selbst wenn das Referenzbild eine andere Flasche zeigt: ignoriere deren Form/Groesse komplett und nutze ausschliesslich die Briefing-Vorgabe. Das Referenzbild dient AUSSCHLIESSLICH dem Etikett/Logo/Text.",
-      "  B) Integriere ALLE klar lesbaren Textelemente als `EXACT TEXT '...'` Bausteine in den finalen englischen Prompt (GPT-Image-2-Syntax).",
-      "  C) Beschreibe Logo und Dekorelemente praezise in Englisch und fordere 1:1-Treue zur Referenz: `preserve the exact label design from the reference image, no text modifications, no logo alterations`.",
-      "  D) Wenn Behaelter = B (Flasche + Glas) und das Glas im Referenzbild ebenfalls ein Logo zeigt: explizit fordern, dass auch das Glas-Logo 1:1 uebernommen wird.",
-      "  Falls Text/Logo im Bild nicht klar erkennbar ist, ERFINDE NICHTS — beschreibe nur, was sichtbar ist, und nutze `PRESERVE LABEL DESIGN FROM REFERENCE IMAGE EXACTLY` als Fallback.",
+      "  A) Lies ALLE Etikett-Elemente: Logo, Wappen, Primaertext, Sekundaertext, Mikrotext, Farben, Layout.",
+      input.beerName?.trim()
+        ? `  A-PRODUKT: Das Foto IST die Sorte „${input.beerName.trim()}“. Der Bild-Prompt muss LABEL LOCK 1:1 enthalten: identisches Etikett, keine Variante, kein erfundenes Logo.`
+        : "  A-PRODUKT: Das Foto IST das Produkt. LABEL LOCK 1:1: identisches Etikett, keine Variante.",
+      "  B) Integriere ALLE klar lesbaren Texte als `EXACT TEXT '...'` im englischen Prompt.",
+      "  C) `preserve the exact label design from the reference image, no text modifications, no logo alterations`.",
+      "  D) Glas-Logo nur, wenn im Referenzbild am Glas sichtbar — sonst nicht erfinden.",
+      "  Falls Text nicht klar lesbar ist: ERFINDE NICHTS, nutze `PRESERVE LABEL DESIGN FROM REFERENCE IMAGE EXACTLY`.",
     );
   } else if (input.etikettModus === "marke") {
     lines.push(
@@ -285,7 +275,7 @@ export function buildHyperrealisticClaudeUserMessage(
     lines.push(
       `KRITISCH GEBINDE-FORM (PFLICHT, woertlich uebernehmen): Die ${gebinde} MUSS sein: ${flasche.promptDescription}.`,
       `VERBOTEN: ${flasche.forbidden}.`,
-      `Baue diese exakte ${gebinde}-Form + Volumen explizit in den englischen Prompt ein und ergaenze am Promptende einen 'BOTTLE SHAPE LOCK (MANDATORY)'-Satz, der genau diese Form/Groesse erzwingt und Verwechslungen (z. B. 0,5-l-NRW-Longneck vs. 0,33-l-Stubbi, oder Glasflasche vs. Aluminium-Dose) ausschliesst.`,
+      `Baue diese exakte ${gebinde}-Form + Volumen explizit in den englischen Prompt ein und ergaenze am Promptende einen 'BOTTLE SHAPE LOCK (MANDATORY)'-Satz. Bei NRW 0,5 l explizit verbieten: Ale-Longneck (laengerer duennerer Hals).`,
       "Die Gebindegroesse muss in real-world Massstab erkennbar sein (0,33 l vs 0,5 l klar unterscheidbar).",
       istDose
         ? "Es ist eine ALUMINIUM-DOSE: KEIN Glas, KEINE Flaschenfarbe, KEIN Flaschenhals, KEIN Kronkorken. Das Referenzbild liefert das Wrap-around-Dosen-Artwork (rund um den Dosenkoerper), nicht die Form."
@@ -309,6 +299,16 @@ export function buildHyperrealisticClaudeUserMessage(
     );
   }
 
+  if (behaelter !== "F" && input.glasTyp) {
+    const glas = GLAS_TYPEN[input.glasTyp];
+    if (glas) {
+      lines.push(
+        `KRITISCH GLASFORM (PFLICHT): Jedes Bierglas MUSS ein ${glas.label} sein: ${glas.promptDescription}.`,
+        "Ergaenze am Promptende einen 'GLASS SHAPE LOCK (MANDATORY)'-Satz. Kein Ersatzglas (Willibecher nicht als Pilstulpe rendern).",
+      );
+    }
+  }
+
   if (input.szene === "fussball_public_viewing") {
     lines.push(
       "KRITISCH Schauplatz = Public Viewing: Die Szene MUSS ein oeffentliches Fussball-Public-Viewing / Fanmeile mit sichtbarer Grossleinwand oder Stadion-Atmosphaere zeigen.",
@@ -317,7 +317,7 @@ export function buildHyperrealisticClaudeUserMessage(
   }
 
   lines.push(
-    "HYPERREALISM (PFLICHT): Das Bild muss wie eine echte Kamera-Aufnahme wirken — keine CGI-, Illustrations- oder AI-Art-Optik.",
+    "HYPERREALISM (PFLICHT): Das Bild muss wie eine echte Handheld-Kameraaufnahme wirken — keine CGI, keine Beauty-Retusche, keine cinematic orange grade, kein Werbe-Hero-Look.",
     "Nutze SRM-Farbe + Hex aus der Farbtabelle, Schaumcharakteristik, Kondenswasser-Realismus und mindestens 3 konkrete Umgebungs-Mikrodetails.",
     "Menschen: natuerliche Hauttextur (Poren, keine waxy plastic skin), korrekte Haende/Finger, keine Stock-Photo-Posen.",
     "Kamera: explizites Objektiv (35/50/85/100mm), Blende, Bildausschnitt und Tiefenschaerfe.",

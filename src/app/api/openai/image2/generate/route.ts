@@ -1,7 +1,9 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { consumeTokens, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { classifyProviderResponse } from "@/lib/ai/providerErrors";
+import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
+import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import {
   buildBrandProfilePromptContext,
@@ -181,7 +183,7 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             error:
-              "Bitte vervollständige zuerst dein Markenprofil unter Einstellungen (Abschnitt Markenprofil oben) oder aktiviere die Nutzung ohne Markenprofil.",
+              "Bitte lege zuerst dein Markenprofil an: Öffne im Dashboard den Bereich „Markenprofil“ und gib deine Website ein — oder wähle dort „Ohne Markenprofil“.",
             code: "brand_profile_incomplete",
           },
           { status: 400 },
@@ -191,7 +193,7 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             error:
-              "Kampagnenbild mit Text ist nur mit einem angelegten Markenprofil möglich (Einstellungen → Markenprofil, nicht „ohne Markenprofil“).",
+              "Kampagnenbild mit Text ist nur mit aktivem Markenprofil möglich. Lege es im Dashboard unter „Markenprofil“ an — ein Website-Link genügt.",
             code: "campaign_requires_guided_brand_profile",
           },
           { status: 400 },
@@ -208,7 +210,7 @@ export async function POST(req: Request) {
     if (subscriptionError) return subscriptionError;
 
     await ensureBillingRow(userId);
-    const currentState = await getBillingRow(userId);
+    const currentState = await getEffectiveBillingRow(userId);
 
     const hasReferenceImage = Boolean(body.referenceImageUrls?.length);
     const usedModelLabel = hasReferenceImage ? "gpt-image-2-image-to-image" : "gpt-image-2-text-to-image";
@@ -282,10 +284,10 @@ export async function POST(req: Request) {
         });
     const openAiPayload = (await openAiRes.json()) as Record<string, unknown>;
     if (!openAiRes.ok) {
-      const errorMessage =
-        ((openAiPayload.error as Record<string, unknown> | undefined)?.message as string | undefined) ||
-        "OpenAI Bildgenerierung fehlgeschlagen.";
-      return NextResponse.json({ error: errorMessage }, { status: openAiRes.status });
+      // Kein Token-Abzug: `consumeTokens` laeuft erst nach erfolgreichem Bild.
+      const classified = classifyProviderResponse("openai", openAiRes, openAiPayload);
+      logProviderFailure(classified, { label: "openai-image2-generate", userId });
+      return providerErrorResponse(classified);
     }
     const base64Image = parseOpenAiBase64(openAiPayload);
     if (!base64Image) {

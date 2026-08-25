@@ -3,7 +3,8 @@ import { z } from "zod";
 import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminSession } from "@/lib/admin/auth";
-import { getDashboardMetadata, mergeDashboardMetadata } from "@/lib/dashboard/metadata";
+import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { readDashboardMedia, writeDashboardMedia } from "@/lib/dashboard/media-store";
 
 const deleteSchema = z.object({
   ownerUserId: z.string().min(1),
@@ -20,20 +21,26 @@ export async function GET(req: Request) {
   const { data, error } = await client.auth.admin.listUsers({ page: 1, perPage: 200 });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const rows = (data.users ?? []).flatMap((user) => {
-    const media = getDashboardMetadata(user.user_metadata).mediaLibrary ?? [];
-    return media.map((item) => ({
-      ownerUserId: user.id,
-      ownerEmail: user.email ?? "",
-      id: item.id,
-      imageUrl: item.imageUrl,
-      prompt: item.prompt,
-      createdAt: item.createdAt,
-      aspectRatio: item.aspectRatio,
-      resolution: item.resolution,
-      outputFormat: item.outputFormat,
-    }));
-  });
+  const rows = (
+    await Promise.all(
+      (data.users ?? []).map(async (user) => {
+        const media = await readDashboardMedia(user.id).catch(
+          () => getDashboardMetadata(user.user_metadata).mediaLibrary ?? [],
+        );
+        return media.map((item) => ({
+          ownerUserId: user.id,
+          ownerEmail: user.email ?? "",
+          id: item.id,
+          imageUrl: item.imageUrl,
+          prompt: item.prompt,
+          createdAt: item.createdAt,
+          aspectRatio: item.aspectRatio,
+          resolution: item.resolution,
+          outputFormat: item.outputFormat,
+        }));
+      }),
+    )
+  ).flat();
 
   return NextResponse.json({
     summary: {
@@ -61,12 +68,18 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Owner-User nicht gefunden." }, { status: 404 });
   }
 
-  const metadata = getDashboardMetadata(data.user.user_metadata);
-  const nextMedia = (metadata.mediaLibrary ?? []).filter((item) => item.id !== parsed.data.mediaId);
-  const merged = mergeDashboardMetadata(data.user.user_metadata, { mediaLibrary: nextMedia });
-  const { error: updateError } = await client.auth.admin.updateUserById(parsed.data.ownerUserId, {
-    user_metadata: merged,
-  });
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  const current = await readDashboardMedia(parsed.data.ownerUserId).catch(() => []);
+  const nextMedia = current.filter((item) => item.id !== parsed.data.mediaId);
+  if (nextMedia.length === current.length) {
+    return NextResponse.json({ error: "Motiv nicht gefunden." }, { status: 404 });
+  }
+  try {
+    await writeDashboardMedia(parsed.data.ownerUserId, nextMedia);
+  } catch (updateError) {
+    return NextResponse.json(
+      { error: updateError instanceof Error ? updateError.message : "Löschen fehlgeschlagen." },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({ ok: true });
 }

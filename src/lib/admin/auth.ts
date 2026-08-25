@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { getVerifiedCookieName, isVerified2FAForUser } from "@/lib/admin/emailTwoFactor";
+import { hasAdminAccess } from "@/lib/auth/owner";
+import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -10,6 +10,10 @@ export type AdminSession = {
   role: string | null;
 };
 
+function readRole(role: unknown): string | null {
+  return typeof role === "string" ? role.trim().toLowerCase() : null;
+}
+
 export async function getAdminSession(): Promise<AdminSession | null> {
   if (!isSupabaseConfigured()) return null;
   const supabase = await createClient();
@@ -17,15 +21,9 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  const role =
-    typeof user.user_metadata?.role === "string"
-      ? String(user.user_metadata.role).toLowerCase()
-      : null;
-  if (role !== "admin") return null;
-  const cookieStore = await cookies();
-  const verifiedToken = cookieStore.get(getVerifiedCookieName())?.value ?? null;
-  if (!isVerified2FAForUser(verifiedToken, user.id)) return null;
-  return { userId: user.id, email: user.email ?? null, role };
+  if (!hasAdminAccess(user)) return null;
+  if (!(await hasPassedTwoFactor(user.id))) return null;
+  return { userId: user.id, email: user.email ?? null, role: readRole(user.user_metadata?.role) };
 }
 
 export async function requireAdminPageAccess(options?: { allowWithout2FA?: boolean }) {
@@ -35,19 +33,13 @@ export async function requireAdminPageAccess(options?: { allowWithout2FA?: boole
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/admin/anmelden");
-  const role =
-    typeof user.user_metadata?.role === "string"
-      ? String(user.user_metadata.role).toLowerCase()
-      : null;
-  if (role !== "admin") redirect("/dashboard");
-  if (!options?.allowWithout2FA) {
-    const cookieStore = await cookies();
-    const verifiedToken = cookieStore.get(getVerifiedCookieName())?.value ?? null;
-    if (!isVerified2FAForUser(verifiedToken, user.id)) redirect("/dashboard/2fa-email");
+  if (!hasAdminAccess(user)) redirect("/dashboard");
+  if (!options?.allowWithout2FA && !(await hasPassedTwoFactor(user.id))) {
+    redirect(TWO_FACTOR_PAGE);
   }
   return {
     userId: user.id,
     email: user.email ?? null,
-    role,
+    role: readRole(user.user_metadata?.role),
   };
 }

@@ -74,5 +74,9 @@ export async function POST(request: Request) {
     return createNoStoreRedirect(`${origin}/anmelden?notice=invite_ready`, requestId);
   }
 
-  return createNoStoreRedirect(`${origin}${next}`, requestId);
+  // Registrierung erzeugt keine Session: der Login setzt danach den 2FA-Code an.
+  const loginUrl = new URL(`${origin}/anmelden`);
+  loginUrl.searchParams.set("notice", "account_ready");
+  if (next !== "/dashboard") loginUrl.searchParams.set("next", next);
+  return createNoStoreRedirect(loginUrl.toString(), requestId);
 }

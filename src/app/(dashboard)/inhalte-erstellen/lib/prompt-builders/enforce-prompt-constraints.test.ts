@@ -14,6 +14,7 @@ const baseInput: HyperrealisticInput = {
   glasTyp: "weizen",
   szene: "biergarten_sommer",
   behaelter: "G",
+  personImBild: true,
   personenModus: "E",
   gruppenAnzahl: "3",
   gruppenTyp: "gemischt",
@@ -41,6 +42,24 @@ describe("enforceHyperrealisticPromptConstraints", () => {
     expect(out).toMatch(/LIQUID PHYSICS/i);
     expect(out).toMatch(/SRM/i);
     expect(out).toMatch(/HUMAN REALISM/i);
+  });
+
+  it("locks bottle shape from the spec and optional shape photo, not by ignoring references", () => {
+    const out = enforceHyperrealisticPromptConstraints("A beer bottle on a table.", {
+      ...baseInput,
+      behaelter: "B",
+      glasTyp: "willibecher",
+      flaschenTyp: "nrw_500",
+      beerName: "ABK Hell",
+    });
+    expect(out).toMatch(/BOTTLE SHAPE LOCK/i);
+    expect(out).toMatch(/MEDIUM-LENGTH neck/i);
+    expect(out).not.toMatch(/Do NOT copy the bottle silhouette/i);
+    expect(out).toMatch(/GLASS SHAPE LOCK/i);
+    expect(out).toMatch(/Willibecher/i);
+    expect(out).toMatch(/NOT a stemmed Pilsner/i);
+    expect(out).toMatch(/LABEL LOCK 1:1/i);
+    expect(out).toMatch(/ABK Hell/i);
   });
 
   it("skips image reference for glass-only generation", () => {

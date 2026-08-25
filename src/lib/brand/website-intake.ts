@@ -8,6 +8,8 @@ import {
 
 const MAX_TEXT_BLOCKS = 24;
 const MAX_TEXT_CHARS = 6_000;
+const MERGED_MAX_TEXT_BLOCKS = 48;
+const MERGED_MAX_TEXT_CHARS = 9_000;
 const MAX_IMAGE_CANDIDATES = 60;
 const MAX_IMAGES_TO_DOWNLOAD = 10;
 const IMAGE_DOWNLOAD_CONCURRENCY = 5;
@@ -87,6 +89,18 @@ const BRAND_LIFESTYLE_SIGNALS = [
 
 const MUST_INCLUDE_SIGNALS = ["social_wall", "social wall", "social-wall", "socialwall"];
 
+/** Hinweise auf freigestellte Produktfotos (Packshots) — fuer den Markenstil kaum brauchbar. */
+const PACKSHOT_URL_SIGNALS = [
+  "freigestellt",
+  "packshot",
+  "cutout",
+  "produktbild",
+  "transparent",
+  "/shop",
+  "_shop",
+  "artikel",
+];
+
 const CAMPAIGN_NOISE_SIGNALS = [
   "wm-",
   "wm_",
@@ -133,6 +147,71 @@ const CAMPAIGN_NOISE_SIGNALS = [
   "homepage-stage",
 ];
 
+/** Unterseiten, die die Markenidentitaet vertiefen (Ueber uns, Sortiment, Brauerei …). */
+const SUBPAGE_LINK_SIGNALS: Array<{ signal: string; weight: number }> = [
+  { signal: "ueber-uns", weight: 30 },
+  { signal: "ueberuns", weight: 30 },
+  { signal: "unsere-biere", weight: 30 },
+  { signal: "geschichte", weight: 28 },
+  { signal: "sortiment", weight: 28 },
+  { signal: "braukunst", weight: 26 },
+  { signal: "philosophie", weight: 26 },
+  { signal: "familienbrauerei", weight: 26 },
+  { signal: "historie", weight: 26 },
+  { signal: "about", weight: 26 },
+  { signal: "brauerei", weight: 24 },
+  { signal: "tradition", weight: 24 },
+  { signal: "biere", weight: 22 },
+  { signal: "produkte", weight: 22 },
+  { signal: "spezialitaeten", weight: 20 },
+  { signal: "marken", weight: 16 },
+  { signal: "story", weight: 12 },
+  { signal: "werte", weight: 12 },
+  { signal: "ueber", weight: 12 },
+  { signal: "heimat", weight: 10 },
+  { signal: "marke", weight: 10 },
+  { signal: "bier", weight: 8 },
+];
+
+const SUBPAGE_NOISE_SIGNALS = [
+  "impressum",
+  "datenschutz",
+  "agb",
+  "kontakt",
+  "job",
+  "karriere",
+  "presse",
+  "news",
+  "blog",
+  "shop",
+  "warenkorb",
+  "cart",
+  "checkout",
+  "login",
+  "logout",
+  "konto",
+  "account",
+  "haendler",
+  "standorte",
+  "faq",
+  "cookie",
+  "sitemap",
+  "download",
+  "veranstaltung",
+  "event",
+  "gewinnspiel",
+  "newsletter",
+  "suche",
+  "search",
+  "widerruf",
+  "versand",
+  "zahlung",
+  "sponsoring",
+  "ticket",
+];
+
+const SUBPAGE_SKIP_EXTENSIONS = /\.(pdf|jpe?g|png|webp|gif|svg|zip|rar|mp[34]|webm|avi|ico|css|js|json|xml|txt|docx?|xlsx?)($|\?)/i;
+
 export type WebsiteIntakeResult = {
   pageUrl: string;
   title: string;
@@ -140,6 +219,14 @@ export type WebsiteIntakeResult = {
   textExcerpt: string;
   imageCandidates: ImageCandidate[];
   downloadedImages: DownloadedImage[];
+};
+
+export type ParsedWebsitePage = Omit<WebsiteIntakeResult, "downloadedImages">;
+
+export type SubpageLink = {
+  url: string;
+  score: number;
+  label: string;
 };
 
 export type ImageCandidate = {
@@ -154,6 +241,10 @@ export type DownloadedImage = {
   url: string;
   alt: string;
   score: number;
+  productScore: number;
+  lifestyleScore: number;
+  /** Freigestelltes Produktfoto (weisser/transparenter Hintergrund) — kein Markenwelt-Motiv. */
+  isPackshot: boolean;
   base64: string;
   mediaType: "image/jpeg" | "image/png" | "image/webp";
   mime: string;
@@ -237,6 +328,8 @@ export function scoreImageCandidate(url: string, alt: string, source: "img" | "o
 
   if (isMustIncludeCandidate(url, alt)) lifestyleScore += 80;
   if (combined.includes("logo")) productScore += 10;
+  // Freigestellte Packshots taugen fuers Etikett, aber nicht fuer die Bildsprache.
+  if (countSignals(combined, PACKSHOT_URL_SIGNALS) > 0) lifestyleScore -= 30;
 
   const campaignPenalty = countSignals(combined, CAMPAIGN_NOISE_SIGNALS) * 26;
   productScore -= campaignPenalty;
@@ -360,6 +453,42 @@ function extractImageCandidates(html: string, pageUrl: string): ImageCandidate[]
     .slice(0, MAX_IMAGE_CANDIDATES);
 }
 
+/**
+ * Erkennt freigestellte Produktfotos (Packshots): Der Bildrand ist fast komplett
+ * weiss oder transparent. Szenische Fotos haben praktisch nie einen uniformen Rand.
+ */
+export async function detectPackshotFromBuffer(raw: Buffer): Promise<boolean> {
+  try {
+    const size = 24;
+    const { data, info } = await sharp(raw)
+      .ensureAlpha()
+      .resize(size, size, { fit: "fill" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    let borderPixels = 0;
+    let plainPixels = 0;
+    for (let y = 0; y < info.height; y += 1) {
+      for (let x = 0; x < info.width; x += 1) {
+        const isBorder = x === 0 || y === 0 || x === info.width - 1 || y === info.height - 1;
+        if (!isBorder) continue;
+        borderPixels += 1;
+        const offset = (y * info.width + x) * info.channels;
+        const r = data[offset] ?? 0;
+        const g = data[offset + 1] ?? 0;
+        const b = data[offset + 2] ?? 0;
+        const a = info.channels >= 4 ? (data[offset + 3] ?? 255) : 255;
+        const nearWhite = r >= 238 && g >= 238 && b >= 238;
+        const transparent = a <= 16;
+        if (nearWhite || transparent) plainPixels += 1;
+      }
+    }
+    return borderPixels > 0 && plainPixels / borderPixels >= 0.88;
+  } catch {
+    return false;
+  }
+}
+
 async function downloadImage(candidate: ImageCandidate): Promise<DownloadedImage | null> {
   try {
     const parsed = new URL(candidate.url);
@@ -386,8 +515,12 @@ async function downloadImage(candidate: ImageCandidate): Promise<DownloadedImage
     const raw = Buffer.from(await response.arrayBuffer());
     if (raw.byteLength === 0 || raw.byteLength > MAX_IMAGE_BYTES) return null;
 
+    const isPackshot = await detectPackshotFromBuffer(raw);
+
+    // Transparente Bilder auf Weiss legen — sonst macht die JPEG-Konvertierung den Hintergrund schwarz.
     const compressed = await sharp(raw)
       .rotate()
+      .flatten({ background: "#ffffff" })
       .resize({ width: 1400, height: 1400, fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: 82 })
       .toBuffer();
@@ -396,6 +529,9 @@ async function downloadImage(candidate: ImageCandidate): Promise<DownloadedImage
       url: candidate.url,
       alt: candidate.alt,
       score: candidate.score,
+      productScore: candidate.productScore,
+      lifestyleScore: candidate.lifestyleScore,
+      isPackshot,
       base64: compressed.toString("base64"),
       mediaType: "image/jpeg",
       mime: "image/jpeg",
@@ -453,15 +589,132 @@ async function downloadImagesWithConcurrency(
   return downloadedImages;
 }
 
-export async function intakeWebsiteFromHtml(html: string, pageUrl: string): Promise<WebsiteIntakeResult> {
-  const parsed = parseWebsiteHtml(html, pageUrl);
-  const downloadQueue = selectCandidatesForDownload(parsed.imageCandidates);
-  const downloadedImages = await downloadImagesWithConcurrency(downloadQueue, MAX_IMAGES_TO_DOWNLOAD);
+function normalizeForSignals(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[\s_/]+/g, "-");
+}
+
+/**
+ * Findet interne Links auf Marken-relevante Unterseiten (Ueber uns, Sortiment, Brauerei …),
+ * damit die Analyse mehr als nur die Startseite sieht.
+ */
+export function extractRelevantInternalLinks(html: string, pageUrl: string, maxLinks = 2): SubpageLink[] {
+  let baseHost: string;
+  let basePath: string;
+  try {
+    const base = new URL(pageUrl);
+    baseHost = base.hostname.replace(/^www\./, "").toLowerCase();
+    basePath = base.pathname.replace(/\/+$/, "");
+  } catch {
+    return [];
+  }
+
+  const byUrl = new Map<string, SubpageLink>();
+
+  for (const match of html.matchAll(/<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,300}?)<\/a>/gi)) {
+    const href = match[1]?.trim() ?? "";
+    if (!href || /^(javascript|mailto|tel|data):/i.test(href)) continue;
+
+    const abs = resolveAbsoluteUrl(pageUrl, href);
+    if (!abs) continue;
+
+    let resolved: URL;
+    try {
+      resolved = new URL(abs);
+    } catch {
+      continue;
+    }
+    if (resolved.hostname.replace(/^www\./, "").toLowerCase() !== baseHost) continue;
+
+    const path = resolved.pathname.replace(/\/+$/, "");
+    if (!path || path === basePath) continue;
+    if (SUBPAGE_SKIP_EXTENSIONS.test(path)) continue;
+
+    let decodedPath = path;
+    try {
+      decodedPath = decodeURIComponent(path);
+    } catch {
+      /* Pfad unveraendert matchen */
+    }
+    const label = normalizeWhitespace(stripTags(match[2] ?? "")).slice(0, 80);
+    const haystack = normalizeForSignals(`${decodedPath} ${label}`);
+    if (SUBPAGE_NOISE_SIGNALS.some((noise) => haystack.includes(noise))) continue;
+
+    let score = 0;
+    for (const { signal, weight } of SUBPAGE_LINK_SIGNALS) {
+      if (haystack.includes(signal)) score += weight;
+    }
+    if (score <= 0) continue;
+
+    // Flache Pfade bevorzugen (z.B. /brauerei vor /de/x/y/brauerei).
+    score -= Math.max(0, path.split("/").length - 2) * 4;
+
+    resolved.hash = "";
+    resolved.search = "";
+    const key = resolved.toString();
+    const existing = byUrl.get(key);
+    if (!existing || score > existing.score) byUrl.set(key, { url: key, score, label });
+  }
+
+  return [...byUrl.values()]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxLinks);
+}
+
+/** Fuehrt Startseite + Unterseiten zu einem Analyse-Kontext zusammen (Texte dedupliziert, Bilder gepoolt). */
+export function mergeParsedWebsitePages(pages: ParsedWebsitePage[]): ParsedWebsitePage {
+  const first = pages[0];
+  if (!first) {
+    throw new Error("mergeParsedWebsitePages: keine Seiten uebergeben.");
+  }
+  if (pages.length === 1) return first;
+
+  const blocks: string[] = [];
+  const seenBlocks = new Set<string>();
+  for (const page of pages) {
+    if (page !== first) {
+      try {
+        blocks.push(`— Unterseite ${new URL(page.pageUrl).pathname || "/"} —`);
+      } catch {
+        /* Seiten ohne parsebare URL ohne Label mergen */
+      }
+    }
+    for (const block of page.textBlocks) {
+      if (seenBlocks.has(block)) continue;
+      seenBlocks.add(block);
+      blocks.push(block);
+    }
+  }
+  const mergedBlocks = blocks.slice(0, MERGED_MAX_TEXT_BLOCKS);
+
+  const byUrl = new Map<string, ImageCandidate>();
+  for (const page of pages) {
+    for (const candidate of page.imageCandidates) {
+      const existing = byUrl.get(candidate.url);
+      if (!existing || candidate.score > existing.score) byUrl.set(candidate.url, candidate);
+    }
+  }
 
   return {
-    ...parsed,
-    downloadedImages,
+    pageUrl: first.pageUrl,
+    title: first.title,
+    textBlocks: mergedBlocks,
+    textExcerpt: mergedBlocks.join("\n\n").slice(0, MERGED_MAX_TEXT_CHARS),
+    imageCandidates: [...byUrl.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_IMAGE_CANDIDATES),
   };
+}
+
+/** Waehlt die besten Kandidaten aus und laedt sie herunter (Produkt + Lifestyle, Kampagnen raus). */
+export async function downloadCandidateImages(candidates: ImageCandidate[]): Promise<DownloadedImage[]> {
+  const downloadQueue = selectCandidatesForDownload(candidates);
+  return downloadImagesWithConcurrency(downloadQueue, MAX_IMAGES_TO_DOWNLOAD);
 }
 
 export function pickImagesByIndices(images: DownloadedImage[], indices: number[]): DownloadedImage[] {
@@ -474,9 +727,28 @@ export function pickImagesByIndices(images: DownloadedImage[], indices: number[]
   return picked;
 }
 
-export function pickTopProductImagesHeuristic(images: DownloadedImage[]): DownloadedImage[] {
-  return [...images]
-    .filter((image) => image.score >= 20)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_REFERENCE_IMAGES);
+/**
+ * Waehlt Referenzbilder fuer den Markenstil: Szenen mit echtem Hintergrund zuerst
+ * (Biergarten, Menschen, Ambiente — daraus lernt die Bild-KI den Look). Freigestellte
+ * Packshots kommen nur als Notloesung dazu: max 1, wenn genug Szenen da sind.
+ */
+export function pickBrandReferenceImages(
+  images: DownloadedImage[],
+  opts?: { minScore?: number },
+): DownloadedImage[] {
+  const minScore = opts?.minScore ?? 20;
+  const eligible = images.filter((image) => image.score >= minScore);
+  const scenes = eligible
+    .filter((image) => !image.isPackshot)
+    .sort((a, b) => b.lifestyleScore - a.lifestyleScore || b.score - a.score);
+  const packshots = eligible
+    .filter((image) => image.isPackshot)
+    .sort((a, b) => b.productScore - a.productScore || b.score - a.score);
+
+  const picked = scenes.slice(0, MAX_REFERENCE_IMAGES);
+  if (picked.length < MAX_REFERENCE_IMAGES && packshots.length > 0) {
+    const packshotBudget = picked.length >= 2 ? 1 : 2;
+    picked.push(...packshots.slice(0, Math.min(MAX_REFERENCE_IMAGES - picked.length, packshotBudget)));
+  }
+  return picked;
 }

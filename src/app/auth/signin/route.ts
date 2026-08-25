@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { redirectWithAdminEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
+import { redirectWithEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
 import { getAppBaseUrlOrigin, isSupabaseConfigured } from "@/lib/supabase/env";
 import { mapSignInErrorCode, signInErrorDetail } from "@/lib/auth/signInErrors";
 import { repairOversizedMetadataForUser } from "@/lib/auth/repairOversizedMetadata";
@@ -75,14 +74,15 @@ export async function POST(request: Request) {
     await repairOversizedMetadataForUser(supabase, user.id, user.user_metadata);
   }
 
-  const admin2fa = await redirectWithAdminEmail2FAIfNeeded(request, {
+  const twoFactor = await redirectWithEmail2FAIfNeeded(request, {
     user,
     requestId,
     origin,
     cookieSource: redirectResponse,
     startedAt,
+    next,
   });
-  if (admin2fa) return admin2fa;
+  if (twoFactor) return twoFactor;
 
   logAuthEvent({
     event: "signin_success",

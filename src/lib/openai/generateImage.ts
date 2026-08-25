@@ -1,3 +1,6 @@
+import { classifyProviderResponse } from "@/lib/ai/providerErrors";
+import { ProviderError, withProviderRetry } from "@/lib/ai/providerRequest";
+
 export type OpenAiImageSize = "1024x1024" | "1024x1536" | "1536x1024";
 export type OpenAiImageQuality = "low" | "medium" | "high" | "auto";
 
@@ -25,16 +28,19 @@ function parseOpenAiBase64(payload: unknown): string | null {
   return typeof b64 === "string" && b64.length > 0 ? b64 : null;
 }
 
-function referenceToFile(reference: OpenAiReferenceImage): File {
+function referenceToFile(reference: OpenAiReferenceImage, index: number): File {
   const buffer = Buffer.from(reference.base64, "base64");
   const mime = reference.mime.toLowerCase().includes("jpeg") ? "image/jpeg" : reference.mime;
   const ext = mime.includes("jpeg") ? "jpg" : mime.includes("webp") ? "webp" : "png";
-  return new File([buffer], `reference.${ext}`, { type: mime });
+  return new File([buffer], `reference-${index}.${ext}`, { type: mime });
 }
 
 /**
  * Erzeugt EIN Bild direkt ueber die OpenAI Images API (gpt-image-2/1).
- * - Mit Referenzbild → `images/edits` (multipart) fuer Etikett-Treue (i2i).
+ * - Mit Referenzbild(ern) → `images/edits` (multipart, bis zu 16 Bilder) fuer
+ *   Form-/Etikett-Treue (i2i). Reihenfolge der `referenceImages` ist relevant
+ *   (z. B. Bild 1 = Flaschenform, Bild 2 = Etikett) und muss im Prompt erklaert
+ *   werden.
  * - Ohne Referenz → `images/generations`.
  * WICHTIG: `response_format` wird NICHT gesendet — GPT-Image-Modelle lehnen es ab
  * und liefern immer base64. Gibt den Bild-Buffer zurueck.
@@ -47,52 +53,64 @@ export async function generateOpenAiImage(args: {
   outputFormat: "png" | "jpg";
   quality?: OpenAiImageQuality;
   referenceImage?: OpenAiReferenceImage | null;
+  referenceImages?: OpenAiReferenceImage[] | null;
 }): Promise<Buffer> {
-  const { apiKey, model, prompt, size, outputFormat, quality, referenceImage } = args;
+  const { apiKey, model, prompt, size, outputFormat, quality, referenceImage, referenceImages } = args;
   const outputFmt = outputFormat === "jpg" ? "jpeg" : "png";
 
-  let res: Response;
-  if (referenceImage) {
-    const form = new FormData();
-    form.append("model", model);
-    form.append("image", referenceToFile(referenceImage));
-    form.append("prompt", prompt);
-    form.append("size", size);
-    form.append("output_format", outputFmt);
-    if (quality) form.append("quality", quality);
-    res = await fetch("https://api.openai.com/v1/images/edits", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-    });
-  } else {
-    res = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        prompt,
-        size,
-        output_format: outputFmt,
-        ...(quality ? { quality } : {}),
-      }),
-    });
-  }
+  const refs = (referenceImages ?? []).filter(Boolean);
+  if (referenceImage) refs.unshift(referenceImage);
 
-  const payload = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    const message =
-      ((payload.error as Record<string, unknown> | undefined)?.message as string | undefined) ||
-      `OpenAI Bildgenerierung fehlgeschlagen (HTTP ${res.status}).`;
-    throw new Error(message);
-  }
+  // Jeder Versuch baut Request-Body und FormData neu auf — Streams sind nicht
+  // wiederverwendbar.
+  return withProviderRetry(
+    "openai",
+    async () => {
+      let res: Response;
+      if (refs.length > 0) {
+        const form = new FormData();
+        form.append("model", model);
+        // Mehrere Referenzbilder: jedes als eigenes `image`-Feld (Array-Semantik).
+        refs.forEach((ref, index) => form.append("image", referenceToFile(ref, index)));
+        form.append("prompt", prompt);
+        form.append("size", size);
+        form.append("output_format", outputFmt);
+        if (quality) form.append("quality", quality);
+        res = await fetch("https://api.openai.com/v1/images/edits", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}` },
+          body: form,
+        });
+      } else {
+        res = await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            prompt,
+            size,
+            output_format: outputFmt,
+            ...(quality ? { quality } : {}),
+          }),
+        });
+      }
 
-  const base64 = parseOpenAiBase64(payload);
-  if (!base64) {
-    throw new Error("OpenAI lieferte kein Bild.");
-  }
-  return Buffer.from(base64, "base64");
+      const payload = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) {
+        throw new ProviderError(classifyProviderResponse("openai", res, payload));
+      }
+
+      const base64 = parseOpenAiBase64(payload);
+      if (!base64) {
+        throw new ProviderError(
+          classifyProviderResponse("openai", { status: 502 }, { error: { message: "OpenAI lieferte kein Bild." } }),
+        );
+      }
+      return Buffer.from(base64, "base64");
+    },
+    { label: `images:${model}` },
+  );
 }

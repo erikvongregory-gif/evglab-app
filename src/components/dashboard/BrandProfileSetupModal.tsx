@@ -9,6 +9,7 @@ import { StudioButton } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
 import { fetchWithRetry, isTransientFetchError } from "@/lib/http/fetchWithRetry";
 import { BRAND_SETTINGS_LIMITS, clampBrandSettingsFields } from "@/lib/dashboard/settingsPayload";
+import { FALLBACK_SWATCHES, formatDomain } from "@/lib/brand/brand-profile-display";
 import { cn } from "@/lib/utils";
 
 export type BrandProfileSource = "url" | "instagram" | "manual" | "skip";
@@ -29,6 +30,8 @@ export type BrandScanSuggestion = {
   brandInstagramUrl: string;
   brandWebsiteUrl: string;
   brandProfileSource: BrandProfileSource;
+  /** Bester Packshot (Etikett-Traeger) aus der Analyse — fuer Etikett-Treue bei der Generierung. */
+  brandLabelReferenceUrl?: string;
 };
 
 type Slot = {
@@ -51,7 +54,8 @@ const EMPTY_SLOTS: Slot[] = Array.from({ length: 5 }, () => ({ file: null, previ
 
 const ANALYSIS_STEPS = [
   "Website wird geladen…",
-  "Texte werden erkannt…",
+  "Unterseiten werden gelesen…",
+  "Texte & Tonalität werden erkannt…",
   "Bilder werden ausgewertet…",
   "Markenprofil wird erstellt…",
 ];
@@ -63,11 +67,34 @@ const INSTAGRAM_ANALYSIS_STEPS = [
   "Markenprofil wird erstellt…",
 ];
 
+/** Pausen (ms) zwischen den Checklisten-Schritten — der letzte Schritt bleibt aktiv bis zur Antwort. */
+const ANALYSIS_STEP_DURATIONS_MS = [2600, 4500, 7000, 10000];
+
+/** Hochwertiger Startpunkt fuer den Express-Weg ohne Analyse — Kunde ergaenzt nur den Namen. */
+function manualTemplateReview(): BrandScanSuggestion {
+  return {
+    breweryName: "",
+    brandTone: "Authentisch, Handwerklich, Regional, Warm",
+    brandColors: FALLBACK_SWATCHES.join(", "),
+    brandDos:
+      "Warmes, natürliches Licht mit weichen Schatten. Produkt im Mittelpunkt, ruhige Komposition mit ehrlichen Materialien wie Holz und Glas.",
+    brandDonts: "Keine grellen Neonfarben, keine überladenen Kompositionen, kein künstlich wirkender Studio-Look.",
+    referenceImageUrls: [],
+    brandInstagramUrl: "",
+    brandWebsiteUrl: "",
+    brandProfileSource: "manual",
+  };
+}
+
 type BrandProfileSetupModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title?: string;
   onSaved: (suggestion: BrandScanSuggestion) => Promise<void>;
+  /** Vorbefuellte Website-URL fuer den Schnellstart aus dem Marken-Tab. */
+  initialWebsiteUrl?: string;
+  /** Zaehler — bei Erhoehung startet die URL-Analyse automatisch (Schnellstart). */
+  autoAnalyzeSignal?: number;
 };
 
 function emptyReview(): BrandScanSuggestion {
@@ -122,6 +149,7 @@ function buildActivateRequestBody(suggestion: BrandScanSuggestion): Record<strin
           ? "instagram"
           : "url",
     brandReferenceImageUrls: rest.referenceImageUrls,
+    brandLabelReferenceUrl: rest.brandLabelReferenceUrl ?? "",
     referenceImagePayloads:
       hasUsableReferenceUrls(rest.referenceImageUrls) || !referenceImagePayloads?.length
         ? undefined
@@ -246,7 +274,14 @@ async function postBrandAnalyzeUrl(url: string): Promise<Response> {
   );
 }
 
-export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: BrandProfileSetupModalProps) {
+export function BrandProfileSetupModal({
+  open,
+  onOpenChange,
+  title,
+  onSaved,
+  initialWebsiteUrl,
+  autoAnalyzeSignal,
+}: BrandProfileSetupModalProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -263,11 +298,18 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
   const [analysisStepIndex, setAnalysisStepIndex] = useState(0);
   const [review, setReview] = useState<BrandScanSuggestion>(emptyReview);
   const [sourceMeta, setSourceMeta] = useState<{ confidence?: string; pageTitle?: string } | null>(null);
+  const [handledAutoSignal, setHandledAutoSignal] = useState(0);
 
   const filledCount = slots.filter((s) => s.file).length;
   const modalTitle = title ?? "Marke einlesen";
   const analysisSteps = inputTab === "instagram" ? INSTAGRAM_ANALYSIS_STEPS : ANALYSIS_STEPS;
   const instagramNeedsConnect = !instagramStatus.connected || instagramStatus.expired;
+  const analysisTargetLabel =
+    inputTab === "url"
+      ? formatDomain(websiteUrl)
+      : inputTab === "instagram"
+        ? `@${instagramStatus.username ?? "instagram"}`
+        : `${filledCount} Screenshot${filledCount === 1 ? "" : "s"}`;
 
   const loadInstagramStatus = useCallback(async () => {
     setInstagramStatusLoading(true);
@@ -320,10 +362,23 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
   useEffect(() => {
     if (step !== "analyzing") return;
     setAnalysisStepIndex(0);
-    const interval = window.setInterval(() => {
-      setAnalysisStepIndex((prev) => (prev < analysisSteps.length - 1 ? prev + 1 : prev));
-    }, 2200);
-    return () => window.clearInterval(interval);
+    let cancelled = false;
+    let timer: number | undefined;
+    let index = 0;
+    const schedule = () => {
+      if (cancelled || index >= analysisSteps.length - 1) return;
+      const delay = ANALYSIS_STEP_DURATIONS_MS[Math.min(index, ANALYSIS_STEP_DURATIONS_MS.length - 1)] ?? 5000;
+      timer = window.setTimeout(() => {
+        index += 1;
+        setAnalysisStepIndex(index);
+        schedule();
+      }, delay);
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [step, analysisSteps.length]);
 
   useEffect(() => {
@@ -392,8 +447,8 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
     onOpenChange(false);
   };
 
-  const runUrlAnalysis = async () => {
-    const url = websiteUrl.trim();
+  const runUrlAnalysis = useCallback(async (rawUrl: string) => {
+    const url = rawUrl.trim();
     if (!url) {
       setError("Bitte die Website deiner Marke eingeben.");
       return;
@@ -437,20 +492,41 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
         brandInstagramUrl: "",
         brandWebsiteUrl: typeof s.brandWebsiteUrl === "string" ? s.brandWebsiteUrl : url,
         brandProfileSource: "url",
+        brandLabelReferenceUrl: typeof s.brandLabelReferenceUrl === "string" ? s.brandLabelReferenceUrl : "",
       };
       setSourceMeta(data.sourceMeta ?? null);
-      applySuggestion(suggestion);
+      setReview(suggestion);
+      setStep("review");
     } catch (e) {
       setStep("input");
       setError(formatAnalysisError(e, "analyze"));
     } finally {
       setBusy(false);
     }
+  }, []);
+
+  // Schnellstart aus dem Marken-Tab: URL uebernehmen und Analyse sofort starten.
+  useEffect(() => {
+    if (!open || !autoAnalyzeSignal || autoAnalyzeSignal === handledAutoSignal) return;
+    setHandledAutoSignal(autoAnalyzeSignal);
+    const url = (initialWebsiteUrl ?? "").trim();
+    setInputTab("url");
+    if (!url) return;
+    setWebsiteUrl(url);
+    void runUrlAnalysis(url);
+  }, [open, autoAnalyzeSignal, handledAutoSignal, initialWebsiteUrl, runUrlAnalysis]);
+
+  /** Express-Weg: sofort in den Review-Schritt mit hochwertiger Vorlage — kein Scan noetig. */
+  const startManualTemplate = () => {
+    setError("");
+    setSourceMeta(null);
+    setReview(manualTemplateReview());
+    setStep("review");
   };
 
   const runManualScan = async () => {
-    if (filledCount !== 5) {
-      setError("Bitte genau 5 Screenshots deiner Instagram-Posts auswaehlen.");
+    if (filledCount < 1) {
+      setError("Bitte mindestens 1 Screenshot deiner Instagram-Posts auswaehlen.");
       return;
     }
     setBusy(true);
@@ -624,7 +700,7 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
             ? "Passe den KI-Vorschlag an, bevor du dein Markenprofil aktivierst."
             : step === "analyzing"
               ? analysisSteps[analysisStepIndex]
-              : "Gib die Website deiner Marke ein oder verbinde Instagram — BrewAI erkennt Tonalität, Farben und Bildsprache."}
+              : "Ein Link genügt — BrewAI erkennt Tonalität, Farben und Bildsprache deiner Marke."}
         </DialogDescription>
 
         <DialogClose asChild>
@@ -671,7 +747,7 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
               </div>
               <h2 className="studio-modal-title">{modalTitle}</h2>
               <p className="studio-modal-sub">
-                Website einlesen oder Instagram verbinden — BrewAI erkennt Tonalität, Farben und Bildsprache für konsistente Motive.
+                Ein Link genügt — BrewAI liest deine Website samt Unterseiten und erkennt Tonalität, Farben und Bildsprache.
               </p>
 
               <div className="studio-modal-tabs" role="tablist">
@@ -718,13 +794,18 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
                       className="studio-field"
                       value={websiteUrl}
                       onChange={(e) => setWebsiteUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && websiteUrl.trim() && !busy) void runUrlAnalysis(websiteUrl);
+                      }}
                       disabled={busy}
-                      placeholder="https://www.beispiel.de"
+                      placeholder="www.deine-brauerei.de"
                       aria-label="Website deiner Marke"
+                      inputMode="url"
+                      autoComplete="url"
                     />
                   </div>
                   <p className="studio-faint" style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.45 }}>
-                    Analysiert öffentliche Texte und Bilder deiner Website.
+                    Analysiert öffentliche Texte und Bilder deiner Website — inklusive relevanter Unterseiten wie „Über uns“ und Sortiment.
                   </p>
                 </div>
               ) : inputTab === "instagram" ? (
@@ -776,7 +857,7 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
                 </div>
               ) : (
                 <div style={{ marginTop: 20 }}>
-                  <span className="studio-field-label">5 Instagram-Posts (Pflicht)</span>
+                  <span className="studio-field-label">Instagram-Posts (1–5 Screenshots)</span>
                   <div className="studio-modal-ref-grid" style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
                     {slots.map((slot, i) => (
                       <label
@@ -814,7 +895,7 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
                     ))}
                   </div>
                   <p className="studio-faint" style={{ marginTop: 8, fontSize: 11 }}>
-                    {filledCount} / 5 Bilder
+                    {filledCount} / 5 Bilder{filledCount > 0 && filledCount < 3 ? " — mehr Bilder = präziseres Profil" : ""}
                   </p>
                   <div style={{ marginTop: 14 }}>
                     <span className="studio-field-label">Instagram-Profil (optional)</span>
@@ -829,15 +910,50 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
                   </div>
                 </div>
               )}
+
+              <div style={{ marginTop: 22, textAlign: "center" }}>
+                <button
+                  type="button"
+                  className="studio-faint"
+                  style={{ fontSize: 12, textDecoration: "underline", textUnderlineOffset: 3 }}
+                  disabled={busy}
+                  onClick={startManualTemplate}
+                >
+                  Ohne Analyse starten — Profil mit Vorlage selbst ausfüllen
+                </button>
+              </div>
             </>
           ) : null}
 
           {step === "analyzing" ? (
-            <div style={{ padding: "48px 12px", textAlign: "center" }}>
-              <Loader2 className="mx-auto size-10 animate-spin" style={{ color: "var(--acc)" }} />
-              <p style={{ marginTop: 16, fontSize: 14, fontWeight: 600 }}>{analysisSteps[analysisStepIndex]}</p>
-              <p className="studio-faint" style={{ marginTop: 8, fontSize: 12 }}>
-                Das kann bis zu 2 Minuten dauern — bitte Fenster offen lassen.
+            <div className="studio-brand-analyzing">
+              <div className="studio-brand-analyzing-domain">
+                <StudioIcon name={inputTab === "url" ? "globe" : "media"} size={13} />
+                <span>{analysisTargetLabel}</span>
+              </div>
+              <div className="studio-brand-analyzing-steps" role="status" aria-live="polite">
+                {analysisSteps.map((label, i) => {
+                  const done = i < analysisStepIndex;
+                  const activeStep = i === analysisStepIndex;
+                  return (
+                    <div
+                      key={label}
+                      className={cn("studio-brand-analyzing-step", done && "done", activeStep && "active")}
+                    >
+                      <span className="studio-brand-analyzing-step-icon">
+                        {done ? (
+                          <StudioIcon name="check" size={10} />
+                        ) : activeStep ? (
+                          <Loader2 className="animate-spin" size={12} />
+                        ) : null}
+                      </span>
+                      <span>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="studio-faint studio-brand-analyzing-hint">
+                Dauert meist unter einer Minute — bitte Fenster offen lassen.
               </p>
             </div>
           ) : null}
@@ -857,12 +973,12 @@ export function BrandProfileSetupModal({ open, onOpenChange, title, onSaved }: B
               size="sm"
               disabled={
                 busy ||
-                (inputTab === "manual" && filledCount !== 5) ||
+                (inputTab === "manual" && filledCount < 1) ||
                 (inputTab === "url" && !websiteUrl.trim()) ||
                 (inputTab === "instagram" && (!instagramStatus.configured || instagramStatusLoading))
               }
               onClick={() => {
-                if (inputTab === "url") void runUrlAnalysis();
+                if (inputTab === "url") void runUrlAnalysis(websiteUrl);
                 else if (inputTab === "instagram") {
                   if (instagramNeedsConnect) connectInstagram();
                   else void runInstagramScan();

@@ -15,6 +15,7 @@ import {
   StudioTopbarSearchDesktop,
   StudioTopbarSearchMobile,
 } from "@/components/studio/studio-global-search";
+import { useStudioOnboarding } from "@/components/studio/onboarding/onboarding-context";
 import { cn } from "@/lib/utils";
 
 /** Content gutter — matches BrewAI Studio redesign (--gutter) */
@@ -398,6 +399,25 @@ function WorkspaceNavItem({
   );
 }
 
+function RestartOnboardingNavItem({ onNavigate }: { onNavigate?: () => void }) {
+  const onboarding = useStudioOnboarding();
+  if (!onboarding) return null;
+  return (
+    <button
+      type="button"
+      className="studio-nav-item"
+      style={{ width: "100%", border: "none", background: "transparent", cursor: "pointer" }}
+      onClick={() => {
+        onboarding.restart();
+        onNavigate?.();
+      }}
+    >
+      <SidebarIcon name="spark" />
+      <span>Tour neu starten</span>
+    </button>
+  );
+}
+
 type NavItemDef = { key: StudioNavKey; label: string; icon: string; href: string; badge?: string };
 
 const NAV_ITEMS: NavItemDef[] = [
@@ -614,6 +634,7 @@ function StudioMobileDrawer({
             <SidebarIcon name="help" />
             <span>Hilfe & Support</span>
           </Link>
+          <RestartOnboardingNavItem onNavigate={onClose} />
         </nav>
         <AccountSidebarFooter accountName={accountName} userEmail={userEmail} initials={initials} />
       </aside>
@@ -812,10 +833,13 @@ export function DashboardStudioShell({
               <span>Admin</span>
             </Link>
           ) : null}
-          <Link href="mailto:kontakt@brewai.de" className="studio-nav-item" style={{ marginBottom: 12 }}>
+          <Link href="mailto:kontakt@brewai.de" className="studio-nav-item">
             <SidebarIcon name="help" />
             <span>Hilfe & Support</span>
           </Link>
+          <div style={{ marginBottom: 12 }}>
+            <RestartOnboardingNavItem />
+          </div>
           <AccountSidebarFooter accountName={accountName} userEmail={userEmail} initials={initials} />
         </div>
       </aside>

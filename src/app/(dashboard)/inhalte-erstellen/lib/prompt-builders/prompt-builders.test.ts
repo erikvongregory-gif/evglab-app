@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCampaignTextPrompt } from "./campaign-text";
-import { buildHyperrealisticPrompt } from "./hyperrealistic";
+import { buildHyperrealisticPrompt, buildProductPlacementPrompt } from "./hyperrealistic";
 import { buildProductIsolatePrompt } from "./product-isolate";
 import { DEFAULT_GLAS_BY_STIL, buildProductStudioPrompt, resolveStudioGlas } from "./product-studio";
 import { campaignTextSchema, hyperrealisticSchema, productIsolateSchema, productStudioSchema } from "../schemas";
@@ -16,14 +16,65 @@ describe("inhalte-erstellen prompt builders", () => {
         glasTyp: "pils_tulpe",
         szene: "biergarten_sommer",
         personImBild: true,
-        personBeschreibung: "Mann ca. 40, Bart, lacht",
         tageszeit: "goldene_stunde",
         stimmung: "gesellig",
         zusatzWunsch: "Dezente Hopfenranken im Vordergrund.",
         aspectRatio: "4:5",
         quality: "high",
+        variantCount: 3,
       }),
     ).toMatchSnapshot();
+  });
+
+  it("places the product photo without describing a brand name for the label", () => {
+    const prompt = buildProductPlacementPrompt({
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "stadtbalkon_abend",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "B",
+      tageszeit: "abend_warm",
+      etikettModus: "marke",
+      beerName: "ABK Hell",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 3,
+    });
+    expect(prompt).toMatch(/Image 1/);
+    expect(prompt).toMatch(/entire printed label/);
+    expect(prompt).not.toMatch(/ABK/);
+    expect(prompt).not.toMatch(/EXACT TEXT/);
+    expect(prompt).toMatch(/not an advertisement/i);
+    expect(prompt).toMatch(/Kodak Portra 400/);
+    expect(prompt).toMatch(/product-preservation/);
+    expect(prompt).toMatch(/Forbidden look/i);
+    expect(prompt).toMatch(/single pour/);
+  });
+
+  it("haelt das Glas auf Flaschenvolumen (kein 0,5-l-Krug neben 0,33 l)", () => {
+    const prompt = buildProductPlacementPrompt({
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "euro_longneck_330",
+      flaschenfarbe: "braun",
+      bierstil: "bock",
+      glasTyp: "masskrug",
+      szene: "wirtshaus_innen",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "abend_warm",
+      etikettModus: "marke",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 3,
+    });
+    expect(prompt).toMatch(/0\.3 litre/);
+    expect(prompt).toMatch(/NOT a 0\.5 litre/);
+    expect(prompt).toMatch(/0\.33 L bottle/);
   });
 
   it("builds a product isolate prompt snapshot", () => {

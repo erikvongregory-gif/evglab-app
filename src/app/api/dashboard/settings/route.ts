@@ -46,6 +46,19 @@ const settingsSchema = z.object({
         }
       }),
     ),
+  brandLabelReferenceUrl: z
+    .string()
+    .max(1200)
+    .optional()
+    .default("")
+    .transform((value) => {
+      try {
+        const parsed = new URL(value.trim());
+        return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : "";
+      } catch {
+        return "";
+      }
+    }),
   brandAnalyzedAt: z.string().max(64).optional(),
 });
 
@@ -106,6 +119,8 @@ export async function GET(req: Request) {
     brandDos: typeof settings?.brandDos === "string" ? settings.brandDos : "",
     brandDonts: typeof settings?.brandDonts === "string" ? settings.brandDonts : "",
     brandReferenceImageUrls: repairedRefs.urls,
+    brandLabelReferenceUrl:
+      typeof settings?.brandLabelReferenceUrl === "string" ? settings.brandLabelReferenceUrl : "",
     brandAnalyzedAt: typeof settings?.brandAnalyzedAt === "string" ? settings.brandAnalyzedAt : undefined,
   };
 

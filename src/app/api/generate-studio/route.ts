@@ -4,6 +4,8 @@ import { aspectRatioToImageSize, generateProductStudio } from "@/app/(dashboard)
 import { buildProductStudioPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/product-studio";
 import { productStudioSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { createReferenceResolverFromMetadata, assertResolvableReferenceUrls, resolveReferenceUrlsForGeneration } from "@/lib/brand/resolve-reference-for-generation";
+import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
+import { calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -21,6 +23,13 @@ export async function POST(req: Request) {
     }
 
     const input = parsed.data;
+    const perImageCost = calculatePerVariantTokenCost({
+      resolution: input.quality === "high" ? "2K" : "1K",
+      hasReferenceImage: true,
+    });
+    const budgetError = await requireTokenBudget(guard.userId, perImageCost);
+    if (budgetError) return budgetError;
+
     const prompt = buildProductStudioPrompt(input);
     const origin = new URL(req.url).origin;
     assertResolvableReferenceUrls(guard.userMetadata, origin, [input.referenzBild]);
@@ -33,12 +42,16 @@ export async function POST(req: Request) {
       resolveReferenceUrl: createReferenceResolverFromMetadata(guard.userMetadata),
     });
 
+    const charge = await chargeGeneratedTokens(guard.userId, perImageCost * Math.max(images.length, 1));
+    if (!charge.ok) return charge.response;
+
     return NextResponse.json({
       mode: "product_studio",
       prompt,
       images,
       model: "gpt-image-2-2026-04-21",
       userId: guard.userId,
+      billing: charge.billing,
     });
   } catch (error) {
     return NextResponse.json(

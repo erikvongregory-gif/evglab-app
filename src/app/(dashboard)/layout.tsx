@@ -1,5 +1,8 @@
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { StudioLayoutFallback, StudioWorkspaceShell } from "@/components/studio/studio-workspace-shell";
+import { hasAdminAccess, isOwnerUser } from "@/lib/auth/owner";
+import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -18,6 +21,11 @@ export default async function StudioDashboardLayout({ children }: { children: Re
     return children;
   }
 
+  // 2FA ist fuer jedes Konto Pflicht — hier greift sie fuer alle Studio-Bereiche.
+  if (!(await hasPassedTwoFactor(user.id))) {
+    redirect(TWO_FACTOR_PAGE);
+  }
+
   const dashboard = getDashboardMetadata(user.user_metadata);
   const settings = dashboard.settings as Record<string, unknown> | undefined;
   const profileName =
@@ -32,9 +40,8 @@ export default async function StudioDashboardLayout({ children }: { children: Re
       : typeof user.user_metadata?.brewery === "string"
         ? user.user_metadata.brewery
         : undefined;
-  const userRole =
-    typeof user.user_metadata?.role === "string" ? String(user.user_metadata.role).toLowerCase() : "user";
-  const isAdmin = userRole === "admin";
+  const isAdmin = hasAdminAccess(user);
+  const isOwner = isOwnerUser(user);
 
   return (
     <Suspense fallback={<StudioLayoutFallback />}>
@@ -43,6 +50,7 @@ export default async function StudioDashboardLayout({ children }: { children: Re
         initialProfileName={profileName}
         initialBreweryName={breweryName}
         isAdmin={isAdmin}
+        initialHasActivePlan={isOwner}
       >
         {children}
       </StudioWorkspaceShell>

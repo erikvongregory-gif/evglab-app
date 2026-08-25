@@ -21,11 +21,6 @@ export type ImageSize = "1024x1024" | "1024x1280" | "1024x1536" | "1024x1792" | 
 export type Quality = "low" | "medium" | "high";
 type ImageApiData = Array<{ b64_json?: string; url?: string; revised_prompt?: string }>;
 
-import {
-  isLegacyKieTempUrl,
-  LEGACY_REFERENCE_IMAGE_ERROR,
-} from "@/lib/brand/reference-image-store";
-
 export type ReferenceUrlResolver = (url: string, index?: number) => Promise<Buffer | null | undefined>;
 
 interface GenerateParams {
@@ -55,10 +50,6 @@ async function fetchReferenceBuffer(
 ): Promise<Buffer> {
   const resolved = resolveReferenceUrl ? await resolveReferenceUrl(url, index) : null;
   if (resolved && resolved.byteLength > 0) return resolved;
-
-  if (isLegacyKieTempUrl(url)) {
-    throw new Error(LEGACY_REFERENCE_IMAGE_ERROR);
-  }
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {

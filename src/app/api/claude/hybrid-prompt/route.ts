@@ -56,7 +56,7 @@ async function finalizeEnglishOnlyPrompt(
     system:
       ENGLISH_FINALIZE_SYSTEM +
       (brandProfileContext
-        ? `\n\nBrand profile constraints (integrate in English; translate any non-English source):\n${brandProfileContext}`
+        ? `\n\nBrand profile context (apply with the bindingness stated inside; translate any non-English source):\n${brandProfileContext}`
         : ""),
     messages: [
       {
@@ -346,7 +346,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Bitte vervollständige zuerst dein Markenprofil unter Einstellungen (Abschnitt Markenprofil oben: fünf Instagram-Post-Screenshots mit KI auswerten) oder aktiviere die Nutzung ohne Markenprofil.",
+            "Bitte lege zuerst dein Markenprofil an: Öffne im Dashboard den Bereich „Markenprofil“ und gib deine Website ein — oder wähle dort „Ohne Markenprofil“.",
           code: "brand_profile_incomplete",
         },
         { status: 400 },
@@ -461,9 +461,9 @@ export async function POST(req: Request) {
               "- Always include liquid continuity constraints for pouring scenes: bottle volume and glass fill must be physically consistent (no near-full bottle when glass is nearly full).",
               "- Always enforce the anti-generic master directives: distinctive brand anchors, specific scene details, and authored camera intent.",
               "- If user requests headline/text in the visual, instruct clean negative space and post-production text overlay instead of in-image typography rendering.",
-              "",
-              "Brand profile context (MUST apply to all outputs):",
-              brandProfileContext,
+              ...(brandProfileContext
+                ? ["", "Brand profile context (apply with the bindingness stated inside):", brandProfileContext]
+                : []),
             ].join("\n"),
           },
         ],

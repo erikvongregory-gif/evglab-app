@@ -46,8 +46,8 @@ export async function POST(req: Request) {
 
     const filesRaw = formData.getAll("image");
     const files = filesRaw.filter((item): item is File => item instanceof File);
-    if (files.length !== 5) {
-      return NextResponse.json({ error: "Bitte genau 5 Bilder hochladen (Screenshots deiner Instagram-Posts)." }, { status: 400 });
+    if (files.length < 1 || files.length > 5) {
+      return NextResponse.json({ error: "Bitte 1 bis 5 Bilder hochladen (Screenshots deiner Instagram-Posts)." }, { status: 400 });
     }
 
     for (const file of files) {

@@ -24,6 +24,8 @@ export type SaveBrandProfileInput = {
   brandWebsiteUrl?: string;
   brandProfileSource: "url" | "instagram" | "manual";
   brandReferenceImageUrls?: string[];
+  /** Bester Packshot (Etikett-Traeger) aus der Analyse — Quelle fuer Etikett-Treue. */
+  brandLabelReferenceUrl?: string;
   referenceImagePayloads?: BrandReferencePayload[];
 };
 
@@ -49,6 +51,17 @@ function normalizeOptionalUrl(value: string | undefined): string {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) return "";
   return normalizeWebsiteUrl(trimmed) ?? "";
+}
+
+function normalizeHttpUrlOrEmpty(value: string | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return "";
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 export async function resolveBrandReferenceImageUrls(input: {
@@ -102,6 +115,7 @@ export function buildActivatedBrandSettings(params: {
     brandWebsiteUrl: normalizeOptionalUrl(params.input.brandWebsiteUrl),
     brandProfileSource: params.input.brandProfileSource,
     brandReferenceImageUrls: params.referenceImageUrls,
+    brandLabelReferenceUrl: normalizeHttpUrlOrEmpty(params.input.brandLabelReferenceUrl),
     brandAnalyzedAt: params.analyzedAt ?? existing.brandAnalyzedAt ?? new Date().toISOString(),
   });
 

@@ -10,14 +10,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { STUDIO_LAYOUT } from "@/components/dashboard/studio-reference-ui";
-import { StudioOnboardingTour } from "@/components/studio/studio-onboarding-tour";
+import { StudioOnboardingProvider } from "@/components/studio/onboarding/onboarding-context";
+import { StudioOnboardingWelcome } from "@/components/studio/onboarding/onboarding-welcome";
+import { StudioOnboardingChecklist } from "@/components/studio/onboarding/onboarding-checklist";
+import { StudioOnboardingHints } from "@/components/studio/onboarding/onboarding-hints";
 import {
   DashboardStudioShell,
   type StudioNavKey,
 } from "@/components/ui/dashboard-studio-shell";
-import { isStudioOnboardingComplete, markStudioOnboardingComplete } from "@/lib/dashboard/studioOnboarding";
 import { runBillingBootstrap } from "@/lib/billing/clientBootstrap";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
 import { HopfenHugoAssistant } from "@/components/studio/hopfen-hugo-assistant";
@@ -86,15 +88,17 @@ export function StudioWorkspaceShell({
   initialProfileName,
   initialBreweryName,
   isAdmin = false,
+  initialHasActivePlan = false,
 }: {
   children: ReactNode;
   userEmail?: string;
   initialProfileName?: string;
   initialBreweryName?: string;
   isAdmin?: boolean;
+  /** Owner starten freigeschaltet — sonst flackert „Abo erforderlich“ in der Nav. */
+  initialHasActivePlan?: boolean;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [brandProfileActive, setBrandProfileActiveState] = useState(false);
@@ -102,8 +106,7 @@ export function StudioWorkspaceShell({
   const [contentPending, setContentPendingState] = useState(false);
   const [tokensRemaining, setTokensRemaining] = useState<number | undefined>();
   const [tokensMonthly, setTokensMonthly] = useState<number | undefined>();
-  const [hasActivePlan, setHasActivePlan] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [hasActivePlan, setHasActivePlan] = useState(initialHasActivePlan);
 
   const isCreateRoute = pathname.startsWith("/inhalte-erstellen");
   const isVideoCreateRoute = pathname.startsWith("/videos-erstellen");
@@ -117,10 +120,6 @@ export function StudioWorkspaceShell({
       : resolveDashboardTab(tabParam);
   const contentKey = isCreateRoute ? "create" : isVideoCreateRoute ? "create-video" : isAdminRoute ? "admin" : "dashboard";
   const breadcrumbLabel = isAdminRoute ? "Admin-Bereich" : breadcrumbForNav(activeNav);
-
-  useEffect(() => {
-    setShowOnboarding(!isStudioOnboardingComplete(userEmail));
-  }, [userEmail]);
 
   useEffect(() => {
     setBrandProfileActiveState(false);
@@ -193,33 +192,29 @@ export function StudioWorkspaceShell({
 
   return (
     <StudioShellContext.Provider value={shellContext}>
-      <DashboardStudioShell
-        userEmail={userEmail}
-        initialProfileName={initialProfileName}
-        initialBreweryName={initialBreweryName}
-        activeNav={activeNav}
-        breadcrumbLabel={breadcrumbLabel}
-        contentPadding={contentPadding ?? STUDIO_LAYOUT.contentPadding}
-        contentKey={contentKey}
-        contentPending={contentPending}
-        brandProfileActive={brandProfileActive}
-        isAdmin={isAdmin}
-        adminRouteActive={isAdminRoute}
-        hasActivePlan={hasActivePlan}
-        tokensRemaining={tokensRemaining}
-        tokensMonthly={tokensMonthly}
-      >
-        {children}
-      </DashboardStudioShell>
-      {showOnboarding ? (
-        <StudioOnboardingTour
-          onDone={() => {
-            markStudioOnboardingComplete(userEmail);
-            setShowOnboarding(false);
-          }}
-          onGoCreate={() => router.push(hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing")}
-        />
-      ) : null}
+      <StudioOnboardingProvider>
+        <DashboardStudioShell
+          userEmail={userEmail}
+          initialProfileName={initialProfileName}
+          initialBreweryName={initialBreweryName}
+          activeNav={activeNav}
+          breadcrumbLabel={breadcrumbLabel}
+          contentPadding={contentPadding ?? STUDIO_LAYOUT.contentPadding}
+          contentKey={contentKey}
+          contentPending={contentPending}
+          brandProfileActive={brandProfileActive}
+          isAdmin={isAdmin}
+          adminRouteActive={isAdminRoute}
+          hasActivePlan={hasActivePlan}
+          tokensRemaining={tokensRemaining}
+          tokensMonthly={tokensMonthly}
+        >
+          {children}
+        </DashboardStudioShell>
+        <StudioOnboardingWelcome />
+        <StudioOnboardingChecklist />
+        <StudioOnboardingHints area={activeNav} />
+      </StudioOnboardingProvider>
       <Suspense fallback={null}>
         <HopfenHugoAssistant />
       </Suspense>

@@ -1,3 +1,5 @@
+import { sanitizeStudioOnboardingState, type StudioOnboardingState } from "@/lib/dashboard/onboarding";
+
 export type DashboardMediaItem = {
   id: string;
   imageUrl: string;
@@ -15,6 +17,63 @@ export function getMediaDisplayTitle(item: Pick<DashboardMediaItem, "title" | "p
   if (custom) return custom;
   const fallback = item.prompt?.trim();
   return fallback || "Unbenanntes Motiv";
+}
+
+/**
+ * Ein Bier aus dem Sortiment der Brauerei ("Meine Biere") — einmal angelegt,
+ * belegt es im Erstell-Flow Bierstil, Flasche, Farbe und Etikett per Klick vor.
+ */
+export type DashboardBeer = {
+  id: string;
+  name: string;
+  /** Bierstil-Code, z. B. "helles", "pils" (siehe WAS_OPTIONS im Erstell-Flow). */
+  bierstil: string;
+  /** Flaschentyp-Code, z. B. "nrw_500" (siehe FLASCHEN_TYPEN). */
+  flaschenTyp: string;
+  flaschenfarbe: "braun" | "gruen" | "klar";
+  /** HTTPS-URL des Sorten-Etiketts (nie Base64 — JWT/Cookie-Limit). */
+  etikettUrl: string;
+  createdAt: string;
+};
+
+export const MAX_MY_BEERS = 8;
+
+/** KIE-Temp-URLs sind oft tot oder vom Server nicht ladbar — Etikett dann neu hochladen. */
+export function hasUsableBeerEtikett(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    return !host.includes("redpandaai.co") && !host.includes("tempfile.");
+  } catch {
+    return false;
+  }
+}
+
+export function sanitizeDashboardBeers(value: unknown): DashboardBeer[] {
+  if (!Array.isArray(value)) return [];
+  const out: DashboardBeer[] = [];
+  for (const raw of value) {
+    const item = asObj(raw);
+    const id = typeof item.id === "string" ? item.id.trim().slice(0, 64) : "";
+    const name = typeof item.name === "string" ? item.name.trim().slice(0, 80) : "";
+    if (!id || !name) continue;
+    out.push({
+      id,
+      name,
+      bierstil: typeof item.bierstil === "string" && item.bierstil.trim() ? item.bierstil.trim().slice(0, 60) : "helles",
+      flaschenTyp:
+        typeof item.flaschenTyp === "string" && item.flaschenTyp.trim() ? item.flaschenTyp.trim().slice(0, 60) : "nrw_500",
+      flaschenfarbe:
+        item.flaschenfarbe === "gruen" || item.flaschenfarbe === "klar" ? item.flaschenfarbe : "braun",
+      etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",
+      createdAt: typeof item.createdAt === "string" ? item.createdAt.slice(0, 40) : "",
+    });
+    if (out.length >= MAX_MY_BEERS) break;
+  }
+  return out;
 }
 
 export type DashboardTeamRole = "owner" | "admin" | "editor" | "viewer";
@@ -44,6 +103,8 @@ export type DashboardSettings = {
   brandDos: string;
   brandDonts: string;
   brandReferenceImageUrls: string[];
+  /** Bester Packshot (Etikett-Traeger) aus der Analyse — fuer Etikett-Treue bei der Generierung. */
+  brandLabelReferenceUrl: string;
   /** ISO-Zeitstempel der letzten Website-/Marken-Analyse */
   brandAnalyzedAt?: string;
 };
@@ -52,6 +113,8 @@ export type DashboardMetadata = {
   mediaLibrary?: DashboardMediaItem[];
   teamMembers?: DashboardTeamMember[];
   settings?: DashboardSettings;
+  onboarding?: StudioOnboardingState;
+  myBeers?: DashboardBeer[];
 };
 
 function asObj(value: unknown): Record<string, unknown> {
@@ -86,6 +149,8 @@ export function getDashboardMetadata(userMetadata: unknown): DashboardMetadata {
     mediaLibrary,
     teamMembers,
     settings: asObj(dashboard.settings) as DashboardSettings,
+    onboarding: sanitizeStudioOnboardingState(dashboard.onboarding),
+    myBeers: sanitizeDashboardBeers(dashboard.myBeers),
   };
 }
 

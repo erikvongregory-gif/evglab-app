@@ -40,12 +40,13 @@ describe("brauerei-bild skill", () => {
         stimmung: "entspannt",
         aspectRatio: "4:5",
         quality: "high",
+        variantCount: 3,
       },
       { breweryName: "Paulaner" },
     );
 
     expect(brief.markenname).toBe("Paulaner");
     expect(brief.glasTyp).toBe("Willibecher");
-    expect(brief.kiPlattform).toBe("GPT Image 2");
+    expect(brief.kiPlattform).toBe("GPT Image 2 (OpenAI gpt-image-2)");
   });
 });

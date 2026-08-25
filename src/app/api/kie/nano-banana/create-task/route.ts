@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { classifyProviderError, classifyProviderResponse } from "@/lib/ai/providerErrors";
+import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { consumeTokens, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
+import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -164,7 +166,7 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             error:
-              "Bitte vervollständige zuerst dein Markenprofil unter Einstellungen (Abschnitt Markenprofil oben: fünf Instagram-Post-Screenshots mit KI auswerten) oder aktiviere die Nutzung ohne Markenprofil.",
+              "Bitte lege zuerst dein Markenprofil an: Öffne im Dashboard den Bereich „Markenprofil“ und gib deine Website ein — oder wähle dort „Ohne Markenprofil“.",
             code: "brand_profile_incomplete",
           },
           { status: 400 },
@@ -190,7 +192,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Kampagnenbild mit Text ist nur mit einem angelegten Markenprofil möglich (Einstellungen → Markenprofil, nicht „ohne Markenprofil“).",
+            "Kampagnenbild mit Text ist nur mit aktivem Markenprofil möglich. Lege es im Dashboard unter „Markenprofil“ an — ein Website-Link genügt.",
           code: "campaign_requires_guided_brand_profile",
         },
         { status: 400 },
@@ -218,7 +220,7 @@ export async function POST(req: Request) {
     if (subscriptionError) return subscriptionError;
 
     await ensureBillingRow(userId);
-    const currentState = await getBillingRow(userId);
+    const currentState = await getEffectiveBillingRow(userId);
 
     const hasReferenceImages = Boolean(body.referenceImageUrls?.length);
     if (!isUsableKieModelName(KIE_MODEL_TEXT_TO_IMAGE) || !isUsableKieModelName(KIE_MODEL_IMAGE_TO_IMAGE)) {
@@ -320,32 +322,23 @@ export async function POST(req: Request) {
 
     const data = (await upstream.json()) as Record<string, unknown>;
     if (!upstream.ok) {
-      const upstreamMessage =
-        (data.msg as string | undefined) ||
-        (data.error as string | undefined) ||
-        ((data.data as Record<string, unknown> | undefined)?.msg as string | undefined);
-      return NextResponse.json(
-        {
-          error: upstreamMessage ? `Kie createTask fehlgeschlagen: ${upstreamMessage}` : "Kie createTask fehlgeschlagen.",
-          raw: data,
-        },
-        { status: upstream.status },
-      );
+      // Kein Token-Abzug: die Buchung erfolgt erst nach erfolgreicher Task-Anlage.
+      const classified = classifyProviderResponse("kie", upstream, data);
+      logProviderFailure(classified, { label: "kie-nano-banana-create-task", userId });
+      return providerErrorResponse(classified);
     }
 
     const code = data.code as number | undefined;
     if (typeof code === "number" && code !== 200) {
+      // Kie liefert Geschaeftsfehler mit HTTP 200 und eigenem `code` (z. B. 402
+      // bei leerem Guthaben) — deshalb den Body-Code als Status klassifizieren.
       const upstreamMessage =
         (data.msg as string | undefined) ||
         (data.error as string | undefined) ||
         ((data.data as Record<string, unknown> | undefined)?.msg as string | undefined);
-      return NextResponse.json(
-        {
-          error: upstreamMessage ? `Kie hat den Task abgelehnt: ${upstreamMessage}` : "Kie hat den Task abgelehnt.",
-          raw: data,
-        },
-        { status: 502 },
-      );
+      const classified = classifyProviderError({ provider: "kie", status: code, message: upstreamMessage });
+      logProviderFailure(classified, { label: "kie-nano-banana-create-task", userId });
+      return providerErrorResponse(classified);
     }
 
     const taskId = extractTaskId(data);

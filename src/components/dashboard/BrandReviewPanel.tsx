@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { StudioButton, StudioEyebrow, StudioFieldLabel } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
 import {
+  computeProfileStrength,
   formatConfidenceLabel,
   parseHexSwatches,
   parseRuleSentences,
@@ -42,6 +43,14 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
   const dos = parseRuleSentences(review.brandDos);
   const donts = parseRuleSentences(review.brandDonts);
   const confidenceLabel = formatConfidenceLabel(sourceMeta?.confidence);
+  const strength = computeProfileStrength({
+    breweryName: review.breweryName,
+    brandTone: review.brandTone,
+    brandColors: review.brandColors,
+    brandDos: review.brandDos,
+    brandDonts: review.brandDonts,
+    referenceImageCount: refs.length,
+  });
 
   const syncTones = (next: string[]) => {
     setTones(next);
@@ -64,6 +73,13 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
 
   const removeColor = (idx: number) => syncColors(colors.filter((_, i) => i !== idx));
 
+  const addColor = (hex: string) => {
+    const normalized = hex.trim().toUpperCase();
+    if (!/^#[0-9A-F]{6}$/.test(normalized)) return;
+    if (colors.some((c) => c.toUpperCase() === normalized)) return;
+    syncColors([...colors, normalized]);
+  };
+
   const sourceLabel = [review.breweryName, sourceMeta?.pageTitle].filter(Boolean).join(" · ") || review.breweryName;
 
   return (
@@ -82,6 +98,15 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
             {confidenceLabel ? <span className="studio-brand-review-confidence">{confidenceLabel}</span> : null}
           </div>
         ) : null}
+
+        <div className="studio-brand-review-strength" title="Wie tragfähig dein Profil für die Bildgenerierung ist">
+          <div className="studio-brand-review-strength-bar">
+            <div className="studio-brand-review-strength-fill" style={{ width: `${strength.percent}%` }} />
+          </div>
+          <span className="studio-brand-review-strength-label">
+            Profil-Stärke · {strength.label}
+          </span>
+        </div>
       </div>
 
       <div className="studio-hr" />
@@ -165,6 +190,18 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
                 <span className="studio-brand-review-color-hex">{color.replace("#", "")}</span>
               </div>
             ))}
+            {colors.length < 8 ? (
+              <label className="studio-brand-review-add-chip studio-brand-review-color-add">
+                <input
+                  type="color"
+                  disabled={busy}
+                  onChange={(e) => addColor(e.target.value)}
+                  aria-label="Farbe hinzufügen"
+                />
+                <StudioIcon name="plus" size={12} />
+                Farbe
+              </label>
+            ) : null}
           </div>
         </div>
 

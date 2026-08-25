@@ -29,6 +29,40 @@
 - `NEXT_PUBLIC_BILLING_CHECKOUT_ENABLED=true`
 - `TOKEN_STATE_SECRET=...`
 - `META_APP_ID=...` und `META_APP_SECRET=...` (Instagram Markenprofil-Scan, siehe [`docs/instagram-oauth-setup.md`](instagram-oauth-setup.md) — Meta Console + Vercel Schritt-für-Schritt)
+- `ADMIN_2FA_SECRET=...` — min. 32 Zeichen, signiert alle 2FA-Cookies
+- `RESEND_API_KEY=...` und `ADMIN_2FA_FROM_EMAIL=kontakt@brewai.de` — **ohne funktionierenden Mailversand kommt niemand mehr in die App**
+- `OWNER_EMAILS=...` — Betreiber-Konten mit unbegrenzten Tokens ohne Stripe-Abo
+- `OWNER_2FA_BACKUP_CODE=...` — lang und zufällig, in Production **anders** als lokal
+
+## 1a) Zwei-Faktor-Authentifizierung (Pflicht für alle Konten)
+
+2FA gilt seit dem Umbau für **jedes** Konto, nicht mehr nur für Admins: nach Login
+(Passwort und Google) kommt ein 6-stelliger E-Mail-Code. Danach wird das Gerät
+30 Tage als vertrauenswürdig gemerkt (`evglab_2fa_device`), die Session selbst 12 Stunden.
+
+Vor dem Go-live zwingend prüfen:
+
+1. Resend-Domain `brewai.de` verifiziert (SPF/DKIM/DMARC) — siehe [`docs/ki-provider-betrieb.md`](ki-provider-betrieb.md).
+2. Testlogin mit einer externen Adresse: Code kommt an und landet nicht im Spam.
+3. `ADMIN_2FA_SECRET` in Production gesetzt und mindestens 32 Zeichen lang.
+   Bei zu kurzem Wert schlägt jeder Login mit einem Fehler fehl.
+4. Ein Wechsel von `ADMIN_2FA_SECRET` invalidiert alle Trusted-Device-Cookies —
+   alle Nutzer brauchen dann beim nächsten Login einen neuen Code.
+
+## 1b) Betreiber-Konto (Owner)
+
+Owner-Konten haben unbegrenzte Tokens und brauchen kein Stripe-Abo. Erkennung über
+`OWNER_EMAILS` oder `user_metadata.role = "owner"` in Supabase.
+
+```bash
+npm run setup:owner                        # Rolle setzen bzw. Konto anlegen
+npm run setup:owner -- --password "..."    # zusätzlich das Passwort setzen
+```
+
+Da eine Owner-Adresse keinen echten Mailempfang haben muss, ersetzt
+`OWNER_2FA_BACKUP_CODE` auf der 2FA-Seite den E-Mail-Code. Diesen Code wie ein
+Passwort behandeln: er ist der einzige garantierte Zugang, wenn der Mailversand
+ausfällt.
 
 ## 2) Supabase Setup
 
@@ -80,10 +114,15 @@ STRIPE_SECRET_KEY=sk_live_... node scripts/sync-stripe-plan-prices.mjs
    - `invoice.paid` (Token-Reset bei Abo-Verlängerung)
 7. Live-Webhook-Secret in `STRIPE_WEBHOOK_SECRET` setzen.
 
+## 3a) KI-Provider
+
+Guthaben-Auffüllung, OpenAI-Organisationsverifizierung (Pflicht für `gpt-image-2`)
+und Meta App Review: [`docs/ki-provider-betrieb.md`](ki-provider-betrieb.md).
+
 ## 4) Smoke-Test (Live-Readiness)
 
 1. `https://brewai.de` öffnen, Dashboard-Abo wählen, auf App-Login weiterleiten.
-2. Mit Google anmelden.
+2. Mit Google anmelden, 2FA-Code aus der E-Mail bestätigen.
 3. Checkout starten, Zahlung abschließen.
 4. Nach Redirect prüfen:
    - Dashboard zeigt aktiven Plan.
@@ -91,6 +130,9 @@ STRIPE_SECRET_KEY=sk_live_... node scripts/sync-stripe-plan-prices.mjs
 5. Token-Pack kaufen und prüfen, dass Tokens steigen.
 6. Stripe-Portal öffnen (`Abo verwalten`) und Abo-Änderung testen.
 7. Webhook-Retries simulieren (Stripe CLI) und prüfen, dass kein doppelte Gutschrift entsteht.
+8. Abmelden und erneut anmelden: das Gerät ist noch 30 Tage vertraut, es darf **kein** neuer Code kommen.
+9. In einem anderen Browser anmelden: hier muss ein Code kommen.
+10. Owner-Login über `/admin/anmelden` mit `OWNER_2FA_BACKUP_CODE` testen.
 
 ## 6) BrewAI Domains (manuell)
 
@@ -108,3 +150,6 @@ Nach Domain-Umstellung prüfen:
 
 - Bei Problemen Checkout sofort per `NEXT_PUBLIC_BILLING_CHECKOUT_ENABLED=false` deaktivieren.
 - Danach nur Login/Bestandskundenzugriff aktiv lassen und Logs prüfen.
+- Wenn der 2FA-Mailversand ausfällt und Nutzer ausgesperrt sind: Resend-Status und
+  `ADMIN_2FA_FROM_EMAIL` prüfen. Der eigene Zugang läuft in der Zeit über
+  `OWNER_2FA_BACKUP_CODE`.

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
+import { isOwnerUser } from "@/lib/auth/owner";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { hasActiveSubscription } from "@/lib/billing/access";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
@@ -49,25 +50,27 @@ export default async function VideosErstellenPage() {
     return <CreateVideosComingSoonView />;
   }
 
-  await ensureBillingRow(user.id);
-  let billing = await getBillingRow(user.id);
-  if (!hasActiveSubscription(billing)) {
-    try {
-      const syncResult = await syncBillingFromStripe({
-        userId: user.id,
-        userEmail: user.email,
-        currentRow: billing,
-      });
-      if (syncResult.synced) {
-        billing = await getBillingRow(user.id);
+  if (!isOwnerUser(user)) {
+    await ensureBillingRow(user.id);
+    let billing = await getBillingRow(user.id);
+    if (!hasActiveSubscription(billing)) {
+      try {
+        const syncResult = await syncBillingFromStripe({
+          userId: user.id,
+          userEmail: user.email,
+          currentRow: billing,
+        });
+        if (syncResult.synced) {
+          billing = await getBillingRow(user.id);
+        }
+      } catch {
+        /* Stripe optional */
       }
-    } catch {
-      /* Stripe optional */
     }
-  }
 
-  if (!hasActiveSubscription(billing)) {
-    return <CreateContentLockedView feature="videos" />;
+    if (!hasActiveSubscription(billing)) {
+      return <CreateContentLockedView feature="videos" />;
+    }
   }
 
   const dashboard = (user.user_metadata?.dashboard ?? {}) as Record<string, unknown>;

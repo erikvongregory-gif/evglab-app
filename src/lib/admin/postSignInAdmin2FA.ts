@@ -1,10 +1,13 @@
 import type { User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import {
+  PENDING_TTL_SECONDS,
   buildPending2FAToken,
   createOneTimeCode,
   getPendingCookieName,
-  sendAdmin2FACodeEmail,
+  getTrustedDeviceCookieName,
+  isTrustedDeviceForUser,
+  send2FACodeEmail,
 } from "@/lib/admin/emailTwoFactor";
 import { logAuthEvent } from "@/lib/security/authObservability";
 import { createNoStoreRedirect, secureCookieOptions } from "@/lib/security/authResponses";
@@ -15,11 +18,24 @@ function copyResponseCookies(target: NextResponse, source: NextResponse) {
   }
 }
 
+function readCookie(request: Request, name: string): string | null {
+  const header = request.headers.get("cookie");
+  if (!header) return null;
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0) continue;
+    if (part.slice(0, separator).trim() !== name) continue;
+    return decodeURIComponent(part.slice(separator + 1).trim());
+  }
+  return null;
+}
+
 /**
- * Nach gültiger Supabase-Session: Admin bekommt E-Mail-Code + Pending-Cookie,
- * alle anderen bleiben auf dem normalen Redirect (cookieSource).
+ * Nach gültiger Supabase-Session: 2FA ist für jedes Konto Pflicht. Geräte, die
+ * die Prüfung schon bestanden haben, tragen ein Trusted-Device-Cookie und
+ * überspringen den Code für dessen Laufzeit.
  */
-export async function redirectWithAdminEmail2FAIfNeeded(
+export async function redirectWithEmail2FAIfNeeded(
   request: Request,
   opts: {
     user: User | null;
@@ -28,19 +44,18 @@ export async function redirectWithAdminEmail2FAIfNeeded(
     cookieSource: NextResponse;
     startedAt: number;
     logEvent?: string;
+    next?: string;
   },
 ): Promise<NextResponse | null> {
-  const { user, requestId, origin, cookieSource, startedAt, logEvent = "signin_admin_2fa_required" } = opts;
+  const { user, requestId, origin, cookieSource, startedAt, logEvent = "signin_2fa_required", next } = opts;
   if (!user?.email) return null;
-  const role =
-    typeof user.user_metadata?.role === "string"
-      ? String(user.user_metadata.role).toLowerCase()
-      : "";
-  if (role !== "admin") return null;
+
+  const trustedDevice = readCookie(request, getTrustedDeviceCookieName());
+  if (isTrustedDeviceForUser(trustedDevice, user.id)) return null;
 
   const code = createOneTimeCode();
   try {
-    await sendAdmin2FACodeEmail({ to: user.email, code });
+    await send2FACodeEmail({ to: user.email, code });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const errorCode =
@@ -54,14 +69,16 @@ export async function redirectWithAdminEmail2FAIfNeeded(
     userId: user.id,
     email: user.email,
     code,
-    ttlSeconds: 600,
+    ttlSeconds: PENDING_TTL_SECONDS,
   });
 
-  const response = createNoStoreRedirect(`${origin}/dashboard/2fa-email`, requestId);
+  const verifyUrl = new URL(`${origin}/dashboard/2fa-email`);
+  if (next) verifyUrl.searchParams.set("next", next);
+  const response = createNoStoreRedirect(verifyUrl.toString(), requestId);
   response.cookies.set(getPendingCookieName(), pendingToken, {
     httpOnly: true,
     ...secureCookieOptions(request),
-    maxAge: 60 * 10,
+    maxAge: PENDING_TTL_SECONDS,
   });
   copyResponseCookies(response, cookieSource);
   response.headers.set("x-request-id", requestId);

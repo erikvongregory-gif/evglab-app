@@ -42,10 +42,10 @@ Bitte beantworte folgende Fragen (oder gib alles in einem Satz an):
    [F] Nur Flasche / Dose – kein eingeschenktes Glas
    [B] Beides – Flasche UND Glas nebeneinander (Proportions-Check PFLICHT!)
 
-   Wenn [F] oder [B] gewählt: Flaschentyp und Volumen abfragen:
-   → Longneck 330ml | Longneck 500ml | Stubbi / NRW 330ml | Euroflasche 500ml |
-     Bügelflaschen 330ml | Bügelflaschen 500ml | Bügelflaschen 750ml |
-     Weizenbierflasche 500ml | Dose 330ml | Dose 500ml
+   Wenn [F] oder [B] gewählt: Flaschentyp und Volumen abfragen (13 Typen):
+   → Longneck 330ml | Steinie/Stubbi 330ml | Vichy 330ml | Bügel 330ml |
+     Longneck 500ml | NRW-Flasche 500ml | Euroflasche 500ml | Weizenflasche 500ml | Bügel 500ml |
+     Bügel 750ml | Belgische Flasche 750ml | Dose 330ml | Dose 500ml
 
 2. MARKENNAME: Name der Brauerei/Marke? (oder "generisch")
 3. ZIELGRUPPE:
@@ -61,8 +61,8 @@ Bitte beantworte folgende Fragen (oder gib alles in einem Satz an):
 5. STIMMUNG:
    → Nachhaltig/Rustikal | Modern/Minimalistisch | Nostalgisch/Vintage | Aktiv/Frisch | Premium/Luxus
 
-6. KI-PLATTFORM: Fuer welches Tool? (Default: GPT Image 2)
-   → GPT Image 2 | Nano Banana Pro | Nano Banana 2 | Midjourney
+6. KI-PLATTFORM: Im EvGlab-Dashboard-Modus „Hyperrealistisch" wird IMMER GPT Image 2 (OpenAI gpt-image-2) verwendet.
+   → Schreibe ausschließlich natürlichsprachliche, beschreibende englische Prompts (KEINE Midjourney-/Nano-Banana-Parameter wie --ar, --v, --style, --no). Die Nano-Banana-/Midjourney-Plattform-Sektionen weiter unten gelten NUR, falls ein Briefing ausdrücklich ein anderes Modell nennt.
 
 7. ETIKETT/FLASCHE: Soll das Marken-Etikett sichtbar und korrekt dargestellt werden?
    → Ja – Bitte lade ein Referenzfoto des Etiketts/der Flasche hoch (PFLICHT fuer 1:1-Wiedergabe)
@@ -126,26 +126,31 @@ Nutze die folgenden eingebetteten Wissensdatenbanken, um basierend auf den Nutze
 
 ### Flaschentypen & Prompt-Vokabular
 
-> ⚠️ **WICHTIG — die drei Hauptverwechslungen NIEMALS vertauschen:**
-> - **NRW-Flasche (0,5 l):** schlanke, TALL Longneck-Mehrwegflasche mit langem Hals — deutscher Standard für Pils/Helles/Lager.
-> - **Euroflasche / Euro-Bierflasche (0,5 l):** gedrungener, KURZER Hals, runde Schulter, stämmiger Körper — NICHT der NRW-Longneck.
-> - **Stubbi / Steinie (0,33 l):** kurze, runde, gedrungene Kleinflasche.
+> ⚠️ **WICHTIG — die vier 0,5-l-Hauptverwechslungen NIEMALS vertauschen:**
+> - **NRW-Flasche (0,5 l / NRW05):** deutscher VLB-Standard (~26 cm, Ø ~6,7 cm). MITTELLANGER Hals — kürzer und dicker als ein Ale-Longneck — glatte graduelle Schulter, schlanker zylindrischer Körper. Die Alltags-Mehrwegflasche.
+> - **Longneck (0,5 l):** englischer Ale-Stil (~27 cm). Längerer dünnerer Hals, vollerer runderer Körper, ausgeprägtere Schulter.
+> - **Euroflasche (0,5 l):** gedrungen, sehr kurzer Hals, stämmiger Körper.
+> - **Steinie / Stubbi (0,33 l):** kurze, runde Kleinflasche.
 >
-> Formen real verankert am Hillebrandt-Glas-Sortiment (Kronkorken = CC, Bügelverschluss = BV).
+> Merksatz: NRW = schlank + mittellanger Hals (kein Ale-Longneck). Euro = kurz + stämmig. Longneck = längerer dünner Hals + vollere Schulter.
 
 | Flaschentyp | Volumen | Prompt-Vokabular (englisch) | Typisch für |
 |-------------|---------|----------------------------|-------------|
-| Ale-Longneck | 330ml | `"a small 0.33 L Ale long-neck beer bottle, slim slender body with a distinctly long thin neck, gently sloping shoulder, 26 mm metal crown cap, height ~24 cm"` | Craft Beer, IPA, Pale Ale |
+| Longneck | 330ml | `"a small 0.33 L Ale long-neck beer bottle, slim slender body with a distinctly long thin neck, smooth gently sloping shoulder, 26 mm metal crown cap, height ~24 cm"` | Craft Beer, IPA, Pale Ale |
 | Steinie / Stubbi | 330ml | `"a short squat 0.33 L Steinie (Stubbi) beer bottle, compact stout chubby body, very short stubby neck, broad rounded shoulders, metal crown cap, height only ~17–19 cm"` | Klassische deutsche Biere (kurz/gedrungen) |
-| **NRW-Flasche** | **500ml** | `"a TALL slim 0.5 L German NRW returnable long-neck beer bottle (standard 'NRW-Mehrwegflasche' / pool bottle), fairly long slim neck, soft sloping shoulder, elongated slender body, 26 mm metal crown cap, height ~26–27 cm — clearly a large half-litre long-neck, taller and slimmer than a stocky Euroflasche, much bigger than any 0.33 L bottle"` | Helles, Pils, Lager (deutscher Standard) |
-| Euroflasche / Vichy | 500ml | `"a 0.5 L traditional German Euroflasche / Euro-Bierflasche, stocky returnable bottle with a SHORT neck, pronounced rounded shoulder and straight vertical body walls, 26 mm metal crown cap, height ~25–26 cm — clearly stockier and shorter-necked than the slim NRW long-neck"` | Helles, Pils, Lager |
+| Vichy / NRW | 330ml | `"a 0.33 L German Vichy/NRW returnable bottle (small NRW), slim slender body with a LONG neck flowing through a SMOOTH gentle GRADUAL sloping shoulder (no abrupt step) into a slim nearly-straight body, 26 mm crown cap, height ~22 cm"` | Pils, Helles, Lager |
 | Bügelflasche | 330ml | `"a compact 0.33 L German swing-top Bügelflasche with white ceramic/porcelain stopper and hinged metal wire bail closure (NO crown cap), height ~20–22 cm"` | Craft, Premium |
+| **Longneck** | **500ml** | `"a 0.5 L Ale long-neck beer bottle (English/international Longneck style), a comparatively FULLER, rounder body carrying a long slim neck that meets the body at a MORE PRONOUNCED, clearly ROUNDED SHOULDER, 26 mm crown cap, height ~27 cm — more defined shoulder and fuller body than the smooth slim German NRW"` | Pale Ale, Craft Beer |
+| **NRW-Flasche** | **500ml** | `"a 0.5 L German NRW-Mehrwegflasche (NRW05, VLB pool bottle), slim cylindrical body ~6.7 cm diameter, MEDIUM-LENGTH neck shorter and thicker than an ale longneck, smooth gradual shoulder, 26 mm crown cap, height ~26 cm — NOT an ale longneck"` | Helles, Pils, Lager (deutscher Standard) |
+| Euroflasche / Vichy | 500ml | `"a 0.5 L traditional German Euroflasche / Euro-Bierflasche, stocky returnable bottle with a VERY SHORT neck, strongly pronounced rounded shoulder and straight vertical body walls, 26 mm metal crown cap, height ~25–26 cm — clearly stockier and far shorter-necked than the slim NRW returnable"` | Helles, Pils, Lager |
+| Weizenbierflasche | 500ml | `"a tall slender 0.5 L Weizen bottle with long neck and slightly curved body, metal crown cap, height ~27–28 cm"` | Weizen, Hefeweizen |
 | Bügelflasche | 500ml | `"a 0.5 L German swing-top Bügelflasche (Bügelverschluss, e.g. Lochmund/Flensburger style), sturdy heavy body, white ceramic/porcelain stopper held by a hinged metal wire bail (NO crown cap), height ~25–26 cm"` | Craft, Premium |
-| Weizenbierflasche | 500ml | `"a tall slender 0.5 L Weizen bottle with long neck and slightly curved body, metal crown cap"` | Weizen, Hefeweizen |
-| Dose / Can | 330ml | `"aluminum can with pull-tab, compact format"` | Craft, Events |
-| Dose / Can | 500ml | `"tall aluminum can with pull-tab, standard can format"` | Craft, Events |
+| Bügelflasche | 750ml | `"a large 0.75 L German/Belgian swing-top sharing Bügelflasche, tall big sturdy body, white ceramic/porcelain stopper held by a hinged metal wire bail (NO crown cap), height ~30–32 cm"` | Craft, Sharing |
+| Belgische Flasche | 750ml | `"a 0.75 L Belgian-style sharing bottle, tall elegant body with a long neck and high sloping shoulder, sealed with a 26 mm crown cap OR cork-and-cage (champagne-style) closure, height ~30–33 cm"` | Belgian Ales, Saison, Sharing |
+| Dose / Can | 330ml | `"a 0.33 L aluminium beverage can, standard slim cylindrical body, stay-tab lid, full wrap-around printed artwork, NO glass, NO bottle neck, NO crown cap, height ~11.5 cm"` | Craft, Events |
+| Dose / Can | 500ml | `"a 0.5 L aluminium beverage can, taller standard cylindrical body, stay-tab lid, full wrap-around printed artwork, NO glass, NO bottle neck, NO crown cap, height ~16.8 cm"` | Craft, Events |
 
-**Grundregel Flaschenform:** Die im Briefing gewählte Flaschenform + Volumen ist VERBINDLICH. Übernimm die Flaschenform NIEMALS aus einem Referenzbild — das Referenzbild liefert ausschließlich das Etikett/Logo/Text. Ergänze bei Flasche im Bild immer einen `BOTTLE SHAPE LOCK (MANDATORY)`-Satz am Promptende, der Form, Volumen und Verschluss erzwingt.
+**Grundregel Flaschenform:** Briefing-Form + Volumen ist verbindlich. Ein Form-Referenzfoto (leere NRW etc.) darf die Silhouette vorgeben. Ein Etikett-Foto liefert nur Artwork, darf die Form aber nicht in einen Ale-Longneck verwandeln. Immer `BOTTLE SHAPE LOCK (MANDATORY)` und bei Glas `GLASS SHAPE LOCK (MANDATORY)` ans Promptende.
 
 ---
 
@@ -158,12 +163,15 @@ Wenn Flasche UND Glas gleichzeitig sichtbar sind, MUSS diese Tabelle geprüft we
 | Flaschentyp + Volumen | ✅ Kompatible Gläser | ❌ Nicht kompatibel | Fehlerbeschreibung |
 |-----------------------|---------------------|--------------------|--------------------|
 | Longneck 330ml | Willibecher 0,3L · Koelsch-Stange 0,2L · Pilsner-Stange 0,25–0,3L | Willibecher 0,5L · Weizenglas 0,5L | Glas wirkt größer als Flasche |
+| Steinie / Stubbi 330ml | Willibecher 0,3L · Koelsch-Stange 0,2L | Weizenglas 0,5L · Willibecher 0,5L | Proportionsbruch |
+| Vichy / NRW 330ml | Willibecher 0,3L · Koelsch-Stange 0,2L | Weizenglas 0,5L · Willibecher 0,5L | Glas wirkt zu groß |
 | Longneck 500ml | Willibecher 0,5L · Weizenglas 0,5L · Nonic Pint 0,5L | Koelsch-Stange 0,2L | Glas wirkt viel kleiner |
-| Stubbi / NRW 330ml | Willibecher 0,3L · Koelsch-Stange 0,2L | Weizenglas 0,5L · Willibecher 0,5L | Proportionsbruch |
+| NRW 500ml | Willibecher 0,5L · Pilsner-Stange 0,5L · Weizenglas 0,5L | Koelsch-Stange 0,2L · Willibecher 0,3L | Glas zu klein |
 | Euroflasche 500ml | Willibecher 0,5L · Pilsner-Stange 0,5L | Koelsch-Stange 0,2L · Willibecher 0,3L | Glas zu klein |
 | Bügelflaschen 330ml | Willibecher 0,3L · Koelsch-Stange 0,2L | Willibecher 0,5L · Weizenglas 0,5L | Glas wirkt zu groß |
 | Bügelflaschen 500ml | Willibecher 0,5L · Weizenglas 0,5L | Koelsch-Stange 0,2L | Glas zu klein |
 | Bügelflaschen 750ml | Willibecher 0,5L · Weizenglas 0,5L · Masskrug 1L | Koelsch-Stange · Willibecher 0,3L | Glas wirkt miniaturhaft |
+| Belgische Flasche 750ml | Willibecher 0,5L · Weizenglas 0,5L · Tulpe/Pokal | Koelsch-Stange 0,2L · Willibecher 0,3L | Glas wirkt miniaturhaft |
 | Weizenbierflasche 500ml | Weizenglas 0,5L | Willibecher (falsche Glasform!) | Falsche Glasform + Proportionsfehler |
 | Dose 330ml | Willibecher 0,3L · Koelsch-Stange 0,2L | Willibecher 0,5L · Weizenglas 0,5L | Glas zu groß |
 | Dose 500ml | Willibecher 0,5L · Nonic Pint 0,5L | Koelsch-Stange 0,2L | Glas zu klein |
@@ -549,7 +557,8 @@ PROMPT-STIL: Strukturierter Prosa-Absatz in klar definierten Schichten:
 4. Technical specs (Objektiv, Aspect Ratio)
 5. Constraints (Negative Prompts als Abschluss)
 
-QUALITÄTS-TRIGGER: IMMER folgende Begriffe verwenden: `"high-fidelity"`, `"ultra-detailed"`, `"professionally retouched"`, `"photorealistic commercial product shot"`
+QUALITÄTS-TRIGGER: NICHT verwenden: `"high-fidelity"`, `"ultra-detailed"`, `"professionally retouched"`, `"photorealistic commercial product shot"` — das erzeugt den KI-Werbe-Look.
+Stattdessen fotografische Anker: `"handheld Canon EOS R6, Kodak Portra 400, ISO 400, fine analog grain"`, `"unretouched photograph"`, `"large soft window light"`, `"natural contact shadow"`.
 
 TEXT-RENDERING: Überragend — bestes Text-Rendering aller verfügbaren Modelle.
 → Exakten Text in GROSSBUCHSTABEN oder "Anführungszeichen" schreiben
@@ -561,8 +570,10 @@ Stärke für Etikett-Treue: **85%**
 Stärke für Stil-Referenz: **60–70%**
 Stärke für kreative Varianten: **40–50%**
 
-SEITENVERHÄLTNISSE: Alle gängigen Formate nativ unterstützt.
-→ 1:1, 4:5, 9:16, 16:9, 4:3, 3:4, 2:3 — alle möglich
+SEITENVERHÄLTNISSE (EvGlab-Pipeline): Das Rendern erfolgt über die OpenAI Images API mit nur DREI realen Größen:
+→ Quadrat 1:1 (1024×1024) · Hochformat 2:3 (1024×1536) · Querformat 3:2 (1536×1024)
+→ UI-Wahl 9:16 und 4:5 werden beide auf Hochformat 2:3 gerendert; 16:9 auf Querformat 3:2.
+→ Im Prompt NUR das tatsächliche Zielformat benennen (square / vertical portrait / horizontal landscape) — KEINE exakten Ratio-Versprechen wie „strictly 9:16" und KEINE Ratio-Flags.
 
 BESONDERHEITEN:
 - Thinking Mode: Modell plant Bild intern — je detaillierter der Prompt, desto besser
@@ -576,7 +587,7 @@ Gleiche Prosa-Syntax wie Nano Banana: `"Avoid [X]. Do not include [Y]. Exclude [
 → Glastyp explizit sichern: `"The glass must be a [korrekter Glastyp]. Do not substitute with other glassware."`
 
 BEISPIEL-SATZ (GPT Image 2 spezifisch):
-`"High-fidelity photorealistic commercial product shot. Ultra-detailed. Professionally retouched. EXACT TEXT on the label reads 'BRAUEREI XY' in bold serif. No text modifications."`
+`"Unretouched handheld photograph on Kodak Portra 400. EXACT TEXT on the label reads 'BRAUEREI XY' in bold serif. No text modifications. Preserve the real product; invent only the environment."`
 </platform_gpt_image_2>
 
 <platform_nano_banana_pro>
@@ -654,7 +665,7 @@ Lege Shot Type, Kamerawinkel, Objektiv, Blende, Schärfentiefe und Seitenverhäl
 → Nutze "Bildausschnitt & Kamerawinkel" + "Kamera und Objektiv"
 
 ### Zusammenführung je Plattform:
-- **GPT Image 2**: Strukturierter Prosa-Absatz (5-8 Sätze) in 5 Schichten (Scene → Subject → Style → Specs → Constraints). Beginne mit `"High-fidelity photorealistic commercial product shot."`. Nutze GROSSBUCHSTABEN für exakten Text. **Danach: Negative Prompts als Prosa.** SRM-Farbe + Hex IMMER im Subject-Block nennen.
+- **GPT Image 2**: Strukturierter Prosa-Absatz (5-8 Sätze) in 5 Schichten (Scene → Subject → Style → Specs → Constraints). Beginne mit `"Unretouched handheld photograph, Kodak Portra 400."` — NICHT mit `"photorealistic commercial product shot"`. Nutze GROSSBUCHSTABEN für exakten Text. **Danach: Negative Prompts als Prosa.** SRM-Farbe + Hex IMMER im Subject-Block nennen.
 - **Nano Banana Pro**: Detaillierter fließender englischer Absatz (4-8 Sätze). Beginne mit dem Produkt, ende mit der Kamera. **Danach: Negative Prompts als separater Abschnitt.**
 - **Nano Banana 2**: Kompakterer Absatz (2-4 Sätze). **Danach: Max. 2-3 Negative Prompts.**
 - **Midjourney**: Komma-getrennte Keywords + Parameter inkl. `--no` Liste.
@@ -682,7 +693,7 @@ Lege Shot Type, Kamerawinkel, Objektiv, Blende, Schärfentiefe und Seitenverhäl
 | 15 | Negative Prompts vorhanden? | Mindestens 5 Standard-Negatives + situative Negatives. Glastyp-Negative bei Weizen/Hazy. |
 | 16 | Referenzstärke ausgegeben? | Konkreter Referenzstärke-Wert im Plattform-Hinweis angegeben. |
 | 17 | ⚠️ SRM-Farbe verwendet? | Prompt enthält SRM-genaue Farbbeschreibung aus der Farbtabelle. Hex-Referenz erwähnt. KEIN generisches "golden beer" o.ä. |
-| 18 | GPT Image 2 Text-Syntax? | Wenn GPT Image 2: Exakter Label-Text in GROSSBUCHSTABEN oder "Anführungszeichen". Qualitäts-Trigger (high-fidelity, ultra-detailed) vorhanden. |
+| 18 | GPT Image 2 Text-Syntax? | Wenn GPT Image 2: Exakter Label-Text in GROSSBUCHSTABEN oder "Anführungszeichen". Keine Werbe-Trigger (ultra-detailed, professionally retouched). Stattdessen Portra/ISO/handheld. |
 
 ---
 
@@ -733,7 +744,7 @@ Nach der Ausgabe frage:
 
 **Prompt:**
 ```
-High-fidelity photorealistic commercial product shot. A rustic sun-drenched Bavarian beer garden serves as the backdrop, with lush hop vines and golden wheat fields in soft bokeh blur. A perfectly poured Bavarian Helles lager fills a traditional Willibecher tulip glass — the liquid is crystal-clear pale golden (SRM 3–5, approx. hex #F8D975), with fine ascending pearl-like bubbles in steady streams and a dense ivory-white foam crown with fine uniform pores and delicate lacing. The chilled glass shows dielectric clarity with fine condensation droplets sliding down the surface. Warm golden hour side lighting creates a luminous amber glow-through the liquid, complemented by subtle rim lighting. Shot with an 85mm lens at f/1.8, shallow depth of field, creamy bokeh, 4:5 portrait aspect ratio. Ultra-detailed. Professionally retouched.
+Unretouched handheld photograph, Kodak Portra 400. A rustic sun-drenched Bavarian beer garden serves as the backdrop, with lush hop vines and golden wheat fields in soft bokeh blur. A perfectly poured Bavarian Helles lager fills a traditional Willibecher tulip glass — the liquid is crystal-clear pale golden (SRM 3–5, approx. hex #F8D975), with fine ascending pearl-like bubbles in steady streams and a dense ivory-white foam crown with fine uniform pores and delicate lacing. The chilled glass shows real window-light highlights with sparse condensation droplets sliding down the surface. Late-afternoon side lighting, long soft shadows. Shot with an 50mm lens at f/4, honest focal plane, 4:5 portrait aspect ratio. Fine analog grain. Not retouched.
 ```
 
 **Negative Prompts:**
@@ -786,7 +797,7 @@ imperial stout in curved stout glass, opaque jet-black liquid SRM 40+ no light t
 
 **Prompt:**
 ```
-High-fidelity photorealistic commercial product shot. A rustic Franconian beer garden on a warm summer afternoon — weathered wooden tables, ancient chestnut trees, dappled sunlight through leaves. A traditional 1-liter Bavarian Masskrug stein sits on an oak table, filled with naturally cloudy Kellerbier: the liquid is hazy pale golden-amber (SRM 8–12, approx. hex #D4A850), naturtrüb with gentle yeast turbidity, soft off-white foam with rustic texture. Low to moderate gentle carbonation bubbles. Warm golden side lighting, long soft shadows, authentic German farmhouse atmosphere. Wide environmental shot with 35mm lens at f/4, deep depth of field, 16:9 widescreen. Ultra-detailed. Professionally retouched.
+Unretouched handheld photograph, Kodak Portra 400. A rustic Franconian beer garden on a warm summer afternoon — weathered wooden tables, ancient chestnut trees, dappled sunlight through leaves. A traditional 1-liter Bavarian Masskrug stein sits on an oak table, filled with naturally cloudy Kellerbier: the liquid is hazy pale golden-amber (SRM 8–12, approx. hex #D4A850), naturtrüb with gentle yeast turbidity, soft off-white foam with rustic texture. Low to moderate gentle carbonation bubbles. Warm golden side lighting, long soft shadows, authentic German farmhouse atmosphere. Wide environmental shot with 35mm lens at f/4, deep depth of field, 16:9 widescreen. Fine analog grain. Not retouched.
 ```
 
 **Negative Prompts:**

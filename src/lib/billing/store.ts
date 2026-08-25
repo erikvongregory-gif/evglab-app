@@ -1,3 +1,4 @@
+import { OWNER_TOKEN_ALLOWANCE, isOwnerUserId } from "@/lib/auth/owner";
 import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -169,7 +170,34 @@ export async function renewBillingPeriodTokens(args: {
   });
 }
 
+/** Synthetischer Billing-Stand für Owner-Konten — kein Stripe-Abo, kein Verbrauch. */
+export function buildOwnerBillingRow(userId: string): BillingRow {
+  return {
+    user_id: userId,
+    plan: "pro",
+    monthly_tokens: OWNER_TOKEN_ALLOWANCE,
+    used_tokens: 0,
+    stripe_customer_id: null,
+    stripe_subscription_id: null,
+    subscription_status: "active",
+    current_period_end: null,
+  };
+}
+
+/**
+ * Wie `getBillingRow`, aber Owner-Konten bekommen einen unbegrenzten Stand.
+ * In Generierungs-Routen statt `getBillingRow` verwenden, damit die
+ * Guthaben-Vorprüfung Owner nicht blockiert.
+ */
+export async function getEffectiveBillingRow(userId: string): Promise<BillingRow | null> {
+  if (await isOwnerUserId(userId)) return buildOwnerBillingRow(userId);
+  return getBillingRow(userId);
+}
+
 export async function consumeTokens(userId: string, amount: number) {
+  if (await isOwnerUserId(userId)) {
+    return { ok: true as const, state: buildOwnerBillingRow(userId) };
+  }
   const admin = createAdminClient();
   const row = await getBillingRow(userId);
   if (!row) {

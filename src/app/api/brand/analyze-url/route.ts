@@ -7,9 +7,13 @@ import { analyzeWebsiteBrand, computeAnalysisConfidence, selectBeerProductImageI
 import { storeBrandReferenceImagesAsUrls } from "@/lib/brand/persist-reference-urls";
 import { isInstagramUrl, normalizeWebsiteUrl, safeFetchHtml } from "@/lib/brand/url-intake";
 import {
-  intakeWebsiteFromHtml,
+  downloadCandidateImages,
+  extractRelevantInternalLinks,
+  mergeParsedWebsitePages,
+  parseWebsiteHtml,
+  pickBrandReferenceImages,
   pickImagesByIndices,
-  pickTopProductImagesHeuristic,
+  type ParsedWebsitePage,
 } from "@/lib/brand/website-intake";
 
 export const runtime = "nodejs";
@@ -73,27 +77,65 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg }, { status: 502 });
     }
 
-    const intake = await intakeWebsiteFromHtml(fetched.html, fetched.finalUrl);
-    const heuristicReferences = pickTopProductImagesHeuristic(intake.downloadedImages);
-    const needsVisionFilter = intake.downloadedImages.length > 8 && heuristicReferences.length < 3;
+    // Startseite + bis zu 2 marken-relevante Unterseiten (Ueber uns, Sortiment …) analysieren.
+    const homepage = parseWebsiteHtml(fetched.html, fetched.finalUrl);
+    const subpageLinks = extractRelevantInternalLinks(fetched.html, fetched.finalUrl, 2);
+    const subpages = (
+      await Promise.all(
+        subpageLinks.map(async (link) => {
+          try {
+            const sub = await safeFetchHtml(link.url);
+            return parseWebsiteHtml(sub.html, sub.finalUrl);
+          } catch {
+            return null;
+          }
+        }),
+      )
+    ).filter((page): page is ParsedWebsitePage => page !== null);
+
+    const intake = mergeParsedWebsitePages([homepage, ...subpages]);
+    const downloadedImages = await downloadCandidateImages(intake.imageCandidates);
+
+    // Referenzbilder = Markenwelt: Szenen mit echtem Hintergrund zuerst, Packshots nur als Notloesung.
+    const heuristicReferences = pickBrandReferenceImages(downloadedImages);
+    const heuristicSceneCount = heuristicReferences.filter((image) => !image.isPackshot).length;
+    const needsVisionFilter = downloadedImages.length > 4 && heuristicSceneCount < 2;
 
     const visionIndices = needsVisionFilter
       ? await selectBeerProductImageIndices({
           apiKey,
-          images: intake.downloadedImages.map((image) => ({
+          images: downloadedImages.map((image) => ({
             base64: image.base64,
             mediaType: image.mediaType,
           })),
-          imageHints: intake.downloadedImages.map((image) => ({ alt: image.alt, url: image.url })),
+          imageHints: downloadedImages.map((image) => ({ alt: image.alt, url: image.url })),
         })
       : [];
+    const visionReferences =
+      visionIndices.length > 0
+        ? pickBrandReferenceImages(pickImagesByIndices(downloadedImages, visionIndices), {
+            minScore: Number.NEGATIVE_INFINITY,
+          })
+        : [];
 
     const referenceImages =
-      visionIndices.length > 0
-        ? pickImagesByIndices(intake.downloadedImages, visionIndices)
+      visionReferences.length > 0
+        ? visionReferences
         : heuristicReferences.length > 0
           ? heuristicReferences
-          : intake.downloadedImages.slice(0, 5);
+          : pickBrandReferenceImages(downloadedImages, { minScore: Number.NEGATIVE_INFINITY });
+
+    // Die KI-Analyse sieht Szenen (Bildsprache) + bis zu 2 Packshots (nur Farbpalette/Etikett).
+    const analysisScenes = referenceImages.filter((image) => !image.isPackshot);
+    const analysisPackshots = downloadedImages
+      .filter((image) => image.isPackshot)
+      .sort((a, b) => b.productScore - a.productScore)
+      .slice(0, 2);
+    // Bester Packshot = Etikett-Traeger: wird separat gespeichert und dient der
+    // Generierung als Etikett-Referenz (die Referenzbilder selbst sind Szenen).
+    const brandLabelReferenceUrl = analysisPackshots[0]?.url ?? "";
+    const analysisImages = [...analysisScenes, ...analysisPackshots].slice(0, 6);
+    const analysisPackshotCount = analysisImages.filter((image) => image.isPackshot).length;
 
     let scan;
     try {
@@ -101,10 +143,11 @@ export async function POST(req: Request) {
         apiKey,
         websiteUrl: fetched.finalUrl,
         textExcerpt: intake.textExcerpt,
-        images: referenceImages.map((image) => ({
+        images: analysisImages.map((image) => ({
           base64: image.base64,
           mediaType: image.mediaType,
         })),
+        packshotImageCount: analysisPackshotCount,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "KI-Analyse fehlgeschlagen.";
@@ -129,7 +172,7 @@ export async function POST(req: Request) {
 
     const confidence = computeAnalysisConfidence({
       textExcerpt: intake.textExcerpt,
-      imageCount: referenceImages.length,
+      imageCount: analysisImages.length,
     });
 
     return NextResponse.json({
@@ -148,15 +191,18 @@ export async function POST(req: Request) {
         brandInstagramUrl: "",
         brandWebsiteUrl: fetched.finalUrl,
         brandProfileSource: "url" as const,
+        brandLabelReferenceUrl,
       },
       sourceMeta: {
-        pagesFetched: 1,
-        imagesScanned: intake.downloadedImages.length,
-        imagesAnalyzed: referenceImages.length,
+        pagesFetched: 1 + subpages.length,
+        imagesScanned: downloadedImages.length,
+        imagesAnalyzed: analysisImages.length,
+        sceneImages: analysisScenes.length,
+        packshotImages: analysisPackshotCount,
         textExcerpt: intake.textExcerpt.slice(0, 500),
         confidence,
         pageTitle: intake.title,
-        imageSelection: visionIndices.length > 0 ? "vision" : referenceImages.length > 0 ? "heuristic" : "text_only",
+        imageSelection: visionReferences.length > 0 ? "vision" : referenceImages.length > 0 ? "heuristic" : "text_only",
       },
     });
   } catch (e) {

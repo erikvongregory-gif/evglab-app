@@ -94,6 +94,83 @@ const LOCK_OPTIONS: Array<{ id: BrandSettings["brandLockLevel"]; label: string; 
 
 ];
 
+/** Schnellstart: URL direkt im Marken-Tab eingeben — Analyse startet ohne Umweg. */
+function BrandQuickStartCard({
+  onQuickAnalyze,
+  onOpenBrandSetup,
+  onSkipBrandProfile,
+}: {
+  onQuickAnalyze?: (url: string) => void;
+  onOpenBrandSetup: () => void;
+  onSkipBrandProfile?: () => void;
+}) {
+  const [url, setUrl] = useState("");
+
+  const submit = () => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    if (onQuickAnalyze) onQuickAnalyze(trimmed);
+    else onOpenBrandSetup();
+  };
+
+  return (
+    <StudioCard pad style={{ textAlign: "center" }}>
+      <p className="studio-muted" style={{ fontSize: 14, lineHeight: 1.5 }}>
+        Ein Link genügt — BrewAI liest deine Website und erstellt daraus dein komplettes Markenprofil.
+      </p>
+      <form
+        className="studio-brand-quickstart"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <div className="studio-field-with-icon">
+          <span className="studio-field-icon">
+            <StudioIcon name="globe" size={16} />
+          </span>
+          <input
+            className="studio-field"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="www.deine-brauerei.de"
+            aria-label="Website deiner Marke"
+            inputMode="url"
+            autoComplete="url"
+          />
+        </div>
+        <StudioButton type="submit" variant="primary" disabled={!url.trim()}>
+          <StudioIcon name="spark" size={15} />
+          Profil erstellen
+        </StudioButton>
+      </form>
+      <p className="studio-faint" style={{ marginTop: 12, fontSize: 11.5 }}>
+        Dauert meist unter einer Minute · alles jederzeit anpassbar
+      </p>
+      <div style={{ marginTop: 14, display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="studio-faint"
+          style={{ fontSize: 12, textDecoration: "underline", textUnderlineOffset: 3 }}
+          onClick={onOpenBrandSetup}
+        >
+          Instagram oder Screenshots nutzen
+        </button>
+        {onSkipBrandProfile ? (
+          <button
+            type="button"
+            className="studio-faint"
+            style={{ fontSize: 12, textDecoration: "underline", textUnderlineOffset: 3 }}
+            onClick={onSkipBrandProfile}
+          >
+            Ohne Profil fortfahren
+          </button>
+        ) : null}
+      </div>
+    </StudioCard>
+  );
+}
+
 
 
 export function BrandProfileView({
@@ -109,6 +186,8 @@ export function BrandProfileView({
   brandProfileNotice,
 
   onOpenBrandSetup,
+
+  onQuickAnalyze,
 
   onSkipBrandProfile,
 
@@ -131,6 +210,8 @@ export function BrandProfileView({
   brandProfileNotice: string;
 
   onOpenBrandSetup: () => void;
+
+  onQuickAnalyze?: (url: string) => void;
 
   onSkipBrandProfile: () => void;
 
@@ -268,15 +349,7 @@ export function BrandProfileView({
 
         </header>
 
-        <StudioCard pad>
-
-          <StudioButton type="button" variant="ghost" size="sm" onClick={onOpenBrandSetup}>
-
-            Markenprofil anlegen
-
-          </StudioButton>
-
-        </StudioCard>
+        <BrandQuickStartCard onQuickAnalyze={onQuickAnalyze} onOpenBrandSetup={onOpenBrandSetup} />
 
       </div>
 
@@ -316,31 +389,15 @@ export function BrandProfileView({
 
         </header>
 
-        <StudioCard pad style={{ textAlign: "center" }}>
+        <BrandQuickStartCard
 
-          <p className="studio-muted" style={{ fontSize: 14, lineHeight: 1.5 }}>
+          onQuickAnalyze={onQuickAnalyze}
 
-            Noch kein Markenprofil aktiv. Ein Link zu deiner Website reicht für den ersten Scan.
+          onOpenBrandSetup={onOpenBrandSetup}
 
-          </p>
+          onSkipBrandProfile={onSkipBrandProfile}
 
-          <div style={{ marginTop: 16, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-
-            <StudioButton type="button" variant="primary" onClick={onOpenBrandSetup}>
-
-              Website analysieren
-
-            </StudioButton>
-
-            <StudioButton type="button" variant="ghost" size="sm" onClick={onSkipBrandProfile}>
-
-              Ohne Profil fortfahren
-
-            </StudioButton>
-
-          </div>
-
-        </StudioCard>
+        />
 
       </div>
 

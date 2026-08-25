@@ -1,7 +1,17 @@
 import crypto from "crypto";
+import { resolveDevEmailForward, sendResendEmail } from "@/lib/email/resend";
 
+/**
+ * E-Mail-2FA für alle Nutzer. Cookie-Namen bleiben aus Kompatibilitätsgründen
+ * beim `admin`-Präfix, gelten aber für jedes Konto.
+ */
 const ADMIN_2FA_VERIFIED_COOKIE = "evglab_admin_2fa_verified";
 const ADMIN_2FA_PENDING_COOKIE = "evglab_admin_2fa_pending";
+const TRUSTED_DEVICE_COOKIE = "evglab_2fa_device";
+
+export const PENDING_TTL_SECONDS = 600;
+export const VERIFIED_TTL_SECONDS = 60 * 60 * 12;
+export const TRUSTED_DEVICE_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 type PendingPayload = {
   userId: string;
@@ -14,6 +24,12 @@ type PendingPayload = {
 type VerifiedPayload = {
   userId: string;
   expiresAt: number;
+};
+
+type TrustedDevicePayload = {
+  userId: string;
+  expiresAt: number;
+  issuedAt: number;
 };
 
 function getSecret() {
@@ -101,7 +117,7 @@ export function hasValidPending2FAForUser(token: string | null | undefined, user
 }
 
 export function buildVerified2FAToken(input: { userId: string; ttlSeconds?: number }) {
-  const ttl = Math.max(input.ttlSeconds ?? 43_200, 300);
+  const ttl = Math.max(input.ttlSeconds ?? VERIFIED_TTL_SECONDS, 300);
   const payload: VerifiedPayload = {
     userId: input.userId,
     expiresAt: Date.now() + ttl * 1000,
@@ -117,6 +133,42 @@ export function isVerified2FAForUser(token: string | null | undefined, userId: s
   return true;
 }
 
+/**
+ * Trusted Device: nach einmal bestandener 2FA darf dasselbe Gerät 30 Tage ohne
+ * neuen Code rein. Das Cookie ersetzt keinen Login, nur den zweiten Faktor.
+ */
+export function buildTrustedDeviceToken(input: { userId: string; ttlSeconds?: number }) {
+  const ttl = Math.max(input.ttlSeconds ?? TRUSTED_DEVICE_TTL_SECONDS, 300);
+  const payload: TrustedDevicePayload = {
+    userId: input.userId,
+    issuedAt: Date.now(),
+    expiresAt: Date.now() + ttl * 1000,
+  };
+  return encodeSigned(payload);
+}
+
+export function isTrustedDeviceForUser(token: string | null | undefined, userId: string) {
+  const payload = decodeSigned<TrustedDevicePayload>(token);
+  if (!payload) return false;
+  if (payload.userId !== userId) return false;
+  if (Date.now() > payload.expiresAt) return false;
+  return true;
+}
+
+/**
+ * Recovery-Code für das Betreiber-Konto. Nötig, weil die Owner-Adresse keinen
+ * echten Mailempfang haben muss — ohne diesen Ausweg wäre der Betreiber
+ * bei Mailproblemen dauerhaft ausgesperrt.
+ */
+export function verifyOwnerBackupCode(code: string): boolean {
+  const configured = process.env.OWNER_2FA_BACKUP_CODE?.trim();
+  if (!configured || configured.length < 8) return false;
+  const provided = Buffer.from(code.trim(), "utf8");
+  const expected = Buffer.from(configured, "utf8");
+  if (provided.length !== expected.length) return false;
+  return crypto.timingSafeEqual(provided, expected);
+}
+
 export function getPendingCookieName() {
   return ADMIN_2FA_PENDING_COOKIE;
 }
@@ -125,30 +177,21 @@ export function getVerifiedCookieName() {
   return ADMIN_2FA_VERIFIED_COOKIE;
 }
 
-export async function sendAdmin2FACodeEmail(input: { to: string; code: string }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ADMIN_2FA_FROM_EMAIL || process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) {
-    throw new Error("RESEND_API_KEY oder ADMIN_2FA_FROM_EMAIL fehlt.");
-  }
+export function getTrustedDeviceCookieName() {
+  return TRUSTED_DEVICE_COOKIE;
+}
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [input.to],
-      subject: "Dein Admin Sicherheitscode",
-      text: `Dein Admin-Login-Code lautet: ${input.code}. Der Code ist 10 Minuten gültig.`,
-      html: `<p>Dein Admin-Login-Code lautet:</p><p style="font-size:28px;font-weight:700;letter-spacing:2px">${input.code}</p><p>Der Code ist 10 Minuten gültig.</p>`,
-    }),
+export async function send2FACodeEmail(input: { to: string; code: string }) {
+  const { to, forwarded, originalTo } = resolveDevEmailForward(input.to);
+  const hint = forwarded
+    ? `<p style="color:#6b7280;font-size:12px">Lokale Weiterleitung, eigentlich an ${originalTo}.</p>`
+    : "";
+
+  await sendResendEmail({
+    to,
+    subject: "Dein BrewAI Sicherheitscode",
+    text: `Dein BrewAI-Login-Code lautet: ${input.code}. Der Code ist 10 Minuten gültig.`,
+    html: `<p>Dein BrewAI-Login-Code lautet:</p><p style="font-size:28px;font-weight:700;letter-spacing:2px">${input.code}</p><p>Der Code ist 10 Minuten gültig.</p>${hint}`,
+    tag: "login_2fa",
   });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`E-Mail-Versand fehlgeschlagen: ${body}`);
-  }
 }

@@ -4,6 +4,10 @@ import {
   buildBottleShapeLockFragment,
   CLOSURE_LOGIC_MARKER,
   buildClosureLogicFragment,
+  GLASS_SHAPE_LOCK_MARKER,
+  buildGlassShapeLockFragment,
+  LABEL_LOCK_MARKER,
+  buildLabelLockFragment,
   ensureHyperrealismDirectives,
 } from "./hyperrealism-blocks";
 
@@ -24,7 +28,7 @@ function glassBrandLock(breweryName: string): string {
   return `GLASS BRAND LOCK (MANDATORY): Every beer glass in frame MUST display the "${brand}" logo/branding on the glass (etched or printed), matching reference label colors and typography. EXACT TEXT on each glass: "${brand}". FORBIDDEN: plain unbranded glasses, wrong brewery names (e.g. fictional brands), missing logos on glasses.`;
 }
 
-/** Gleiche Logik wie Legacy ImagePromptWorkflow — auf finalen Kie-Prompt anwenden. */
+/** Wird auf den finalen Prompt angewandt, bevor er an OpenAI gpt-image-2 geht. */
 export function enforceHyperrealisticPromptConstraints(
   prompt: string,
   input: HyperrealisticInput,
@@ -92,10 +96,20 @@ export function enforceHyperrealisticPromptConstraints(
     }
   }
 
+  if (!next.includes(GLASS_SHAPE_LOCK_MARKER)) {
+    const glassLock = buildGlassShapeLockFragment(input);
+    if (glassLock) next = `${next}\n\n${glassLock}`;
+  }
+
+  if (!next.includes(LABEL_LOCK_MARKER)) {
+    const labelLock = buildLabelLockFragment(input);
+    if (labelLock) next = `${next}\n\n${labelLock}`;
+  }
+
   return ensureHyperrealismDirectives(next.trim(), input);
 }
 
-/** Bei Nur-Glas darf Kie kein Flaschen-Referenzbild bekommen — sonst kopiert i2i die Flasche in die Szene. */
+/** Bei Nur-Glas/Generisch darf die Bild-KI kein Flaschen-Referenzbild bekommen — sonst kopiert i2i die Flasche in die Szene. */
 export function shouldUseImageReferenceForGeneration(input: HyperrealisticInput): boolean {
   if (input.etikettModus === "generisch") return false;
   if (input.behaelter === "G") return false;

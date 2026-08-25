@@ -34,6 +34,7 @@ type MarketingPromptCreateShellProps = {
   primaryMode: "next" | "generate";
   onPrimary: () => void;
   onBack?: () => void;
+  backLabel?: string;
   canBack?: boolean;
   primaryDisabled?: boolean;
   loading?: boolean;
@@ -71,6 +72,7 @@ export function MarketingPromptCreateShell({
   primaryMode,
   onPrimary,
   onBack,
+  backLabel = "Zurück",
   canBack = false,
   primaryDisabled = false,
   loading = false,
@@ -106,7 +108,7 @@ export function MarketingPromptCreateShell({
               <div className="evg-marketing-create__lang">EN ↔ DE</div>
             </div>
 
-            <div className="evg-marketing-create__prompt-text" aria-live="polite">
+            <div className="evg-marketing-create__prompt-text" data-tour="prompt" aria-live="polite">
               {promptSegments.length === 0 ? (
                 <span style={{ color: P.ink3 }}>Dein Motiv entsteht Schritt für Schritt …</span>
               ) : (
@@ -179,13 +181,14 @@ export function MarketingPromptCreateShell({
               <div className="evg-marketing-create__foot-actions">
                 {canBack ? (
                   <button type="button" className="evg-marketing-create__back" onClick={onBack}>
-                    Zurück
+                    {backLabel}
                   </button>
                 ) : null}
                 <span className="evg-marketing-create__eta">{estimatedLabel}</span>
                 <button
                   type="button"
                   className="evg-marketing-create__primary"
+                  data-tour="generate"
                   disabled={primaryDisabled || loading}
                   onClick={onPrimary}
                 >
@@ -243,6 +246,13 @@ export function MarketingPromptCreateShell({
                   )}
                 </div>
               ))}
+              {variants.some((variant) => variant.src) && onBack && !loading ? (
+                <div className="evg-marketing-create__results-nav">
+                  <button type="button" className="evg-marketing-create__back" onClick={onBack}>
+                    {backLabel}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : null}
 

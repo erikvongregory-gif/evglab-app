@@ -1,4 +1,4 @@
-import { FLASCHEN_TYPEN, isDoseTyp } from "../brewing-knowledge";
+import { FLASCHEN_TYPEN, GLAS_TYPEN, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 
 type BeerPhysicsProfile = {
@@ -125,14 +125,14 @@ const BEER_PHYSICS: Record<string, BeerPhysicsProfile> = {
 };
 
 const CAMERA_BY_SHOT: Record<NonNullable<HyperrealisticInput["shotType"]>, string> = {
-  A: "Shot on full-frame DSLR, 85mm lens at f/2.8, classic 45° hero angle, shallow depth of field with creamy natural bokeh, hero product tack-sharp",
-  B: "Shot on full-frame DSLR, 50mm lens at f/2.8, eye-level frontal perspective, natural perspective compression, product and label fully sharp",
-  C: "Shot on full-frame DSLR, 35mm lens at f/2.8, low-angle heroic framing, slight upward tilt, dramatic but physically plausible perspective",
-  D: "Shot on full-frame DSLR, 50mm lens at f/5.6, flat lay top-down, organized graphic composition with natural shadow falloff",
-  E: "Shot on full-frame DSLR, 100mm macro lens at f/4, extreme close-up of foam meniscus, condensation beads, and label micro-texture, razor-thin focal plane with natural optical falloff",
-  F: "Shot on full-frame DSLR, 35mm lens at f/4, wide environmental framing, deep depth of field, authentic venue context with natural scale",
-  G: "Aerial drone perspective at moderate altitude, 24mm equivalent, realistic top-down geometry, no impossible tilt-shift toy effect",
-  H: "POV over-shoulder framing, 35mm lens at f/2.8, immersive first-person perspective with natural hand-scale and believable foreground depth",
+  A: "Handheld Canon EOS R6, 50mm at f/4, slight 45° angle, available light, product sharp, background naturally falling off — not cinematic bokeh",
+  B: "Handheld Canon EOS R6, 50mm at f/4, eye-level, natural perspective, label fully sharp",
+  C: "Handheld Canon EOS R6, 35mm at f/4, slight low angle, physically plausible perspective, no superhero tilt",
+  D: "Handheld Canon EOS R6, 50mm at f/5.6, top-down, natural shadow falloff",
+  E: "Handheld Canon EOS R6, 85mm at f/4, close-up of glass, condensation and label texture, thin but honest focal plane",
+  F: "Handheld Canon EOS R6, 35mm at f/5.6, wide environmental framing, authentic venue scale",
+  G: "Aerial drone perspective at moderate altitude, 24mm equivalent, realistic geometry",
+  H: "Over-shoulder handheld, 35mm at f/2.8, first-person, believable hand scale, slight motion of a real hold",
 };
 
 const SCENE_TEXTURE_ANCHORS: Record<HyperrealisticInput["szene"], string> = {
@@ -157,7 +157,7 @@ const SCENE_TEXTURE_ANCHORS: Record<HyperrealisticInput["szene"], string> = {
 };
 
 export const HYPERREALISM_NEGATIVE =
-  "illustration, cartoon, painting, CGI, 3D render, synthetic AI-art look, waxy plastic skin, beauty-filter smoothing, malformed hands, extra fingers, fused fingers, uncanny faces, duplicate limbs, generic stock-photo staging, sterile catalog packshot, oversaturated colors, inaccurate beer color, plastic-looking foam, perfectly dome-shaped fake foam, sticker-like condensation droplets, uniform droplet grid, floating bottle, wrong bottle scale, melted glass, gibberish label text, warped typography, mirrored words, AI-glossy hyper-sharpening, unnatural HDR glow";
+  "illustration, cartoon, painting, CGI, 3D render, Octane, Unreal Engine, synthetic AI-art look, waxy plastic skin, beauty-filter smoothing, professionally retouched, ultra-detailed 8k, photorealistic commercial product shot, malformed hands, extra fingers, fused fingers, uncanny faces, duplicate limbs, generic stock-photo staging, sterile catalog packshot, studio cyclorama, beauty dish, oversaturated colors, inaccurate beer color, plastic-looking foam, perfectly dome-shaped fake foam, sticker-like condensation droplets, uniform droplet grid, floating bottle, wrong bottle scale, melted glass, gibberish label text, warped typography, mirrored words, AI-glossy hyper-sharpening, unnatural HDR glow, warm amber AI glow washed over the entire frame, teal-and-orange cinematic color grade, model-perfect faces, flawless magazine-ad symmetry, airbrushed advertising perfection, everyone posing and smiling at the camera, staged toast performed for the camera, even flattering studio light on every face";
 
 export function resolveBeerPhysics(bierstil: string): BeerPhysicsProfile {
   const key = bierstil.trim().toLowerCase().replace(/\s+/g, "_");
@@ -185,10 +185,21 @@ export function buildBeerPhysicsFragment(bierstil: string, behaelter: NonNullabl
     `Color SRM ${profile.srm}, approx. hex ${profile.hex} — ${profile.liquid}.`,
     `Foam: ${profile.foam}.`,
     `Carbonation: ${profile.carbonation}.`,
-    "Glass material: crystal-clear glass with dielectric refraction, subsurface scattering, crisp specular highlights.",
+    "Glass: ordinary real glass. Highlights come from this room (window, sky, lamps), not a studio HDRI. Reflections show the actual setting. Condensation only if the drink is cold — sparse, irregular, some droplets already slid.",
     "Condensation: fine irregular perspiration droplets with varied size and spacing slowly sliding down chilled glass — never uniform sticker dots.",
     "Avoid unnaturally stiff, plastic-looking, or perfectly symmetrical foam domes.",
   ].join(" ");
+}
+
+/**
+ * gpt-image-2 liefert nur 3 reale Formate (1024x1024 / 1024x1536 / 1536x1024).
+ * Wir versprechen dem Modell daher das tatsächlich gerenderte Format, nicht das
+ * UI-Verhältnis (9:16 und 4:5 werden beide zu Hochformat 2:3).
+ */
+function aspectRatioFormatLabel(aspectRatio: HyperrealisticInput["aspectRatio"]): string {
+  if (aspectRatio === "1:1") return "a square 1:1";
+  if (aspectRatio === "16:9") return "a horizontal landscape (3:2)";
+  return "a vertical portrait (2:3)";
 }
 
 export function buildCameraFragment(
@@ -196,7 +207,7 @@ export function buildCameraFragment(
   aspectRatio: HyperrealisticInput["aspectRatio"],
 ): string {
   const shot = shotType ?? "A";
-  return `${CAMERA_BY_SHOT[shot]}. Final composition strictly matches ${aspectRatio} aspect ratio. Natural color grading, subtle film-like dynamic range, no Instagram filter look.`;
+  return `${CAMERA_BY_SHOT[shot]}. Kodak Portra 400 color, ISO 400, fine analog grain. Final composition framed for ${aspectRatioFormatLabel(aspectRatio)} format. Neutral white balance, slightly muted real-world color — no Instagram filter, no HDR.`;
 }
 
 export function buildSceneTextureAnchors(szene: HyperrealisticInput["szene"]): string {
@@ -207,7 +218,7 @@ export function buildHumanRealismFragment(input: HyperrealisticInput): string {
   const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
   if (modus === "A") return "";
   if (modus === "B" || modus === "C") {
-    return "HUMAN REALISM: Natural adult skin on visible hands/arms with pores, subtle veins, believable knuckle creases, and correct finger count. No waxy plastic skin, no rubbery joints.";
+    return "HUMAN REALISM: Real adult hands — visible knuckles, pores, veins, slight dryness or tan lines, correct finger count, believable grip pressure on glass and bottle. Not smooth CGI hands, not beauty-retouched skin.";
   }
   return [
     "HUMAN REALISM:",
@@ -242,14 +253,66 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
   const noun = istDose ? "aluminium beverage can" : "bottle";
   const nounCap = istDose ? "Can" : "Bottle";
   const colorClause = istDose ? "" : `, made of ${FLASCHENFARBE_TEXT[input.flaschenfarbe]}`;
-  const referenceArtwork = istDose ? "wrap-around can artwork" : "LABEL artwork";
   return [
     `${BOTTLE_SHAPE_LOCK_MARKER}:`,
     `The ${noun} MUST be ${flasche.promptDescription}${colorClause}.`,
-    `${nounCap} shape and size are defined ONLY by this specification — ${flasche.forbidden}.`,
-    `Do NOT copy the ${noun} silhouette, proportions or closure from any reference image; the reference image only defines the ${referenceArtwork}, never the ${noun} shape or volume.`,
+    `${nounCap} shape and size are defined by this specification — ${flasche.forbidden}.`,
+    `If a bottle-shape reference photo is attached, copy that silhouette, neck length, shoulder and proportions exactly.`,
+    `Label/artwork photos only supply printed graphics to apply onto this ${noun} — they must not replace the ${noun} with a different type.`,
     `Render the ${noun} at physically correct real-world scale so its size class (0.33 L vs 0.5 L) is unmistakable.`,
   ].join(" ");
+}
+
+const GLASS_FORBIDDEN: Record<NonNullable<HyperrealisticInput["glasTyp"]>, string> = {
+  willibecher:
+    "NOT a stemmed Pilsner flute or tulip, NOT a curvy Weizen vase, NOT a Maßkrug with handle, NOT a Teku, NOT a Stange",
+  pils_tulpe: "NOT a stemless Willibecher tumbler, NOT a Weizen vase, NOT a Maßkrug, NOT a Teku",
+  weizen: "NOT a Willibecher tumbler, NOT a stemmed Pilsner flute, NOT a Maßkrug, NOT a Stange",
+  masskrug: "NOT a Willibecher, NOT a Pilsner flute, NOT a Weizen vase, NOT a stemless tumbler without handle",
+  ipa_teku: "NOT a Willibecher, NOT a Weizen vase, NOT a Maßkrug, NOT a Pilsner flute",
+  schwenker: "NOT a Willibecher, NOT a Weizen vase, NOT a Maßkrug, NOT a Pilsner flute",
+  stange: "NOT a Willibecher (too wide), NOT a Pilsner flute, NOT a Weizen vase, NOT a Maßkrug",
+};
+
+/** Marker, damit der Etikett-Lock nicht doppelt angehängt wird. */
+export const LABEL_LOCK_MARKER = "LABEL LOCK 1:1 (MANDATORY)";
+
+export function buildLabelLockFragment(input: HyperrealisticInput): string {
+  if ((input.etikettModus ?? "marke") !== "marke") return "";
+  const product = input.beerName?.trim();
+  const noun = isDoseTyp(input.flaschenTyp) ? "can" : "bottle";
+  return [
+    `${LABEL_LOCK_MARKER}:`,
+    product ? `The attached reference photo IS the product "${product}".` : "The attached reference photo IS this exact product.",
+    `Copy the printed ${noun} artwork 1:1 — same logo, same crest, same typography, same colors, same layout, same words.`,
+    "Do not redesign, restyle, recolor, translate, abbreviate, or invent a variant (no new names, no extra badges, no swapped colorways).",
+    "Every letter that is readable on the reference must appear the same on the generated label.",
+    "The result is a new photograph of that same physical product in a new scene — not a collage and not a different beer.",
+  ].join(" ");
+}
+export const GLASS_SHAPE_LOCK_MARKER = "GLASS SHAPE LOCK (MANDATORY)";
+
+export function buildGlassShapeLockFragment(input: HyperrealisticInput): string {
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  if (behaelter === "F" || !input.glasTyp) return "";
+  const glas = GLAS_TYPEN[input.glasTyp];
+  if (!glas) return "";
+  const fillMl = pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter);
+  const pour = glassPourPromptDescription(input.glasTyp, fillMl);
+  const bottleMl = flascheVolumeMl(input.flaschenTyp);
+  const volumeLock =
+    behaelter === "B"
+      ? `POUR VOLUME: the glass is a single pour from this ${bottleMl / 1000} L bottle/can (${fillMl} ml). It must look like it was filled from that one container — never a larger mug.`
+      : "";
+  return [
+    `${GLASS_SHAPE_LOCK_MARKER}:`,
+    `Every beer glass in frame MUST be ${pour}.`,
+    `${GLASS_FORBIDDEN[input.glasTyp]}.`,
+    volumeLock,
+    "Do not substitute a different glass type.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /** Marker, damit die Verschluss-Logik nicht doppelt angehängt wird. */
@@ -308,12 +371,45 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
 export function buildHyperrealismLockFragment(): string {
   return [
     "HYPERREALISM LOCK:",
-    "Output must be indistinguishable from a real camera photograph captured on location.",
+    "Output must look like an unretouched photograph from a real camera on location — a brewery snapshot, not a CGI product viz and not a retouched ad.",
     "Enforce physically plausible lighting, real material response, true-to-life reflections, natural shadow penumbra, and subtle real-world imperfections.",
     "Include at least three concrete environmental micro-details and believable surface wear — avoid sterile CGI smoothness.",
-    "Ultra-detailed. Professionally retouched. High-fidelity photorealistic commercial product shot.",
+    "Do not describe this as photorealistic, ultra-detailed, high-fidelity, or professionally retouched — those words produce the AI-ad look.",
     "Strictly forbid illustration, cartoon, painting, CGI, 3D render, or stylized AI-art aesthetics.",
   ].join(" ");
+}
+
+/** Eindeutiger Marker, damit der Authentizitaets-Block nicht doppelt angehaengt wird. */
+export const AUTHENTICITY_MARKER = "ANTI-AI AUTHENTICITY (MANDATORY)";
+
+/**
+ * Gegen den typischen "KI-Werbebild"-Look: Der Block zwingt das Modell in eine
+ * dokumentarisch-editoriale Aesthetik (Reportage statt Hochglanz-Render).
+ * Wird bewusst spaet im Prompt platziert — gpt-image-2 gewichtet spaete
+ * Anweisungen staerker, und der Block ueberlebt so den Claude-Rewrite.
+ */
+export function buildAuthenticityFragment(input: HyperrealisticInput): string {
+  const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
+  const lines = [
+    `${AUTHENTICITY_MARKER}:`,
+    "This must read as a candid documentary photograph of a real moment — NOT a polished advertising render.",
+    "Aesthetic: handheld editorial snapshot; slightly imperfect, lived-in, ordinary.",
+    "Color science of Kodak Portra 400. Fine analog grain. Neutral white balance, slightly muted real-world color — never a warm amber glow over the whole frame, never teal-orange grading, never HDR, never beauty-retouch.",
+    "Lighting is a large soft source from the actual scene (sun, overcast sky, window, practical lamps) with true falloff. Some areas stay in shadow. Highlights may clip softly. No beauty dish, no rim-light hero glow.",
+    "The product rests on a real surface with a natural contact shadow. Glass reflects this room, not a white studio cove.",
+    "Composition is slightly off: not centered, natural overlaps, things cropped at the frame edge. Not everything is razor-sharp.",
+  ];
+  if (modus === "B" || modus === "C") {
+    lines.push(
+      "Visible hands are real adult hands: knuckles, pores, veins, slightly imperfect skin, a firm believable grip — not smooth CGI, not beauty-retouched.",
+    );
+  }
+  if (modus === "D" || modus === "E") {
+    lines.push(
+      "The people are ordinary real people, not models: uneven skin with visible pores, stray hairs, natural imperfect teeth, asymmetric mid-moment expressions, relaxed unposed body language. They are absorbed in their own moment — nobody performs or poses for the camera unless the brief explicitly asks for it.",
+    );
+  }
+  return lines.join(" ");
 }
 
 export function ensureHyperrealismDirectives(prompt: string, input: HyperrealisticInput): string {
@@ -338,12 +434,27 @@ export function ensureHyperrealismDirectives(prompt: string, input: Hyperrealist
     next = `${next}\n\n${buildHumanRealismFragment(input)}`;
   }
 
-  if (!/shot on full-frame|35mm lens|50mm lens|85mm lens|100mm macro/i.test(lower)) {
+  if (!/shot on.*full-frame|canon eos|35mm|50mm|85mm|100mm/i.test(lower)) {
     next = `${next}\n\nCAMERA: ${buildCameraFragment(input.shotType, input.aspectRatio)}`;
   }
 
   if (!/cgi|3d render|plastic-looking foam|waxy plastic skin/i.test(lower.slice(-600))) {
     next = `${next}\n\nNEGATIVE (hyperreal): ${HYPERREALISM_NEGATIVE}`;
+  }
+
+  if (!next.includes(GLASS_SHAPE_LOCK_MARKER)) {
+    const glassLock = buildGlassShapeLockFragment(input);
+    if (glassLock) next = `${next}\n\n${glassLock}`;
+  }
+
+  // Immer spaet anhaengen: dokumentarische Authentizitaet gegen den KI-Werbe-Look.
+  if (!next.includes(AUTHENTICITY_MARKER)) {
+    next = `${next}\n\n${buildAuthenticityFragment(input)}`;
+  }
+
+  if (!next.includes(LABEL_LOCK_MARKER)) {
+    const labelLock = buildLabelLockFragment(input);
+    if (labelLock) next = `${next}\n\n${labelLock}`;
   }
 
   return next.trim();

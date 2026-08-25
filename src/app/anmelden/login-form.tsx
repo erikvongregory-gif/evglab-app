@@ -73,6 +73,8 @@ function messageForNotice(code: string | undefined): string | undefined {
   switch (code) {
     case "invite_ready":
       return "Konto ist bereit. Du kannst dich jetzt anmelden.";
+    case "account_ready":
+      return "Konto erstellt. Melde dich an — wir senden dir dann einen Sicherheitscode per E-Mail.";
     case "password_updated":
       return "Passwort wurde geändert. Du kannst dich jetzt anmelden.";
     case "signed_out":

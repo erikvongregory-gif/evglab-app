@@ -58,6 +58,11 @@ export function buildPrunedAuthUserData(userMetadata: unknown): Record<string, u
       settings: slim.settings,
       mediaLibrary: slim.mediaLibrary,
       teamMembers: slim.teamMembers,
+      // Winzig (vier Flags plus gedeckelte ID-Liste) und muss erhalten bleiben,
+      // sonst startet das Onboarding nach dem Verkleinern von vorn.
+      onboarding: slim.onboarding,
+      // Sortiment (max 8 kompakte Eintraege) — darf beim Verkleinern nicht verloren gehen.
+      myBeers: slim.myBeers,
     },
   };
 }

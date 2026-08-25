@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  PENDING_TTL_SECONDS,
+  TRUSTED_DEVICE_TTL_SECONDS,
+  VERIFIED_TTL_SECONDS,
   buildPending2FAToken,
+  buildTrustedDeviceToken,
   buildVerified2FAToken,
   createOneTimeCode,
   getPendingCookieName,
+  getTrustedDeviceCookieName,
   getVerifiedCookieName,
-  sendAdmin2FACodeEmail,
+  send2FACodeEmail,
+  verifyOwnerBackupCode,
   verifyPending2FACode,
 } from "@/lib/admin/emailTwoFactor";
+import { isOwnerUser } from "@/lib/auth/owner";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { createNoStoreRedirect, secureCookieOptions } from "@/lib/security/authResponses";
+import { createNoStoreRedirect, normalizeNextPath, secureCookieOptions } from "@/lib/security/authResponses";
 import { getOrCreateRequestId, logAuthEvent } from "@/lib/security/authObservability";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { getAppBaseUrlOrigin } from "@/lib/supabase/env";
@@ -24,6 +31,8 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const action = String(formData.get("action") ?? "verify");
   const code = String(formData.get("code") ?? "").trim();
+  const next = normalizeNextPath(String(formData.get("next") ?? "/dashboard"));
+  const verifyPage = next === "/dashboard" ? "/dashboard/2fa-email" : `/dashboard/2fa-email?next=${encodeURIComponent(next)}`;
 
   const authResponse = NextResponse.next();
   const supabase = createRouteHandlerClient(request, authResponse);
@@ -36,79 +45,76 @@ export async function POST(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const role =
-    typeof user?.user_metadata?.role === "string"
-      ? String(user.user_metadata.role).toLowerCase()
-      : "";
-  if (!user || role !== "admin" || !user.email) {
+  if (!user?.email) {
     return createNoStoreRedirect(`${origin}/anmelden?error=auth`, requestId);
   }
-  const baseIdentifier = `admin2fa:${user.id}`;
+  const baseIdentifier = `twofa:${user.id}`;
   const baseRateError = await enforceRateLimitPersistent(request, {
-    keyPrefix: "admin-2fa-verify-base",
+    keyPrefix: "two-factor-verify-base",
     limit: 20,
     windowMs: 60_000,
   }, { identifier: baseIdentifier });
   if (baseRateError) return baseRateError;
 
   const pendingToken = request.cookies.get(getPendingCookieName())?.value ?? null;
-  if (!pendingToken) {
-    return createNoStoreRedirect(`${origin}/anmelden?error=admin_2fa_session_expired`, requestId);
-  }
+  const usedBackupCode = Boolean(code) && isOwnerUser(user) && verifyOwnerBackupCode(code);
+  const withQuery = (path: string, query: string) => `${origin}${path}${path.includes("?") ? "&" : "?"}${query}`;
 
-  if (action === "resend") {
+  // "send" deckt beide Fälle ab: erneut senden und erstmalig anfordern, wenn
+  // eine bestehende Session noch kein Pending-Cookie hat.
+  if (action === "resend" || action === "send") {
     const resendRateError = await enforceRateLimitPersistent(
       request,
-      { keyPrefix: "admin-2fa-resend", limit: 3, windowMs: 10 * 60_000 },
+      { keyPrefix: "two-factor-send", limit: 5, windowMs: 10 * 60_000 },
       { identifier: baseIdentifier },
     );
     if (resendRateError) return resendRateError;
     const newCode = createOneTimeCode();
     try {
-      await sendAdmin2FACodeEmail({ to: user.email, code: newCode });
+      await send2FACodeEmail({ to: user.email, code: newCode });
     } catch {
-      return createNoStoreRedirect(`${origin}/dashboard/2fa-email?error=email_failed`, requestId);
+      return createNoStoreRedirect(withQuery(verifyPage, "error=email_failed"), requestId);
     }
     const nextPending = buildPending2FAToken({
       userId: user.id,
       email: user.email,
       code: newCode,
-      ttlSeconds: 600,
+      ttlSeconds: PENDING_TTL_SECONDS,
     });
-    const resendResponse = createNoStoreRedirect(`${origin}/dashboard/2fa-email?notice=resent`, requestId);
-    resendResponse.cookies.set(getPendingCookieName(), nextPending, {
+    const sendResponse = createNoStoreRedirect(withQuery(verifyPage, "notice=resent"), requestId);
+    sendResponse.cookies.set(getPendingCookieName(), nextPending, {
       httpOnly: true,
       ...cookieOptions,
-      maxAge: 60 * 10,
+      maxAge: PENDING_TTL_SECONDS,
     });
     logAuthEvent({
-      event: "admin_2fa_code_resent",
+      event: "two_factor_code_sent",
       requestId,
       userId: user.id,
       email: user.email,
       status: 303,
       durationMs: Date.now() - startedAt,
     });
-    return withAuthCookies(resendResponse);
+    return withAuthCookies(sendResponse);
   }
 
   if (!code) {
-    return createNoStoreRedirect(`${origin}/dashboard/2fa-email?error=missing_code`, requestId);
+    return createNoStoreRedirect(withQuery(verifyPage, "error=missing_code"), requestId);
+  }
+  if (!pendingToken && !usedBackupCode) {
+    return createNoStoreRedirect(withQuery(verifyPage, "error=admin_2fa_session_expired"), requestId);
   }
   const verifyRateError = await enforceRateLimitPersistent(
     request,
-    { keyPrefix: "admin-2fa-code-verify", limit: 5, windowMs: 10 * 60_000 },
+    { keyPrefix: "two-factor-code-verify", limit: 5, windowMs: 10 * 60_000 },
     { identifier: baseIdentifier },
   );
   if (verifyRateError) return verifyRateError;
 
-  const result = verifyPending2FACode(pendingToken, {
-    userId: user.id,
-    code,
-  });
+  const result = usedBackupCode ? { ok: true as const } : verifyPending2FACode(pendingToken, { userId: user.id, code });
   if (!result.ok) {
     logAuthEvent({
-      event: "admin_2fa_verify_failed",
+      event: "two_factor_verify_failed",
       level: "warn",
       requestId,
       userId: user.id,
@@ -116,18 +122,19 @@ export async function POST(request: NextRequest) {
       status: 303,
       durationMs: Date.now() - startedAt,
     });
-    return createNoStoreRedirect(`${origin}/dashboard/2fa-email?error=admin_2fa_invalid`, requestId);
+    return createNoStoreRedirect(withQuery(verifyPage, "error=admin_2fa_invalid"), requestId);
   }
 
-  const verifiedToken = buildVerified2FAToken({
-    userId: user.id,
-    ttlSeconds: 60 * 60 * 12,
-  });
-  const done = createNoStoreRedirect(`${origin}/admin`, requestId);
-  done.cookies.set(getVerifiedCookieName(), verifiedToken, {
+  const done = createNoStoreRedirect(`${origin}${next}`, requestId);
+  done.cookies.set(getVerifiedCookieName(), buildVerified2FAToken({ userId: user.id }), {
     httpOnly: true,
     ...cookieOptions,
-    maxAge: 60 * 60 * 12,
+    maxAge: VERIFIED_TTL_SECONDS,
+  });
+  done.cookies.set(getTrustedDeviceCookieName(), buildTrustedDeviceToken({ userId: user.id }), {
+    httpOnly: true,
+    ...cookieOptions,
+    maxAge: TRUSTED_DEVICE_TTL_SECONDS,
   });
   done.cookies.set(getPendingCookieName(), "", {
     httpOnly: true,
@@ -135,7 +142,7 @@ export async function POST(request: NextRequest) {
     maxAge: 0,
   });
   logAuthEvent({
-    event: "admin_2fa_verified",
+    event: usedBackupCode ? "two_factor_backup_code_used" : "two_factor_verified",
     requestId,
     userId: user.id,
     email: user.email,

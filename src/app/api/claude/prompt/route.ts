@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { classifyThrownProviderError } from "@/lib/ai/providerErrors";
+import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
 import { generateBrauereiBildPrompt } from "@/lib/prompts/brauerei-bild/generate-prompt";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { createClient } from "@/lib/supabase/server";
@@ -78,24 +80,13 @@ function getStrictGlassRule(biertyp: string): string {
   return "Mandatory glass constraint: use the beer-style-correct glass only. Never substitute with a Weizen glass unless beer style is Weizen.";
 }
 
-function classifyAnthropicError(message: string) {
-  const lower = message.toLowerCase();
-  if (/credit balance|billing|insufficient|payment/.test(lower)) {
-    return { code: "CLAUDE_BILLING", error: "Anthropic-Guthaben ist zu niedrig.", status: 402 };
-  }
-  if (/api key|authentication|unauthorized|forbidden|permission/.test(lower)) {
-    return { code: "CLAUDE_AUTH", error: "Anthropic-Authentifizierung fehlgeschlagen.", status: 401 };
-  }
-  if (/rate limit|too many requests|429/.test(lower)) {
-    return { code: "CLAUDE_RATE_LIMIT", error: "Anthropic-Rate-Limit erreicht. Bitte kurz warten.", status: 429 };
-  }
-  if (/model|not found/.test(lower)) {
-    return { code: "CLAUDE_MODEL", error: "Anthropic-Modellzugriff nicht verfügbar.", status: 502 };
-  }
-  return { code: "CLAUDE_UNKNOWN", error: "Claude-Anfrage fehlgeschlagen.", status: 500 };
+function respondWithAnthropicFailure(error: unknown, label: string) {
+  const classified = classifyThrownProviderError("anthropic", error);
+  logProviderFailure(classified, { label });
+  return providerErrorResponse(classified);
 }
 
-function buildClaudeInput(body: PromptRequestBody, brandProfileContext: string): string {
+function buildClaudeInput(body: PromptRequestBody): string {
   const strictGlassRule = getStrictGlassRule(body.biertyp ?? "");
   const containerRule =
     body.behaelter === "Nur Flasche"
@@ -140,8 +131,6 @@ function buildClaudeInput(body: PromptRequestBody, brandProfileContext: string):
   const presetDirectives = body.imageType ? getPresetSystemDirectives(body.imageType) : "";
   return [
     "Erstelle einen hochwertigen ENGLISCHEN Image-Generation Prompt für eine Brauerei auf Basis dieses Briefings.",
-    "",
-    brandProfileContext,
     "",
     "Nutze die folgenden Briefing-Daten:",
     JSON.stringify(body, null, 2),
@@ -188,7 +177,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Bitte vervollständige zuerst dein Markenprofil unter Einstellungen (Abschnitt Markenprofil oben: fünf Instagram-Post-Screenshots mit KI auswerten) oder aktiviere die Nutzung ohne Markenprofil.",
+            "Bitte lege zuerst dein Markenprofil an: Öffne im Dashboard den Bereich „Markenprofil“ und gib deine Website ein — oder wähle dort „Ohne Markenprofil“.",
           code: "brand_profile_incomplete",
         },
         { status: 400 },
@@ -215,21 +204,13 @@ export async function POST(req: Request) {
     try {
       prompt = await generateBrauereiBildPrompt({
         anthropic,
-        userMessage: buildClaudeInput(body, brandProfileContext),
-        brandProfileContext: "",
+        userMessage: buildClaudeInput(body),
+        brandProfileContext,
         maxTokens: 1000,
         temperature: 0.4,
       });
     } catch (lastError) {
-      const msg = lastError instanceof Error ? lastError.message : "Claude-Model konnte nicht geladen werden.";
-      const classified = classifyAnthropicError(msg);
-      return NextResponse.json(
-        {
-          error: classified.error,
-          code: classified.code,
-        },
-        { status: classified.status },
-      );
+      return respondWithAnthropicFailure(lastError, "claude-prompt");
     }
 
     if (!prompt) {
@@ -238,15 +219,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ prompt });
   } catch (error) {
-    console.error("Claude API error");
-    const message = error instanceof Error ? error.message : "";
-    const classified = classifyAnthropicError(message);
-    return NextResponse.json(
-      {
-        error: classified.error,
-        code: classified.code,
-      },
-      { status: classified.status },
-    );
+    return respondWithAnthropicFailure(error, "claude-prompt");
   }
 }
