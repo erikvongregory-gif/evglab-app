@@ -2,8 +2,10 @@
 
 ## 1) Pflicht-Env in Produktion
 
-- Soft-Launch: Warteliste ist im Code aktiv (`LOGIN_WAITLIST_ENABLED = true` in `src/lib/featureFlags.ts`).
-- Go-live: Flag wieder an Env koppeln (`!== "0"`), in Vercel `NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED=0` setzen und redeployen.
+- Soft-Launch (Production): `NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED=1` in Vercel — Warteliste statt Login.
+- Lokal/Dev: in `.env.local` immer `NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED=0` — normal einloggen und Dashboard bauen.
+- Go-live: Production-Env auf `0` setzen + Redeploy (Login/Registrierung freigeben).
+- Admin-Bypass: `/admin/anmelden` ist auch bei aktiver Warteliste nutzbar (`waitlistMode={false}`).
 - `NEXT_PUBLIC_APP_BASE_URL=https://app.brewai.de`
 - `NEXT_PUBLIC_MARKETING_SITE_URL=https://brewai.de` (Alias: `NEXT_PUBLIC_SITE_URL`)
 - `NEXT_PUBLIC_SITE_NAME=BrewAI`
