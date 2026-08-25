@@ -26,6 +26,8 @@ export function getSharedCookieDomain(): string | undefined {
   const configured =
     typeof process !== "undefined" ? process.env.NEXT_PUBLIC_COOKIE_DOMAIN?.trim() : undefined;
   if (!configured) return undefined;
+  // Preview/Localhost: Host-only Cookies. Sonst landet der PKCE-Verifier auf Domain=brewai.de und Google-Login stirbt.
+  if (process.env.NODE_ENV !== "production") return undefined;
   return configured.replace(/^\./, "") || undefined;
 }
 

@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import type { NextResponse } from "next/server";
 import {
   PENDING_TTL_SECONDS,
   buildPending2FAToken,
@@ -10,13 +10,7 @@ import {
   send2FACodeEmail,
 } from "@/lib/admin/emailTwoFactor";
 import { logAuthEvent } from "@/lib/security/authObservability";
-import { createNoStoreRedirect, secureCookieOptions } from "@/lib/security/authResponses";
-
-function copyResponseCookies(target: NextResponse, source: NextResponse) {
-  for (const cookie of source.cookies.getAll()) {
-    target.cookies.set(cookie.name, cookie.value, cookie);
-  }
-}
+import { appendResponseCookies, createNoStoreRedirect, secureCookieOptions } from "@/lib/security/authResponses";
 
 function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get("cookie");
@@ -28,6 +22,13 @@ function readCookie(request: Request, name: string): string | null {
     return decodeURIComponent(part.slice(separator + 1).trim());
   }
   return null;
+}
+
+function twoFactorUrl(origin: string, next?: string, error?: string) {
+  const url = new URL(`${origin}/dashboard/2fa-email`);
+  if (next && next !== "/dashboard") url.searchParams.set("next", next);
+  if (error) url.searchParams.set("error", error);
+  return url.toString();
 }
 
 /**
@@ -57,31 +58,33 @@ export async function redirectWithEmail2FAIfNeeded(
   try {
     await send2FACodeEmail({ to: user.email, code });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    const errorCode =
-      message.includes("RESEND_API_KEY") || message.includes("ADMIN_2FA_FROM_EMAIL")
-        ? "admin_2fa_email_config"
-        : "admin_2fa_email_failed";
-    return createNoStoreRedirect(`${origin}/anmelden?error=${errorCode}`, requestId);
+    const failed = createNoStoreRedirect(twoFactorUrl(origin, next, "email_failed"), requestId);
+    appendResponseCookies(failed, cookieSource);
+    logAuthEvent({
+      event: "signin_2fa_email_failed",
+      level: "warn",
+      requestId,
+      userId: user.id,
+      email: user.email,
+      status: 303,
+      durationMs: Date.now() - startedAt,
+      meta: { message: error instanceof Error ? error.message : "" },
+    });
+    return failed;
   }
 
-  const pendingToken = buildPending2FAToken({
+  const response = createNoStoreRedirect(twoFactorUrl(origin, next), requestId);
+  response.cookies.set(getPendingCookieName(), buildPending2FAToken({
     userId: user.id,
     email: user.email,
     code,
     ttlSeconds: PENDING_TTL_SECONDS,
-  });
-
-  const verifyUrl = new URL(`${origin}/dashboard/2fa-email`);
-  if (next) verifyUrl.searchParams.set("next", next);
-  const response = createNoStoreRedirect(verifyUrl.toString(), requestId);
-  response.cookies.set(getPendingCookieName(), pendingToken, {
+  }), {
     httpOnly: true,
     ...secureCookieOptions(request),
     maxAge: PENDING_TTL_SECONDS,
   });
-  copyResponseCookies(response, cookieSource);
-  response.headers.set("x-request-id", requestId);
+  appendResponseCookies(response, cookieSource);
   logAuthEvent({
     event: logEvent,
     requestId,

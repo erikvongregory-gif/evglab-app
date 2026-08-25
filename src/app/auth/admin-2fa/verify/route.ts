@@ -16,7 +16,7 @@ import {
 } from "@/lib/admin/emailTwoFactor";
 import { isOwnerUser } from "@/lib/auth/owner";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { createNoStoreRedirect, normalizeNextPath, secureCookieOptions } from "@/lib/security/authResponses";
+import { appendResponseCookies, createNoStoreRedirect, normalizeNextPath, secureCookieOptions } from "@/lib/security/authResponses";
 import { getOrCreateRequestId, logAuthEvent } from "@/lib/security/authObservability";
 import { createRouteHandlerClient } from "@/lib/supabase/server";
 import { getAppBaseUrlOrigin } from "@/lib/supabase/env";
@@ -37,9 +37,7 @@ export async function POST(request: NextRequest) {
   const authResponse = NextResponse.next();
   const supabase = createRouteHandlerClient(request, authResponse);
   const withAuthCookies = (response: NextResponse) => {
-    for (const cookie of authResponse.cookies.getAll()) {
-      response.cookies.set(cookie.name, cookie.value, cookie);
-    }
+    appendResponseCookies(response, authResponse);
     return response;
   };
   const {

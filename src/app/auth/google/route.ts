@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
 import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
-import { createRouteHandlerClient } from "@/lib/supabase/server";
-import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
+import { createAuthRouteHandlerClient } from "@/lib/supabase/server";
+import { createNoStoreRedirect, createRedirectWithCookies, normalizeNextPath } from "@/lib/security/authResponses";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
 
 export const runtime = "nodejs";
@@ -23,25 +22,16 @@ export async function GET(request: Request) {
     return createNoStoreRedirect(`${appOrigin}/anmelden?error=invite_only`, requestId);
   }
 
-  const supabaseResponse = NextResponse.redirect(new URL(redirectTo));
-  supabaseResponse.headers.set("Cache-Control", "no-store, max-age=0");
-  supabaseResponse.headers.set("x-request-id", requestId);
-
-  const supabase = createRouteHandlerClient(request, supabaseResponse);
+  const cookieJar = createNoStoreRedirect(`${appOrigin}/anmelden`, requestId);
+  const supabase = await createAuthRouteHandlerClient(cookieJar);
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo },
+    options: { redirectTo, skipBrowserRedirect: true },
   });
 
   if (error || !data.url) {
     return createNoStoreRedirect(`${appOrigin}/anmelden?error=google`, requestId);
   }
 
-  const redirect = NextResponse.redirect(data.url);
-  redirect.headers.set("Cache-Control", "no-store, max-age=0");
-  redirect.headers.set("x-request-id", requestId);
-  for (const cookie of supabaseResponse.cookies.getAll()) {
-    redirect.cookies.set(cookie.name, cookie.value, cookie);
-  }
-  return redirect;
+  return createRedirectWithCookies(data.url, requestId, cookieJar);
 }

@@ -12,7 +12,7 @@ import {
   bridgeOAuthSession,
   peekBridgedOAuthSession,
 } from "@/lib/supabase/oauthSessionBridge";
-import { createAuthRouteHandlerClient, createRouteHandlerClient } from "@/lib/supabase/server";
+import { createAuthRouteHandlerClient } from "@/lib/supabase/server";
 import {
   createNoStoreRedirect,
   createOAuthSessionPollerHtml,
@@ -227,7 +227,7 @@ export async function handleAuthCallbackGet(request: Request) {
   }
 
   const redirectResponse = createNoStoreRedirect(`${appOrigin}${postAuthNext}`, requestId);
-  const supabase = createRouteHandlerClient(request, redirectResponse);
+  const supabase = await createAuthRouteHandlerClient(redirectResponse);
 
   try {
     const {

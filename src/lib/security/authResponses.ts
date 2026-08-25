@@ -18,6 +18,15 @@ export function createNoStoreRedirect(url: string, requestId: string, status = 3
   return response;
 }
 
+/** Cookies von einer Response auf eine andere kopieren — ohne name/value in den Options, sonst verwirft Next sie. */
+export function appendResponseCookies(target: NextResponse, source: NextResponse) {
+  for (const cookie of source.cookies.getAll()) {
+    const { name, value, ...options } = cookie;
+    target.cookies.set(name, value, options);
+  }
+  return target;
+}
+
 /** 303-Redirect inkl. Session-Cookies von einer OAuth-Exchange-Response. */
 export function createRedirectWithCookies(
   url: string,
@@ -25,12 +34,7 @@ export function createRedirectWithCookies(
   cookieSource: NextResponse,
   status = 303,
 ): NextResponse {
-  const response = createNoStoreRedirect(url, requestId, status);
-  for (const cookie of cookieSource.cookies.getAll()) {
-    const { name, value, ...options } = cookie;
-    response.cookies.set(name, value, options);
-  }
-  return response;
+  return appendResponseCookies(createNoStoreRedirect(url, requestId, status), cookieSource);
 }
 
 /** Recovery-Links: Hash-Fragment (#access_token) erreicht den Server nicht — im Browser weiterleiten. */
@@ -74,12 +78,7 @@ export function createHtmlRedirect(
       "x-request-id": requestId,
     },
   });
-  if (cookieSource) {
-    for (const cookie of cookieSource.cookies.getAll()) {
-      const { name, value, ...options } = cookie;
-      response.cookies.set(name, value, options);
-    }
-  }
+  if (cookieSource) appendResponseCookies(response, cookieSource);
   return response;
 }
 
@@ -108,12 +107,7 @@ step()})();</script></body></html>`;
       "x-request-id": opts.requestId,
     },
   });
-  if (cookieSource) {
-    for (const cookie of cookieSource.cookies.getAll()) {
-      const { name, value, ...options } = cookie;
-      response.cookies.set(name, value, options);
-    }
-  }
+  if (cookieSource) appendResponseCookies(response, cookieSource);
   return response;
 }
 
