@@ -5,6 +5,7 @@ import { AuthLinkBootstrap } from "@/components/auth/auth-link-bootstrap";
 import { SITE } from "@/lib/siteConfig";
 import { resolveAuthCallbackRedirect } from "@/lib/supabase/authEntryRedirect";
 import { isInviteOnlyEnabled } from "@/lib/supabase/env";
+import { LOGIN_WAITLIST_ENABLED } from "@/lib/featureFlags";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -69,6 +70,7 @@ export default async function AnmeldenPage({
         initialMode={initialMode}
         inviteToken={typeof invite === "string" ? invite : undefined}
         inviteOnly={isInviteOnlyEnabled()}
+        waitlistMode={LOGIN_WAITLIST_ENABLED}
         urlError={typeof urlError === "string" ? urlError : undefined}
         urlNotice={typeof urlNotice === "string" ? urlNotice : undefined}
       />

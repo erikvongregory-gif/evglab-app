@@ -11,6 +11,7 @@ interface LoginFormProps {
   initialMode?: "signin" | "register";
   inviteToken?: string;
   inviteOnly?: boolean;
+  waitlistMode?: boolean;
 }
 
 function messageForError(
@@ -91,6 +92,7 @@ export function LoginForm({
   initialMode = "signin",
   inviteToken,
   inviteOnly = false,
+  waitlistMode,
 }: LoginFormProps) {
   const searchParams = useSearchParams();
   const [persistedError, setPersistedError] = useState<string | undefined>();
@@ -122,6 +124,7 @@ export function LoginForm({
       initialMode={errorMode}
       inviteToken={inviteToken ?? searchParams.get("invite") ?? undefined}
       inviteOnly={inviteOnly}
+      waitlistMode={waitlistMode}
       feedbackError={messageForError(persistedError, errorMode, errorDetail)}
       feedbackNotice={messageForNotice(urlNotice ?? searchParams.get("notice") ?? undefined)}
     />

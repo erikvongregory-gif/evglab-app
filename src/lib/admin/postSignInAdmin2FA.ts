@@ -9,6 +9,7 @@ import {
   isTrustedDeviceForUser,
   send2FACodeEmail,
 } from "@/lib/admin/emailTwoFactor";
+import { isOwnerUser } from "@/lib/auth/owner";
 import { logAuthEvent } from "@/lib/security/authObservability";
 import { appendResponseCookies, createNoStoreRedirect, secureCookieOptions } from "@/lib/security/authResponses";
 
@@ -58,10 +59,26 @@ export async function redirectWithEmail2FAIfNeeded(
   try {
     await send2FACodeEmail({ to: user.email, code });
   } catch (error) {
-    const failed = createNoStoreRedirect(twoFactorUrl(origin, next, "email_failed"), requestId);
-    appendResponseCookies(failed, cookieSource);
+    const ownerCanBypass = isOwnerUser(user) && Boolean(process.env.OWNER_2FA_BACKUP_CODE);
+    if (!ownerCanBypass) {
+      const failed = createNoStoreRedirect(twoFactorUrl(origin, next, "email_failed"), requestId);
+      appendResponseCookies(failed, cookieSource);
+      logAuthEvent({
+        event: "signin_2fa_email_failed",
+        level: "warn",
+        requestId,
+        userId: user.id,
+        email: user.email,
+        status: 303,
+        durationMs: Date.now() - startedAt,
+        meta: { message: error instanceof Error ? error.message : "" },
+      });
+      return failed;
+    }
+    const bypass = createNoStoreRedirect(twoFactorUrl(origin, next), requestId);
+    appendResponseCookies(bypass, cookieSource);
     logAuthEvent({
-      event: "signin_2fa_email_failed",
+      event: "signin_2fa_owner_backup",
       level: "warn",
       requestId,
       userId: user.id,
@@ -70,7 +87,7 @@ export async function redirectWithEmail2FAIfNeeded(
       durationMs: Date.now() - startedAt,
       meta: { message: error instanceof Error ? error.message : "" },
     });
-    return failed;
+    return bypass;
   }
 
   const response = createNoStoreRedirect(twoFactorUrl(origin, next), requestId);

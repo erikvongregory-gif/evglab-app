@@ -117,16 +117,38 @@ export async function sendResendEmail(input: SendResendEmailInput, options?: { f
     await postResendEmail({ apiKey: config.apiKey, from }, input);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    const allowSandbox =
-      process.env.NODE_ENV === "development" || process.env.RESEND_USE_SANDBOX === "1";
-    if (
-      allowSandbox &&
-      !options?.fromOverride &&
-      isResendDomainNotVerifiedError(message)
-    ) {
-      await postResendEmail({ apiKey: config.apiKey, from: RESEND_SANDBOX_FROM }, input);
-      return;
+    if (options?.fromOverride) throw error;
+
+    if (isResendDomainNotVerifiedError(message)) {
+      try {
+        await postResendEmail({ apiKey: config.apiKey, from: RESEND_SANDBOX_FROM }, input);
+        return;
+      } catch (sandboxError) {
+        const sandboxMessage = sandboxError instanceof Error ? sandboxError.message : "";
+        const forward = process.env.RESEND_DEV_FORWARD_TO?.trim();
+        if (
+          forward &&
+          isResendSandboxRecipientError(sandboxMessage) &&
+          input.to.toLowerCase() !== forward.toLowerCase()
+        ) {
+          await postResendEmail(
+            { apiKey: config.apiKey, from: RESEND_SANDBOX_FROM },
+            { ...input, to: forward },
+          );
+          return;
+        }
+        throw sandboxError;
+      }
     }
+
+    if (isResendSandboxRecipientError(message)) {
+      const forward = process.env.RESEND_DEV_FORWARD_TO?.trim();
+      if (forward && input.to.toLowerCase() !== forward.toLowerCase()) {
+        await postResendEmail({ apiKey: config.apiKey, from: RESEND_SANDBOX_FROM }, { ...input, to: forward });
+        return;
+      }
+    }
+
     throw error;
   }
 }

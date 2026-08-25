@@ -70,7 +70,17 @@ export async function POST(request: NextRequest) {
     const newCode = createOneTimeCode();
     try {
       await send2FACodeEmail({ to: user.email, code: newCode });
-    } catch {
+    } catch (error) {
+      logAuthEvent({
+        event: "two_factor_send_failed",
+        level: "warn",
+        requestId,
+        userId: user.id,
+        email: user.email,
+        status: 303,
+        durationMs: Date.now() - startedAt,
+        meta: { message: error instanceof Error ? error.message : "" },
+      });
       return createNoStoreRedirect(withQuery(verifyPage, "error=email_failed"), requestId);
     }
     const nextPending = buildPending2FAToken({
