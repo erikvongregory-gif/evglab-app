@@ -53,10 +53,14 @@
   transition: background var(--dur) var(--ease);
 }
 
-.evg-studio .evg-shell-search-item:hover,
+.evg-studio .evg-shell-search-item:hover {
+  background: var(--s3);
+}
+
 .evg-studio .evg-shell-search-item:focus-visible {
   background: var(--s3);
-  outline: none;
+  outline: 2px solid var(--ac);
+  outline-offset: -2px;
 }
 
 .evg-studio .evg-shell-search-item-hint {
@@ -123,12 +127,18 @@
     color var(--dur) var(--ease);
 }
 
-.evg-studio .evg-shell-topbar-search-trigger:hover,
-.evg-studio .evg-shell-topbar-search-trigger:focus-visible {
+.evg-studio .evg-shell-topbar-search-trigger:hover {
   background: var(--s3);
   border-color: var(--line2);
   color: var(--t1);
-  outline: none;
+}
+
+.evg-studio .evg-shell-topbar-search-trigger:focus-visible {
+  background: var(--s3);
+  border-color: var(--ac);
+  color: var(--t1);
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
 }
 
 .evg-studio .evg-shell-search-mobile-panel {

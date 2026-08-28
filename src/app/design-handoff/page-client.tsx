@@ -15,8 +15,6 @@ import { StudioPricingView } from "@/components/studio/studio-pricing-view";
 import { CreateVideosComingSoonView } from "@/components/studio/create-videos-coming-soon-view";
 import { CreateContentLockedView } from "@/components/studio/create-content-locked-view";
 import { BrandProfileView } from "@/components/dashboard/BrandProfileView";
-import { ComposerProvider } from "@/components/studio/composer/composer-context";
-import { StudioImageComposer } from "@/components/studio/composer/studio-image-composer";
 import { TokenBadgeStatesDemo } from "@/components/studio/token-badge-states-demo";
 import { StudioIcon } from "@/components/studio/icons";
 
@@ -388,57 +386,14 @@ export default function DesignHandoffPage() {
         );
       case "create-start":
         return (
-          <ComposerProvider
-            initial={{
-              activeMode: "hyperreal",
-              shared: {
-                prompt: "",
-                product: { id: "demo", name: "Das Blaue", etikettUrl: undefined },
-              },
-              hyperreal: {
-                mode: "hyperreal",
-                styleId: "brewai-hyperreal",
-                resolution: "2K",
-                aspectRatio: "4:5",
-                variantCount: 2,
-                strictLabel: false,
-                referenceImageUrl: null,
-              },
-              studio: {
-                mode: "studio",
-                styleId: "studio-clean",
-                resolution: "2K",
-                aspectRatio: "1:1",
-                variantCount: 2,
-                strictLabel: false,
-                referenceImageUrl: null,
-                hintergrundStil: "studio_gradient_warm",
-              },
-              isolate: {
-                mode: "isolate",
-                hintergrund: "transparent",
-                schattenErhalten: true,
-                sourceImageUrl: null,
-              },
-              campaign: {
-                mode: "campaign",
-                styleId: "campaign-feed",
-                resolution: "2K",
-                aspectRatio: "4:5",
-                variantCount: 2,
-                headline: "",
-                postZiel: "produkt_launch",
-              },
-            }}
-          >
-            <StudioImageComposer
-              brandLine="Beispielbrauerei · Das Blaue"
-              onBrandClick={() => undefined}
-              onOpenWizard={() => undefined}
-              showGuidedProminent
-              onGenerate={() => undefined}
+          <>
+            <StudioPageHeader
+              eyebrow="Design Handoff"
+              title="Bilder Erstellen · Composer"
+              subtitle="Der Composer-Mock ist in diesem Branch nicht enthalten. Nutze die produktive Route /inhalte-erstellen."
             />
-          </ComposerProvider>
+            <CreateContentLockedView feature="images" />
+          </>
         );
       case "token-badge":
         return <TokenBadgeStatesDemo />;
@@ -486,7 +441,7 @@ export default function DesignHandoffPage() {
         tokensMonthly={1600}
         tokensUnlimited={false}
         billingPlan="start"
-        periodEnd={new Date(Date.now() + 1000 * 60 * 60 * 24 * 18).toISOString()}
+        periodEnd={MOCK_DASHBOARD_SUMMARY.periodEnd}
         recentMedia={[]}
         recentCharges={[]}
         contentKey={screen}
