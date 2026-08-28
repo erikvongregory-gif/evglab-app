@@ -139,9 +139,7 @@ function AuthSubmitInner({ mode }: { mode: AuthMode }) {
   );
 }
 
-export function LoginHero({ mode }: { mode: AuthMode }) {
-  const isRegister = mode === "register";
-
+export function LoginHero({ mode: _mode }: { mode: AuthMode }) {
   return (
     <section className={styles.hero}>
       <div className={styles.glow} aria-hidden />
@@ -155,37 +153,24 @@ export function LoginHero({ mode }: { mode: AuthMode }) {
       <div className={`${styles.heroBody} ${styles.stagger}`}>
         <div className={styles.eyebrow}>
           <span className={styles.eyebrowLine} aria-hidden />
-          KI-Marketing · Brauereien
+          Für Brauereien gebaut
         </div>
 
-        <div className={styles.heroHeadlineStack}>
-          <h1
-            className={`${styles.display} ${styles.heroHeadline} ${!isRegister ? styles.heroHeadlineVisible : ""}`}
-            aria-hidden={isRegister}
-          >
-            Dein Motiv.
-            <br />
-            <em>Generiert.</em>
-            <br />
-            Sofort.
-          </h1>
-          <h1
-            className={`${styles.display} ${styles.heroHeadline} ${isRegister ? styles.heroHeadlineVisible : ""}`}
-            aria-hidden={!isRegister}
-          >
-            Drei Motive.
-            <br />
-            <em>Kostenlos.</em>
-            <br />
-            Jetzt.
-          </h1>
-        </div>
+        <h1 className={`${styles.display} ${styles.heroHeadline} ${styles.heroHeadlineVisible}`}>
+          Motive, die nach deiner Brauerei aussehen — nicht nach einer Bildagentur.
+        </h1>
 
-        <div className={styles.hook}>
-          <span className={styles.hookCount}>3</span>
-          <span>
-            Bilder <b>kostenlos</b> generieren — keine Kreditkarte
-          </span>
+        <p className={styles.lead} style={{ marginTop: 18, maxWidth: 420 }}>
+          Markenprofil einmal anlegen, danach Bilder, Kampagnen und Clips für Sortiment und Anlässe erzeugen. Tokens
+          statt Abo-Falle.
+        </p>
+
+        <div className={styles.hook} style={{ marginTop: 20, flexWrap: "wrap" }}>
+          {["Markenprofil", "Sortiment", "Anlässe & Feste", "Mediathek"].map((chip) => (
+            <span key={chip} style={{ padding: "5px 11px", borderRadius: 100, border: "1px solid var(--line-strong)", fontSize: 12, color: "var(--tx-1)" }}>
+              {chip}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -393,6 +378,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
               </>
             ) : (
               <>
+                Melde dich an, um Motive für deine Brauerei zu erstellen.{" "}
                 Noch kein Konto?{" "}
                 <button type="button" className={styles.modeToggle} onClick={() => setMode("register")}>
                   Kostenlos starten →
