@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../styles/studio-tokens.css";
+@import "../styles/studio-screens.css";
 @custom-variant dark (&:where(.dark, .dark *));
 /* Explizit alle TS/TSX unter src scannen (u. a. components/ui – Neon-Button-Klassen) */
 @source "..";
@@ -28,12 +29,40 @@
   }
 }
 
-/* Tailwind: Sans = Inter, Display = Playfair (next/font-Variablen auf <html>) */
+/* Tailwind: Sans = Inter, Display = Playfair (Marketing auf <html>) */
+/* Studio-Semantik: Flächen/Akzent für Utilities unter .evg-studio */
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-serif), Georgia, "Times New Roman", serif;
+  /* Studio-Tailwind: Work Sans nur über --font-work-sans (studioFontClassName) */
+  --font-studio-sans: var(--font-work-sans), "Work Sans", system-ui, sans-serif;
+  --font-studio-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+
   --color-background: #ffffff;
   --color-foreground: #0f172a;
+
+  /* BrewAI Studio — FINAL Handoff (an .evg-studio Tokens angeglichen) */
+  --color-bg: #0F0906;
+  --color-surface: #16100B;
+  --color-surface-2: #1E1710;
+  --color-surface-hover: #271E16;
+  --color-border: #2E2418;
+  --color-strong: #3D3021;
+  --color-fg: #F3EDE4;
+  --color-muted: #B3A694;
+  --color-faint: #7E7263;
+  --color-acc: #C9A24D;
+  --color-acc-deep: #A9853A;
+  --color-acc-hover: #DDBA6A;
+  --color-acc-fg: #1A1207;
+  --color-acc-dim: rgba(201, 162, 77, 0.10);
+  --color-ok: #6FA96F;
+  --color-warn: #DE8F3C;
+  --color-err: #D0604C;
+  --color-mode-hyperreal: #C9A24D;
+  --color-mode-studio: #7E96AE;
+  --color-mode-isolate: #8E82B0;
+  --color-mode-campaign: #B0808C;
 }
 
 :root {
