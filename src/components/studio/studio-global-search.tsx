@@ -183,7 +183,7 @@ function useMobileSearchViewport(): boolean {
   const [mobile, setMobile] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 1023px)");
+    const mq = window.matchMedia("(max-width: 1239px)");
     const update = () => setMobile(mq.matches);
     update();
     mq.addEventListener("change", update);

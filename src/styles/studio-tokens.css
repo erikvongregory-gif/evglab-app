@@ -160,39 +160,88 @@
 .evg-pagehead__meta { font-family: var(--f-mono); font-size: var(--t-11); color: var(--fg-5); letter-spacing: 0.06em; }
 .evg-pagehead__ctx { font-size: var(--t-13); color: var(--fg-4); margin-top: 5px; }
 
-/* ── LAYOUT ────────────────────────────────────────────── */
+/* ── LAYOUT (T3 FINAL Shell) ───────────────────────────── */
 
-.evg-app { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; background: var(--app); }
-.evg-app--collapsed { grid-template-columns: 64px minmax(0, 1fr); }
+.evg-app {
+  display: grid;
+  grid-template-columns: var(--sidebar-open, 236px) minmax(0, 1fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  transition: grid-template-columns 240ms var(--ease);
+}
+.evg-app--collapsed { grid-template-columns: var(--sidebar-collapsed, 62px) minmax(0, 1fr); }
 
 .evg-rail {
-  background: var(--rail);
+  background: var(--bg);
   border-right: 1px solid var(--line);
   display: flex; flex-direction: column;
-  position: sticky; top: 0; height: 100vh;
+  position: sticky; top: 0; height: 100vh; height: 100dvh;
+  min-width: 0;
+  z-index: 25;
 }
-
 .evg-rail__brand {
-  height: 56px;
+  height: var(--topbar-h, 60px);
   border-bottom: 1px solid var(--line);
   display: flex; align-items: center; gap: var(--sp-4);
-  padding: 0 var(--sp-7);
+  padding: 0 14px;
+  flex: none;
 }
-.evg-rail__mark { width: 18px; height: 18px; border: 1px solid var(--acc); display: grid; place-items: center; flex: none; }
-.evg-rail__mark::after { content: ''; width: 6px; height: 6px; background: var(--acc); }
-.evg-rail__name { font-size: var(--t-14); line-height: 1.15; }
-.evg-rail__sub { font-family: var(--f-mono); font-size: var(--t-9); color: var(--fg-5); letter-spacing: 0.1em; }
+.evg-rail__mark {
+  width: 22px; height: 22px;
+  border-radius: var(--r-sm);
+  background: var(--ac-tint2);
+  border: 1px solid var(--ac-line);
+  display: grid; place-items: center; flex: none;
+  color: var(--ac);
+  font-family: var(--f-sans); font-size: 11px; font-weight: 700;
+}
+.evg-rail__name { font-size: var(--t-14); font-weight: 600; line-height: 1.15; color: var(--t1); }
+.evg-rail__sub {
+  font-family: var(--f-mono); font-size: 9.5px; color: var(--t3);
+  letter-spacing: 0.14em; text-transform: uppercase;
+}
+.evg-nav-group { display: flex; flex-direction: column; padding: 4px 0 10px; }
+.evg-nav-group__label {
+  font-family: var(--f-mono); font-size: 9.5px; font-weight: 500;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--t3);
+  padding: 8px 16px 6px;
+}
+.evg-app--collapsed .evg-nav-group__label { display: none; }
 
-.evg-nav { display: flex; flex-direction: column; padding: var(--sp-5) 0; }
+.evg-nav { display: flex; flex-direction: column; padding: var(--sp-3) 0; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; }
 .evg-nav__item {
-  display: flex; align-items: center; gap: var(--sp-4);
-  padding: 7px var(--sp-7);
-  color: var(--fg-4); font-size: var(--t-14);
-  cursor: pointer; border: 0; background: transparent; width: 100%; text-align: left;
-  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+  display: flex; align-items: center; gap: 10px;
+  min-height: 40px;
+  margin: 0 8px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  color: var(--t2); font-size: 13px; font-weight: 500;
+  cursor: pointer; border: 0; background: transparent; width: calc(100% - 16px); text-align: left;
+  text-decoration: none;
+  transition: color 220ms var(--ease), background 220ms var(--ease), box-shadow 220ms var(--ease);
 }
-.evg-nav__item:hover { color: var(--fg); background: var(--raised); }
-.evg-nav__item[aria-current='page'] { color: #F0E7DC; background: var(--raised); box-shadow: inset 2px 0 0 var(--acc); }
+.evg-nav__item:hover { color: var(--t1); background: var(--s3); }
+.evg-nav__item[aria-current='page'] {
+  color: var(--ac);
+  background: var(--ac-tint);
+  box-shadow: inset 2px 0 0 var(--ac);
+}
+.evg-app--collapsed .evg-nav__item {
+  justify-content: center;
+  width: calc(100% - 12px);
+  margin: 0 6px;
+  padding: 0;
+  min-height: 44px;
+}
+.evg-nav__badge {
+  margin-left: auto;
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--t3);
+  border: 1px solid var(--line2); border-radius: var(--r-sm);
+  padding: 2px 5px;
+}
+.evg-app--collapsed .evg-nav__badge { display: none; }
 
 .evg-chargen { border-top: 1px solid var(--line); padding: var(--sp-6) var(--sp-7) var(--sp-4); }
 .evg-chargen__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); margin-top: var(--sp-4); }
@@ -209,26 +258,99 @@
 
 .evg-rail__foot {
   margin-top: auto; border-top: 1px solid var(--line);
-  padding: var(--sp-5) var(--sp-7);
-  display: flex; align-items: center; gap: var(--sp-4); cursor: pointer;
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  width: 100%; border-left: 0; border-right: 0; border-bottom: 0;
+  background: transparent; color: inherit; font: inherit; text-align: left;
 }
-.evg-rail__foot:hover { background: var(--raised); }
+.evg-rail__foot:hover { background: var(--s3); }
+.evg-rail__foot:focus-visible { outline: 2px solid var(--ac); outline-offset: -2px; }
 .evg-avatar {
-  width: 24px; height: 24px; border: 1px solid #3A3129;
+  width: 28px; height: 28px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line2);
+  background: var(--s3);
   display: grid; place-items: center;
-  font-family: var(--f-mono); font-size: var(--t-10); color: var(--fg-3); flex: none;
+  font-family: var(--f-mono); font-size: 10px; color: var(--t2); flex: none;
 }
 
 /* ── KOPFLEISTE ────────────────────────────────────────── */
 
 .evg-top {
-  height: 56px; border-bottom: 1px solid var(--line);
-  display: flex; align-items: center; gap: var(--sp-8);
-  padding: 0 var(--sp-8);
-  position: sticky; top: 0; z-index: 20; background: var(--app);
+  height: var(--topbar-h, 60px);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 20px;
+  position: sticky; top: 0; z-index: 20; background: var(--s1);
+  flex: none;
 }
-.evg-crumb { font-family: var(--f-mono); font-size: 11.5px; color: var(--fg-4); }
-.evg-crumb b { color: var(--fg-2); font-weight: 400; }
+.evg-crumb { font-family: var(--f-mono); font-size: 11.5px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.evg-crumb b { color: var(--t1); font-weight: 500; }
+
+.evg-main-wrap {
+  display: flex; flex-direction: column; min-width: 0; min-height: 100vh; min-height: 100dvh;
+  background: var(--s1);
+}
+.evg-main {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 24px;
+}
+.evg-main__inner {
+  margin: 0 auto;
+  width: 100%;
+  max-width: var(--content-max, 1240px);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Mobile Bottom-Nav */
+.evg-bottom-nav {
+  display: none;
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 30;
+  height: calc(var(--bottom-nav-h, 62px) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid var(--line);
+  background: var(--s1);
+  align-items: stretch;
+}
+.evg-bottom-nav__item {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 0; background: transparent;
+  color: var(--t3); font-size: 10.5px; font-weight: 500;
+  text-decoration: none; cursor: pointer;
+  transition: color 220ms var(--ease), background 220ms var(--ease);
+}
+.evg-bottom-nav__item:hover { color: var(--t1); }
+.evg-bottom-nav__item[aria-current='page'],
+.evg-bottom-nav__item[data-active='true'] {
+  color: var(--ac);
+  background: var(--ac-tint);
+}
+.evg-bottom-nav__item:focus-visible { outline: 2px solid var(--ac); outline-offset: -2px; }
+
+.evg-more-sheet-list { display: flex; flex-direction: column; gap: 2px; }
+.evg-more-sheet-list a,
+.evg-more-sheet-list button {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 44px; width: 100%;
+  padding: 0 12px; border: 0; border-radius: var(--r-md);
+  background: transparent; color: var(--t1);
+  font: inherit; font-size: 13.5px; font-weight: 500;
+  text-align: left; text-decoration: none; cursor: pointer;
+}
+.evg-more-sheet-list a:hover,
+.evg-more-sheet-list button:hover { background: var(--s3); }
+.evg-more-sheet-list a[aria-current='page'] {
+  background: var(--ac-tint); color: var(--ac);
+}
+.evg-more-sheet-list .stu-label { padding: 10px 12px 4px; }
 
 .evg-search {
   flex: 1; max-width: 380px; height: 28px;
@@ -464,22 +586,54 @@
    because studio-tokens.css loads after tailwindcss. */
 .evg-only-mobile { display: none !important; }
 .evg-only-desktop-lg { display: block !important; }
-@media (max-width: 767px) {
+.evg-hide-collapsed { display: initial; }
+.evg-app--collapsed .evg-hide-collapsed { display: none !important; }
+
+@media (max-width: 1239px) {
+  /* Tablet / Mid: Sidebar immer 62px — User-Desktop-Preference bleibt in localStorage */
+  .evg-app:not(.evg-app--mobile) {
+    grid-template-columns: var(--sidebar-collapsed, 62px) minmax(0, 1fr);
+  }
+  .evg-app:not(.evg-app--mobile) .evg-nav-group__label { display: none; }
+  .evg-app:not(.evg-app--mobile) .evg-nav__item {
+    justify-content: center;
+    width: calc(100% - 12px);
+    margin: 0 6px;
+    padding: 0;
+    min-height: 44px;
+  }
+  .evg-app:not(.evg-app--mobile) .evg-nav__badge { display: none; }
+  .evg-app:not(.evg-app--mobile) .evg-hide-collapsed { display: none !important; }
+  .evg-app:not(.evg-app--mobile) .evg-chargen { display: none; }
+}
+
+@media (max-width: 639px) {
   .evg-only-mobile { display: flex !important; }
   .evg-btn.evg-only-mobile { display: inline-flex !important; }
   .evg-scrim.evg-only-mobile { display: block !important; }
-}
-@media (max-width: 1023px) {
-  .evg-only-desktop-lg { display: none !important; }
-}
-
-@media (max-width: 767px) {
+  .evg-bottom-nav { display: flex !important; }
   .evg-app { grid-template-columns: minmax(0, 1fr); }
   .evg-rail { display: none; }
+  .evg-top { height: var(--topbar-h-mobile, 54px); padding: 0 12px; gap: 10px; }
+  .evg-main {
+    padding-bottom: calc(var(--bottom-nav-h, 62px) + env(safe-area-inset-bottom, 0px) + 16px);
+  }
   .evg-form__body { grid-template-columns: minmax(0, 1fr); }
   .evg-form__main { border-right: 0; border-bottom: 1px solid var(--line); }
   .evg-log__head { display: none; }
   .evg-log__row { grid-template-columns: minmax(0, 1fr); gap: 0; padding-bottom: var(--sp-5); }
+}
+
+@media (max-width: 1239px) {
+  .evg-only-desktop-lg { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-app,
+  .evg-nav__item,
+  .evg-bottom-nav__item {
+    transition: none !important;
+  }
 }
 /* BrewAI Studio â€” Sudbuch, Teil 2
    ErgÃ¤nzung fÃ¼r Dashboard, Team, Einstellungen, Abonnement, Markenprofil.

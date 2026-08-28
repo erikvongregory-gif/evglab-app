@@ -1,49 +1,77 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "framer-motion";
 import { StudioViewTransition } from "@/components/studio/studio-view-transition";
-import { EvglabMark } from "@/components/studio/evglab-mark";
-import { StudioButton, StudioIconButton } from "@/components/studio/ui";
+import { StudioTokenBadge, type StudioTokenCharge } from "@/components/studio/studio-token-badge";
 import { studioFontClassName } from "@/lib/fonts/studio-fonts";
-import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
+import { isVideosCreateEnabled } from "@/lib/featureFlags";
 import {
   StudioSearchProvider,
   StudioTopbarSearchDesktop,
   StudioTopbarSearchMobile,
 } from "@/components/studio/studio-global-search";
 import { useStudioOnboarding } from "@/components/studio/onboarding/onboarding-context";
+import {
+  StudioUiDialog,
+  StudioUiDialogContent,
+  StudioUiDialogDescription,
+  StudioUiDialogHeader,
+  StudioUiDialogTitle,
+  StudioUiIconButton,
+  StudioUiToaster,
+  StudioUiTooltip,
+  StudioUiTooltipContent,
+  StudioUiTooltipProvider,
+  StudioUiTooltipTrigger,
+} from "@/components/studio/ui";
 import { cn } from "@/lib/utils";
 
-/** Content gutter — matches BrewAI Studio redesign (--gutter) */
+const RAIL_COLLAPSE_KEY = "evg-studio-rail-collapsed";
+const PRICING_HREF = "/dashboard?tab=pricing";
+const DESKTOP_MIN = 1240;
+const MOBILE_MAX = 639;
+
+export type StudioRecentMediaItem = {
+  id: string;
+  imageUrl: string;
+  title: string;
+  prompt: string;
+  createdAt: string;
+  aspectRatio: string;
+  resolution: "1K" | "2K" | "4K";
+  chargeNumber?: number | null;
+};
+
+/** Content gutter — matches BrewAI Studio redesign */
 export const STUDIO_PAD_X = 40;
 
-/** Studio design tokens (CSS vars on .evg-studio) */
+/** Studio design tokens (CSS vars on .evg-studio) — mapped to Sudbuch vars */
 export const STUDIO_TOKENS = {
-  paper: "var(--bg-0)",
-  paper2: "var(--bg-1)",
-  ink: "var(--tx-0)",
-  ink2: "var(--tx-1)",
-  ink3: "var(--tx-2)",
+  paper: "var(--page)",
+  paper2: "var(--app)",
+  ink: "var(--fg)",
+  ink2: "var(--fg-2)",
+  ink3: "var(--fg-4)",
   amber: "var(--acc)",
-  amber2: "var(--acc-hi)",
-  ember: "var(--acc-lo)",
-  glow: "var(--acc-soft)",
-  sans: "var(--studio-sans)",
-  accentSerif: "var(--studio-accent-serif)",
-  /** @deprecated Nur für orange/Gradient-Akzente — sonst `sans` verwenden */
-  serif: "var(--studio-accent-serif)",
-  mono: "var(--studio-mono)",
-  gradientBrand: "linear-gradient(150deg, var(--acc-hi), var(--acc-lo))",
-  gradientGlow: "radial-gradient(circle at 18% 0%, var(--acc-softer) 0%, transparent 52%)",
-  gradientCard: "linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%)",
+  amber2: "var(--acc-hover)",
+  ember: "var(--acc)",
+  glow: "var(--acc-dim)",
+  sans: "var(--f-sans)",
+  accentSerif: "var(--f-sans)",
+  /** @deprecated Display-Alias — Serif im Studio entfernt */
+  serif: "var(--f-sans)",
+  mono: "var(--f-mono)",
+  gradientBrand: "var(--acc)",
+  gradientGlow: "transparent",
+  gradientCard: "var(--field)",
 };
 
 /** Text on amber CTAs */
-export const STUDIO_ON_ACCENT = "var(--acc-ink)";
+export const STUDIO_ON_ACCENT = "var(--acc-fg)";
 
 export type StudioPalette = {
   bg: string;
@@ -59,7 +87,15 @@ export type StudioPalette = {
   accent2: string;
 };
 
-export type StudioNavKey = "dashboard" | "create" | "create-video" | "media" | "team" | "brand" | "settings" | "pricing";
+export type StudioNavKey =
+  | "dashboard"
+  | "create"
+  | "create-video"
+  | "media"
+  | "team"
+  | "brand"
+  | "settings"
+  | "pricing";
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -68,15 +104,30 @@ function initialsFromName(name: string) {
   return (a + (b ?? "")).toUpperCase();
 }
 
-function WaveMark({ size = 28, color = STUDIO_TOKENS.ink }: { size?: number; color?: string }) {
-  const h = (size * 20) / 28;
-  return (
-    <svg width={size} height={h} viewBox="0 0 28 20" fill="none" aria-hidden="true">
-      <path d="M2 5 C6 1, 10 9, 14 5 S22 1, 26 5" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M2 11 C6 7, 10 15, 14 11 S22 7, 26 11" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M2 17 C6 13, 10 21, 14 17 S22 13, 26 17" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
+function padCharge(n: number) {
+  return String(n).padStart(4, "0");
+}
+
+function formatChargeRange(items: StudioRecentMediaItem[]): string | null {
+  const nums = items
+    .map((i) => i.chargeNumber)
+    .filter((n): n is number => typeof n === "number" && Number.isFinite(n));
+  if (nums.length === 0) return null;
+  const hi = Math.max(...nums);
+  const lo = Math.min(...nums);
+  return hi === lo ? padCharge(hi) : `${padCharge(hi)} – ${padCharge(lo)}`;
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const update = () => setMatches(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [query]);
+  return matches;
 }
 
 function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: string }) {
@@ -91,22 +142,22 @@ function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: s
     ),
     dash: (
       <>
-        <rect x="3" y="3" width="6" height="6" rx="1.2" />
-        <rect x="11" y="3" width="6" height="4" rx="1.2" />
-        <rect x="11" y="9" width="6" height="8" rx="1.2" />
-        <rect x="3" y="11" width="6" height="6" rx="1.2" />
+        <rect x="3" y="3" width="6" height="6" rx="0" />
+        <rect x="11" y="3" width="6" height="4" rx="0" />
+        <rect x="11" y="9" width="6" height="8" rx="0" />
+        <rect x="3" y="11" width="6" height="6" rx="0" />
       </>
     ),
     spark: <path d="M10 3 L11.5 8 L16.5 9.5 L11.5 11 L10 16 L8.5 11 L3.5 9.5 L8.5 8 Z" />,
     video: (
       <>
-        <rect x="3" y="5" width="14" height="10" rx="2" />
+        <rect x="3" y="5" width="14" height="10" rx="0" />
         <path d="M8 10 L13 12.5 V7.5 Z" fill={color} stroke="none" />
       </>
     ),
     media: (
       <>
-        <rect x="3" y="3" width="14" height="14" rx="2" />
+        <rect x="3" y="3" width="14" height="14" rx="0" />
         <path d="M3 13 L7 9 L11 13 L14 10 L17 13" />
         <circle cx="13.5" cy="6.5" r="1.3" />
       </>
@@ -126,7 +177,7 @@ function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: s
     ),
     brand: (
       <>
-        <rect x="4" y="4" width="12" height="12" rx="2.5" />
+        <rect x="4" y="4" width="12" height="12" rx="0" />
         <path d="M8 13 V9.5" />
         <circle cx="8" cy="7.5" r="1" fill={color} stroke="none" />
         <path d="M12 13 V8" />
@@ -141,9 +192,27 @@ function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: s
         <circle cx="10" cy="13.5" r="0.6" fill={color} stroke="none" />
       </>
     ),
+    more: (
+      <>
+        <circle cx="4" cy="10" r="1.2" fill={color} stroke="none" />
+        <circle cx="10" cy="10" r="1.2" fill={color} stroke="none" />
+        <circle cx="16" cy="10" r="1.2" fill={color} stroke="none" />
+      </>
+    ),
   };
   return (
-    <svg width={s} height={s} viewBox="0 0 20 20" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true">
+    <svg
+      width={s}
+      height={s}
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke={color}
+      strokeWidth={sw}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+      aria-hidden="true"
+    >
       {map[name]}
     </svg>
   );
@@ -152,50 +221,19 @@ function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: s
 export function useStudioPalette(): StudioPalette {
   return useMemo(
     () => ({
-      bg: "#131211",
-      surface: "#1a1816",
-      surface2: "#201d1b",
-      ink: "#f4f1ec",
-      ink2: "#c4bdb3",
-      ink3: "#8a837a",
-      muted: "#635c54",
-      rule: "rgba(255, 255, 255, 0.07)",
-      ruleStrong: "rgba(255, 255, 255, 0.12)",
-      accent: "#e8772e",
-      accent2: "#f08a45",
+      bg: "#0F0906",
+      surface: "#16100B",
+      surface2: "#1E1710",
+      ink: "#F3EDE4",
+      ink2: "#DED5CA",
+      ink3: "#7E7263",
+      muted: "#7E7263",
+      rule: "#2E2418",
+      ruleStrong: "#3D3021",
+      accent: "#C9A24D",
+      accent2: "#DDBA6A",
     }),
     [],
-  );
-}
-
-function StudioBrandMark({ size = 30 }: { size?: number }) {
-  return <EvglabMark size={size} />;
-}
-
-function StudioBreadcrumbLabel({ label }: { label: string }) {
-  const reduceMotion = useReducedMotion();
-  if (reduceMotion) {
-    return <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>;
-  }
-  return (
-    <span
-      className="studio-view-transition studio-view-transition--inline"
-      style={{ position: "relative", minHeight: 18, alignItems: "center" }}
-    >
-      <AnimatePresence initial={false}>
-        <motion.span
-          key={label}
-          className="studio-view-transition__panel"
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -3 }}
-          transition={{ duration: 0.14, ease: [0.22, 0.68, 0.2, 1] }}
-          style={{ fontSize: 13, fontWeight: 600 }}
-        >
-          {label}
-        </motion.span>
-      </AnimatePresence>
-    </span>
   );
 }
 
@@ -203,158 +241,144 @@ function StudioTopbar({
   breadcrumbLabel,
   tokensRemaining,
   tokensMonthly,
-  onOpenMobileMenu,
-  mobileMenuOpen = false,
+  tokensUnlimited,
+  billingPlan,
+  periodEnd,
+  recentCharges,
   showCreateCta = true,
   hasActivePlan = true,
+  accountInitials,
+  breweryLabel,
+  isMobile,
 }: {
   breadcrumbLabel: string;
   tokensRemaining?: number;
   tokensMonthly?: number;
-  onOpenMobileMenu?: () => void;
-  mobileMenuOpen?: boolean;
+  tokensUnlimited?: boolean;
+  billingPlan?: string | null;
+  periodEnd?: string | null;
+  recentCharges?: StudioTokenCharge[];
   showCreateCta?: boolean;
   hasActivePlan?: boolean;
+  accountInitials: string;
+  breweryLabel: string;
+  isMobile: boolean;
 }) {
-  const free =
-    typeof tokensRemaining === "number" && typeof tokensMonthly === "number"
-      ? Math.max(0, tokensRemaining)
-      : null;
-
   return (
-    <header
-      className="evg-shell-topbar"
-      style={{
-        height: "var(--topbar-h)",
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        padding: "0 var(--gutter)",
-        borderBottom: "1px solid var(--line)",
-        background: "color-mix(in srgb, var(--bg-0) 80%, transparent)",
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-        position: "sticky",
-        top: 0,
-        width: "100%",
-        boxSizing: "border-box",
-      }}
-    >
-      <StudioIconButton
-        type="button"
-        className="evg-shell-menu-btn"
-        aria-label="Navigation öffnen"
-        title="Alle Bereiche — Markenprofil, Einstellungen, Abo …"
-        aria-expanded={mobileMenuOpen}
-        onClick={() => onOpenMobileMenu?.()}
-      >
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-          <path d="M3 6 H17 M3 10 H17 M3 14 H17" />
-        </svg>
-      </StudioIconButton>
-      <div className="evg-shell-topbar-breadcrumb" style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-        <span className="studio-faint evg-shell-topbar-studio-label" style={{ fontSize: 13 }}>
-          Studio
-        </span>
-        <svg className="evg-shell-topbar-chevron" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="var(--tx-3)" strokeWidth="1.6" aria-hidden="true">
-          <path d="M6 4 L10 8 L6 12" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <StudioBreadcrumbLabel label={breadcrumbLabel} />
-      </div>
-
-      <StudioTopbarSearchDesktop />
-
-      <div className="evg-shell-topbar-spacer" style={{ flex: 1, minWidth: 0 }} />
-
-      <div className="evg-shell-topbar-actions">
-        <StudioTopbarSearchMobile />
-        {free !== null ? (
-          <div
-            data-tour="tokens"
-            className="studio-tnum evg-shell-topbar-tokens"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              height: 36,
-              padding: "0 12px",
-              borderRadius: "var(--r-sm)",
-              border: "1px solid var(--line)",
-              background: "var(--bg-1)",
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--acc-hi)" strokeWidth="1.6" aria-hidden="true">
-              <path d="M9 2 L4 9 H8 L7 14 L12 7 H8 Z" strokeLinejoin="round" />
-            </svg>
-            {free.toLocaleString("de-DE")}
-            <span className="studio-faint evg-shell-topbar-tokens-label" style={{ fontSize: 11.5, fontWeight: 500 }}>
-              Tokens
-            </span>
-          </div>
-        ) : null}
-
-        <StudioIconButton aria-label="Benachrichtigungen" className="evg-shell-topbar-notify" style={{ position: "relative" }}>
-          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 7 C4 4.8 5.8 3 8 3 C10.2 3 12 4.8 12 7 V10 L13 12 H3 L4 10 Z" />
-            <path d="M6.5 12 C6.7 13 7.3 13.5 8 13.5 C8.7 13.5 9.3 13 9.5 12" />
-          </svg>
-          <span
-            style={{
-              position: "absolute",
-              top: 8,
-              right: 9,
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: "var(--acc)",
-              border: "1.5px solid var(--bg-0)",
-            }}
-          />
-        </StudioIconButton>
-
-        {showCreateCta ? (
-          <>
-            <div className="evg-shell-topbar-divider" style={{ width: 1, height: 24, background: "var(--line)" }} />
-            <StudioButton
-              href={hasActivePlan ? "/inhalte-erstellen" : PRICING_HREF}
-              variant="primary"
-              size="sm"
-              data-tour="create"
-              className="evg-shell-topbar-create"
-              aria-label={hasActivePlan ? "Neu erstellen" : "Tarif wählen"}
+    <header className="evg-top">
+      {isMobile ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+          <span className="evg-rail__mark" aria-hidden="true">
+            B
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: 14,
+                color: "var(--t1)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
             >
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                {hasActivePlan ? (
-                  <path d="M8 3 V13 M3 8 H13" strokeLinecap="round" />
-                ) : (
-                  <>
-                    <rect x="3" y="7" width="10" height="7" rx="1.5" />
-                    <path d="M5.5 7 V5.5a2.5 2.5 0 0 1 5 0 V7" strokeLinecap="round" />
-                  </>
-                )}
-              </svg>
-              <span className="evg-shell-topbar-create-label">{hasActivePlan ? "Neu erstellen" : "Tarif wählen"}</span>
-            </StudioButton>
-          </>
+              {breadcrumbLabel}
+            </div>
+            <div
+              className="evg-mono"
+              style={{
+                fontSize: 10,
+                color: "var(--t3)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {breweryLabel}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="evg-crumb" style={{ minWidth: 0 }}>
+          Studio / <b>{breadcrumbLabel}</b>
+        </div>
+      )}
+
+      {!isMobile ? <StudioTopbarSearchDesktop /> : null}
+
+      <div style={{ flex: isMobile ? 0 : 1, minWidth: 0 }} />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
+        <StudioTopbarSearchMobile />
+        <StudioTokenBadge
+          unlimited={tokensUnlimited}
+          remaining={tokensRemaining}
+          monthly={tokensMonthly}
+          plan={billingPlan}
+          periodEnd={periodEnd}
+          recentCharges={recentCharges}
+        />
+
+        {showCreateCta && !isMobile ? (
+          <Link
+            href={hasActivePlan ? "/inhalte-erstellen" : PRICING_HREF}
+            aria-label={hasActivePlan ? "Neu erstellen" : "Tarif wählen"}
+            className="stu-btn stu-btn--primary stu-btn--sm"
+            style={{ textDecoration: "none", minHeight: 36 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              {hasActivePlan ? (
+                <path d="M8 3 V13 M3 8 H13" strokeLinecap="round" />
+              ) : (
+                <>
+                  <rect x="3" y="7" width="10" height="7" rx="0" />
+                  <path d="M5.5 7 V5.5a2.5 2.5 0 0 1 5 0 V7" strokeLinecap="round" />
+                </>
+              )}
+            </svg>
+            <span>{hasActivePlan ? "Neu erstellen" : "Tarif wählen"}</span>
+          </Link>
         ) : null}
 
-        <div className="evg-shell-topbar-divider evg-shell-topbar-brand-divider" style={{ width: 1, height: 24, background: "var(--line)" }} />
-        <Link href={MARKETING_SITE_URL} className="evg-shell-topbar-brand" aria-label="BrewAI Startseite">
-          <EvglabMark size={26} />
-          <span className="evg-shell-topbar-brand-name studio-serif">BrewAI</span>
-        </Link>
+        {!isMobile ? (
+          <Link href="/dashboard?tab=settings" className="evg-avatar" aria-label="Konto & Einstellungen" title="Konto">
+            {accountInitials}
+          </Link>
+        ) : null}
       </div>
     </header>
   );
 }
 
-const PRICING_HREF = "/dashboard?tab=pricing";
-
 function createNavHref(key: StudioNavKey, href: string, hasActivePlan: boolean) {
   if (key === "create" && !hasActivePlan) return "/inhalte-erstellen";
   return href;
+}
+
+type NavItemDef = { key: StudioNavKey; label: string; icon: string; href: string; badge?: string };
+
+const NAV_WORKSPACE: NavItemDef[] = [
+  { key: "dashboard", label: "Dashboard", icon: "dash", href: "/dashboard" },
+  { key: "create", label: "Bilder erstellen", icon: "spark", href: "/inhalte-erstellen" },
+  { key: "create-video", label: "Videos erstellen", icon: "video", href: "/videos-erstellen" },
+  { key: "media", label: "Mediathek", icon: "media", href: "/dashboard?tab=media" },
+];
+
+const NAV_BRAND: NavItemDef[] = [
+  { key: "brand", label: "Markenprofil", icon: "brand", href: "/dashboard?tab=brand" },
+  { key: "team", label: "Team", icon: "team", href: "/dashboard?tab=team" },
+];
+
+const NAV_ACCOUNT: NavItemDef[] = [
+  { key: "pricing", label: "Abonnement", icon: "bolt", href: "/dashboard?tab=pricing" },
+  { key: "settings", label: "Einstellungen", icon: "gear", href: "/dashboard?tab=settings" },
+];
+
+function useWorkspaceNavItems(): NavItemDef[] {
+  return useMemo(
+    () => (isVideosCreateEnabled() ? NAV_WORKSPACE : NAV_WORKSPACE.filter((item) => item.key !== "create-video")),
+    [],
+  );
 }
 
 function WorkspaceNavItem({
@@ -363,39 +387,49 @@ function WorkspaceNavItem({
   brandProfileActive,
   hasActivePlan,
   onNavigate,
+  collapsed = false,
 }: {
   item: NavItemDef;
   activeNav: StudioNavKey;
   brandProfileActive: boolean;
   hasActivePlan: boolean;
   onNavigate?: () => void;
+  collapsed?: boolean;
 }) {
   const locked = item.key === "create" && !hasActivePlan;
   const active = item.key === activeNav || (item.key === "brand" && brandProfileActive);
   const href = createNavHref(item.key, item.href, hasActivePlan);
+  const tip = locked ? "Abo erforderlich" : item.label;
 
-  return (
+  const link = (
     <Link
       href={href}
       scroll={false}
-      className={cn("studio-nav-item", active && "studio-nav-item--active", locked && "studio-nav-item--locked")}
+      className="evg-nav__item"
+      aria-current={active ? "page" : undefined}
+      aria-label={collapsed ? tip : undefined}
       onClick={onNavigate}
-      title={locked ? "Abo erforderlich" : undefined}
+      title={!collapsed && locked ? tip : undefined}
     >
       <SidebarIcon name={item.icon} />
-      <span style={{ flex: 1 }}>{item.label}</span>
-      {item.badge ? (
-        <span className="studio-mono studio-faint" style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          {item.badge}
-        </span>
-      ) : null}
-      {locked ? (
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-          <rect x="3" y="7" width="10" height="7" rx="1.5" />
+      {!collapsed ? <span className="evg-hide-collapsed" style={{ flex: 1, minWidth: 0 }}>{item.label}</span> : null}
+      {!collapsed && locked ? (
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="evg-hide-collapsed">
+          <rect x="3" y="7" width="10" height="7" rx="0" />
           <path d="M5.5 7 V5.5a2.5 2.5 0 0 1 5 0 V7" strokeLinecap="round" />
         </svg>
       ) : null}
+      {!collapsed && item.badge ? <span className="evg-nav__badge">{item.badge}</span> : null}
     </Link>
+  );
+
+  if (!collapsed) return link;
+
+  return (
+    <StudioUiTooltip>
+      <StudioUiTooltipTrigger asChild>{link}</StudioUiTooltipTrigger>
+      <StudioUiTooltipContent side="right">{tip}</StudioUiTooltipContent>
+    </StudioUiTooltip>
   );
 }
 
@@ -405,8 +439,8 @@ function RestartOnboardingNavItem({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <button
       type="button"
-      className="studio-nav-item"
-      style={{ width: "100%", border: "none", background: "transparent", cursor: "pointer" }}
+      className="evg-opt"
+      role="menuitem"
       onClick={() => {
         onboarding.restart();
         onNavigate?.();
@@ -418,210 +452,168 @@ function RestartOnboardingNavItem({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-type NavItemDef = { key: StudioNavKey; label: string; icon: string; href: string; badge?: string };
+function RecentMediaRail({
+  items,
+  collapsed,
+}: {
+  items: StudioRecentMediaItem[];
+  collapsed: boolean;
+}) {
+  const router = useRouter();
+  const range = formatChargeRange(items);
 
-const NAV_ITEMS: NavItemDef[] = [
-  { key: "dashboard", label: "Dashboard", icon: "dash", href: "/dashboard" },
-  { key: "create", label: "Bilder Erstellen", icon: "spark", href: "/inhalte-erstellen" },
-  { key: "create-video", label: "Videos Erstellen", icon: "video", href: "/videos-erstellen", badge: "Bald" },
-  { key: "media", label: "Mediathek", icon: "media", href: "/dashboard?tab=media" },
-  { key: "team", label: "Team", icon: "team", href: "/dashboard?tab=team" },
-  { key: "brand", label: "Markenprofil", icon: "brand", href: "/dashboard?tab=brand" },
-  { key: "settings", label: "Einstellungen", icon: "gear", href: "/dashboard?tab=settings" },
-  { key: "pricing", label: "Abonnement", icon: "bolt", href: "/dashboard?tab=pricing" },
-];
+  if (collapsed) return null;
+
+  return (
+    <div className="evg-chargen evg-hide-collapsed" data-tour="recent-media">
+      <div className="evg-rubrik">Chargen</div>
+      {items.length === 0 ? (
+        <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--fg-5)" }}>Deine Motive erscheinen hier</p>
+      ) : (
+        <>
+          <div className="evg-chargen__grid">
+            {items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="evg-chargen__item"
+                title={item.title}
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem(
+                      "evg-reuse-media",
+                      JSON.stringify({
+                        id: item.id,
+                        prompt: item.prompt,
+                        aspectRatio: item.aspectRatio,
+                        resolution: item.resolution,
+                        title: item.title,
+                      }),
+                    );
+                  } catch {
+                    /* ignore quota */
+                  }
+                  router.push("/inhalte-erstellen");
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.imageUrl} alt="" />
+              </button>
+            ))}
+          </div>
+          {range ? <div className="evg-chargen__range">{range}</div> : <div className="evg-chargen__range" />}
+        </>
+      )}
+    </div>
+  );
+}
 
 function AccountSidebarFooter({
   accountName,
   userEmail,
   initials,
+  isAdmin = false,
+  adminRouteActive = false,
+  collapsed = false,
 }: {
   accountName: string;
   userEmail?: string;
   initials: string;
+  isAdmin?: boolean;
+  adminRouteActive?: boolean;
+  collapsed?: boolean;
 }) {
   const [signingOut, setSigningOut] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  return (
-    <div style={{ marginTop: 12 }}>
-      <Link
-        href="/dashboard?tab=settings"
-        className="studio-card"
-        style={{
-          padding: 10,
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          gap: 11,
-          textDecoration: "none",
-          color: "inherit",
-        }}
-      >
-        <div className="studio-avatar">{initials}</div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              fontWeight: 600,
-              fontSize: 13,
-              color: "var(--tx-0)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {accountName}
-          </div>
-          <div
-            className="studio-mono studio-faint"
-            style={{
-              fontSize: 9.5,
-              letterSpacing: 0.4,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {userEmail ?? ""}
-          </div>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--tx-3)" strokeWidth="1.6" aria-hidden="true">
-          <path d="M4 6 L8 10 L12 6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </Link>
-      <button
-        type="button"
-        className="studio-nav-item"
-        style={{ width: "100%", marginTop: 4, border: "none", background: "transparent", cursor: signingOut ? "wait" : "pointer" }}
-        disabled={signingOut}
-        onClick={() => {
-          setSigningOut(true);
-          void signOutAndRedirect();
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M7 17 H4a1 1 0 0 1-1-1 V4a1 1 0 0 1 1-1h3" />
-          <path d="M13 14 L17 10 L13 6" />
-          <path d="M17 10 H7" />
-        </svg>
-        <span>{signingOut ? "Abmelden …" : "Abmelden"}</span>
-      </button>
-    </div>
-  );
-}
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    const onPointer = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onPointer);
+    };
+  }, [menuOpen]);
 
-function StudioMobileBottomNav({
-  activeNav,
-  onOpenMenu,
-  hasActivePlan = true,
-}: {
-  activeNav: StudioNavKey;
-  onOpenMenu: () => void;
-  hasActivePlan?: boolean;
-}) {
-  const tabs: Array<{ key: StudioNavKey | "menu"; label: string; icon: string; href?: string }> = [
-    { key: "dashboard", label: "Home", icon: "dash", href: "/dashboard" },
-    { key: "create", label: "Bilder", icon: "spark", href: "/inhalte-erstellen" },
-    { key: "media", label: "Medien", icon: "media", href: "/dashboard?tab=media" },
-    { key: "menu", label: "Navigation", icon: "gear" },
-  ];
-
-  return (
-    <nav className="evg-shell-mobile-nav" aria-label="Hauptnavigation">
-      {tabs.map((tab) => {
-        if (tab.key === "menu") {
-          return (
-            <button key={tab.key} type="button" className="evg-shell-mobile-nav-item" onClick={onOpenMenu}>
-              <SidebarIcon name={tab.icon} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        }
-        const active = tab.key === activeNav;
-        const href = tab.key === "create" ? createNavHref("create", tab.href!, hasActivePlan) : tab.href!;
-        return (
-          <Link
-            key={tab.key}
-            href={href}
-            scroll={false}
-            className={cn("evg-shell-mobile-nav-item", active && "evg-shell-mobile-nav-item--active")}
-          >
-            <SidebarIcon name={tab.icon} color={active ? "var(--acc-hi)" : "currentColor"} />
-            <span>{tab.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
-
-function StudioMobileDrawer({
-  open,
-  onClose,
-  activeNav,
-  brandProfileActive,
-  isAdmin,
-  adminRouteActive,
-  hasActivePlan = true,
-  accountName,
-  userEmail,
-  initials,
-}: {
-  open: boolean;
-  onClose: () => void;
-  activeNav: StudioNavKey;
-  brandProfileActive: boolean;
-  isAdmin: boolean;
-  adminRouteActive: boolean;
-  hasActivePlan?: boolean;
-  accountName: string;
-  userEmail?: string;
-  initials: string;
-}) {
-  if (!open) return null;
-
-  return (
-    <>
-      <button
-        type="button"
-        className="evg-shell-mobile-backdrop evg-shell-mobile-backdrop--open"
-        aria-label="Navigation schließen"
-        onClick={onClose}
-      />
-      <aside className="evg-shell-mobile-drawer evg-shell-mobile-drawer--open" aria-label="Navigation">
-        <div className="evg-shell-mobile-drawer-head">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <StudioBrandMark />
-            <div>
-              <div className="studio-serif" style={{ fontSize: 17, fontWeight: 600 }}>
-                BrewAI
-              </div>
-              <div className="studio-mono studio-faint" style={{ fontSize: 9, letterSpacing: "0.14em", marginTop: 2 }}>
-                STUDIO
-              </div>
+  const trigger = (
+    <button
+      type="button"
+      className="evg-rail__foot"
+      aria-expanded={menuOpen}
+      aria-haspopup="menu"
+      aria-label={collapsed ? `Konto: ${accountName}` : undefined}
+      onClick={() => setMenuOpen((v) => !v)}
+      style={collapsed ? { justifyContent: "center", paddingInline: 10 } : undefined}
+    >
+      <div className="evg-avatar">{initials}</div>
+      {!collapsed ? (
+        <>
+          <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
+            <div
+              style={{
+                fontWeight: 500,
+                fontSize: 13,
+                color: "var(--t1)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {accountName}
+            </div>
+            <div
+              className="evg-mono"
+              style={{
+                fontSize: 9.5,
+                color: "var(--t3)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {userEmail ?? ""}
             </div>
           </div>
-          <StudioIconButton type="button" aria-label="Menü schließen" onClick={onClose}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-              <path d="M4 4 L12 12 M12 4 L4 12" />
-            </svg>
-          </StudioIconButton>
-        </div>
-        <nav className="evg-shell-mobile-drawer-nav" aria-label="Seitennavigation">
-          {NAV_ITEMS.map((it) => (
-            <WorkspaceNavItem
-              key={it.key}
-              item={it}
-              activeNav={activeNav}
-              brandProfileActive={brandProfileActive}
-              hasActivePlan={hasActivePlan}
-              onNavigate={onClose}
-            />
-          ))}
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--t3)" strokeWidth="1.6" aria-hidden="true">
+            <path d="M4 6 L8 10 L12 6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </>
+      ) : null}
+    </button>
+  );
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      {collapsed ? (
+        <StudioUiTooltip>
+          <StudioUiTooltipTrigger asChild>{trigger}</StudioUiTooltipTrigger>
+          <StudioUiTooltipContent side="right">{accountName}</StudioUiTooltipContent>
+        </StudioUiTooltip>
+      ) : (
+        trigger
+      )}
+
+      {menuOpen ? (
+        <div
+          className="evg-pop"
+          role="menu"
+          style={{ position: "absolute", left: 8, right: 8, bottom: "100%", marginBottom: 6, zIndex: 40 }}
+        >
           {isAdmin ? (
             <Link
               href="/admin"
-              className={cn("studio-nav-item", adminRouteActive && "studio-nav-item--active")}
-              onClick={onClose}
+              role="menuitem"
+              className="evg-opt"
+              aria-current={adminRouteActive ? "page" : undefined}
+              onClick={() => setMenuOpen(false)}
             >
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M10 2 L16.5 5 V10.5 C16.5 14.3 13.5 16.8 10 18 C6.5 16.8 3.5 14.3 3.5 10.5 V5 Z" />
@@ -630,15 +622,239 @@ function StudioMobileDrawer({
               <span>Admin</span>
             </Link>
           ) : null}
-          <Link href="mailto:kontakt@brewai.de" className="studio-nav-item" onClick={onClose}>
+          <Link href="mailto:kontakt@brewai.de" role="menuitem" className="evg-opt" onClick={() => setMenuOpen(false)}>
             <SidebarIcon name="help" />
             <span>Hilfe & Support</span>
           </Link>
-          <RestartOnboardingNavItem onNavigate={onClose} />
-        </nav>
-        <AccountSidebarFooter accountName={accountName} userEmail={userEmail} initials={initials} />
-      </aside>
-    </>
+          <RestartOnboardingNavItem onNavigate={() => setMenuOpen(false)} />
+          <button
+            type="button"
+            role="menuitem"
+            className="evg-opt"
+            disabled={signingOut}
+            aria-label="Abmelden"
+            onClick={() => {
+              setSigningOut(true);
+              void signOutAndRedirect();
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M7 17 H4a1 1 0 0 1-1-1 V4a1 1 0 0 1 1-1h3" />
+              <path d="M13 14 L17 10 L13 6" />
+              <path d="M17 10 H7" />
+            </svg>
+            <span>{signingOut ? "Abmelden …" : "Abmelden"}</span>
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StudioMobileBottomNav({
+  activeNav,
+  moreOpen,
+  onOpenMore,
+  hasActivePlan = true,
+}: {
+  activeNav: StudioNavKey;
+  moreOpen: boolean;
+  onOpenMore: () => void;
+  hasActivePlan?: boolean;
+}) {
+  const primary: Array<{ key: StudioNavKey; label: string; icon: string; href: string }> = [
+    { key: "dashboard", label: "Dashboard", icon: "dash", href: "/dashboard" },
+    { key: "create", label: "Erstellen", icon: "spark", href: "/inhalte-erstellen" },
+    { key: "media", label: "Mediathek", icon: "media", href: "/dashboard?tab=media" },
+  ];
+  const moreActive =
+    moreOpen ||
+    activeNav === "brand" ||
+    activeNav === "team" ||
+    activeNav === "settings" ||
+    activeNav === "pricing" ||
+    activeNav === "create-video";
+
+  return (
+    <nav className="evg-bottom-nav" aria-label="Hauptnavigation">
+      {primary.map((tab) => {
+        const active = tab.key === activeNav;
+        const href = tab.key === "create" ? createNavHref("create", tab.href, hasActivePlan) : tab.href;
+        return (
+          <Link
+            key={tab.key}
+            href={href}
+            scroll={false}
+            className="evg-bottom-nav__item"
+            aria-current={active ? "page" : undefined}
+          >
+            <SidebarIcon name={tab.icon} />
+            <span>{tab.label}</span>
+          </Link>
+        );
+      })}
+      <button
+        type="button"
+        className="evg-bottom-nav__item"
+        data-active={moreActive ? "true" : undefined}
+        aria-expanded={moreOpen}
+        aria-haspopup="dialog"
+        aria-label="Mehr Navigation"
+        onClick={onOpenMore}
+      >
+        <SidebarIcon name="more" />
+        <span>Mehr</span>
+      </button>
+    </nav>
+  );
+}
+
+function StudioMobileMoreSheet({
+  open,
+  onOpenChange,
+  activeNav,
+  brandProfileActive,
+  isAdmin,
+  adminRouteActive,
+  hasActivePlan = true,
+  accountName,
+  userEmail,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  activeNav: StudioNavKey;
+  brandProfileActive: boolean;
+  isAdmin: boolean;
+  adminRouteActive: boolean;
+  hasActivePlan?: boolean;
+  accountName: string;
+  userEmail?: string;
+}) {
+  const [signingOut, setSigningOut] = useState(false);
+  const videosEnabled = isVideosCreateEnabled();
+  const onboarding = useStudioOnboarding();
+
+  const close = () => onOpenChange(false);
+
+  const sheetItems: NavItemDef[] = [
+    ...NAV_BRAND,
+    ...(videosEnabled
+      ? [{ key: "create-video" as const, label: "Videos", icon: "video", href: "/videos-erstellen" }]
+      : []),
+    ...NAV_ACCOUNT,
+  ];
+
+  return (
+    <StudioUiDialog open={open} onOpenChange={onOpenChange}>
+      <StudioUiDialogContent sheetOnMobile showClose aria-describedby={undefined}>
+        <StudioUiDialogHeader>
+          <StudioUiDialogTitle>Mehr</StudioUiDialogTitle>
+          <StudioUiDialogDescription>
+            <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {accountName}
+              {userEmail ? ` · ${userEmail}` : ""}
+            </span>
+          </StudioUiDialogDescription>
+        </StudioUiDialogHeader>
+
+        <div className="evg-more-sheet-list" role="navigation" aria-label="Weitere Bereiche">
+          <div className="stu-label">Marke & Konto</div>
+          {sheetItems.map((item) => {
+            const active = item.key === activeNav || (item.key === "brand" && brandProfileActive);
+            return (
+              <Link
+                key={item.key}
+                href={createNavHref(item.key, item.href, hasActivePlan)}
+                scroll={false}
+                aria-current={active ? "page" : undefined}
+                onClick={close}
+              >
+                <SidebarIcon name={item.icon} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+
+          {isAdmin ? (
+            <Link href="/admin" aria-current={adminRouteActive ? "page" : undefined} onClick={close}>
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M10 2 L16.5 5 V10.5 C16.5 14.3 13.5 16.8 10 18 C6.5 16.8 3.5 14.3 3.5 10.5 V5 Z" />
+                <path d="M7.5 10 L9 11.5 L12.5 8" />
+              </svg>
+              <span>Admin</span>
+            </Link>
+          ) : null}
+
+          <Link href="mailto:kontakt@brewai.de" onClick={close}>
+            <SidebarIcon name="help" />
+            <span>Hilfe & Support</span>
+          </Link>
+
+          {onboarding ? (
+            <button
+              type="button"
+              onClick={() => {
+                onboarding.restart();
+                close();
+              }}
+            >
+              <SidebarIcon name="spark" />
+              <span>Tour neu starten</span>
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            aria-label="Abmelden"
+            disabled={signingOut}
+            onClick={() => {
+              setSigningOut(true);
+              void signOutAndRedirect();
+            }}
+            style={{ color: "var(--err)" }}
+          >
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M7 17 H4a1 1 0 0 1-1-1 V4a1 1 0 0 1 1-1h3" />
+              <path d="M13 14 L17 10 L13 6" />
+              <path d="M17 10 H7" />
+            </svg>
+            <span>{signingOut ? "Abmelden …" : "Abmelden"}</span>
+          </button>
+        </div>
+      </StudioUiDialogContent>
+    </StudioUiDialog>
+  );
+}
+
+function NavGroup({
+  label,
+  items,
+  activeNav,
+  brandProfileActive,
+  hasActivePlan,
+  collapsed,
+}: {
+  label: string;
+  items: NavItemDef[];
+  activeNav: StudioNavKey;
+  brandProfileActive: boolean;
+  hasActivePlan: boolean;
+  collapsed: boolean;
+}) {
+  return (
+    <div className="evg-nav-group">
+      <div className="evg-nav-group__label">{label}</div>
+      {items.map((it) => (
+        <WorkspaceNavItem
+          key={it.key}
+          item={it}
+          activeNav={activeNav}
+          brandProfileActive={brandProfileActive}
+          hasActivePlan={hasActivePlan}
+          collapsed={collapsed}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -657,6 +873,11 @@ export function DashboardStudioShell({
   hasActivePlan = true,
   tokensRemaining,
   tokensMonthly,
+  tokensUnlimited = false,
+  billingPlan = null,
+  periodEnd = null,
+  recentMedia = [],
+  recentCharges = [],
   contentKey,
   contentPending = false,
 }: {
@@ -674,43 +895,67 @@ export function DashboardStudioShell({
   hasActivePlan?: boolean;
   tokensRemaining?: number;
   tokensMonthly?: number;
+  tokensUnlimited?: boolean;
+  billingPlan?: string | null;
+  periodEnd?: string | null;
+  recentMedia?: StudioRecentMediaItem[];
+  recentCharges?: StudioTokenCharge[];
   /** Schlüssel für View-Transition (Tab oder Route). */
   contentKey?: string;
   contentPending?: boolean;
 }) {
+  void onOpenBrandProfile;
   const pathname = usePathname();
   const mainRef = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem(RAIL_COLLAPSE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const workspaceNav = useWorkspaceNavItems();
+  const isNarrow = useMediaQuery(`(max-width: ${DESKTOP_MIN - 1}px)`);
+  const isMobile = useMediaQuery(`(max-width: ${MOBILE_MAX}px)`);
+  /** Tablet/Mid erzwingen Icon-Rail; Desktop-Preference bleibt in localStorage. */
+  const effectiveCollapsed = isNarrow || railCollapsed;
+
+  const toggleRail = () => {
+    if (isNarrow) return;
+    setRailCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(RAIL_COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!contentKey || !mainRef.current) return;
     mainRef.current.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
   }, [contentKey, reduceMotion]);
 
+  /* Sheet nach Navigation schließen */
   useEffect(() => {
-    setMobileMenuOpen(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional close on route/tab change
+    setMoreOpen(false);
   }, [pathname, contentKey]);
 
-  useEffect(() => {
-    if (!mobileMenuOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMobileMenuOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [mobileMenuOpen]);
-
-  // Live-State, damit die Fußzeile (Avatar + Name) sofort aktualisiert, wenn der
-  // Markenname in den Einstellungen geändert wird (per evglab-profile-updated-Event),
-  // ohne auf einen Server-Reload zu warten.
   const [liveBreweryName, setLiveBreweryName] = useState(initialBreweryName?.trim() || "");
   const [liveProfileName, setLiveProfileName] = useState(initialProfileName?.trim() || "");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror server/layout props
     setLiveBreweryName(initialBreweryName?.trim() || "");
   }, [initialBreweryName]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror server/layout props
     setLiveProfileName(initialProfileName?.trim() || "");
   }, [initialProfileName]);
 
@@ -729,162 +974,149 @@ export function DashboardStudioShell({
 
   const accountName = liveBreweryName || liveProfileName || "BrewAI";
   const initials = initialsFromName(accountName);
-  const pad = contentPadding ?? "var(--gutter)";
+  const pad = contentPadding ?? "var(--sp-8)";
 
   return (
     <StudioSearchProvider>
-    <div
-      className={cn(studioFontClassName, "evg-studio", "evg-shell")}
-      style={{
-        background: "var(--bg-0)",
-        display: "flex",
-        width: "100%",
-      }}
-    >
-      <style>{`
-        .evg-shell .evg-card { transition: transform .2s ease, border-color .2s ease, box-shadow .25s ease; }
-        .evg-shell .evg-card:hover { transform: translateY(-1px); border-color: var(--line-strong) !important; box-shadow: var(--sh-2); }
-        .evg-shell .evg-cta { transition: transform .15s ease, box-shadow .2s ease, filter .2s ease; }
-        .evg-shell .evg-cta:hover { transform: translateY(-1px); filter: brightness(1.04); }
-        .evg-shell input:not(.studio-field), .evg-shell select:not(.studio-field), .evg-shell textarea:not(.studio-field) {
-          background-color: var(--bg-1);
-          color: var(--tx-0);
-          border: 1px solid var(--line-strong);
-          caret-color: var(--acc);
-        }
-        .evg-shell select option { background: var(--bg-2); color: var(--tx-0); }
-        .evg-shell input[type="checkbox"], .evg-shell input[type="radio"] { accent-color: var(--acc); }
-        .evg-pill { transition: all .18s ease; }
-        .evg-pill:hover { border-color: var(--line-strong) !important; background: var(--bg-3) !important; color: var(--tx-0) !important; }
-        .evg-pill-active:hover { border-color: var(--line-accent) !important; background: var(--acc-soft) !important; }
-        .evg-result-card:hover .evg-result-img { transform: scale(1.04); }
-        .evg-result-card:hover .evg-result-overlay { opacity: 1 !important; }
-        .evg-result-card:hover .evg-result-actions { opacity: 1 !important; transform: translateY(0) !important; }
-        .evg-result-card { transition: border-color .25s ease, transform .25s ease; }
-        .evg-result-card:hover { border-color: var(--line-accent) !important; }
-        @keyframes evg-ping { 0% { transform: scale(1); opacity: 1; } 80%,100% { transform: scale(2.2); opacity: 0; } }
-        @keyframes evg-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        .evg-ping::after { content: ""; position: absolute; inset: -3px; border-radius: 999px; background: var(--acc); opacity: 0.6; animation: evg-ping 1.8s cubic-bezier(0,0,0.2,1) infinite; }
-        .evg-skeleton { background: linear-gradient(90deg, var(--bg-2) 0%, var(--bg-3) 50%, var(--bg-2) 100%); background-size: 200% 100%; animation: evg-shimmer 1.6s linear infinite; }
-      `}</style>
-      <aside
-        className="evg-shell-sidebar"
-        style={{
-          width: "var(--sidebar-w)",
-          background: "var(--bg-1)",
-          borderRight: "1px solid var(--line)",
-          padding: "24px 18px",
-        }}
-      >
-        <div className="evg-shell-sidebar-brand" style={{ padding: "0 6px 26px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <StudioBrandMark />
-            <div>
-              <div className="studio-serif" style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1 }}>
-                BrewAI
-              </div>
-              <div className="studio-mono studio-faint" style={{ fontSize: 9.5, letterSpacing: "0.16em", marginTop: 4 }}>
-                STUDIO · V2.4
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <nav
-          className="evg-shell-sidebar-nav"
-          data-tour="nav"
-          style={{ display: "flex", flexDirection: "column", gap: 3 }}
+      <StudioUiTooltipProvider delayDuration={280}>
+        <div
+          className={cn(
+            studioFontClassName,
+            "evg-studio",
+            "evg-app",
+            effectiveCollapsed && "evg-app--collapsed",
+            isMobile && "evg-app--mobile",
+          )}
         >
-          <div className="studio-field-label" style={{ padding: "0 12px", marginBottom: 8 }}>
-            Arbeitsbereich
-          </div>
-          {NAV_ITEMS.map((it) => (
-            <WorkspaceNavItem
-              key={it.key}
-              item={it}
-              activeNav={activeNav}
-              brandProfileActive={brandProfileActive}
-              hasActivePlan={hasActivePlan}
-            />
-          ))}
-        </nav>
-
-        <div className="evg-shell-sidebar-footer">
-          {isAdmin ? (
-            <Link
-              href="/admin"
-              className={cn("studio-nav-item", adminRouteActive && "studio-nav-item--active")}
-              style={{ marginBottom: 4 }}
+          <aside className="evg-rail" aria-label="Seitennavigation">
+            <div
+              className="evg-rail__brand"
+              style={effectiveCollapsed ? { justifyContent: "center", paddingInline: 8, gap: 6 } : undefined}
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M10 2 L16.5 5 V10.5 C16.5 14.3 13.5 16.8 10 18 C6.5 16.8 3.5 14.3 3.5 10.5 V5 Z" />
-                <path d="M7.5 10 L9 11.5 L12.5 8" />
-              </svg>
-              <span>Admin</span>
-            </Link>
-          ) : null}
-          <Link href="mailto:kontakt@brewai.de" className="studio-nav-item">
-            <SidebarIcon name="help" />
-            <span>Hilfe & Support</span>
-          </Link>
-          <div style={{ marginBottom: 12 }}>
-            <RestartOnboardingNavItem />
+              <span className="evg-rail__mark" aria-hidden="true">
+                B
+              </span>
+              {!effectiveCollapsed ? (
+                <div style={{ minWidth: 0, flex: 1 }} className="evg-hide-collapsed">
+                  <div className="evg-rail__name">BrewAI</div>
+                  <div
+                    className="evg-rail__sub"
+                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    title={liveBreweryName || undefined}
+                  >
+                    {liveBreweryName || "STUDIO"}
+                  </div>
+                </div>
+              ) : null}
+              {!isNarrow ? (
+                <StudioUiIconButton
+                  size="sm"
+                  aria-label={railCollapsed ? "Navigation ausklappen" : "Navigation einklappen"}
+                  aria-pressed={railCollapsed}
+                  onClick={toggleRail}
+                  style={{ marginLeft: effectiveCollapsed ? 0 : "auto" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                    {railCollapsed ? (
+                      <path d="M6 4 L10 8 L6 12" strokeLinecap="round" strokeLinejoin="round" />
+                    ) : (
+                      <path d="M10 4 L6 8 L10 12" strokeLinecap="round" strokeLinejoin="round" />
+                    )}
+                  </svg>
+                </StudioUiIconButton>
+              ) : null}
+            </div>
+
+            <nav className="evg-nav" data-tour="nav" aria-label="Arbeitsbereich">
+              <NavGroup
+                label="Arbeitsbereich"
+                items={workspaceNav}
+                activeNav={activeNav}
+                brandProfileActive={brandProfileActive}
+                hasActivePlan={hasActivePlan}
+                collapsed={effectiveCollapsed}
+              />
+              <NavGroup
+                label="Marke"
+                items={NAV_BRAND}
+                activeNav={activeNav}
+                brandProfileActive={brandProfileActive}
+                hasActivePlan={hasActivePlan}
+                collapsed={effectiveCollapsed}
+              />
+              <NavGroup
+                label="Konto"
+                items={NAV_ACCOUNT}
+                activeNav={activeNav}
+                brandProfileActive={brandProfileActive}
+                hasActivePlan={hasActivePlan}
+                collapsed={effectiveCollapsed}
+              />
+            </nav>
+
+            <RecentMediaRail items={recentMedia} collapsed={effectiveCollapsed} />
+
+            <AccountSidebarFooter
+              accountName={accountName}
+              userEmail={userEmail}
+              initials={initials}
+              isAdmin={isAdmin}
+              adminRouteActive={adminRouteActive}
+              collapsed={effectiveCollapsed}
+            />
+          </aside>
+
+          <div className="evg-main-wrap">
+            <StudioTopbar
+              breadcrumbLabel={breadcrumbLabel}
+              tokensRemaining={tokensRemaining}
+              tokensMonthly={tokensMonthly}
+              tokensUnlimited={tokensUnlimited}
+              billingPlan={billingPlan}
+              periodEnd={periodEnd}
+              recentCharges={recentCharges}
+              showCreateCta={activeNav !== "create" && activeNav !== "create-video"}
+              hasActivePlan={hasActivePlan}
+              accountInitials={initials}
+              breweryLabel={accountName}
+              isMobile={isMobile}
+            />
+            <main
+              ref={mainRef}
+              className={cn("evg-main", contentPending && "studio-main-pending")}
+            >
+              <div className="evg-main__inner" style={{ padding: pad }}>
+                {contentKey ? (
+                  <StudioViewTransition viewKey={contentKey} variant="route">
+                    {children}
+                  </StudioViewTransition>
+                ) : (
+                  children
+                )}
+              </div>
+            </main>
           </div>
-          <AccountSidebarFooter accountName={accountName} userEmail={userEmail} initials={initials} />
+
+          <StudioMobileMoreSheet
+            open={moreOpen}
+            onOpenChange={setMoreOpen}
+            activeNav={activeNav}
+            brandProfileActive={brandProfileActive}
+            isAdmin={isAdmin}
+            adminRouteActive={adminRouteActive}
+            hasActivePlan={hasActivePlan}
+            accountName={accountName}
+            userEmail={userEmail}
+          />
+          <StudioMobileBottomNav
+            activeNav={activeNav}
+            moreOpen={moreOpen}
+            onOpenMore={() => setMoreOpen(true)}
+            hasActivePlan={hasActivePlan}
+          />
+          <StudioUiToaster />
         </div>
-      </aside>
-
-      <div className="evg-shell-main-column" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <StudioTopbar
-          breadcrumbLabel={breadcrumbLabel}
-          tokensRemaining={tokensRemaining}
-          tokensMonthly={tokensMonthly}
-          onOpenMobileMenu={() => setMobileMenuOpen(true)}
-          mobileMenuOpen={mobileMenuOpen}
-          showCreateCta={activeNav !== "create" && activeNav !== "create-video"}
-          hasActivePlan={hasActivePlan}
-        />
-        <main
-          ref={mainRef}
-          className={cn("evg-shell-main", contentPending && "studio-main-pending")}
-          style={{ flex: 1, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}
-        >
-          <div style={{ maxWidth: "var(--maxw)", margin: "0 auto", padding: pad, boxSizing: "border-box" }}>
-            {contentKey ? (
-              <StudioViewTransition viewKey={contentKey} variant="route">
-                {children}
-              </StudioViewTransition>
-            ) : (
-              children
-            )}
-          </div>
-        </main>
-      </div>
-
-      <StudioMobileDrawer
-        open={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
-        activeNav={activeNav}
-        brandProfileActive={brandProfileActive}
-        isAdmin={isAdmin}
-        adminRouteActive={adminRouteActive}
-        hasActivePlan={hasActivePlan}
-        accountName={accountName}
-        userEmail={userEmail}
-        initials={initials}
-      />
-      <StudioMobileBottomNav activeNav={activeNav} onOpenMenu={() => setMobileMenuOpen(true)} hasActivePlan={hasActivePlan} />
-    </div>
+      </StudioUiTooltipProvider>
     </StudioSearchProvider>
   );
 }
