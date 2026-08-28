@@ -1,0 +1,308 @@
+/* T10 — Team (BrewAI Studio Final) */
+
+.evg-studio .studio-team-page {
+  max-width: var(--content-max, 1240px);
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.evg-studio .studio-team-page .studio-faint {
+  color: var(--t3);
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+
+.evg-studio .studio-team-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-7);
+}
+
+.evg-studio .studio-team-header__eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-team-title {
+  margin: 0;
+  font-size: var(--t-19);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+  line-height: 1.2;
+}
+
+.evg-studio .studio-team-sub {
+  margin: 5px 0 0;
+  font-size: var(--t-13);
+  color: var(--t3);
+  max-width: 52ch;
+  line-height: 1.55;
+}
+
+.evg-studio .studio-team-meta {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: var(--t-11);
+  color: var(--t3);
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line2);
+  background: var(--s2);
+}
+
+/* ── Feedback ──────────────────────────────────────────────── */
+
+.evg-studio .studio-team-feedback {
+  margin-top: var(--sp-4);
+  font-size: var(--t-12);
+  line-height: 1.5;
+}
+
+.evg-studio .studio-team-feedback--error {
+  color: var(--err);
+}
+
+.evg-studio .studio-team-feedback--ok {
+  color: var(--ok);
+}
+
+/* ── Invite card ───────────────────────────────────────────── */
+
+.evg-studio .studio-team-invite {
+  padding: var(--sp-6);
+  margin-bottom: var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+}
+
+.evg-studio .studio-team-invite__title {
+  margin: 0 0 var(--sp-5);
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-team-invite__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-5);
+  align-items: end;
+}
+
+.evg-studio .studio-team-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evg-studio .studio-team-field__label {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-team-field__hint {
+  font-size: var(--t-11);
+  color: var(--t3);
+}
+
+.evg-studio .studio-team-input,
+.evg-studio .studio-team-select {
+  width: 100%;
+  height: 36px;
+  padding: 0 11px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  color: var(--t1);
+  font-family: var(--f-sans);
+  font-size: var(--t-13);
+  outline: none;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.evg-studio .studio-team-input:focus,
+.evg-studio .studio-team-select:focus {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--ac-tint);
+}
+
+.evg-studio .studio-team-input:disabled,
+.evg-studio .studio-team-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.evg-studio .studio-team-invite__actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+/* ── Members list ──────────────────────────────────────────── */
+
+.evg-studio .studio-team-members {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  overflow: hidden;
+}
+
+.evg-studio .studio-team-members__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 15px var(--sp-7);
+  border-bottom: 1px solid var(--line);
+}
+
+.evg-studio .studio-team-members__title {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-team-members__summary {
+  font-size: var(--t-12);
+  color: var(--t3);
+}
+
+.evg-studio .studio-team-empty {
+  padding: var(--sp-10) var(--sp-7);
+  text-align: center;
+  font-size: var(--t-13);
+  color: var(--t3);
+}
+
+.evg-studio .studio-team-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto auto;
+  gap: var(--sp-5);
+  align-items: center;
+  padding: 14px var(--sp-7);
+  border-bottom: 1px solid var(--line);
+}
+
+.evg-studio .studio-team-row:last-child {
+  border-bottom: 0;
+}
+
+.evg-studio .studio-team-row__person {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.evg-studio .studio-team-row__avatar {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line2);
+  background: var(--s3);
+  color: var(--t1);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.evg-studio .studio-team-row__avatar--invited {
+  border-style: dashed;
+  color: var(--t3);
+}
+
+.evg-studio .studio-team-row__name {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evg-studio .studio-team-row__email {
+  font-size: var(--t-11);
+  color: var(--t3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evg-studio .studio-team-row__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.evg-studio .studio-team-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--t-11);
+  font-weight: 500;
+}
+
+.evg-studio .studio-team-badge--role {
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  color: var(--t2);
+  text-transform: capitalize;
+}
+
+.evg-studio .studio-team-badge--active {
+  background: var(--ok-dim);
+  color: var(--ok);
+}
+
+.evg-studio .studio-team-badge--invited {
+  background: var(--warn-dim);
+  color: var(--warn);
+}
+
+.evg-studio .studio-team-badge__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+@media (max-width: 720px) {
+  .evg-studio .studio-team-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .evg-studio .studio-team-invite__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evg-studio .studio-team-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-4);
+  }
+
+  .evg-studio .studio-team-row__meta {
+    justify-content: flex-start;
+  }
+}
