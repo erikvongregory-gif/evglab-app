@@ -497,6 +497,15 @@
   align-items: center;
   gap: 10px;
   min-height: 44px;
+  cursor: pointer;
+  user-select: none;
+}
+.evg-studio .stu-switch__input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
 }
 .evg-studio .stu-switch {
   width: 44px;
@@ -505,14 +514,17 @@
   border: 1px solid var(--line2);
   background: var(--s3);
   padding: 2px;
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
   transition: background var(--dur-mid) var(--ease), border-color var(--dur-mid) var(--ease);
+  pointer-events: none;
 }
-.evg-studio .stu-switch:focus-visible {
+.evg-studio .stu-switch__input:focus-visible + .stu-switch {
   outline: 2px solid var(--ac);
   outline-offset: 2px;
 }
-.evg-studio .stu-switch--on {
+.evg-studio .stu-switch__input:checked + .stu-switch {
   background: var(--ac);
   border-color: var(--ac);
 }
@@ -524,9 +536,14 @@
   background: var(--t1);
   transition: transform var(--dur-mid) var(--ease);
 }
-.evg-studio .stu-switch--on .stu-switch__thumb {
+.evg-studio .stu-switch__input:checked + .stu-switch .stu-switch__thumb {
   transform: translateX(18px);
   background: var(--ac-ink);
+}
+.evg-studio .stu-switch__label {
+  color: var(--t1);
+  font-family: var(--f-sans);
+  font-size: var(--t-14);
 }
 
 /* ── T2b: Tabs ──────────────────────────────────────────── */

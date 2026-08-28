@@ -7,6 +7,7 @@ type TabsContextValue = {
   value: string;
   setValue: (value: string) => void;
   baseId: string;
+  orientation: "horizontal" | "vertical";
 };
 
 const TabsContext = React.createContext<TabsContextValue | null>(null);
@@ -15,6 +16,7 @@ export type StudioUiTabsProps = {
   value?: string;
   defaultValue: string;
   onValueChange?: (value: string) => void;
+  orientation?: "horizontal" | "vertical";
   className?: string;
   children: React.ReactNode;
 };
@@ -23,6 +25,7 @@ export function StudioUiTabs({
   value,
   defaultValue,
   onValueChange,
+  orientation = "horizontal",
   className,
   children,
 }: StudioUiTabsProps) {
@@ -36,13 +39,19 @@ export function StudioUiTabs({
       value={{
         value: current,
         baseId,
+        orientation,
         setValue: (next) => {
           if (!isControlled) setUncontrolled(next);
           onValueChange?.(next);
         },
       }}
     >
-      <div className={cn("stu-tabs", className)}>{children}</div>
+      <div
+        className={cn("stu-tabs", orientation === "vertical" && "stu-tabs--vertical", className)}
+        data-orientation={orientation}
+      >
+        {children}
+      </div>
     </TabsContext.Provider>
   );
 }
@@ -54,6 +63,7 @@ export function StudioUiTabsList({
 }: React.HTMLAttributes<HTMLDivElement>) {
   const ctx = React.useContext(TabsContext);
   const listRef = React.useRef<HTMLDivElement>(null);
+  const orientation = ctx?.orientation ?? "horizontal";
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const triggers = Array.from(
@@ -62,13 +72,17 @@ export function StudioUiTabsList({
     if (!triggers.length) return;
     const index = triggers.findIndex((el) => el === document.activeElement);
     if (index < 0) return;
+
+    const nextKey = orientation === "vertical" ? "ArrowDown" : "ArrowRight";
+    const prevKey = orientation === "vertical" ? "ArrowUp" : "ArrowLeft";
+
     let next = index;
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (index + 1) % triggers.length;
-    else if (e.key === "ArrowLeft" || e.key === "ArrowUp")
-      next = (index - 1 + triggers.length) % triggers.length;
+    if (e.key === nextKey) next = (index + 1) % triggers.length;
+    else if (e.key === prevKey) next = (index - 1 + triggers.length) % triggers.length;
     else if (e.key === "Home") next = 0;
     else if (e.key === "End") next = triggers.length - 1;
     else return;
+
     e.preventDefault();
     triggers[next]?.focus();
     const value = triggers[next]?.dataset.value;
@@ -79,6 +93,7 @@ export function StudioUiTabsList({
     <div
       ref={listRef}
       role="tablist"
+      aria-orientation={orientation}
       className={cn("stu-tabs__list", className)}
       onKeyDown={onKeyDown}
       {...props}

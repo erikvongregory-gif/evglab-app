@@ -69,6 +69,8 @@ export {
   StudioUiDropdownMenuTrigger,
   type StudioUiDropdownMenuContentProps,
   type StudioUiDropdownMenuItemProps,
+  type StudioUiDropdownMenuProps,
+  type StudioUiDropdownMenuTriggerProps,
 } from "./dropdown-menu";
 export {
   StudioUiDialog,
