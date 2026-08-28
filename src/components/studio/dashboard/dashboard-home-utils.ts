@@ -102,10 +102,47 @@ export function planLabelFromKey(plan: string | null, unlimited: boolean) {
 }
 
 export function tokenCostForMedia(item: DashboardHomeMediaItem) {
-  if (typeof item.generation?.tokenCost === "number" && Number.isFinite(item.generation.tokenCost)) {
-    return item.generation.tokenCost;
+  const stored = item.generation?.tokenCost;
+  if (typeof stored === "number" && Number.isFinite(stored) && stored >= 0) {
+    return stored;
   }
   return calculateGenerationTokenCost({ resolution: item.resolution, variantCount: 1 });
+}
+
+export type ChargesTotalSource = "unique-charge-numbers" | "mediathek-entries" | "estimated-from-counter";
+
+export function chargesTotalSource(
+  summary: DashboardHomeSummary | null,
+  media: DashboardHomeMediaItem[],
+): ChargesTotalSource {
+  const chargeNumbers = media
+    .map((m) => m.generation?.chargeNumber)
+    .filter((n): n is number => typeof n === "number" && n >= 1);
+  if (chargeNumbers.length > 0) return "unique-charge-numbers";
+
+  const total = deriveChargesTotal(summary, media);
+  if (media.length > 0 && total === media.length) return "mediathek-entries";
+  return "estimated-from-counter";
+}
+
+export function describeChargesTotalKpi(summary: DashboardHomeSummary | null, media: DashboardHomeMediaItem[]) {
+  switch (chargesTotalSource(summary, media)) {
+    case "unique-charge-numbers":
+      return {
+        label: "Generierungen gesamt",
+        subtitle: "Eindeutige Chargennummern in der Mediathek",
+      };
+    case "mediathek-entries":
+      return {
+        label: "Motive gesamt",
+        subtitle: "Einträge in der Mediathek",
+      };
+    default:
+      return {
+        label: "Generierungen gesamt",
+        subtitle: "Geschätzt aus internem Zähler",
+      };
+  }
 }
 
 export function deriveChargesTotal(summary: DashboardHomeSummary | null, media: DashboardHomeMediaItem[]) {
@@ -164,18 +201,54 @@ export function canOfferAllTokenRanges(media: DashboardHomeMediaItem[]) {
   return spanDays >= TOKEN_RANGE_DAYS["365d"];
 }
 
+export function shouldShowTokenChart(points: { date: string; tokens: number }[]) {
+  if (points.length === 0) return false;
+  return points.some((p) => p.tokens > 0);
+}
+
+export function chartHasVariation(points: { date: string; tokens: number }[]) {
+  if (points.length <= 1) return false;
+  const first = points[0]!.tokens;
+  return points.some((p) => p.tokens !== first);
+}
+
+export function formatChartTextAlternative(
+  points: { date: string; tokens: number }[],
+  total: number,
+  rangeDays: number,
+) {
+  if (points.length === 0) {
+    return `Kein Token-Verbrauch in den letzten ${rangeDays} Tagen.`;
+  }
+  const peak = points.reduce((best, p) => (p.tokens > best.tokens ? p : best), points[0]!);
+  const peakDate = new Date(peak.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  return `Tokens pro Tag: ${formatDeNumber(total)} Tokens gesamt in ${rangeDays} Tagen. Höchster Tagesverbrauch ${formatDeNumber(peak.tokens)} am ${peakDate}.`;
+}
+
+function safeChartCoord(value: number, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
 export function buildChartPaths(points: { date: string; tokens: number }[], width = 720, height = 190) {
-  if (points.length === 0) return { linePath: "", areaPath: "", labels: [] as string[] };
+  if (points.length === 0) {
+    return { linePath: "", areaPath: "", labels: [] as string[], maxTokens: 0, coords: [] as { x: number; y: number }[] };
+  }
 
   const padX = 8;
   const padY = 12;
   const innerW = width - padX * 2;
   const innerH = height - padY * 2;
-  const maxTokens = Math.max(...points.map((p) => p.tokens), 1);
+  const sanitized = points.map((p) => ({
+    date: p.date,
+    tokens: safeChartCoord(p.tokens, 0),
+  }));
+  const maxTokens = Math.max(...sanitized.map((p) => p.tokens), 1);
 
-  const coords = points.map((p, i) => {
-    const x = padX + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
-    const y = padY + innerH - (p.tokens / maxTokens) * innerH;
+  const coords = sanitized.map((p, i) => {
+    const x = safeChartCoord(
+      padX + (sanitized.length === 1 ? innerW / 2 : (i / (sanitized.length - 1)) * innerW),
+    );
+    const y = safeChartCoord(padY + innerH - (p.tokens / maxTokens) * innerH, padY + innerH);
     return { x, y, date: p.date, tokens: p.tokens };
   });
 
@@ -190,7 +263,17 @@ export function buildChartPaths(points: { date: string; tokens: number }[], widt
       new Date(c.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" }),
     );
 
-  return { linePath, areaPath, labels, maxTokens };
+  return { linePath, areaPath, labels, maxTokens, coords };
+}
+
+export function chartPathsWithinBounds(
+  paths: Pick<ReturnType<typeof buildChartPaths>, "coords">,
+  width = 720,
+  height = 190,
+) {
+  return paths.coords.every(
+    (c) => c.x >= 0 && c.x <= width && c.y >= 0 && c.y <= height && Number.isFinite(c.x) && Number.isFinite(c.y),
+  );
 }
 
 export function missingBrandFields(settings: DashboardHomeSettings | null) {
@@ -242,7 +325,9 @@ export function mediaChargeLabel(item: DashboardHomeMediaItem) {
 export function tokensAvailablePct(remaining: number, monthly: number, unlimited: boolean) {
   if (unlimited) return null;
   if (monthly <= 0) return null;
-  return Math.round((remaining / monthly) * 100);
+  const pct = Math.round((remaining / monthly) * 100);
+  if (!Number.isFinite(pct)) return null;
+  return Math.max(0, Math.min(100, pct));
 }
 
 export function tokensUsed(summary: DashboardHomeSummary | null, unlimited: boolean) {

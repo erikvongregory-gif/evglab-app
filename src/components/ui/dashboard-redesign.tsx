@@ -1,5 +1,6 @@
 "use client";
 
+import "@/styles/studio-dashboard-home.css";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";

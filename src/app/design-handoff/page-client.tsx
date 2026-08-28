@@ -58,12 +58,14 @@ const MOCK_DASHBOARD_SUMMARY: DashboardHomeSummary = {
   tokens: { monthly: 1600, used: 360, remaining: 1240 },
   periodEnd: new Date(Date.now() + 1000 * 60 * 60 * 24 * 4).toISOString(),
   postsThisMonth: 12,
-  chargesTotal: 148,
+  chargesTotal: 8,
   teamMembers: 3,
   openInvites: 1,
   billingStatus: "active",
   plan: "pro",
 };
+
+const MOCK_DAILY_TOKEN_COSTS = [45, 30, 60, 25, 50, 35, 55, 40];
 
 const MOCK_DASHBOARD_MEDIA: DashboardHomeMediaItem[] = Array.from({ length: 8 }).map((_, i) => ({
   id: `gen-${i + 1}`,
@@ -75,8 +77,8 @@ const MOCK_DASHBOARD_MEDIA: DashboardHomeMediaItem[] = Array.from({ length: 8 })
   resolution: "2K" as const,
   generation: {
     mode: (["hyperreal", "campaign", "studio", "isolate"] as const)[i % 4],
-    tokenCost: 30 + i * 5,
-    chargeNumber: 148 - i,
+    tokenCost: MOCK_DAILY_TOKEN_COSTS[i] ?? 35,
+    chargeNumber: 8 - i,
   },
 }));
 

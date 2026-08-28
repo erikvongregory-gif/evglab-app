@@ -17,7 +17,10 @@ import {
   brandStatusLabel,
   buildChartPaths,
   canOfferAllTokenRanges,
+  chartHasVariation,
   deriveChargesTotal,
+  describeChargesTotalKpi,
+  formatChartTextAlternative,
   formatDashboardDate,
   formatDeNumber,
   formatPeriodEnd,
@@ -26,6 +29,7 @@ import {
   mediaRowTitle,
   missingBrandFields,
   planLabelFromKey,
+  shouldShowTokenChart,
   TOKEN_RANGE_DAYS,
   tokenCostForMedia,
   tokensAvailablePct,
@@ -35,6 +39,7 @@ import {
   type DashboardHomeSummary,
   type TokenRangeKey,
 } from "./dashboard-home-utils";
+import { StudioIcon } from "@/components/studio/icons";
 
 type DashboardTab = "dashboard" | "media" | "team" | "brand" | "settings" | "pricing";
 
@@ -119,6 +124,7 @@ export function DashboardHomeView({
 
   const motifsThisMonth = summary?.postsThisMonth;
   const chargesTotal = summaryLoaded ? deriveChargesTotal(summary, media) : null;
+  const chargesKpi = useMemo(() => describeChargesTotalKpi(summary, media), [summary, media]);
   const teamMembers = summary?.teamMembers;
   const openInvites = summary?.openInvites ?? 0;
   const availPct = remaining != null ? tokensAvailablePct(remaining, monthly, unlimited) : null;
@@ -137,6 +143,8 @@ export function DashboardHomeView({
     [sortedMedia, activeRange],
   );
   const chart = useMemo(() => buildChartPaths(tokenSeries.points), [tokenSeries.points]);
+  const showChart = shouldShowTokenChart(tokenSeries.points);
+  const chartAlt = formatChartTextAlternative(tokenSeries.points, tokenSeries.total, TOKEN_RANGE_DAYS[activeRange]);
 
   const brandMissing = missingBrandFields(settings);
   const brandActive = brandProfileActiveFromSettings(settings);
@@ -207,7 +215,7 @@ export function DashboardHomeView({
               <div className="stu-dash-home__kpi-head">
                 <span className="stu-dash-home__kpi-label">Tokens übrig</span>
                 <span className="stu-dash-home__kpi-icon stu-dash-home__kpi-icon--accent" aria-hidden="true">
-                  ⚡
+                  <StudioIcon name="bolt" size={14} />
                 </span>
               </div>
               {unlimited ? (
@@ -244,7 +252,7 @@ export function DashboardHomeView({
               <div className="stu-dash-home__kpi-head">
                 <span className="stu-dash-home__kpi-label">Generierungen</span>
                 <span className="stu-dash-home__kpi-icon" aria-hidden="true">
-                  ✦
+                  <StudioIcon name="sparkles" size={14} />
                 </span>
               </div>
               <div className="stu-dash-home__kpi-value">
@@ -255,22 +263,22 @@ export function DashboardHomeView({
 
             <StudioUiCard padding="md" className="stu-dash-home__enter">
               <div className="stu-dash-home__kpi-head">
-                <span className="stu-dash-home__kpi-label">Chargen gesamt</span>
+                <span className="stu-dash-home__kpi-label">{chargesKpi.label}</span>
                 <span className="stu-dash-home__kpi-icon" aria-hidden="true">
-                  ▦
+                  <StudioIcon name="grid" size={14} />
                 </span>
               </div>
               <div className="stu-dash-home__kpi-value">
                 {chargesTotal != null ? formatDeNumber(chargesTotal) : "—"}
               </div>
-              <p className="stu-dash-home__kpi-meta">Abgeschlossene Generierungen</p>
+              <p className="stu-dash-home__kpi-meta">{chargesKpi.subtitle}</p>
             </StudioUiCard>
 
             <StudioUiCard padding="md" className="stu-dash-home__enter">
               <div className="stu-dash-home__kpi-head">
                 <span className="stu-dash-home__kpi-label">Teammitglieder</span>
                 <span className="stu-dash-home__kpi-icon" aria-hidden="true">
-                  👥
+                  <StudioIcon name="users" size={14} />
                 </span>
               </div>
               <div className="stu-dash-home__kpi-value">
@@ -289,8 +297,8 @@ export function DashboardHomeView({
           <StudioUiCard padding="md" className="stu-dash-home__enter">
             <div className="stu-dash-home__card-head">
               <div>
-                <h2 className="stu-dash-home__card-title">Token-Verbrauch</h2>
-                <p className="stu-dash-home__card-sub">Generierungen im Zeitverlauf (Bilder)</p>
+                <h2 className="stu-dash-home__card-title">Tokens pro Tag</h2>
+                <p className="stu-dash-home__card-sub">Täglicher Token-Verbrauch aus der Mediathek</p>
               </div>
               {showRangeTabs ? (
                 <div className="stu-dash-home__range-tabs" role="group" aria-label="Zeitraum">
@@ -312,10 +320,10 @@ export function DashboardHomeView({
             <div className="stu-dash-home__chart-legend">
               <div className="stu-dash-home__chart-legend-item">
                 <span className="stu-dash-home__chart-legend-dot" />
-                Bilder
+                Tokens pro Tag
               </div>
               <div className="stu-dash-home__chart-total" aria-live="polite">
-                {loadingChart ? "…" : `${formatDeNumber(tokenSeries.total)} Tokens (${TOKEN_RANGE_DAYS[activeRange]} Tage)`}
+                {loadingChart ? "…" : `Summe: ${formatDeNumber(tokenSeries.total)} Tokens (${TOKEN_RANGE_DAYS[activeRange]} Tage)`}
               </div>
             </div>
 
@@ -323,11 +331,11 @@ export function DashboardHomeView({
               <div className="stu-dash-home__chart-empty">
                 <StudioUiSkeleton style={{ width: "100%", height: 196, borderRadius: 8 }} />
               </div>
-            ) : tokenSeries.points.length === 0 ? (
+            ) : !showChart ? (
               <div className="stu-dash-home__chart-empty" role="status">
                 <div>
                   <strong style={{ color: "var(--t1)", display: "block", marginBottom: 6 }}>Noch kein Verlauf</strong>
-                  Sobald du Motive generierst, erscheint hier der Token-Verbrauch nach Datum.
+                  Sobald du Motive generierst, erscheint hier der tägliche Token-Verbrauch.
                   <div style={{ marginTop: 12 }}>
                     <Link href={createHref} className="stu-btn stu-btn--primary stu-btn--sm" style={{ textDecoration: "none" }}>
                       {hasActivePlan ? "Erstes Motiv erstellen" : "Tarif wählen"}
@@ -340,7 +348,7 @@ export function DashboardHomeView({
                 <svg
                   viewBox="0 0 720 190"
                   role="img"
-                  aria-label={`Token-Verbrauch: ${formatDeNumber(tokenSeries.total)} Tokens in ${TOKEN_RANGE_DAYS[activeRange]} Tagen`}
+                  aria-label={chartAlt}
                   style={{ width: "100%", height: "auto", display: "block" }}
                 >
                   <defs>
@@ -352,17 +360,43 @@ export function DashboardHomeView({
                   {[12, 56, 100, 144].map((y) => (
                     <line key={y} x1="0" y1={y} x2="720" y2={y} stroke="var(--line)" strokeWidth="1" />
                   ))}
-                  <path d={chart.areaPath} fill="url(#stu-dash-area)" />
-                  <path d={chart.linePath} fill="none" stroke="var(--ac)" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
+                  {tokenSeries.points.length === 1 ? (
+                    <>
+                      <rect
+                        x={chart.coords[0]!.x - 6}
+                        y={chart.coords[0]!.y}
+                        width={12}
+                        height={190 - 12 - chart.coords[0]!.y}
+                        rx={3}
+                        fill="url(#stu-dash-area)"
+                      />
+                      <circle cx={chart.coords[0]!.x} cy={chart.coords[0]!.y} r={4.5} fill="var(--ac)" />
+                    </>
+                  ) : (
+                    <>
+                      <path d={chart.areaPath} fill="url(#stu-dash-area)" />
+                      <path
+                        d={chart.linePath}
+                        fill="none"
+                        stroke="var(--ac)"
+                        strokeWidth="2.2"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    </>
+                  )}
                 </svg>
                 <div className="stu-dash-home__chart-axis" aria-hidden="true">
                   {chart.labels.map((label) => (
                     <span key={label}>{label}</span>
                   ))}
                 </div>
-                <p className="sr-only">
-                  Maximal {formatDeNumber(chart.maxTokens ?? 0)} Tokens an einem Tag in diesem Zeitraum.
-                </p>
+                <p className="sr-only">{chartAlt}</p>
+                {!chartHasVariation(tokenSeries.points) && tokenSeries.points.length > 1 ? (
+                  <p className="stu-dash-home__chart-note" role="note">
+                    Gleichbleibender Tagesverbrauch in diesem Zeitraum.
+                  </p>
+                ) : null}
               </div>
             )}
           </StudioUiCard>

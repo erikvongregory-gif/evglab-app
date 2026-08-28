@@ -104,6 +104,10 @@
   color: var(--t2);
 }
 
+.stu-dash-home__kpi-icon svg {
+  flex: none;
+}
+
 .stu-dash-home__kpi-icon--accent {
   background: var(--ac-tint);
   color: var(--ac);
@@ -158,6 +162,13 @@
 
 .stu-dash-home__chart-wrap {
   margin-top: 14px;
+}
+
+.stu-dash-home__chart-note {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--t3);
+  line-height: 1.45;
 }
 
 .stu-dash-home__chart-legend {
@@ -420,6 +431,7 @@
 @media (max-width: 639px) {
   .stu-dash-home {
     gap: 10px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   }
   .stu-dash-home__head {
     align-items: flex-start;
@@ -436,7 +448,21 @@
   }
   .stu-dash-home__kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: 8px;
+  }
+  .stu-dash-home__kpi-grid .stu-card {
+    padding: 12px 10px;
+  }
+  .stu-dash-home__kpi-value {
+    margin-top: 10px;
+    font-size: 22px;
+  }
+  .stu-dash-home__kpi-label {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+  }
+  .stu-dash-home__kpi-meta {
+    font-size: 10.5px;
   }
   .stu-dash-home__table-wrap {
     display: none;
@@ -450,7 +476,7 @@
   }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 350px) {
   .stu-dash-home__kpi-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -459,5 +485,95 @@
 @media (prefers-reduced-motion: reduce) {
   .stu-dash-home__enter {
     animation: none;
+  }
+}
+
+/* T4.1 — Shell-Topbar: Suche nur bei ausreichender Breite (Dashboard-Routen) */
+
+.evg-studio .evg-top {
+  flex-wrap: nowrap;
+  min-height: var(--topbar-h, 60px);
+  height: var(--topbar-h, 60px);
+  overflow: hidden;
+}
+
+.evg-studio .evg-shell-topbar-search {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(380px, 32vw);
+}
+
+.evg-studio .evg-shell-topbar-search--desktop {
+  display: block;
+}
+
+.evg-studio .evg-shell-topbar-search-field {
+  position: relative;
+  min-width: 0;
+}
+
+.evg-studio .evg-shell-topbar-search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--t3);
+  pointer-events: none;
+  display: inline-flex;
+}
+
+.evg-studio .evg-shell-topbar-search-input {
+  height: 38px;
+  width: 100%;
+  min-width: 0;
+  padding-left: 38px;
+  padding-right: 58px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.evg-studio .evg-shell-topbar-search-kbd {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10.5px;
+  color: var(--t3);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 6px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.evg-studio .evg-shell-topbar-search-trigger {
+  display: none;
+  flex: none;
+}
+
+@media (max-width: 1023px) {
+  .evg-studio .evg-shell-topbar-search--desktop,
+  .evg-studio .evg-shell-topbar-search-trigger {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1239px) {
+  .evg-studio .evg-shell-topbar-search--desktop {
+    display: block;
+    max-width: 220px;
+  }
+
+  .evg-studio .evg-shell-topbar-search-kbd {
+    display: none;
+  }
+}
+
+@media (min-width: 1240px) {
+  .evg-studio .evg-shell-topbar-search--desktop {
+    max-width: 380px;
   }
 }
