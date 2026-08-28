@@ -746,7 +746,7 @@ function StudioMobileMoreSheet({
 
   return (
     <StudioUiDialog open={open} onOpenChange={onOpenChange}>
-      <StudioUiDialogContent sheetOnMobile showClose aria-describedby={undefined}>
+      <StudioUiDialogContent sheetOnMobile showClose>
         <StudioUiDialogHeader>
           <StudioUiDialogTitle>Mehr</StudioUiDialogTitle>
           <StudioUiDialogDescription>
