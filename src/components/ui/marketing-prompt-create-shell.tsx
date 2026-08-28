@@ -44,6 +44,8 @@ type MarketingPromptCreateShellProps = {
   tokensLabel: string;
   variants: VariantCardState[];
   onSelectVariant?: (index: number) => void;
+  feedError?: string;
+  generationStep?: string;
 };
 
 function aspectRatioCss(value: string): string {
@@ -51,6 +53,152 @@ function aspectRatioCss(value: string): string {
   if (value === "4:5") return "4 / 5";
   if (value === "16:9") return "16 / 9";
   return "1 / 1";
+}
+
+function FeedColumn({
+  variants,
+  cardAspect,
+  loading,
+  generationStep,
+  feedError,
+  onBack,
+  backLabel,
+  onSelectVariant,
+  P,
+}: {
+  variants: VariantCardState[];
+  cardAspect: string;
+  loading: boolean;
+  generationStep?: string;
+  feedError?: string;
+  onBack?: () => void;
+  backLabel?: string;
+  onSelectVariant?: (index: number) => void;
+  P: StudioPalette;
+}) {
+  if (feedError) {
+    return (
+      <div className="studio-create-feed-error" role="alert">
+        <div className="studio-create-feed-error__title">Generierung fehlgeschlagen</div>
+        <p className="studio-create-feed-error__text">{feedError}</p>
+      </div>
+    );
+  }
+
+  if (loading && variants.length > 0 && variants.every((v) => !v.src)) {
+    return (
+      <div className="studio-create-feed-panel studio-create-feed-loading">
+        <div className="studio-create-feed-loading__head">
+          <span className="studio-create-feed-loading__spinner" aria-hidden="true" />
+          <span>{variants.length} Motive werden erzeugt …</span>
+        </div>
+        <div className="studio-create-feed-loading__bar" aria-hidden="true">
+          <span />
+        </div>
+        {generationStep ? <p className="studio-create-feed-loading__hint">{generationStep}</p> : null}
+        <div className="evg-marketing-create__results">
+          {variants.map((variant) => (
+            <div
+              key={variant.index}
+              className="evg-marketing-create__result"
+              style={{ aspectRatio: cardAspect }}
+            >
+              <div className="evg-marketing-create__rendering">
+                <div className="evg-marketing-create__render-ring" aria-hidden="true">
+                  <svg viewBox="0 0 80 80">
+                    <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(245,237,223,0.08)" strokeWidth="6" />
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="34"
+                      fill="none"
+                      stroke={P.accent}
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeDasharray={`${Math.max(8, (variant.progress ?? 12) * 2.13)} 213`}
+                      transform="rotate(-90 40 40)"
+                    />
+                  </svg>
+                </div>
+                <div className="evg-marketing-create__render-label">KI generiert</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (variants.length > 0) {
+    return (
+      <div className="studio-create-feed-panel">
+        <div className="studio-create-feed-panel__head">
+          <div>
+            <div className="studio-create-feed-panel__title">Ergebnisse</div>
+            <div className="studio-create-feed-panel__meta">Tippe auf ein Motiv zum Vergrößern</div>
+          </div>
+        </div>
+        <div className="evg-marketing-create__results" style={{ marginTop: 14 }}>
+          {variants.map((variant) => (
+            <div
+              key={variant.index}
+              className={variant.src ? "evg-marketing-create__result evg-marketing-create__result--done" : "evg-marketing-create__result"}
+              style={{ aspectRatio: cardAspect }}
+            >
+              {variant.src ? (
+                <>
+                  <img src={variant.src} alt={`Variante ${variant.index + 1}`} className="evg-marketing-create__result-img" />
+                  <div className="evg-marketing-create__result-badge">Fertig</div>
+                  <div className="evg-marketing-create__result-bar">
+                    <span>Variante {variant.index + 1}</span>
+                    <button type="button" className="evg-marketing-create__select" onClick={() => onSelectVariant?.(variant.index)}>
+                      Öffnen
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="evg-marketing-create__rendering">
+                  <div className="evg-marketing-create__render-ring" aria-hidden="true">
+                    <svg viewBox="0 0 80 80">
+                      <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(245,237,223,0.08)" strokeWidth="6" />
+                      <circle
+                        cx="40"
+                        cy="40"
+                        r="34"
+                        fill="none"
+                        stroke={P.accent}
+                        strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={`${Math.max(8, (variant.progress ?? 12) * 2.13)} 213`}
+                        transform="rotate(-90 40 40)"
+                      />
+                    </svg>
+                  </div>
+                  <div className="evg-marketing-create__render-label">KI generiert</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        {variants.some((variant) => variant.src) && onBack && !loading ? (
+          <div className="evg-marketing-create__results-nav" style={{ marginTop: 12 }}>
+            <button type="button" className="evg-marketing-create__back" onClick={onBack}>
+              {backLabel}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="studio-create-feed-empty">
+      <div className="studio-create-feed-empty__title">Noch keine Motive</div>
+      <p className="studio-create-feed-empty__text">
+        Konfiguriere links dein Motiv — die Ergebnisse erscheinen hier nach der Generierung.
+      </p>
+    </div>
+  );
 }
 
 export function MarketingPromptCreateShell({
@@ -82,30 +230,29 @@ export function MarketingPromptCreateShell({
   tokensLabel,
   variants,
   onSelectVariant,
+  feedError,
+  generationStep,
 }: MarketingPromptCreateShellProps) {
   const cardAspect = aspectRatioCss(aspectValue);
 
   return (
     <div className="evg-marketing-create">
-      <div className="evg-marketing-create__chrome">
-        <div className="evg-marketing-create__titlebar">
-          <div className="evg-marketing-create__dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="evg-marketing-create__url">app.brewai.de</div>
-          <div className="evg-marketing-create__meta">{brandMeta}</div>
-        </div>
+      <div className="studio-create-workspace">
+        <div className="studio-create-composer">
+          <header className="studio-create-page-head" style={{ marginBottom: 0 }}>
+            <div className="studio-create-page-head__main">
+              <span className="studio-eyebrow">Motiv-Composer</span>
+              <h1 style={{ fontSize: "var(--t-15)", margin: 0 }}>Brief &amp; Einstellungen</h1>
+              <p className="studio-create-composer-meta">{brandMeta}</p>
+            </div>
+          </header>
 
-        <div className="evg-marketing-create__body">
-          <div className="evg-marketing-create__prompt-card">
+          <div className="studio-create-composer-surface">
             <div className="evg-marketing-create__prompt-head">
               <div className="evg-marketing-create__prompt-label">
                 <span className="evg-marketing-create__prompt-accent">Prompt</span>
-                <span> · {promptStepLabel}</span>
+                <span> · Schritt {promptStepLabel}</span>
               </div>
-              <div className="evg-marketing-create__lang">EN ↔ DE</div>
             </div>
 
             <div className="evg-marketing-create__prompt-text" data-tour="prompt" aria-live="polite">
@@ -203,59 +350,6 @@ export function MarketingPromptCreateShell({
             </div>
           </div>
 
-          {variants.length > 0 ? (
-            <div className="evg-marketing-create__results">
-              {variants.map((variant) => (
-                <div
-                  key={variant.index}
-                  className={variant.src ? "evg-marketing-create__result evg-marketing-create__result--done" : "evg-marketing-create__result"}
-                  style={{ aspectRatio: cardAspect }}
-                >
-                  {variant.src ? (
-                    <>
-                      <img src={variant.src} alt={`Variante ${variant.index + 1}`} className="evg-marketing-create__result-img" />
-                      <div className="evg-marketing-create__result-badge">✓ Fertig</div>
-                      <div className="evg-marketing-create__result-bar">
-                        <span>Variante {variant.index + 1}</span>
-                        <button type="button" className="evg-marketing-create__select" onClick={() => onSelectVariant?.(variant.index)}>
-                          Wählen
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="evg-marketing-create__rendering">
-                      <div className="evg-marketing-create__render-ring" aria-hidden="true">
-                        <svg viewBox="0 0 80 80">
-                          <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(245,237,223,0.08)" strokeWidth="6" />
-                          <circle
-                            cx="40"
-                            cy="40"
-                            r="34"
-                            fill="none"
-                            stroke={P.accent}
-                            strokeWidth="6"
-                            strokeLinecap="round"
-                            strokeDasharray={`${Math.max(8, (variant.progress ?? 12) * 2.13)} 213`}
-                            transform="rotate(-90 40 40)"
-                          />
-                        </svg>
-                      </div>
-                      <div className="evg-marketing-create__render-label">KI generiert</div>
-                      <div className="evg-marketing-create__render-pct">{Math.round(variant.progress ?? 12)}%</div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {variants.some((variant) => variant.src) && onBack && !loading ? (
-                <div className="evg-marketing-create__results-nav">
-                  <button type="button" className="evg-marketing-create__back" onClick={onBack}>
-                    {backLabel}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
           <div className="evg-marketing-create__statusbar">
             <div className="evg-marketing-create__brand-chip">
               <div className={`evg-marketing-create__brand-icon${brandStyleActive ? " evg-marketing-create__brand-icon--active" : ""}`} />
@@ -270,6 +364,20 @@ export function MarketingPromptCreateShell({
             <div className="evg-marketing-create__tokens">{tokensLabel}</div>
           </div>
         </div>
+
+        <aside className="studio-create-feed" aria-label="Generierte Motive">
+          <FeedColumn
+            variants={variants}
+            cardAspect={cardAspect}
+            loading={loading}
+            generationStep={generationStep}
+            feedError={feedError}
+            onBack={onBack}
+            backLabel={backLabel}
+            onSelectVariant={onSelectVariant}
+            P={P}
+          />
+        </aside>
       </div>
     </div>
   );

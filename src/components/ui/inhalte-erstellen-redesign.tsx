@@ -1745,12 +1745,7 @@ export function InhalteErstellenRedesign({
               <p style={{ margin: "14px 0 0", fontFamily: STUDIO_TOKENS.mono, fontSize: 11, color: P.ink3 }}>
                 {formatDeNumber(generationTokenCost)} Tokens · {tokensFreeLabel} frei
               </p>
-              {error ? (
-                <p style={{ margin: "10px 0 0", fontSize: 12, color: "#F5A8A8" }} role="alert">
-                  {error}
-                </p>
-              ) : null}
-              {loading && generationStep ? (
+              {loading && generationStep && !error ? (
                 <p style={{ margin: "10px 0 0", fontSize: 12, color: P.ink2 }}>{generationStep}</p>
               ) : null}
             </div>
@@ -1762,84 +1757,30 @@ export function InhalteErstellenRedesign({
   })();
 
   return (
-    <>
+    <div className="studio-create-page">
       {!profileComplete && profileMode !== "skip" ? (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "14px 16px",
-            borderRadius: 12,
-            border: "1px solid rgba(199,105,30,0.25)",
-            background: "rgba(244,216,180,0.45)",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
+        <div className="studio-create-banner studio-create-banner--brand">
           <div>
-            <div style={{ fontFamily: STUDIO_TOKENS.sans, fontWeight: 650, fontSize: 14, color: P.ink }}>Markenprofil empfohlen</div>
-            <div style={{ marginTop: 4, fontFamily: STUDIO_TOKENS.sans, fontSize: 13, color: P.ink2 }}>
+            <div className="studio-create-banner__title">Markenprofil empfohlen</div>
+            <div className="studio-create-banner__text">
               Gib die Website deiner Brauerei ein — die KI erstellt Tonality, Farben und Bildregeln für konsistente Motive.
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setBrandProfileSetupOpen(true)}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              background: "linear-gradient(135deg, #F2A35A 0%, #E66A2B 38%, #C13B1F 100%)",
-              color: "#0A0807",
-              fontFamily: STUDIO_TOKENS.sans,
-              fontWeight: 650,
-              fontSize: 13,
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" className="studio-create-banner__btn studio-create-banner__btn--primary" onClick={() => setBrandProfileSetupOpen(true)}>
             Markenprofil anlegen
           </button>
         </div>
       ) : null}
 
       {referenceImagesStale ? (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: "12px 16px",
-            borderRadius: 12,
-            border: "1px solid rgba(199,105,30,0.35)",
-            background: "rgba(255,238,210,0.7)",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
+        <div className="studio-create-banner studio-create-banner--warn">
           <div>
-            <div style={{ fontFamily: STUDIO_TOKENS.sans, fontWeight: 650, fontSize: 13, color: P.ink }}>Referenzbilder veraltet</div>
-            <div style={{ marginTop: 4, fontFamily: STUDIO_TOKENS.sans, fontSize: 12, color: P.ink2 }}>
+            <div className="studio-create-banner__title">Referenzbilder veraltet</div>
+            <div className="studio-create-banner__text">
               Lade neue Bilder im Markenprofil hoch oder nutze den manuellen Upload im Prompt-Flow.
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setBrandProfileSetupOpen(true)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 10,
-              background: "transparent",
-              color: P.ink,
-              fontFamily: STUDIO_TOKENS.sans,
-              fontWeight: 650,
-              fontSize: 12,
-              border: `1px solid ${P.ruleStrong}`,
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" className="studio-create-banner__btn" onClick={() => setBrandProfileSetupOpen(true)}>
             Referenzen aktualisieren
           </button>
         </div>
@@ -1896,6 +1837,8 @@ export function InhalteErstellenRedesign({
         formatTag={formatTag}
         tokensLabel={tokensStatusLabel}
         variants={variantCards}
+        feedError={isReviewStep && error ? error : undefined}
+        generationStep={generationStep || undefined}
         onSelectVariant={(index) => {
           const src = variantCards[index]?.src;
           if (src) window.open(src, "_blank", "noopener,noreferrer");
@@ -1911,12 +1854,12 @@ export function InhalteErstellenRedesign({
         </p>
       ) : null}
 
-    <BrandProfileSetupModal
-      open={brandProfileSetupOpen}
-      onOpenChange={setBrandProfileSetupOpen}
-      title="Marke einlesen"
-      onSaved={applyBrandScanAndPersist}
-    />
-    </>
+      <BrandProfileSetupModal
+        open={brandProfileSetupOpen}
+        onOpenChange={setBrandProfileSetupOpen}
+        title="Marke einlesen"
+        onSaved={applyBrandScanAndPersist}
+      />
+    </div>
   );
 }
