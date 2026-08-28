@@ -40,6 +40,7 @@ export function StudioOnboardingChecklist() {
   }, [celebrating, markCelebrated]);
 
   if (!onboarding || !onboarding.ready) return null;
+  if (onboarding.suppressLegacyUi) return null;
   if (onboarding.welcomeOpen || onboarding.state.checklistDismissed) return null;
   if (onboarding.complete && !celebrating) return null;
 

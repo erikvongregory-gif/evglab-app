@@ -7,6 +7,8 @@ import { isOwnerUser } from "@/lib/auth/owner";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { hasActiveSubscription } from "@/lib/billing/access";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
+import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
 import { isVideosCreateEnabled } from "@/lib/featureFlags";
 import { CreateContentLockedView } from "@/components/studio/create-content-locked-view";
 import { CreateVideosComingSoonView } from "@/components/studio/create-videos-coming-soon-view";
@@ -44,6 +46,14 @@ export default async function VideosErstellenPage() {
 
   if (!user) {
     redirect("/anmelden");
+  }
+
+  if (
+    needsFullOnboardingFlow(
+      sanitizeStudioOnboardingState(getDashboardMetadata(user.user_metadata).onboarding),
+    )
+  ) {
+    redirect("/onboarding");
   }
 
   if (!isVideosCreateEnabled()) {

@@ -45,3 +45,7 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# T-ONB2 local prototype extract (nicht committen)
+_t-onb2-prototype/
+

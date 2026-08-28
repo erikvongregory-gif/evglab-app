@@ -150,7 +150,11 @@ export function StudioOnboardingHints({ area }: { area: string }) {
   const steps = useMemo(() => TOURS[area] ?? [], [area]);
   const hints = onboarding?.state.hints;
   const seen = useMemo(() => hints ?? [], [hints]);
-  const active = Boolean(onboarding?.ready) && !onboarding?.welcomeOpen && settledArea === area;
+  const active =
+    Boolean(onboarding?.ready) &&
+    !onboarding?.suppressLegacyUi &&
+    !onboarding?.welcomeOpen &&
+    settledArea === area;
 
   const stepIndex = spot ? steps.findIndex((entry) => entry.id === spot.id) : -1;
   const step = stepIndex >= 0 ? steps[stepIndex] : undefined;

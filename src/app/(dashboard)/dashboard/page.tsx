@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
 import { DashboardRedesignShell } from "@/components/ui/dashboard-redesign";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,13 @@ export default async function DashboardPage({
     }
     const qs = loginQuery.toString();
     redirect(qs ? `/anmelden?${qs}` : "/anmelden");
+  }
+
+  const onboardingState = sanitizeStudioOnboardingState(
+    getDashboardMetadata(user.user_metadata).onboarding,
+  );
+  if (needsFullOnboardingFlow(onboardingState)) {
+    redirect("/onboarding");
   }
 
   const dashboard = getDashboardMetadata(user.user_metadata);

@@ -15,6 +15,7 @@ import {
   isStudioOnboardingComplete,
   requiredTasksDone,
   sanitizeStudioOnboardingState,
+  shouldSuppressLegacyOnboardingUi,
   STUDIO_ONBOARDING_REQUIRED_TASKS,
   type StudioOnboardingProgress,
   type StudioOnboardingState,
@@ -46,6 +47,8 @@ type StudioOnboardingContextValue = {
   totalCount: number;
   complete: boolean;
   welcomeOpen: boolean;
+  /** Legacy Welcome/Checklist/Hints unterdrücken (v2-Flow). */
+  suppressLegacyUi: boolean;
   closeWelcome: () => void;
   dismissChecklist: () => void;
   markCelebrated: () => void;
@@ -165,7 +168,9 @@ export function StudioOnboardingProvider({ children }: { children: ReactNode }) 
   const tasks = useMemo(() => buildTasks(progress), [progress]);
 
   const value = useMemo<StudioOnboardingContextValue>(
-    () => ({
+    () => {
+      const suppressLegacyUi = shouldSuppressLegacyOnboardingUi(state);
+      return {
       ready,
       state,
       progress,
@@ -173,7 +178,8 @@ export function StudioOnboardingProvider({ children }: { children: ReactNode }) 
       doneCount: requiredTasksDone(progress),
       totalCount: STUDIO_ONBOARDING_REQUIRED_TASKS.length,
       complete: isStudioOnboardingComplete(progress),
-      welcomeOpen: ready && !state.welcome,
+      welcomeOpen: ready && !state.welcome && !suppressLegacyUi,
+      suppressLegacyUi,
       closeWelcome: () => patch({ welcome: true }),
       dismissChecklist: () => patch({ checklistDismissed: true }),
       markCelebrated: () => patch({ celebrated: true, checklistDismissed: true }),
@@ -184,9 +190,35 @@ export function StudioOnboardingProvider({ children }: { children: ReactNode }) 
         if (unchanged) return;
         patch({ hints: next });
       },
-      restart: () =>
-        patch({ welcome: false, checklistDismissed: false, celebrated: false, hints: [] }),
-    }),
+      restart: () => {
+        const reset = sanitizeStudioOnboardingState({
+          welcome: false,
+          checklistDismissed: false,
+          celebrated: false,
+          hints: [],
+          flowVersion: 2,
+          currentStep: 1,
+        });
+        setState(reset);
+        void fetch("/api/dashboard/onboarding", {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            welcome: false,
+            checklistDismissed: false,
+            celebrated: false,
+            hints: [],
+            flowVersion: 2,
+            currentStep: 1,
+            completedAt: null,
+          }),
+        }).finally(() => {
+          window.location.assign("/onboarding");
+        });
+      },
+    };
+    },
     [ready, state, progress, tasks, patch],
   );
 

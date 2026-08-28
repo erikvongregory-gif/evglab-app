@@ -1,0 +1,847 @@
+/* T-ONB2 — Fullscreen Onboarding Flow */
+
+.evg-onb {
+  --onb-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  min-height: 100dvh;
+  background: var(--bg, #0f0906);
+  color: var(--t1);
+  font-family: var(--f-sans, "Work Sans", sans-serif);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.evg-onb::before {
+  content: "";
+  position: absolute;
+  inset: -20% -10% auto auto;
+  width: min(560px, 70vw);
+  height: min(560px, 70vw);
+  background: radial-gradient(circle, rgba(201, 162, 77, 0.06) 0%, transparent 68%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.evg-onb-shell {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--s1);
+}
+
+.evg-onb-rail {
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+.evg-onb-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.evg-onb-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--ac-tint2, rgba(201, 162, 77, 0.2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.evg-onb-brand-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--t1);
+  line-height: 1.15;
+}
+
+.evg-onb-brand-sub {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--t3);
+}
+
+.evg-onb-rail-label {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--t3);
+  padding: 0 8px 10px;
+}
+
+.evg-onb-rail-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evg-onb-rail-step {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 8px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t3);
+  text-align: left;
+  transition:
+    background 220ms var(--onb-ease),
+    color 220ms var(--onb-ease);
+}
+
+.evg-onb-rail-step:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.evg-onb-rail-step[data-active="true"] {
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-onb-rail-step[data-done="true"]:not([data-active="true"]) {
+  color: var(--t2);
+}
+
+.evg-onb-rail-active {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: var(--ac-tint, rgba(201, 162, 77, 0.1));
+  box-shadow: inset 2px 0 0 var(--ac);
+  z-index: 0;
+}
+
+.evg-onb-rail-step > *:not(.evg-onb-rail-active) {
+  position: relative;
+  z-index: 1;
+}
+
+.evg-onb-rail-dot {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  border: 1px solid var(--line2);
+  color: var(--t3);
+  background: transparent;
+}
+
+.evg-onb-rail-step[data-active="true"] .evg-onb-rail-dot {
+  border-color: var(--ac);
+  color: var(--ac);
+}
+
+.evg-onb-rail-step[data-done="true"] .evg-onb-rail-dot {
+  background: var(--ac);
+  border-color: var(--ac);
+  color: var(--ac-ink, #1a1207);
+}
+
+.evg-onb-rail-step-title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.evg-onb-rail-step-sub {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--t3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.evg-onb-rail-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.evg-onb-progress-track {
+  height: 4px;
+  border-radius: 100px;
+  background: var(--s3);
+  overflow: hidden;
+}
+
+.evg-onb-progress-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: var(--ac);
+  transform-origin: left center;
+  transition: transform 260ms var(--onb-ease);
+}
+
+.evg-onb-progress-label {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--t3);
+}
+
+.evg-onb-rail-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--t3);
+  text-wrap: pretty;
+}
+
+.evg-onb-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--s1);
+}
+
+.evg-onb-topbar {
+  flex: none;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  display: none;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.evg-onb-topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.evg-onb-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-onb-content {
+  flex: 1;
+  overflow: auto;
+  padding: 40px 56px 40px 56px;
+  min-width: 0;
+}
+
+.evg-onb-content-inner {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  min-width: 0;
+}
+
+.evg-onb-kicker {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--ac);
+  margin-bottom: 10px;
+}
+
+.evg-onb-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--t1);
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+  outline: none;
+}
+
+.evg-onb-lead {
+  margin-top: 7px;
+  max-width: 58ch;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--t2);
+  text-wrap: pretty;
+}
+
+.evg-onb-rule {
+  height: 1px;
+  background: var(--line);
+  margin: 24px 0;
+}
+
+.evg-onb-footer {
+  flex: none;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+  /* Match .evg-onb-content horizontal padding — full workspace, no width formula. */
+  padding: 14px 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+}
+
+.evg-onb-btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    background 180ms var(--onb-ease),
+    border-color 180ms var(--onb-ease),
+    color 180ms var(--onb-ease),
+    opacity 120ms var(--onb-ease),
+    transform 80ms ease;
+}
+
+.evg-onb-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.evg-onb-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.evg-onb-btn--ghost {
+  background: transparent;
+  border: 1px solid var(--line2);
+  color: var(--t2);
+}
+
+.evg-onb-btn--ghost:hover:not(:disabled) {
+  color: var(--t1);
+  border-color: var(--line2);
+}
+
+.evg-onb-btn--text {
+  background: none;
+  border: none;
+  color: var(--t3);
+  padding: 0 12px;
+}
+
+.evg-onb-btn--text:hover:not(:disabled) {
+  color: var(--t1);
+}
+
+.evg-onb-btn--primary {
+  background: var(--ac);
+  border: none;
+  color: var(--ac-ink, #1a1207);
+  font-weight: 600;
+  padding: 0 20px;
+}
+
+.evg-onb-btn--primary:hover:not(:disabled) {
+  background: var(--ac-2, #ddba6a);
+}
+
+.evg-onb-btn--soft {
+  background: var(--s3);
+  border: 1px solid var(--line2);
+  color: var(--t1);
+}
+
+.evg-onb-btn--soft:hover:not(:disabled) {
+  background: var(--s4, #332618);
+}
+
+.evg-onb-btn--lg {
+  height: 42px;
+  font-size: 13.5px;
+  padding: 0 18px;
+}
+
+.evg-onb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.evg-onb-label {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--t3);
+}
+
+.evg-onb-input,
+.evg-onb-textarea,
+.evg-onb-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line2);
+  background: var(--bg, var(--s1));
+  color: var(--t1);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color 120ms var(--onb-ease),
+    background 120ms var(--onb-ease),
+    box-shadow 120ms var(--onb-ease);
+}
+
+.evg-onb-textarea {
+  height: auto;
+  padding: 10px 12px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 84px;
+}
+
+.evg-onb-input:focus-visible,
+.evg-onb-textarea:focus-visible,
+.evg-onb-select:focus-visible {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--ac-tint, rgba(201, 162, 77, 0.1));
+}
+
+.evg-onb-field[data-invalid="true"] .evg-onb-input,
+.evg-onb-field[data-invalid="true"] .evg-onb-textarea {
+  border-color: var(--err, #c45c4a);
+}
+
+.evg-onb-error {
+  font-size: 12px;
+  color: var(--err, #c45c4a);
+  margin: 0;
+}
+
+.evg-onb-panel {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 15px 18px;
+  border-radius: 12px;
+  background: var(--s2);
+  border: 1px solid var(--line);
+}
+
+.evg-onb-info {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 15px;
+  border-radius: 8px;
+  background: var(--info-tint, rgba(110, 147, 184, 0.14));
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--t2);
+}
+
+.evg-onb-empty {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 28px 18px;
+  border-radius: 12px;
+  border: 1px dashed var(--line2);
+  background: var(--s2);
+  text-align: center;
+}
+
+.evg-onb-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.evg-onb-stack--lg {
+  gap: 18px;
+}
+
+.evg-onb-grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.evg-onb-swatches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.evg-onb-swatch {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px 8px 9px;
+  border-radius: 8px;
+  background: var(--s2);
+  border: 1px solid var(--line);
+}
+
+.evg-onb-swatch-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: none;
+}
+
+.evg-onb-swatch-hex {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 11.5px;
+  color: var(--t2);
+}
+
+.evg-onb-scan {
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--s2);
+}
+
+.evg-onb-scan-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.evg-onb-scan-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 100px;
+  background: var(--ac);
+  box-shadow: 0 0 0 0 rgba(201, 162, 77, 0.45);
+  animation: evg-onb-pulse 1.6s var(--onb-ease) infinite;
+}
+
+@keyframes evg-onb-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 77, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(201, 162, 77, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 77, 0);
+  }
+}
+
+.evg-onb-scan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evg-onb-scan-list li {
+  font-size: 12.5px;
+  color: var(--t3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.evg-onb-scan-list li[data-active="true"] {
+  color: var(--t1);
+}
+
+.evg-onb-scan-list li[data-done="true"] {
+  color: var(--t2);
+}
+
+.evg-onb-skeleton {
+  height: 72px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--s2) 0%, var(--s3) 50%, var(--s2) 100%);
+  background-size: 200% 100%;
+  animation: evg-onb-shimmer 1.8s linear infinite;
+}
+
+@keyframes evg-onb-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.evg-onb-tone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evg-onb-chip {
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--s2);
+  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+.evg-onb-beer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  background: var(--s2);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.evg-onb-beer-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evg-onb-beer-meta {
+  flex: none;
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 11px;
+  color: var(--t3);
+}
+
+.evg-onb-empty h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-onb-empty p {
+  margin: 6px auto 0;
+  max-width: 62ch;
+  font-size: 12.5px;
+  color: var(--t3);
+  line-height: 1.55;
+}
+
+.evg-onb-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.evg-onb-summary-row:last-child {
+  border-bottom: none;
+}
+
+.evg-onb-summary-label {
+  flex: none;
+  width: 118px;
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--t3);
+}
+
+.evg-onb-summary-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evg-onb-token-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--ac-tint, rgba(201, 162, 77, 0.1));
+  border: 1px solid var(--ac-line, rgba(201, 162, 77, 0.28));
+}
+
+.evg-onb-token-value {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ac);
+  letter-spacing: -0.02em;
+}
+
+.evg-onb-success {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.evg-onb-success-mark {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+}
+
+.evg-onb-success-glow {
+  position: absolute;
+  inset: -12px;
+  border-radius: 100px;
+  background: radial-gradient(circle, rgba(201, 162, 77, 0.08), transparent 70%);
+  pointer-events: none;
+}
+
+.evg-onb-success-ring {
+  width: 56px;
+  height: 56px;
+  border-radius: 100px;
+  border: 2px solid var(--ac);
+  display: grid;
+  place-items: center;
+}
+
+.evg-onb-cta-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.evg-onb-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 1239px) {
+  .evg-onb-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evg-onb-rail {
+    display: none;
+  }
+
+  .evg-onb-topbar {
+    display: flex;
+  }
+
+  .evg-onb-content {
+    padding: 28px 24px;
+  }
+
+  .evg-onb-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    padding: 14px 24px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 639px) {
+  .evg-onb-content {
+    padding: 20px 16px 24px;
+  }
+
+  .evg-onb-footer {
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .evg-onb-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evg-onb-summary-label {
+    width: 92px;
+  }
+
+  .evg-onb-btn {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-onb-scan-pulse,
+  .evg-onb-skeleton {
+    animation: none !important;
+  }
+
+  .evg-onb-progress-fill,
+  .evg-onb-btn,
+  .evg-onb-rail-step,
+  .evg-onb-input,
+  .evg-onb-textarea {
+    transition: none !important;
+  }
+}
+
+@media (hover: hover) {
+  .evg-onb-beer-row[data-interactive="true"]:hover {
+    background: var(--s3);
+    border-color: var(--line2);
+  }
+}

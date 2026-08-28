@@ -19,6 +19,10 @@ const patchSchema = z.object({
   checklistDismissed: z.boolean().optional(),
   celebrated: z.boolean().optional(),
   hints: z.array(z.string().max(40)).max(24).optional(),
+  flowVersion: z.literal(2).optional(),
+  currentStep: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
+  /** ISO string oder null zum Zurücksetzen (Restart). */
+  completedAt: z.union([z.string().max(40), z.null()]).optional(),
 });
 
 async function deriveProgress(
@@ -96,7 +100,7 @@ export async function PATCH(req: Request) {
   const current = sanitizeStudioOnboardingState(
     getDashboardMetadata(user.user_metadata).onboarding,
   );
-  const next = mergeStudioOnboardingState(current, parsed.data);
+  const next = mergeStudioOnboardingState(current, parsed.data as Parameters<typeof mergeStudioOnboardingState>[1]);
   const { error } = await supabase.auth.updateUser({
     data: mergeDashboardMetadata(user.user_metadata, { onboarding: next }),
   });

@@ -53,6 +53,7 @@ export async function middleware(request: NextRequest) {
 
   const needsAuthSession =
     pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/onboarding") ||
     (pathname.startsWith("/admin") && pathname !== "/admin/anmelden") ||
     pathname.startsWith("/invite") ||
     pathname.startsWith("/inhalte-erstellen") ||

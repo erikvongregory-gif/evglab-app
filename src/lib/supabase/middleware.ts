@@ -80,7 +80,7 @@ export async function updateSession(request: NextRequest) {
     return redirect;
   }
 
-  if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/admin"))) {
+  if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/admin") || pathname.startsWith("/onboarding"))) {
     const loginUrl = new URL("/anmelden", request.url);
     for (const key of ["plan", "checkout", "source", "tab"] as const) {
       const value = request.nextUrl.searchParams.get(key);

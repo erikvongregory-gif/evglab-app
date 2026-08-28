@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
 import { getBrandProfileFromMetadata, isBrandProfileActive, isBrandProfileComplete } from "@/lib/dashboard/brandProfile";
 import { isOwnerUser } from "@/lib/auth/owner";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
@@ -44,6 +45,14 @@ export default async function InhalteErstellenPage() {
 
   if (!user) {
     redirect("/anmelden");
+  }
+
+  if (
+    needsFullOnboardingFlow(
+      sanitizeStudioOnboardingState(getDashboardMetadata(user.user_metadata).onboarding),
+    )
+  ) {
+    redirect("/onboarding");
   }
 
   const dashboard = getDashboardMetadata(user.user_metadata);

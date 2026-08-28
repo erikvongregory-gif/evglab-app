@@ -1,0 +1,92 @@
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { OnboardingFlow } from "@/components/studio/onboarding/flow/onboarding-flow";
+import type { OnboardingBootstrap } from "@/components/studio/onboarding/flow/onboarding-types";
+import { hasActiveSubscription } from "@/lib/billing/access";
+import { getEffectiveBillingRow } from "@/lib/billing/store";
+import {
+  needsFullOnboardingFlow,
+  resolveOnboardingStep,
+  sanitizeStudioOnboardingState,
+} from "@/lib/dashboard/onboarding";
+import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: { absolute: "BrewAI · Einrichtung" },
+  robots: { index: false, follow: false },
+};
+
+export default async function OnboardingPage() {
+  if (!isSupabaseConfigured()) {
+    redirect("/anmelden");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/anmelden");
+  }
+
+  if (!(await hasPassedTwoFactor(user.id))) {
+    redirect(TWO_FACTOR_PAGE);
+  }
+
+  const dashboard = getDashboardMetadata(user.user_metadata);
+  const onboarding = sanitizeStudioOnboardingState(dashboard.onboarding);
+
+  if (!needsFullOnboardingFlow(onboarding)) {
+    redirect("/dashboard");
+  }
+
+  const settings = dashboard.settings;
+  const profileName =
+    (typeof settings?.profileName === "string" && settings.profileName.trim()) ||
+    (typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name.trim()) ||
+    (user.email?.split("@")[0] ?? "");
+
+  let hasActivePlan = false;
+  let tokensRemaining: number | null = null;
+  try {
+    const row = await getEffectiveBillingRow(user.id);
+    hasActivePlan = hasActiveSubscription(row);
+    if (row) {
+      tokensRemaining = Math.max((row.monthly_tokens ?? 0) - (row.used_tokens ?? 0), 0);
+    }
+  } catch {
+    /* optional */
+  }
+
+  const bootstrap: OnboardingBootstrap = {
+    profileName,
+    settings: settings ?? null,
+    beers: dashboard.myBeers ?? [],
+    team: dashboard.teamMembers ?? [],
+    userEmail: user.email ?? "",
+    initialStep: resolveOnboardingStep(onboarding),
+    hasActivePlan,
+    tokensRemaining,
+  };
+
+  return (
+    <Suspense
+      fallback={
+        <div className="evg-studio evg-onb" style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>
+          <p style={{ color: "var(--t3)", fontSize: 13 }}>Einrichtung wird geladen …</p>
+        </div>
+      }
+    >
+      <div className="evg-studio">
+        <OnboardingFlow bootstrap={bootstrap} />
+      </div>
+    </Suspense>
+  );
+}
