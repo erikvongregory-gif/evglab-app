@@ -71,7 +71,7 @@ const TOURS: Record<string, TourStep[]> = {
   media: [
     {
       id: "media-grid",
-      selector: ".studio-media-grid",
+      selector: ".evg-grid",
       title: "Deine Mediathek",
       body: "Jedes Motiv landet hier. Klick es an, um es umzubenennen oder herunterzuladen.",
       placement: "top",
@@ -253,13 +253,12 @@ export function StudioOnboardingHints({ area }: { area: string }) {
         aria-hidden="true"
       />
       <div
-        className="studio-onb-hint studio-tour-sheet-in"
+        className="evg-dialog studio-onb-hint"
         style={cardPosition(rect, step.placement)}
         role="dialog"
         aria-modal="false"
         aria-label={`${step.title} — Schritt ${stepIndex + 1} von ${steps.length}`}
       >
-        <div className="studio-onb-dialog-accent" aria-hidden="true" />
         <div className="studio-onb-hint-body">
           <div className="studio-onb-hint-title">{step.title}</div>
           <p className="studio-faint studio-onb-hint-text">{step.body}</p>
@@ -273,7 +272,7 @@ export function StudioOnboardingHints({ area }: { area: string }) {
                 />
               ))}
             </div>
-            <span className="studio-mono studio-onb-tour-count">
+            <span className="evg-mono studio-onb-tour-count">
               {stepIndex + 1}/{steps.length}
             </span>
           </div>

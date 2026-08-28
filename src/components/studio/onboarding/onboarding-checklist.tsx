@@ -46,8 +46,7 @@ export function StudioOnboardingChecklist() {
   if (celebrating) {
     return (
       <Dock>
-        <aside className="studio-onb-widget studio-tour-sheet-in" aria-live="polite">
-          <div className="studio-onb-dialog-accent" aria-hidden="true" />
+        <aside className="studio-onb-widget" aria-live="polite">
           <div className="studio-onb-done">
             <CheckIcon done />
             <div>
@@ -69,7 +68,7 @@ export function StudioOnboardingChecklist() {
   return (
     <Dock>
       <aside
-        className="studio-onb-widget studio-tour-sheet-in"
+        className="studio-onb-widget"
         data-expanded={expanded ? "true" : "false"}
         aria-label="Erste Schritte"
       >
@@ -81,7 +80,7 @@ export function StudioOnboardingChecklist() {
             aria-expanded={expanded}
           >
             <span className="studio-onb-widget-title">Erste Schritte</span>
-            <span className="studio-mono studio-onb-widget-count">
+            <span className="evg-mono studio-onb-widget-count">
               {doneCount}/{totalCount}
             </span>
             <svg

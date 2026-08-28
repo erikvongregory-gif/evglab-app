@@ -28,7 +28,7 @@ function PromptFrame({ chars }: { chars: number }) {
   return (
     <div className="studio-onb-demo-pad">
       <div className="studio-field-label">Neues Motiv</div>
-      <div className="studio-accent-serif studio-onb-demo-headline">Was soll generiert werden?</div>
+      <div className="studio-onb-demo-headline">Was soll generiert werden?</div>
       <div className="studio-onb-demo-chips">
         {["Produktfoto", "Kampagne", "Social"].map((chip, index) => (
           <span key={chip} className="studio-onb-demo-chip" data-on={index === 0 ? "true" : "false"}>
@@ -67,11 +67,11 @@ function GenerateFrame({ pct }: { pct: number }) {
         <path d="M3 16c4-2.5 7 2.5 11 0s7-2.5 11 0 7 2.5 11 0" />
       </svg>
       <div className="studio-onb-demo-headline-sm">Generieren läuft …</div>
-      <div className="studio-mono studio-onb-demo-step">{step}</div>
+      <div className="evg-mono studio-onb-demo-step">{step}</div>
       <div className="studio-onb-demo-bar">
         <div className="studio-onb-demo-bar-fill" style={{ width: `${pct}%` }} />
       </div>
-      <div className="studio-mono studio-onb-demo-step">{Math.round(pct)} %</div>
+      <div className="evg-mono studio-onb-demo-step">{Math.round(pct)} %</div>
     </div>
   );
 }
@@ -81,7 +81,7 @@ function ResultFrame() {
     <div className="studio-onb-demo-result">
       <div className="studio-onb-demo-thumb" aria-hidden="true" />
       <div style={{ minWidth: 0 }}>
-        <span className="studio-badge ok">Fertig</span>
+        <span className="studio-onb-demo-badge">Fertig</span>
         <div className="studio-onb-demo-headline-sm" style={{ marginTop: 10 }}>
           Produktfoto mit Hopfen
         </div>
@@ -143,7 +143,7 @@ export function StudioOnboardingDemo() {
         {PHASES.map((entry, index) => (
           <span
             key={entry.label}
-            className="studio-mono studio-onb-demo-steplabel"
+            className="evg-mono studio-onb-demo-steplabel"
             data-on={index <= phase ? "true" : "false"}
           >
             {entry.label}

@@ -1,0 +1,530 @@
+/* Sudbuch — screen CSS for onboarding (EVG tokens). */
+
+/* ── Welcome dialog ────────────────────────────────────── */
+.evg-studio.studio-onb-welcome-root {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: max(8vh, 16px) 16px 16px;
+  pointer-events: none;
+}
+
+.evg-studio .studio-onb-welcome-scrim {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.evg-studio .studio-onb-welcome-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  max-height: 84vh;
+  overflow: auto;
+  padding: var(--sp-8);
+  pointer-events: auto;
+}
+
+.evg-studio .studio-onb-welcome-title {
+  margin-top: var(--sp-4);
+}
+
+.evg-studio .studio-onb-welcome-lead {
+  margin: 10px 0 0;
+  color: var(--fg-4);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.evg-studio .studio-onb-welcome-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+@media (max-width: 639px) {
+  .evg-studio .studio-onb-welcome-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .evg-studio .studio-onb-welcome-actions .evg-btn,
+  .evg-studio .studio-onb-welcome-actions .evg-btn--primary {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Checklist dock ────────────────────────────────────── */
+.evg-studio.studio-onb-dock {
+  position: fixed;
+  right: 24px;
+  bottom: 96px;
+  z-index: 95;
+}
+
+.evg-studio .studio-onb-widget {
+  width: 330px;
+  border: 1px solid var(--line-strong);
+  background: var(--field);
+  animation: evg-rise var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-onb-widget-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 10px 10px 14px;
+}
+
+.evg-studio .studio-onb-widget-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.evg-studio .studio-onb-widget-toggle:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.evg-studio .studio-onb-widget-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.evg-studio .studio-onb-widget-count {
+  font-size: 10.5px;
+  color: var(--fg-4);
+  margin-left: auto;
+}
+
+.evg-studio .studio-onb-widget-chevron {
+  color: var(--fg-4);
+  transition: transform var(--dur) var(--ease);
+}
+
+.evg-studio .studio-onb-widget[data-expanded="true"] .studio-onb-widget-chevron {
+  transform: rotate(180deg);
+}
+
+.evg-studio .studio-onb-widget-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-5);
+  cursor: pointer;
+}
+
+.evg-studio .studio-onb-widget-close:hover {
+  color: var(--fg);
+  background: var(--raised);
+}
+
+.evg-studio .studio-onb-widget-close:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.evg-studio .studio-onb-progress {
+  height: 2px;
+  background: var(--line);
+}
+
+.evg-studio .studio-onb-progress-fill {
+  height: 100%;
+  background: var(--acc);
+  transition: width var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-onb-tasks {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  gap: 2px;
+}
+
+.evg-studio .studio-onb-task {
+  display: flex;
+  gap: 10px;
+  padding: 9px 10px;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.evg-studio .studio-onb-task:hover {
+  background: var(--raised);
+}
+
+.evg-studio .studio-onb-task:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: -2px;
+}
+
+.evg-studio .studio-onb-task-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.evg-studio .studio-onb-task-label {
+  font-size: 13px;
+  color: var(--fg-2);
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.evg-studio .studio-onb-task[data-done="true"] .studio-onb-task-label {
+  color: var(--fg-5);
+  text-decoration: line-through;
+}
+
+.evg-studio .studio-onb-task-optional {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  color: var(--fg-5);
+  text-transform: uppercase;
+}
+
+.evg-studio .studio-onb-task-desc {
+  font-size: 12px;
+  color: var(--fg-4);
+}
+
+.evg-studio .studio-onb-check {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: var(--acc-fg);
+}
+
+.evg-studio .studio-onb-check[data-done="true"] {
+  background: var(--acc);
+  border-color: var(--acc);
+}
+
+.evg-studio .studio-onb-done {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  align-items: flex-start;
+}
+
+.evg-studio .studio-onb-done-text {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--fg-4);
+}
+
+.evg-studio .studio-faint {
+  color: var(--fg-4);
+}
+
+/* ── Tour hints ────────────────────────────────────────── */
+.evg-studio.studio-onb-hint-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  pointer-events: none;
+}
+
+.evg-studio .studio-onb-spot {
+  position: absolute;
+  border: 1px solid var(--acc);
+  box-shadow: 0 0 0 9999px var(--scrim);
+  pointer-events: none;
+}
+
+.evg-studio .studio-onb-hint {
+  position: absolute;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  pointer-events: auto;
+  padding: var(--sp-6);
+  animation: evg-rise var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-onb-hint-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.evg-studio .studio-onb-hint-text {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--fg-4);
+  line-height: 1.45;
+}
+
+.evg-studio .studio-onb-tour-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.evg-studio .studio-onb-tour-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.evg-studio .studio-onb-tour-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--line-strong);
+}
+
+.evg-studio .studio-onb-tour-dot[data-state="done"] {
+  background: var(--fg-5);
+}
+
+.evg-studio .studio-onb-tour-dot[data-state="current"] {
+  background: var(--acc);
+}
+
+.evg-studio .studio-onb-tour-count {
+  font-size: 10.5px;
+  color: var(--fg-5);
+}
+
+.evg-studio .studio-onb-hint-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.evg-studio .studio-onb-tour-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.evg-studio .studio-onb-tour-skip {
+  border: 0;
+  background: transparent;
+  color: var(--fg-5);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.evg-studio .studio-onb-tour-skip:hover {
+  color: var(--fg);
+}
+
+.evg-studio .studio-onb-tour-skip:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* ── Welcome demo (compact) ────────────────────────────── */
+.evg-studio .studio-onb-demo {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  background: var(--field);
+}
+
+.evg-studio .studio-onb-demo-stage {
+  position: relative;
+  min-height: 160px;
+  padding: 16px;
+}
+
+.evg-studio .studio-onb-demo-frame {
+  display: none;
+}
+
+.evg-studio .studio-onb-demo-frame[data-active="true"] {
+  display: block;
+}
+
+.evg-studio .studio-onb-demo-headline {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 10px;
+}
+
+.evg-studio .studio-onb-demo-headline-sm {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-2);
+}
+
+.evg-studio .studio-onb-demo-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.evg-studio .studio-onb-demo-chip {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  color: var(--fg-4);
+}
+
+.evg-studio .studio-onb-demo-chip[data-on="true"] {
+  border-color: var(--acc);
+  color: var(--fg);
+  background: var(--acc-dim);
+}
+
+.evg-studio .studio-onb-demo-input {
+  border: 1px solid var(--line-strong);
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--fg-3);
+  min-height: 36px;
+}
+
+.evg-studio .studio-onb-demo-caret {
+  color: var(--acc);
+}
+
+.evg-studio .studio-onb-demo-cta {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--fg-5);
+}
+
+.evg-studio .studio-onb-demo-cta[data-ready="true"] {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--acc-fg);
+}
+
+.evg-studio .studio-onb-demo-center {
+  text-align: center;
+  padding: 12px 0;
+}
+
+.evg-studio .studio-onb-demo-step {
+  font-size: 11px;
+  color: var(--fg-5);
+  margin-top: 6px;
+}
+
+.evg-studio .studio-onb-demo-bar {
+  height: 2px;
+  background: var(--line);
+  margin: 10px auto;
+  max-width: 180px;
+}
+
+.evg-studio .studio-onb-demo-bar-fill {
+  height: 100%;
+  background: var(--acc);
+}
+
+.evg-studio .studio-onb-demo-result {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.evg-studio .studio-onb-demo-thumb {
+  width: 48px;
+  height: 60px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.evg-studio .studio-onb-demo-result-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.evg-studio .studio-onb-demo-steps {
+  display: flex;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.evg-studio .studio-onb-demo-steplabel {
+  font-size: 10.5px;
+  color: var(--fg-5);
+}
+
+.evg-studio .studio-onb-demo-steplabel[data-on="true"] {
+  color: var(--acc);
+}
+
+.evg-studio .studio-onb-demo-wave {
+  display: block;
+  margin: 0 auto;
+}
+
+.evg-studio .studio-onb-demo-badge {
+  display: inline-block;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border: 1px solid var(--ok);
+  color: var(--ok);
+}
+
+.evg-studio .studio-field-label {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  color: var(--fg-5);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 639px) {
+  .evg-studio.studio-onb-dock {
+    left: 12px;
+    right: 12px;
+    bottom: 80px;
+  }
+
+  .evg-studio .studio-onb-widget {
+    width: 100%;
+  }
+}
