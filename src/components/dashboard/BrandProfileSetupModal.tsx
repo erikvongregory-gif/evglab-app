@@ -682,7 +682,7 @@ export function BrandProfileSetupModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className={cn(
-          "evg-studio studio-modal-mobile fixed left-1/2 top-1/2 z-[130] max-h-[min(92vh,720px)] w-[min(100%,560px)] -translate-x-1/2 -translate-y-1/2 gap-0 overflow-hidden border-[var(--line-strong)] bg-[var(--bg-2)] p-0 text-[var(--tx-0)] shadow-[var(--sh-pop)] sm:max-w-[560px] [&>button.group]:hidden",
+          "evg-studio studio-brand-modal studio-modal-mobile fixed left-1/2 top-1/2 z-[130] max-h-[min(92vh,720px)] w-[min(100%,560px)] -translate-x-1/2 -translate-y-1/2 gap-0 overflow-hidden border-[var(--line2)] bg-[var(--s2)] p-0 text-[var(--t1)] shadow-[var(--sh-modal)] sm:max-w-[560px] [&>button.group]:hidden",
           step === "review" && "flex flex-col",
         )}
         onPointerDownOutside={(e) => {

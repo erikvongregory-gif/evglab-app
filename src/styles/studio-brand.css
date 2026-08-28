@@ -1,0 +1,1096 @@
+/* T7 — Markenprofil (BrewAI Studio Final) */
+
+.evg-studio .studio-brand-page {
+  max-width: var(--content-max, 1240px);
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+
+.evg-studio .studio-brand-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-7);
+}
+
+.evg-studio .studio-brand-title {
+  margin: 0;
+  font-size: var(--t-19);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+  line-height: 1.2;
+}
+
+.evg-studio .studio-brand-sub {
+  margin: 5px 0 0;
+  font-size: var(--t-13);
+  color: var(--t3);
+  max-width: 52ch;
+  line-height: 1.55;
+}
+
+.evg-studio .studio-muted {
+  color: var(--t2);
+}
+
+.evg-studio .studio-faint {
+  color: var(--t3);
+}
+
+.evg-studio .studio-hr {
+  height: 1px;
+  border: 0;
+  margin: 0;
+  background: var(--line);
+}
+
+/* ── Shared form (brand scope) ─────────────────────────────── */
+
+.evg-studio .studio-brand-page .studio-field-label,
+.evg-studio .studio-brand-modal .studio-field-label {
+  display: block;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-page .studio-field,
+.evg-studio .studio-brand-modal .studio-field,
+.evg-studio .studio-brand-review .studio-field {
+  width: 100%;
+  height: 36px;
+  padding: 0 11px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  color: var(--t1);
+  font-family: var(--f-sans);
+  font-size: var(--t-13);
+  outline: none;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.evg-studio .studio-brand-page .studio-field:focus,
+.evg-studio .studio-brand-modal .studio-field:focus,
+.evg-studio .studio-brand-review .studio-field:focus {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--ac-tint);
+}
+
+.evg-studio .studio-brand-page .studio-field:disabled,
+.evg-studio .studio-brand-modal .studio-field:disabled,
+.evg-studio .studio-brand-review .studio-field:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.evg-studio .studio-brand-page textarea.studio-field,
+.evg-studio .studio-brand-modal textarea.studio-field,
+.evg-studio .studio-brand-review textarea.studio-field {
+  height: auto;
+  min-height: 72px;
+  padding: 10px 11px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.evg-studio .studio-brand-page .studio-field-with-icon,
+.evg-studio .studio-brand-modal .studio-field-with-icon {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: 36px;
+  padding: 0 11px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.evg-studio .studio-brand-page .studio-field-with-icon:focus-within,
+.evg-studio .studio-brand-modal .studio-field-with-icon:focus-within {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--ac-tint);
+}
+
+.evg-studio .studio-brand-page .studio-field-with-icon .studio-field,
+.evg-studio .studio-brand-modal .studio-field-with-icon .studio-field {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.evg-studio .studio-brand-page .studio-field-icon,
+.evg-studio .studio-brand-modal .studio-field-icon {
+  flex: none;
+  display: flex;
+  color: var(--t3);
+}
+
+/* ── Quick start / Empty ───────────────────────────────────── */
+
+.evg-studio .studio-brand-quickstart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  max-width: 420px;
+  margin: var(--sp-7) auto 0;
+}
+
+.evg-studio .studio-brand-empty-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  padding: var(--sp-10) var(--sp-8);
+  text-align: center;
+}
+
+.evg-studio .studio-brand-empty-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto var(--sp-5);
+  border-radius: var(--r-md);
+  border: 1px dashed var(--line2);
+  color: var(--t3);
+}
+
+/* ── Profile grid ──────────────────────────────────────────── */
+
+.evg-studio .studio-brand-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: var(--sp-5);
+  align-items: start;
+}
+
+.evg-studio .studio-brand-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-page .studio-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+}
+
+.evg-studio .studio-brand-divider {
+  margin: var(--sp-6) 0;
+}
+
+.evg-studio .studio-brand-section-label {
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin-bottom: var(--sp-4);
+}
+
+.evg-studio .studio-brand-tones-label {
+  margin-top: var(--sp-6);
+}
+
+/* Website row */
+.evg-studio .studio-brand-website-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-5);
+}
+
+.evg-studio .studio-brand-website-left {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-5);
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-website-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line2);
+  background: var(--s3);
+  color: var(--t2);
+}
+
+.evg-studio .studio-brand-website-icon.ok {
+  border-color: var(--ok-dim);
+  color: var(--ok);
+}
+
+.evg-studio .studio-brand-domain {
+  font-size: var(--t-15);
+  font-weight: 600;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evg-studio .studio-brand-meta {
+  margin-top: 3px;
+  font-family: var(--f-mono);
+  font-size: var(--t-11);
+  color: var(--t3);
+}
+
+/* Colors */
+.evg-studio .studio-brand-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.evg-studio .studio-brand-swatch-bar {
+  flex: 1;
+  min-width: 48px;
+  max-width: 80px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line2);
+}
+
+/* Tags */
+.evg-studio .studio-brand-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.evg-studio .studio-brand-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--s3);
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--t1);
+}
+
+/* Bildregeln */
+.evg-studio .studio-brand-rules-title {
+  font-size: var(--t-15);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-brand-rules-sub {
+  margin-top: 4px;
+  font-size: var(--t-12);
+  line-height: 1.55;
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-rules-head {
+  margin-bottom: var(--sp-5);
+}
+
+.evg-studio .studio-brand-rule-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: var(--sp-4);
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.evg-studio .studio-brand-rule-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.evg-studio .studio-brand-rule-key {
+  font-family: var(--f-mono);
+  font-size: var(--t-11);
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-rule-val {
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--t2);
+}
+
+/* Brand-Lock */
+.evg-studio .studio-brand-lock-label {
+  font-size: var(--t-15);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-brand-lock-desc {
+  margin: 6px 0 0;
+  font-size: var(--t-12);
+  line-height: 1.6;
+  color: var(--t2);
+}
+
+.evg-studio .studio-brand-lock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: var(--sp-5);
+}
+
+.evg-studio .studio-brand-lock-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-mid) var(--ease),
+    background var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-brand-lock-opt:hover:not(:disabled) {
+  background: var(--s3);
+  border-color: var(--line2);
+}
+
+.evg-studio .studio-brand-lock-opt.on {
+  border-color: var(--ac-line);
+  background: var(--ac-tint);
+}
+
+.evg-studio .studio-brand-lock-opt:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.evg-studio .studio-brand-lock-opt:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+.evg-studio .studio-brand-lock-radio {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line2);
+  background: var(--s1);
+}
+
+.evg-studio .studio-brand-lock-opt.on .studio-brand-lock-radio {
+  border: 4px solid var(--ac);
+}
+
+.evg-studio .studio-brand-lock-name {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--t1);
+}
+
+.evg-studio .studio-brand-lock-sub {
+  margin-top: 2px;
+  font-size: var(--t-11);
+  line-height: 1.5;
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-lock-opt:not(.on) .studio-brand-lock-name {
+  color: var(--t2);
+}
+
+/* Referenzen */
+.evg-studio .studio-brand-refs-section {
+  margin-top: var(--sp-8);
+}
+
+.evg-studio .studio-brand-refs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+}
+
+.evg-studio .studio-brand-ref-tile {
+  aspect-ratio: 1;
+  overflow: hidden;
+  padding: 0;
+  border-radius: var(--r-md);
+}
+
+.evg-studio .studio-brand-ref-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.evg-studio .studio-brand-reset-card {
+  border-color: var(--line);
+}
+
+/* ── Loading skeleton ──────────────────────────────────────── */
+
+.evg-studio .studio-brand-skeleton {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
+  gap: var(--sp-5);
+}
+
+.evg-studio .studio-brand-skeleton__block {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  padding: var(--sp-8);
+}
+
+.evg-studio .studio-brand-skeleton__line {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--s3);
+}
+
+.evg-studio .studio-brand-skeleton__line--short {
+  width: 45%;
+  margin-top: var(--sp-4);
+}
+
+.evg-studio .studio-brand-skeleton__line--title {
+  width: 70%;
+  height: 14px;
+  margin-bottom: var(--sp-6);
+}
+
+.evg-studio .studio-brand-skeleton__shimmer {
+  background: linear-gradient(90deg, var(--s2) 0%, var(--s3) 50%, var(--s2) 100%);
+  background-size: 200% 100%;
+  animation: studio-brand-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes studio-brand-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* ── Setup modal ───────────────────────────────────────────── */
+
+.evg-studio.studio-brand-modal,
+.evg-studio .studio-brand-modal {
+  border: 1px solid var(--line2) !important;
+  background: var(--s2) !important;
+  color: var(--t1) !important;
+  box-shadow: var(--sh-modal) !important;
+  border-radius: var(--r-lg) !important;
+}
+
+.evg-studio .studio-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--s3);
+  color: var(--t2);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.evg-studio .studio-modal-close:hover:not(:disabled) {
+  background: var(--s4);
+  color: var(--t1);
+}
+
+.evg-studio .studio-modal-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.evg-studio .studio-modal-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-modal-eyebrow .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ac);
+}
+
+.evg-studio .studio-modal-title {
+  margin: 10px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--t1);
+  letter-spacing: -0.01em;
+}
+
+.evg-studio .studio-modal-sub {
+  margin: 8px 0 0;
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--t3);
+}
+
+.evg-studio .studio-modal-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: var(--sp-7);
+  padding: 3px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--s1);
+}
+
+.evg-studio .studio-modal-tab {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: calc(var(--r-md) - 2px);
+  background: transparent;
+  font-family: var(--f-sans);
+  font-size: var(--t-12);
+  font-weight: 500;
+  color: var(--t3);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.evg-studio .studio-modal-tab.on {
+  background: var(--s3);
+  color: var(--t1);
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+
+.evg-studio .studio-modal-tab:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
+}
+
+.evg-studio .studio-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-8);
+  border-top: 1px solid var(--line);
+  background: var(--s2);
+}
+
+.evg-studio .studio-modal-ref-grid label.studio-card {
+  border: 1px dashed var(--line2);
+  border-radius: var(--r-md);
+  background: var(--s1);
+  transition: border-color var(--dur) var(--ease);
+}
+
+.evg-studio .studio-modal-ref-grid label.studio-card:hover {
+  border-color: var(--line2);
+}
+
+/* Scan / Analyzing */
+.evg-studio .studio-brand-analyzing {
+  padding: var(--sp-6) 0 var(--sp-4);
+}
+
+.evg-studio .studio-brand-analyzing-domain {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--s3);
+  font-family: var(--f-mono);
+  font-size: var(--t-11);
+  color: var(--t2);
+}
+
+.evg-studio .studio-brand-analyzing-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: var(--sp-7);
+}
+
+.evg-studio .studio-brand-analyzing-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--t-13);
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-analyzing-step.done {
+  color: var(--t2);
+}
+
+.evg-studio .studio-brand-analyzing-step.active {
+  color: var(--t1);
+  font-weight: 500;
+}
+
+.evg-studio .studio-brand-analyzing-step-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--line2);
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-analyzing-step.done .studio-brand-analyzing-step-icon {
+  border-color: var(--ok-dim);
+  background: var(--ok-dim);
+  color: var(--ok);
+}
+
+.evg-studio .studio-brand-analyzing-step.active .studio-brand-analyzing-step-icon {
+  border-color: var(--ac-line);
+  background: var(--ac-tint);
+  color: var(--ac);
+}
+
+.evg-studio .studio-brand-analyzing-hint {
+  margin-top: var(--sp-7);
+  font-size: var(--t-11);
+  text-align: center;
+}
+
+/* ── Review panel ──────────────────────────────────────────── */
+
+.evg-studio .studio-brand-review {
+  display: flex;
+  flex-direction: column;
+  max-height: min(92vh, 720px);
+  min-height: 0;
+}
+
+.evg-studio .studio-brand-review-head {
+  flex: none;
+  padding: var(--sp-8) var(--sp-8) 0;
+}
+
+.evg-studio .studio-brand-review-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-top: var(--sp-5);
+  padding: 8px 11px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--s1);
+}
+
+.evg-studio .studio-brand-review-source-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--t-12);
+  color: var(--t2);
+}
+
+.evg-studio .studio-brand-review-source-left span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evg-studio .studio-brand-review-confidence {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-review-strength {
+  margin-top: var(--sp-5);
+}
+
+.evg-studio .studio-brand-review-strength-bar {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--s4);
+  overflow: hidden;
+}
+
+.evg-studio .studio-brand-review-strength-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ac);
+  transition: width var(--dur-page) var(--ease);
+}
+
+.evg-studio .studio-brand-review-strength-label {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-review-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-6) var(--sp-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+}
+
+.evg-studio .studio-brand-review-label {
+  margin-bottom: 8px;
+}
+
+.evg-studio .studio-brand-review-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.evg-studio .studio-brand-review-ref {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line2);
+}
+
+.evg-studio .studio-brand-review-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.evg-studio .studio-brand-review-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--s3);
+  font-size: var(--t-12);
+  color: var(--t1);
+}
+
+.evg-studio .studio-brand-review-chip button {
+  display: flex;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+}
+
+.evg-studio .studio-brand-review-chip button:hover:not(:disabled) {
+  color: var(--t1);
+}
+
+.evg-studio .studio-brand-review-tone-input {
+  height: 28px;
+  min-width: 120px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--ac-line);
+  background: var(--s1);
+  font-size: var(--t-12);
+  color: var(--t1);
+  outline: none;
+}
+
+.evg-studio .studio-brand-review-add-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--line2);
+  background: transparent;
+  font-family: var(--f-sans);
+  font-size: var(--t-12);
+  color: var(--t3);
+  cursor: pointer;
+}
+
+.evg-studio .studio-brand-review-add-chip:hover:not(:disabled) {
+  border-color: var(--line2);
+  color: var(--t1);
+  background: var(--s3);
+}
+
+.evg-studio .studio-brand-review-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  margin-top: 8px;
+}
+
+.evg-studio .studio-brand-review-color {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.evg-studio .studio-brand-review-color-swatch-wrap {
+  position: relative;
+}
+
+.evg-studio .studio-brand-review-color-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line2);
+}
+
+.evg-studio .studio-brand-review-color-swatch-wrap button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line2);
+  border-radius: 50%;
+  background: var(--s2);
+  color: var(--t3);
+  cursor: pointer;
+}
+
+.evg-studio .studio-brand-review-color-hex {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  color: var(--t3);
+}
+
+.evg-studio .studio-brand-review-color-add input[type="color"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.evg-studio .studio-brand-review-rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-5);
+  margin-top: 8px;
+}
+
+.evg-studio .studio-brand-review-rules-heading {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.evg-studio .studio-brand-review-rules-heading.ok {
+  color: var(--ok);
+}
+
+.evg-studio .studio-brand-review-rules-heading.warn {
+  color: var(--warn);
+}
+
+.evg-studio .studio-brand-review-rule-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: var(--t-12);
+  line-height: 1.5;
+  color: var(--t2);
+}
+
+.evg-studio .studio-brand-review-rule-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-top: 2px;
+}
+
+.evg-studio .studio-brand-review-rule-icon.ok {
+  background: var(--ok-dim);
+  color: var(--ok);
+}
+
+.evg-studio .studio-brand-review-rule-icon.warn {
+  background: var(--warn-dim);
+  color: var(--warn);
+}
+
+.evg-studio .studio-brand-review-edit-details {
+  margin-top: var(--sp-5);
+}
+
+.evg-studio .studio-brand-review-edit-details summary {
+  font-size: var(--t-12);
+  color: var(--t3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.evg-studio .studio-brand-review-edit-details summary:hover {
+  color: var(--t1);
+}
+
+.evg-studio .studio-brand-review-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  margin-top: var(--sp-5);
+}
+
+.evg-studio .studio-brand-review-foot {
+  flex: none;
+  padding: var(--sp-5) var(--sp-8) var(--sp-7);
+  border-top: 1px solid var(--line);
+  background: var(--s2);
+}
+
+.evg-studio .studio-brand-review-error {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--t-12);
+  color: var(--warn);
+}
+
+.evg-studio .studio-brand-review-foot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .evg-studio .studio-brand-grid,
+  .evg-studio .studio-brand-skeleton {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evg-studio .studio-brand-lock-card {
+    order: -1;
+  }
+
+  .evg-studio .studio-brand-review-rules {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .evg-studio .studio-brand-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .evg-studio .studio-brand-quickstart {
+    max-width: none;
+  }
+
+  .evg-studio .studio-modal-foot,
+  .evg-studio .studio-brand-review-foot-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .evg-studio .studio-modal-foot .evg-btn,
+  .evg-studio .studio-brand-review-foot-actions .evg-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .evg-studio.studio-brand-modal,
+  .evg-studio .studio-brand-modal {
+    max-height: min(92dvh, 720px) !important;
+  }
+
+  .evg-studio .studio-brand-review-head,
+  .evg-studio .studio-brand-review-body,
+  .evg-studio .studio-brand-review-foot {
+    padding-left: var(--sp-6);
+    padding-right: var(--sp-6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-studio .studio-brand-skeleton__shimmer {
+    animation: none;
+    background: var(--s3);
+  }
+}

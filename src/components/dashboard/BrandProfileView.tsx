@@ -114,8 +114,11 @@ function BrandQuickStartCard({
   };
 
   return (
-    <StudioCard pad style={{ textAlign: "center" }}>
-      <p className="studio-muted" style={{ fontSize: 14, lineHeight: 1.5 }}>
+    <div className="studio-brand-empty-card">
+      <div className="studio-brand-empty-card__icon" aria-hidden>
+        <StudioIcon name="shield" size={18} />
+      </div>
+      <p className="studio-muted" style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
         Ein Link genügt — BrewAI liest deine Website und erstellt daraus dein komplettes Markenprofil.
       </p>
       <form
@@ -167,7 +170,7 @@ function BrandQuickStartCard({
           </button>
         ) : null}
       </div>
-    </StudioCard>
+    </div>
   );
 }
 
@@ -282,127 +285,78 @@ export function BrandProfileView({
 
 
   if (!value) {
-
     return (
-
-      <div className="studio-pop">
-
-        <StudioCard pad>
-
-          {!loaded ? (
-
-            <span className="studio-faint">Lade Markenprofil…</span>
-
-          ) : loadError ? (
-
-            <>
-
-              <span style={{ color: "var(--warn)", fontWeight: 600 }}>{loadError}</span>
-
-              <StudioButton type="button" variant="soft" size="sm" style={{ marginTop: 12 }} onClick={() => window.location.reload()}>
-
-                Erneut versuchen
-
-              </StudioButton>
-
-            </>
-
-          ) : (
-
+      <div className="studio-brand-page">
+        {!loaded ? (
+          <div className="studio-brand-skeleton" aria-busy="true" aria-label="Markenprofil wird geladen">
+            <div className="studio-brand-skeleton__block">
+              <div className="studio-brand-skeleton__line studio-brand-skeleton__line--title studio-brand-skeleton__shimmer" />
+              <div className="studio-brand-skeleton__line studio-brand-skeleton__shimmer" />
+              <div className="studio-brand-skeleton__line studio-brand-skeleton__line--short studio-brand-skeleton__shimmer" />
+            </div>
+            <div className="studio-brand-skeleton__block">
+              <div className="studio-brand-skeleton__line studio-brand-skeleton__line--title studio-brand-skeleton__shimmer" />
+              <div className="studio-brand-skeleton__line studio-brand-skeleton__shimmer" />
+            </div>
+          </div>
+        ) : loadError ? (
+          <div className="studio-brand-empty-card">
+            <span style={{ color: "var(--warn)", fontWeight: 600 }}>{loadError}</span>
+            <StudioButton type="button" variant="soft" size="sm" style={{ marginTop: 12 }} onClick={() => window.location.reload()}>
+              Erneut versuchen
+            </StudioButton>
+          </div>
+        ) : (
+          <div className="studio-brand-empty-card">
             <span className="studio-faint">Keine Daten verfügbar.</span>
-
-          )}
-
-        </StudioCard>
-
+          </div>
+        )}
       </div>
-
     );
-
   }
 
 
 
   if (skipped) {
-
     return (
-
-      <div className="studio-pop">
-
+      <div className="studio-brand-page">
         <header className="studio-brand-header">
-
           <div>
-
             <StudioEyebrow>Markenprofil · deaktiviert</StudioEyebrow>
-
-            <h1 className="studio-brand-title">Marke & Stil</h1>
-
+            <h1 className="studio-brand-title">Markenprofil</h1>
             <p className="studio-brand-sub">Du generierst ohne festes Markenprofil. Du kannst jederzeit eine Website einlesen lassen.</p>
-
           </div>
-
           <StudioButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
-
             Marke einlesen
-
           </StudioButton>
-
         </header>
-
         <BrandQuickStartCard onQuickAnalyze={onQuickAnalyze} onOpenBrandSetup={onOpenBrandSetup} />
-
       </div>
-
     );
-
   }
 
-
-
   if (!active) {
-
     return (
-
-      <div className="studio-pop">
-
+      <div className="studio-brand-page">
         <header className="studio-brand-header">
-
           <div>
-
             <StudioEyebrow>Markenprofil · ausstehend</StudioEyebrow>
-
-            <h1 className="studio-brand-title">Marke & Stil</h1>
-
+            <h1 className="studio-brand-title">Markenprofil</h1>
             <p className="studio-brand-sub">
-
-              Gib die Website deiner Marke ein — BrewAI erkennt Tonalität, Farben und Bildsprache für konsistente Motive.
-
+              Die Grundlage jeder Generierung — einmal sauber gepflegt, dauerhaft konsistente Motive.
             </p>
-
           </div>
-
           <StudioButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
-
             Marke einlesen
-
           </StudioButton>
-
         </header>
-
         <BrandQuickStartCard
-
           onQuickAnalyze={onQuickAnalyze}
-
           onOpenBrandSetup={onOpenBrandSetup}
-
           onSkipBrandProfile={onSkipBrandProfile}
-
         />
-
       </div>
-
     );
-
   }
 
 
@@ -420,33 +374,19 @@ export function BrandProfileView({
 
 
   return (
-
-    <div className="studio-pop">
-
+    <div className="studio-brand-page">
       <header className="studio-brand-header">
-
         <div>
-
-          <StudioEyebrow dot="ok">Markenprofil · Aktiv</StudioEyebrow>
-
-          <h1 className="studio-brand-title">Marke & Stil</h1>
-
+          <StudioEyebrow dot="ok">Markenprofil · aktiv</StudioEyebrow>
+          <h1 className="studio-brand-title">Markenprofil</h1>
           <p className="studio-brand-sub">
-
             BrewAI hat deine Website analysiert. Diese Vorgaben fließen automatisch in jede Generierung ein.
-
           </p>
-
         </div>
-
         <StudioButton type="button" variant="ghost" size="sm" onClick={onOpenBrandSetup}>
-
           <StudioIcon name="pencil" size={15} />
-
           Neu einlesen
-
         </StudioButton>
-
       </header>
 
 
