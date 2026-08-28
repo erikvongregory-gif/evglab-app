@@ -179,59 +179,93 @@
   position: sticky; top: 0; height: 100vh; height: 100dvh;
   min-width: 0;
   z-index: 25;
+  padding: var(--sp-7) var(--sp-5);
+}
+.evg-rail__scroll {
+  display: flex; flex-direction: column;
+  flex: 1; min-height: 0; overflow: hidden;
 }
 .evg-rail__brand {
-  height: var(--topbar-h, 60px);
-  border-bottom: 1px solid var(--line);
   display: flex; align-items: center; gap: var(--sp-4);
-  padding: 0 14px;
+  padding: var(--sp-1) var(--sp-3) var(--sp-8);
   flex: none;
 }
+.evg-app--collapsed .evg-rail__brand {
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-1) 0 var(--sp-8);
+}
 .evg-rail__mark {
-  width: 22px; height: 22px;
-  border-radius: var(--r-sm);
+  width: 28px; height: 28px;
+  border-radius: var(--r-md);
   background: var(--ac-tint2);
-  border: 1px solid var(--ac-line);
+  border: none;
   display: grid; place-items: center; flex: none;
   color: var(--ac);
-  font-family: var(--f-sans); font-size: 11px; font-weight: 700;
 }
-.evg-rail__name { font-size: var(--t-14); font-weight: 600; line-height: 1.15; color: var(--t1); }
+.evg-rail__mark svg { display: block; }
+.evg-rail__name { font-size: var(--t-15); font-weight: 600; line-height: 1.15; color: var(--t1); }
 .evg-rail__sub {
-  font-family: var(--f-mono); font-size: 9.5px; color: var(--t3);
-  letter-spacing: 0.14em; text-transform: uppercase;
+  font-family: var(--f-mono); font-size: 8.5px; font-weight: 500;
+  color: var(--t3); letter-spacing: 0.16em; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.evg-nav-group { display: flex; flex-direction: column; padding: 4px 0 10px; }
+.evg-rail__collapse {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: var(--r-sm);
+  background: var(--s2);
+  border: 1px solid var(--line);
+  color: var(--t2);
+  display: grid; place-items: center;
+  cursor: pointer; padding: 0;
+  margin-left: auto;
+  transition: color var(--dur-mid) var(--ease), border-color var(--dur-mid) var(--ease), background var(--dur-mid) var(--ease);
+}
+.evg-rail__collapse:hover { color: var(--t1); border-color: var(--line2); }
+.evg-rail__collapse:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; }
+.evg-app--collapsed .evg-rail__collapse { margin-left: 0; }
+
+.evg-nav-group { display: flex; flex-direction: column; }
+.evg-nav-group + .evg-nav-group { margin-top: var(--sp-3); }
 .evg-nav-group__label {
   font-family: var(--f-mono); font-size: 9.5px; font-weight: 500;
   letter-spacing: 0.14em; text-transform: uppercase; color: var(--t3);
-  padding: 8px 16px 6px;
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+.evg-nav-group:not(:first-child) .evg-nav-group__label {
+  padding-top: var(--sp-7);
 }
 .evg-app--collapsed .evg-nav-group__label { display: none; }
 
-.evg-nav { display: flex; flex-direction: column; padding: var(--sp-3) 0; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; }
+.evg-nav {
+  display: flex; flex-direction: column;
+  gap: 1px;
+  flex: 1; min-height: 0; overflow-y: auto;
+  margin: 0 calc(var(--sp-3) * -1);
+  padding: 0 var(--sp-3);
+}
 .evg-nav__item {
-  display: flex; align-items: center; gap: 10px;
-  min-height: 40px;
-  margin: 0 8px;
-  padding: 0 12px;
+  display: flex; align-items: center; gap: var(--sp-4);
+  min-height: 38px;
+  padding: 9px var(--sp-3);
   border-radius: var(--r-md);
-  color: var(--t2); font-size: 13px; font-weight: 500;
-  cursor: pointer; border: 0; background: transparent; width: calc(100% - 16px); text-align: left;
+  color: var(--t2); font-size: var(--t-14); font-weight: 500;
+  cursor: pointer; border: 0; background: transparent; width: 100%; text-align: left;
   text-decoration: none;
   transition: color 220ms var(--ease), background 220ms var(--ease), box-shadow 220ms var(--ease);
 }
 .evg-nav__item:hover { color: var(--t1); background: var(--s3); }
+.evg-nav__item:focus-visible { outline: 2px solid var(--ac); outline-offset: -2px; }
 .evg-nav__item[aria-current='page'] {
   color: var(--ac);
   background: var(--ac-tint);
-  box-shadow: inset 2px 0 0 var(--ac);
+  box-shadow: inset 0 0 0 1px var(--ac-line);
 }
 .evg-app--collapsed .evg-nav__item {
   justify-content: center;
-  width: calc(100% - 12px);
-  margin: 0 6px;
-  padding: 0;
+  padding: 9px 0;
   min-height: 44px;
 }
 .evg-nav__badge {
@@ -243,7 +277,11 @@
 }
 .evg-app--collapsed .evg-nav__badge { display: none; }
 
-.evg-chargen { border-top: 1px solid var(--line); padding: var(--sp-6) var(--sp-7) var(--sp-4); }
+.evg-chargen {
+  border-top: 1px solid var(--line);
+  margin: var(--sp-4) calc(var(--sp-5) * -1) 0;
+  padding: var(--sp-6) var(--sp-5) var(--sp-4);
+}
 .evg-chargen__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); margin-top: var(--sp-4); }
 .evg-chargen__item {
   aspect-ratio: 4 / 5;
@@ -256,15 +294,55 @@
 .evg-chargen__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .evg-chargen__range { font-family: var(--f-mono); font-size: var(--t-9); color: var(--fg-6); margin-top: var(--sp-3); }
 
+.evg-rail__bottom {
+  flex: none;
+  margin: 0 calc(var(--sp-5) * -1) calc(var(--sp-7) * -1);
+  padding: 0 var(--sp-5) var(--sp-7);
+}
+.evg-rail__foot-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 0 var(--sp-1) var(--sp-5);
+}
 .evg-rail__foot {
-  margin-top: auto; border-top: 1px solid var(--line);
-  padding: 12px 14px;
-  display: flex; align-items: center; gap: 10px; cursor: pointer;
-  width: 100%; border-left: 0; border-right: 0; border-bottom: 0;
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  width: 100%; border: 0;
   background: transparent; color: inherit; font: inherit; text-align: left;
+  transition: background 220ms var(--ease);
 }
 .evg-rail__foot:hover { background: var(--s3); }
 .evg-rail__foot:focus-visible { outline: 2px solid var(--ac); outline-offset: -2px; }
+.evg-rail__foot-name {
+  font-weight: 500;
+  font-size: var(--t-13);
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.evg-rail__foot-email {
+  font-size: var(--t-11);
+  color: var(--t3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.evg-rail__foot-chevron { flex: none; color: var(--t3); }
+.evg-rail__foot-menu {
+  position: absolute;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  bottom: 100%;
+  margin-bottom: var(--sp-3);
+  z-index: 40;
+}
+.evg-app--collapsed .evg-rail__foot {
+  justify-content: center;
+  padding: var(--sp-3) var(--sp-2);
+}
 .evg-avatar {
   width: 28px; height: 28px;
   border-radius: var(--r-sm);
@@ -272,6 +350,13 @@
   background: var(--s3);
   display: grid; place-items: center;
   font-family: var(--f-mono); font-size: 10px; color: var(--t2); flex: none;
+}
+.evg-rail__foot .evg-avatar {
+  width: 30px; height: 30px;
+  border-radius: var(--r-md);
+  font-size: var(--t-11);
+  font-weight: 600;
+  color: var(--t1);
 }
 
 /* ── KOPFLEISTE ────────────────────────────────────────── */
@@ -319,11 +404,11 @@
 .evg-bottom-nav__item {
   flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px;
+  gap: 4px;
   min-height: 44px;
   padding: 6px 4px;
   border: 0; background: transparent;
-  color: var(--t3); font-size: 10.5px; font-weight: 500;
+  color: var(--t3); font-size: 10px; font-weight: 500;
   text-decoration: none; cursor: pointer;
   transition: color 220ms var(--ease), background 220ms var(--ease);
 }
@@ -597,9 +682,7 @@
   .evg-app:not(.evg-app--mobile) .evg-nav-group__label { display: none; }
   .evg-app:not(.evg-app--mobile) .evg-nav__item {
     justify-content: center;
-    width: calc(100% - 12px);
-    margin: 0 6px;
-    padding: 0;
+    padding: 9px 0;
     min-height: 44px;
   }
   .evg-app:not(.evg-app--mobile) .evg-nav__badge { display: none; }

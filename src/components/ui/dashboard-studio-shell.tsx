@@ -21,7 +21,6 @@ import {
   StudioUiDialogDescription,
   StudioUiDialogHeader,
   StudioUiDialogTitle,
-  StudioUiIconButton,
   StudioUiToaster,
   StudioUiTooltip,
   StudioUiTooltipContent,
@@ -128,6 +127,44 @@ function useMediaQuery(query: string) {
     return () => mq.removeEventListener("change", update);
   }, [query]);
   return matches;
+}
+
+function BrewAILogoMark() {
+  return (
+    <span className="evg-rail__mark" aria-hidden="true">
+      <svg width="18" height="11" viewBox="0 0 26 16" fill="none" aria-hidden="true">
+        <path
+          d="M1 12C4 4 7 4 9 8C11 12 14 12 16 8C18 4 21 4 25 12"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function RailCollapseButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="evg-rail__collapse"
+      aria-label={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
+      aria-pressed={collapsed}
+      onClick={onClick}
+    >
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+        {collapsed ? (
+          <path d="M6 4 L10 8 L6 12" strokeLinecap="round" strokeLinejoin="round" />
+        ) : (
+          <>
+            <path d="M3 2 V14" strokeLinecap="round" />
+            <path d="M12 5 L9 8 L12 11" strokeLinecap="round" strokeLinejoin="round" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
 }
 
 function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: string }) {
@@ -268,9 +305,7 @@ function StudioTopbar({
     <header className="evg-top">
       {isMobile ? (
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-          <span className="evg-rail__mark" aria-hidden="true">
-            B
-          </span>
+          <BrewAILogoMark />
           <div style={{ minWidth: 0 }}>
             <div
               style={{
@@ -551,38 +586,24 @@ function AccountSidebarFooter({
       aria-haspopup="menu"
       aria-label={collapsed ? `Konto: ${accountName}` : undefined}
       onClick={() => setMenuOpen((v) => !v)}
-      style={collapsed ? { justifyContent: "center", paddingInline: 10 } : undefined}
     >
       <div className="evg-avatar">{initials}</div>
       {!collapsed ? (
         <>
           <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
-            <div
-              style={{
-                fontWeight: 500,
-                fontSize: 13,
-                color: "var(--t1)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {accountName}
-            </div>
-            <div
-              className="evg-mono"
-              style={{
-                fontSize: 9.5,
-                color: "var(--t3)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {userEmail ?? ""}
-            </div>
+            <div className="evg-rail__foot-name">{accountName}</div>
+            <div className="evg-rail__foot-email">{userEmail ?? ""}</div>
           </div>
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--t3)" strokeWidth="1.6" aria-hidden="true">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            aria-hidden="true"
+            className="evg-rail__foot-chevron"
+          >
             <path d="M4 6 L8 10 L12 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </>
@@ -602,11 +623,7 @@ function AccountSidebarFooter({
       )}
 
       {menuOpen ? (
-        <div
-          className="evg-pop"
-          role="menu"
-          style={{ position: "absolute", left: 8, right: 8, bottom: "100%", marginBottom: 6, zIndex: 40 }}
-        >
+        <div className="evg-pop evg-rail__foot-menu" role="menu">
           {isAdmin ? (
             <Link
               href="/admin"
@@ -989,81 +1006,63 @@ export function DashboardStudioShell({
           )}
         >
           <aside className="evg-rail" aria-label="Seitennavigation">
-            <div
-              className="evg-rail__brand"
-              style={effectiveCollapsed ? { justifyContent: "center", paddingInline: 8, gap: 6 } : undefined}
-            >
-              <span className="evg-rail__mark" aria-hidden="true">
-                B
-              </span>
-              {!effectiveCollapsed ? (
-                <div style={{ minWidth: 0, flex: 1 }} className="evg-hide-collapsed">
-                  <div className="evg-rail__name">BrewAI</div>
-                  <div
-                    className="evg-rail__sub"
-                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                    title={liveBreweryName || undefined}
-                  >
-                    {liveBreweryName || "STUDIO"}
+            <div className="evg-rail__scroll">
+              <div className="evg-rail__brand">
+                <BrewAILogoMark />
+                {!effectiveCollapsed ? (
+                  <div style={{ minWidth: 0, flex: 1 }} className="evg-hide-collapsed">
+                    <div className="evg-rail__name">BrewAI</div>
+                    <div className="evg-rail__sub" title={liveBreweryName || undefined}>
+                      {liveBreweryName || "STUDIO"}
+                    </div>
                   </div>
-                </div>
-              ) : null}
-              {!isNarrow ? (
-                <StudioUiIconButton
-                  size="sm"
-                  aria-label={railCollapsed ? "Navigation ausklappen" : "Navigation einklappen"}
-                  aria-pressed={railCollapsed}
-                  onClick={toggleRail}
-                  style={{ marginLeft: effectiveCollapsed ? 0 : "auto" }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                    {railCollapsed ? (
-                      <path d="M6 4 L10 8 L6 12" strokeLinecap="round" strokeLinejoin="round" />
-                    ) : (
-                      <path d="M10 4 L6 8 L10 12" strokeLinecap="round" strokeLinejoin="round" />
-                    )}
-                  </svg>
-                </StudioUiIconButton>
-              ) : null}
+                ) : null}
+                {!isNarrow ? (
+                  <RailCollapseButton collapsed={railCollapsed} onClick={toggleRail} />
+                ) : null}
+              </div>
+
+              <nav className="evg-nav" data-tour="nav" aria-label="Arbeitsbereich">
+                <NavGroup
+                  label="Arbeitsbereich"
+                  items={workspaceNav}
+                  activeNav={activeNav}
+                  brandProfileActive={brandProfileActive}
+                  hasActivePlan={hasActivePlan}
+                  collapsed={effectiveCollapsed}
+                />
+                <NavGroup
+                  label="Marke"
+                  items={NAV_BRAND}
+                  activeNav={activeNav}
+                  brandProfileActive={brandProfileActive}
+                  hasActivePlan={hasActivePlan}
+                  collapsed={effectiveCollapsed}
+                />
+                <NavGroup
+                  label="Konto"
+                  items={NAV_ACCOUNT}
+                  activeNav={activeNav}
+                  brandProfileActive={brandProfileActive}
+                  hasActivePlan={hasActivePlan}
+                  collapsed={effectiveCollapsed}
+                />
+              </nav>
+
+              <RecentMediaRail items={recentMedia} collapsed={effectiveCollapsed} />
             </div>
 
-            <nav className="evg-nav" data-tour="nav" aria-label="Arbeitsbereich">
-              <NavGroup
-                label="Arbeitsbereich"
-                items={workspaceNav}
-                activeNav={activeNav}
-                brandProfileActive={brandProfileActive}
-                hasActivePlan={hasActivePlan}
+            <div className="evg-rail__bottom">
+              {!effectiveCollapsed ? <div className="evg-rail__foot-divider" aria-hidden="true" /> : null}
+              <AccountSidebarFooter
+                accountName={accountName}
+                userEmail={userEmail}
+                initials={initials}
+                isAdmin={isAdmin}
+                adminRouteActive={adminRouteActive}
                 collapsed={effectiveCollapsed}
               />
-              <NavGroup
-                label="Marke"
-                items={NAV_BRAND}
-                activeNav={activeNav}
-                brandProfileActive={brandProfileActive}
-                hasActivePlan={hasActivePlan}
-                collapsed={effectiveCollapsed}
-              />
-              <NavGroup
-                label="Konto"
-                items={NAV_ACCOUNT}
-                activeNav={activeNav}
-                brandProfileActive={brandProfileActive}
-                hasActivePlan={hasActivePlan}
-                collapsed={effectiveCollapsed}
-              />
-            </nav>
-
-            <RecentMediaRail items={recentMedia} collapsed={effectiveCollapsed} />
-
-            <AccountSidebarFooter
-              accountName={accountName}
-              userEmail={userEmail}
-              initials={initials}
-              isAdmin={isAdmin}
-              adminRouteActive={adminRouteActive}
-              collapsed={effectiveCollapsed}
-            />
+            </div>
           </aside>
 
           <div className="evg-main-wrap">
