@@ -1,0 +1,745 @@
+/* T8 — Abonnement / Pricing (BrewAI Studio Final) */
+
+.evg-studio .studio-pricing-page {
+  max-width: var(--content-max, 1240px);
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.evg-studio .studio-pricing-page .studio-faint {
+  color: var(--t2);
+}
+
+.evg-studio .studio-pricing-page .studio-mono {
+  font-family: var(--f-mono);
+}
+
+.evg-studio .studio-pricing-page .studio-accent-serif {
+  font-family: var(--f-sans);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--t1);
+}
+
+.evg-studio .studio-pricing-page .studio-tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.evg-studio .studio-pricing-page .studio-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+}
+
+.evg-studio .studio-pricing-page .studio-card-pad {
+  padding: var(--sp-6);
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+
+.evg-studio .studio-pricing-header {
+  margin-bottom: var(--sp-7);
+}
+
+.evg-studio .studio-pricing-header__eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-pricing-title {
+  margin: 0;
+  font-size: var(--t-19);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+  line-height: 1.2;
+}
+
+.evg-studio .studio-pricing-sub {
+  margin: 5px 0 0;
+  font-size: var(--t-13);
+  color: var(--t3);
+  max-width: 58ch;
+  line-height: 1.55;
+}
+
+/* ── Error ───────────────────────────────────────────────── */
+
+.evg-studio .studio-pricing-error {
+  margin-bottom: var(--sp-6);
+  padding: var(--sp-5) var(--sp-6);
+  border: 1px solid var(--warn);
+  border-radius: var(--r-lg);
+  background: var(--warn-dim);
+}
+
+.evg-studio .studio-pricing-error__text {
+  margin: 0;
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--warn);
+}
+
+/* ── Current plan summary ────────────────────────────────── */
+
+.evg-studio .studio-pricing-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 0.8fr) auto;
+  gap: var(--sp-6);
+  align-items: center;
+  padding: var(--sp-6) var(--sp-7);
+  margin-bottom: var(--sp-6);
+}
+
+.evg-studio .studio-page-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-page-eyebrow__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-dim);
+}
+
+.evg-studio .studio-pricing-summary__plan-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.evg-studio .studio-pricing-summary__plan-name {
+  font-size: var(--t-19);
+  font-weight: 500;
+}
+
+.evg-studio .studio-pricing-summary__plan-price {
+  font-size: var(--t-13);
+}
+
+.evg-studio .studio-pricing-summary__tokens-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.evg-studio .studio-pricing-page .studio-field-label {
+  margin: 0;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-pricing-summary__pct {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  background: var(--ac-tint);
+  color: var(--ac-2);
+}
+
+.evg-studio .studio-pricing-summary__bar {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--s4);
+  overflow: hidden;
+}
+
+.evg-studio .studio-pricing-summary__bar-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--ac), var(--ac-2));
+  transition: width 0.4s ease;
+}
+
+.evg-studio .studio-pricing-summary__tokens-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11.5px;
+}
+
+.evg-studio .studio-pricing-summary__billing-label {
+  font-size: 11.5px;
+  margin-bottom: 4px;
+}
+
+.evg-studio .studio-pricing-summary__billing-value {
+  font-weight: 600;
+  font-size: var(--t-14);
+  color: var(--t1);
+}
+
+.evg-studio .studio-pricing-summary__portal {
+  justify-self: end;
+}
+
+/* ── Yearly billing toggle ───────────────────────────────── */
+
+.evg-studio .studio-pricing-yearly-toggle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-6);
+  padding: var(--sp-5) var(--sp-6);
+  margin-bottom: var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-mid) var(--ease),
+    background var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-pricing-yearly-toggle:hover {
+  border-color: var(--line2);
+  background: var(--s3);
+}
+
+.evg-studio .studio-pricing-yearly-toggle:focus-within {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on {
+  border-color: var(--ac-line);
+  background: var(--ac-tint);
+}
+
+.evg-studio .studio-pricing-yearly-toggle-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.evg-studio .studio-pricing-yearly-toggle-title {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-pricing-yearly-toggle-pill {
+  display: inline-flex;
+  height: 22px;
+  padding: 0 8px;
+  align-items: center;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--s3);
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-pill {
+  border-color: var(--ac-line);
+  background: var(--ac-tint2);
+  color: var(--ac);
+}
+
+.evg-studio .studio-pricing-yearly-toggle-pill-off {
+  display: inline;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-pill-on {
+  display: none;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-pill-off {
+  display: none;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-pill-on {
+  display: inline;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-hint {
+  margin-top: 6px;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-hint p {
+  margin: 0;
+  font-size: var(--t-12);
+  line-height: 1.55;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-hint-off {
+  display: block;
+}
+
+.evg-studio .studio-pricing-yearly-toggle-hint-on {
+  display: none;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-hint-off {
+  display: none;
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-toggle-hint-on {
+  display: block;
+}
+
+.evg-studio .studio-pricing-yearly-switch {
+  flex: none;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--s4);
+  transition:
+    background var(--dur-mid) var(--ease),
+    border-color var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-switch {
+  border-color: var(--ac-line);
+  background: var(--ac);
+}
+
+.evg-studio .studio-pricing-yearly-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--t1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transition: transform var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-pricing-yearly-toggle.on .studio-pricing-yearly-switch-knob {
+  transform: translateX(18px);
+  background: var(--ac-ink);
+}
+
+.evg-studio .studio-pricing-yearly-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Plan grid ───────────────────────────────────────────── */
+
+.evg-studio .studio-pricing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-6);
+}
+
+.evg-studio .studio-pricing-card-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.evg-studio .studio-pricing-card-wrap.rec {
+  padding-top: 12px;
+}
+
+.evg-studio .studio-pricing-rec-badge {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--ac-line);
+  background: var(--ac-tint);
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ac);
+  white-space: nowrap;
+}
+
+.evg-studio .studio-pricing-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  transition:
+    border-color var(--dur-mid) var(--ease),
+    background var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-pricing-card.rec {
+  border-color: var(--ac-line);
+}
+
+.evg-studio .studio-pricing-card.current {
+  border-color: var(--ac-line);
+  background: var(--ac-tint);
+}
+
+.evg-studio .studio-pricing-card-head {
+  margin-bottom: var(--sp-4);
+}
+
+.evg-studio .studio-pricing-card-tag {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+  line-height: 1.45;
+}
+
+.evg-studio .studio-pricing-card-tag.rec {
+  color: var(--ac);
+}
+
+.evg-studio .studio-pricing-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-top: 10px;
+}
+
+.evg-studio .studio-pricing-card-title {
+  margin: 0;
+  font-size: var(--t-16);
+  font-weight: 600;
+  color: var(--t1);
+  line-height: 1.25;
+}
+
+.evg-studio .studio-pricing-current-badge {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--ac-tint2);
+  border: 1px solid var(--ac-line);
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ac);
+}
+
+.evg-studio .studio-pricing-promo-slot {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-pricing-promo-slot.on {
+  grid-template-rows: 1fr;
+  margin-bottom: var(--sp-3);
+}
+
+.evg-studio .studio-pricing-promo-row {
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evg-studio .studio-pricing-promo-badge {
+  padding: 2px 7px;
+  border-radius: var(--r-sm);
+  background: var(--ac-tint2);
+  border: 1px solid var(--ac-line);
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 600;
+  color: var(--ac);
+}
+
+.evg-studio .studio-pricing-promo-savings {
+  font-size: var(--t-12);
+  color: var(--t2);
+}
+
+.evg-studio .studio-pricing-price-block {
+  margin-bottom: var(--sp-5);
+}
+
+.evg-studio .studio-pricing-price-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 5px;
+}
+
+.evg-studio .studio-pricing-price {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--t1);
+}
+
+.evg-studio .studio-pricing-price-anim {
+  animation: studio-pricing-price-in 0.28s var(--ease);
+}
+
+@keyframes studio-pricing-price-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.evg-studio .studio-pricing-currency {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-pricing-compare-wrap {
+  display: none;
+  margin-left: 4px;
+}
+
+.evg-studio .studio-pricing-compare-wrap.on {
+  display: inline;
+}
+
+.evg-studio .studio-pricing-compare {
+  font-size: var(--t-12);
+  color: var(--t3);
+  text-decoration: line-through;
+}
+
+.evg-studio .studio-pricing-price-meta-slot,
+.evg-studio .studio-pricing-price-sub-slot {
+  position: relative;
+  min-height: 1.2em;
+}
+
+.evg-studio .studio-pricing-price-meta,
+.evg-studio .studio-pricing-price-sub {
+  display: none;
+  margin: 6px 0 0;
+  font-size: var(--t-12);
+  line-height: 1.45;
+}
+
+.evg-studio .studio-pricing-price-meta.on,
+.evg-studio .studio-pricing-price-sub.on {
+  display: block;
+}
+
+.evg-studio .studio-pricing-savings-amount {
+  color: var(--ac);
+  font-weight: 600;
+}
+
+.evg-studio .studio-pricing-features {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 var(--sp-6);
+  padding: 0;
+  list-style: none;
+}
+
+.evg-studio .studio-pricing-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--t-12);
+  line-height: 1.45;
+  color: var(--t2);
+}
+
+.evg-studio .studio-pricing-check {
+  flex: none;
+  margin-top: 2px;
+}
+
+.evg-studio .studio-pricing-cta {
+  margin-top: auto;
+}
+
+.evg-studio .studio-pricing-cta-current {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 34px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--s3);
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--t3);
+}
+
+.evg-studio .studio-pricing-cta-dark.evg-btn--primary {
+  background: var(--s3);
+  color: var(--t1);
+  border: 1px solid var(--line2);
+}
+
+.evg-studio .studio-pricing-cta-dark.evg-btn--primary:hover:not(:disabled) {
+  background: var(--s4);
+  color: var(--t1);
+}
+
+/* ── Token packs ─────────────────────────────────────────── */
+
+.evg-studio .studio-pricing-token-section {
+  margin-top: var(--sp-7);
+  padding: 20px;
+}
+
+.evg-studio .studio-pricing-token-section .studio-page-eyebrow {
+  margin-bottom: 8px;
+}
+
+.evg-studio .studio-pricing-token-section__desc {
+  margin: 0 0 var(--sp-6);
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--t3);
+  max-width: 52ch;
+}
+
+.evg-studio .studio-pricing-token-packs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-5);
+}
+
+.evg-studio .studio-pricing-token-pack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.evg-studio .studio-pricing-token-pack-title {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-pricing-token-pack-price {
+  font-size: var(--t-19);
+  font-weight: 600;
+}
+
+.evg-studio .studio-pricing-token-pack-cta {
+  margin-top: auto;
+}
+
+/* ── Footnote ────────────────────────────────────────────── */
+
+.evg-studio .studio-pricing-footnote {
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line);
+}
+
+.evg-studio .studio-pricing-footnote p {
+  margin: 0;
+  font-size: var(--t-11);
+  line-height: 1.6;
+  color: var(--t3);
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .evg-studio .studio-pricing-summary {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .evg-studio .studio-pricing-summary__portal {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .evg-studio .studio-pricing-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+    padding: var(--sp-5);
+  }
+
+  .evg-studio .studio-pricing-yearly-toggle {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .evg-studio .studio-pricing-yearly-switch {
+    align-self: flex-end;
+  }
+
+  .evg-studio .studio-pricing-plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evg-studio .studio-pricing-token-packs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-studio .studio-pricing-price-anim {
+    animation: none;
+  }
+
+  .evg-studio .studio-pricing-summary__bar-fill {
+    transition: none;
+  }
+}

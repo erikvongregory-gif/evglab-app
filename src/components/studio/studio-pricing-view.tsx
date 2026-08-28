@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { StudioButton, StudioPageHeader } from "@/components/studio/ui";
+import { StudioButton } from "@/components/studio/ui";
 import {
   getPlanAnnualSavingsVsList,
   getPlanDisplayMonthlyPrice,
@@ -12,7 +12,6 @@ import {
 } from "@/lib/billing/planCatalog";
 import { startBillingCheckout } from "@/lib/billing/checkoutClient";
 import type { SubscriptionPlanKey } from "@/lib/billing/tokenState";
-import { STUDIO_TOKENS } from "@/components/ui/dashboard-studio-shell";
 
 function YearlyBillingToggle({
   enabled,
@@ -258,93 +257,64 @@ export function StudioPricingView({
   }, []);
 
   return (
-    <div>
-      <StudioPageHeader
-        eyebrow="Abonnement"
-        title="Dein Plan"
-        subtitle="Jährliche Zahlung ist standardmäßig aktiv (79 / 149 / 299 €) — ohne Jahresabo gelten die Listenpreise 100 / 200 / 400 €. Tokens gelten für Bilder und Videos (Seedance 2)."
-      />
+    <div className="studio-pricing-page">
+      <header className="studio-pricing-header">
+        <span className="studio-pricing-header__eyebrow">Abonnement</span>
+        <h1 className="studio-pricing-title">Dein Plan</h1>
+        <p className="studio-pricing-sub">
+          Jährliche Zahlung ist standardmäßig aktiv (79 / 149 / 299 €) — ohne Jahresabo gelten die Listenpreise 100 / 200 /
+          400 €. Tokens gelten für Bilder und Videos (Seedance 2).
+        </p>
+      </header>
 
       {checkoutError ? (
-        <div
-          className="studio-card studio-card-pad"
-          style={{ marginBottom: 16, borderColor: "var(--warn)", background: "var(--warn-soft)" }}
-          role="alert"
-        >
-          <p className="studio-page-sub" style={{ color: "var(--warn-hi)", margin: 0 }}>
-            {checkoutError}
-          </p>
+        <div className="studio-pricing-error" role="alert">
+          <p className="studio-pricing-error__text">{checkoutError}</p>
         </div>
       ) : null}
 
       <div className="studio-card studio-pricing-summary">
         <div>
-          <div className="studio-page-eyebrow" style={{ marginBottom: 10 }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--ok)", boxShadow: "0 0 0 3px var(--ok-soft)" }} />
+          <div className="studio-page-eyebrow">
+            <span className="studio-page-eyebrow__dot" aria-hidden="true" />
             Aktiver Plan
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-            <span className="studio-accent-serif" style={{ fontSize: 22, fontWeight: 500 }}>
+          <div className="studio-pricing-summary__plan-row">
+            <span className="studio-accent-serif studio-pricing-summary__plan-name">
               {currentPlan ? activePlan.name : "Kein Abo"}
             </span>
             {currentPlan ? (
-              <span className="studio-faint" style={{ fontSize: 13 }}>
-                {activePlan.monthly} € / Monat
-              </span>
+              <span className="studio-faint studio-pricing-summary__plan-price">{activePlan.monthly} € / Monat</span>
             ) : null}
           </div>
         </div>
 
         <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span className="studio-field-label" style={{ margin: 0 }}>
-              Tokens · aktueller Zyklus
-            </span>
-            <span
-              className="studio-mono"
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                padding: "3px 8px",
-                borderRadius: "var(--r-xs)",
-                background: "var(--acc-soft)",
-                color: "var(--acc-hi)",
-              }}
-            >
-              {tokenPct}% genutzt
-            </span>
+          <div className="studio-pricing-summary__tokens-head">
+            <span className="studio-field-label">Tokens · aktueller Zyklus</span>
+            <span className="studio-pricing-summary__pct">{tokenPct}% genutzt</span>
           </div>
-          <div style={{ height: 6, borderRadius: 99, background: "var(--bg-4)", overflow: "hidden" }}>
-            <div
-              style={{
-                width: `${Math.min(tokenPct, 100)}%`,
-                height: "100%",
-                borderRadius: 99,
-                background: "linear-gradient(90deg, var(--acc-lo), var(--acc-hi))",
-                transition: "width .4s ease",
-              }}
-            />
+          <div className="studio-pricing-summary__bar">
+            <div className="studio-pricing-summary__bar-fill" style={{ width: `${Math.min(tokenPct, 100)}%` }} />
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-            <span className="studio-faint studio-tnum" style={{ fontSize: 11.5 }}>
-              {usedTokens.toLocaleString("de-DE")} verbraucht
-            </span>
-            <span className="studio-faint studio-tnum" style={{ fontSize: 11.5 }}>
+          <div className="studio-pricing-summary__tokens-meta">
+            <span className="studio-faint studio-tnum">{usedTokens.toLocaleString("de-DE")} verbraucht</span>
+            <span className="studio-faint studio-tnum">
               {monthlyTokens.toLocaleString("de-DE")} gesamt · {remainingTokens.toLocaleString("de-DE")} frei
             </span>
           </div>
         </div>
 
         <div>
-          <div className="studio-faint" style={{ fontSize: 11.5, marginBottom: 4 }}>
-            Abrechnung
-          </div>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{currentPlan ? "Aktives Abonnement" : "Noch kein Plan"}</div>
+          <div className="studio-faint studio-pricing-summary__billing-label">Abrechnung</div>
+          <div className="studio-pricing-summary__billing-value">{currentPlan ? "Aktives Abonnement" : "Noch kein Plan"}</div>
         </div>
 
-        <StudioButton variant="ghost" size="sm" disabled={portalPending} onClick={() => void openPortal()}>
-          {portalPending ? "Öffnen …" : "Rechnung & Portal"}
-        </StudioButton>
+        <div className="studio-pricing-summary__portal">
+          <StudioButton variant="ghost" size="sm" disabled={portalPending} onClick={() => void openPortal()}>
+            {portalPending ? "Öffnen …" : "Rechnung & Portal"}
+          </StudioButton>
+        </div>
       </div>
 
       <YearlyBillingToggle enabled={yearlyBilling} onChange={setYearlyBilling} />
@@ -363,11 +333,9 @@ export function StudioPricingView({
       </div>
 
       {currentPlan ? (
-        <div className="studio-card" style={{ marginTop: 24, padding: 20 }}>
-          <div className="studio-page-eyebrow" style={{ marginBottom: 8 }}>
-            Zusätzliche Tokens
-          </div>
-          <p className="studio-faint" style={{ fontSize: 13, marginBottom: 16, maxWidth: 520 }}>
+        <div className="studio-card studio-pricing-token-section">
+          <div className="studio-page-eyebrow">Zusätzliche Tokens</div>
+          <p className="studio-pricing-token-section__desc">
             Einmalige Token-Packs für mehr Bild- und Video-Generierungen im aktuellen Abrechnungszeitraum. Gekaufte Tokens
             bleiben erhalten, bis du sie verbrauchst. {SEEDANCE_VIDEO_TOKEN_HINT}
           </p>
