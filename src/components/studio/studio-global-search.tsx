@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { getMediaDisplayTitle } from "@/lib/dashboard/metadata";
+import { isVideosCreateEnabled } from "@/lib/featureFlags";
 
 type MediaHit = {
   id: string;
@@ -30,16 +31,20 @@ type QuickLink = {
   keywords: string;
 };
 
-const QUICK_LINKS: QuickLink[] = [
+const ALL_QUICK_LINKS: QuickLink[] = [
   { id: "dashboard", label: "Dashboard", href: "/dashboard", hint: "Übersicht", keywords: "dashboard home start" },
   { id: "create", label: "Bilder Erstellen", href: "/inhalte-erstellen", hint: "KI-Bilder", keywords: "bilder generieren create inhalte" },
-  { id: "videos", label: "Videos Erstellen", href: "/videos-erstellen", hint: "Demnächst", keywords: "video reels story ugc tiktok" },
+  { id: "videos", label: "Videos Erstellen", href: "/videos-erstellen", hint: "Video-Studio", keywords: "video reels story ugc tiktok" },
   { id: "media", label: "Mediathek", href: "/dashboard?tab=media", hint: "Alle Motive", keywords: "mediathek medien gallery bilder" },
   { id: "brand", label: "Markenprofil", href: "/dashboard?tab=brand", hint: "Marke & Stil", keywords: "marke brand profil" },
   { id: "team", label: "Team", href: "/dashboard?tab=team", hint: "Einladungen", keywords: "team mitglieder" },
   { id: "settings", label: "Einstellungen", href: "/dashboard?tab=settings", hint: "Profil", keywords: "einstellungen settings konto" },
   { id: "pricing", label: "Abonnement", href: "/dashboard?tab=pricing", hint: "Tarif & Tokens", keywords: "abo pricing tokens tarif" },
 ];
+
+function getQuickLinks(): QuickLink[] {
+  return ALL_QUICK_LINKS.filter((item) => item.id !== "videos" || isVideosCreateEnabled());
+}
 
 type StudioSearchContextValue = {
   query: string;
@@ -52,6 +57,7 @@ type StudioSearchContextValue = {
   isMac: boolean;
   quickResults: QuickLink[];
   mediaResults: MediaHit[];
+  mediaLoaded: boolean;
   navigate: (href: string) => void;
   normalizedQuery: string;
 };
@@ -124,15 +130,17 @@ export function StudioSearchProvider({ children }: { children: ReactNode }) {
     [close, router],
   );
 
+  const quickLinks = useMemo(() => getQuickLinks(), []);
+
   const quickResults = useMemo(
     () =>
-      QUICK_LINKS.filter(
+      quickLinks.filter(
         (item) =>
           matchesQuery(item.label, normalizedQuery) ||
           matchesQuery(item.hint ?? "", normalizedQuery) ||
           matchesQuery(item.keywords, normalizedQuery),
       ),
-    [normalizedQuery],
+    [normalizedQuery, quickLinks],
   );
 
   const mediaResults = useMemo(
@@ -172,6 +180,7 @@ export function StudioSearchProvider({ children }: { children: ReactNode }) {
     isMac,
     quickResults,
     mediaResults,
+    mediaLoaded,
     navigate,
     normalizedQuery,
   };
@@ -194,10 +203,12 @@ function useMobileSearchViewport(): boolean {
 }
 
 function StudioSearchDropdown({ mobile = false }: { mobile?: boolean }) {
-  const { open, query, normalizedQuery, quickResults, mediaResults, navigate } = useStudioSearch();
+  const { open, query, normalizedQuery, quickResults, mediaResults, mediaLoaded, navigate } = useStudioSearch();
   if (!open) return null;
 
-  const showEmpty = normalizedQuery.length > 0 && quickResults.length === 0 && mediaResults.length === 0;
+  const quickLinkCount = getQuickLinks().length;
+  const showEmpty =
+    normalizedQuery.length > 0 && quickResults.length === 0 && mediaLoaded && mediaResults.length === 0;
 
   return (
     <div
@@ -217,7 +228,9 @@ function StudioSearchDropdown({ mobile = false }: { mobile?: boolean }) {
         </div>
       ) : null}
 
-      {mediaResults.length > 0 ? (
+      {!mediaLoaded ? <div className="evg-shell-search-loading">Lade Motive …</div> : null}
+
+      {mediaLoaded && mediaResults.length > 0 ? (
         <div className="evg-shell-search-section">
           <div className="evg-shell-search-section-label">Mediathek</div>
           {mediaResults.slice(0, 6).map((item) => (
@@ -242,7 +255,7 @@ function StudioSearchDropdown({ mobile = false }: { mobile?: boolean }) {
 
       {showEmpty ? <div className="evg-shell-search-empty">Keine Treffer für „{query.trim()}“.</div> : null}
 
-      {!normalizedQuery && quickResults.length === QUICK_LINKS.length ? (
+      {!normalizedQuery && quickResults.length === quickLinkCount ? (
         <div className="evg-shell-search-empty">Tippe, um Bereiche und Motive zu filtern.</div>
       ) : null}
     </div>
@@ -269,7 +282,7 @@ function StudioSearchField() {
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        placeholder="Suche · Posts, Bilder, Kampagnen …"
+        placeholder="Suche · Bereiche und Motive …"
         aria-label="Suche"
         aria-expanded={open}
         aria-controls="studio-global-search-results"
