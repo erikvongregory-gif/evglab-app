@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "../styles/studio-tokens.css";
 @import "../styles/studio-screens.css";
+@import "../styles/studio-primitives.css";
 @custom-variant dark (&:where(.dark, .dark *));
 /* Explizit alle TS/TSX unter src scannen (u. a. components/ui – Neon-Button-Klassen) */
 @source "..";

@@ -1,0 +1,448 @@
+/* BrewAI Studio FINAL — T2a Primitives (scoped under .evg-studio)
+   Classes: .stu-*  · Tokens only · no hex in components */
+
+.evg-studio .stu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  font-family: var(--f-sans);
+  font-size: var(--t-13);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  color: var(--t2);
+  transition:
+    background var(--dur-mid) var(--ease),
+    border-color var(--dur-mid) var(--ease),
+    color var(--dur-mid) var(--ease),
+    transform 80ms ease;
+}
+.evg-studio .stu-btn:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+.evg-studio .stu-btn:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+.evg-studio .stu-btn--secondary:active:not(:disabled):not([aria-disabled="true"]),
+.evg-studio .stu-btn--ghost:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.98);
+}
+.evg-studio .stu-btn:disabled,
+.evg-studio .stu-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  pointer-events: none;
+}
+
+.evg-studio .stu-btn--primary {
+  background: var(--ac);
+  color: var(--ac-ink);
+  border-color: transparent;
+}
+.evg-studio .stu-btn--primary:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--ac-2);
+  color: var(--ac-ink);
+}
+.evg-studio .stu-btn--primary:active:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--ac-3);
+  color: var(--ac-ink);
+}
+
+.evg-studio .stu-btn--secondary {
+  background: var(--s3);
+  border-color: var(--line2);
+  color: var(--t1);
+  font-weight: 500;
+}
+.evg-studio .stu-btn--secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--s4);
+  border-color: var(--line2);
+  color: var(--t1);
+}
+
+.evg-studio .stu-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--t2);
+  font-weight: 500;
+}
+.evg-studio .stu-btn--ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--s3);
+  color: var(--t1);
+}
+
+.evg-studio .stu-btn--danger {
+  background: transparent;
+  border-color: var(--err);
+  color: var(--err);
+  font-weight: 500;
+}
+.evg-studio .stu-btn--danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--err-dim);
+  border-color: var(--err);
+  color: var(--err);
+}
+
+.evg-studio .stu-btn--sm {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: var(--t-12);
+  border-radius: var(--r-sm);
+}
+.evg-studio .stu-btn--md {
+  min-height: 34px;
+}
+.evg-studio .stu-btn--lg {
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+.evg-studio .stu-btn__spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--r-pill);
+  border: 2px solid var(--line2);
+  border-top-color: currentColor;
+  animation: stu-spin 800ms linear infinite;
+  flex: none;
+}
+
+.evg-studio .stu-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--t2);
+  cursor: pointer;
+  transition:
+    background var(--dur-mid) var(--ease),
+    border-color var(--dur-mid) var(--ease),
+    color var(--dur-mid) var(--ease),
+    transform 80ms ease;
+}
+.evg-studio .stu-icon-btn:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+.evg-studio .stu-icon-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--s3);
+  color: var(--t1);
+}
+.evg-studio .stu-icon-btn:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.97);
+  background: var(--s4);
+}
+.evg-studio .stu-icon-btn:disabled,
+.evg-studio .stu-icon-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.evg-studio .stu-icon-btn--secondary {
+  background: var(--s3);
+  border-color: var(--line2);
+}
+.evg-studio .stu-icon-btn--danger {
+  color: var(--err);
+}
+.evg-studio .stu-icon-btn--danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--err-dim);
+  color: var(--err);
+}
+.evg-studio .stu-icon-btn--sm {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: var(--r-sm);
+}
+.evg-studio .stu-icon-btn--lg {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.evg-studio .stu-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.evg-studio .stu-label {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.evg-studio .stu-label__req {
+  color: var(--err);
+  margin-left: 4px;
+}
+.evg-studio .stu-hint {
+  font-family: var(--f-sans);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--t3);
+  margin: 0;
+}
+.evg-studio .stu-hint--error {
+  color: var(--err);
+}
+.evg-studio .stu-hint--success {
+  color: var(--ok);
+}
+.evg-studio .stu-hint--warning {
+  color: var(--warn);
+}
+
+.evg-studio .stu-input,
+.evg-studio .stu-textarea,
+.evg-studio .stu-select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  color: var(--t1);
+  font-family: var(--f-sans);
+  font-size: var(--t-14);
+  font-weight: 400;
+  line-height: 1.45;
+  transition:
+    border-color var(--dur-mid) var(--ease),
+    background var(--dur-mid) var(--ease);
+}
+.evg-studio .stu-input::placeholder,
+.evg-studio .stu-textarea::placeholder {
+  color: var(--t3);
+}
+.evg-studio .stu-input:hover:not(:disabled):not([aria-invalid="true"]),
+.evg-studio .stu-textarea:hover:not(:disabled):not([aria-invalid="true"]),
+.evg-studio .stu-select:hover:not(:disabled):not([aria-invalid="true"]) {
+  background: var(--s2);
+}
+.evg-studio .stu-input:focus-visible,
+.evg-studio .stu-textarea:focus-visible,
+.evg-studio .stu-select:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+  border-color: var(--ac-line);
+}
+.evg-studio .stu-input:disabled,
+.evg-studio .stu-textarea:disabled,
+.evg-studio .stu-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--s2);
+}
+.evg-studio .stu-input[aria-invalid="true"],
+.evg-studio .stu-textarea[aria-invalid="true"],
+.evg-studio .stu-select[aria-invalid="true"],
+.evg-studio .stu-input--error,
+.evg-studio .stu-textarea--error,
+.evg-studio .stu-select--error {
+  border-color: var(--err);
+}
+.evg-studio .stu-input--success,
+.evg-studio .stu-textarea--success,
+.evg-studio .stu-select--success {
+  border-color: var(--ok);
+}
+.evg-studio .stu-textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+.evg-studio .stu-select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--t3) 50%),
+    linear-gradient(135deg, var(--t3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 11px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+.evg-studio .stu-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  line-height: 1.2;
+}
+.evg-studio .stu-badge--neutral {
+  color: var(--t2);
+  background: var(--s3);
+  border-color: var(--line);
+}
+.evg-studio .stu-badge--accent {
+  color: var(--ac);
+  background: var(--ac-tint);
+  border-color: var(--ac-line);
+}
+.evg-studio .stu-badge--success {
+  color: var(--ok);
+  background: var(--ok-dim);
+  border-color: var(--ok);
+}
+.evg-studio .stu-badge--warning {
+  color: var(--warn);
+  background: var(--warn-dim);
+  border-color: var(--warn);
+}
+.evg-studio .stu-badge--error {
+  color: var(--err);
+  background: var(--err-dim);
+  border-color: var(--err);
+}
+.evg-studio .stu-badge--info {
+  color: var(--info);
+  background: var(--info-dim);
+  border-color: var(--info);
+}
+
+.evg-studio .stu-card {
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  color: var(--t2);
+}
+.evg-studio .stu-card--pad-sm {
+  padding: 13px 15px;
+}
+.evg-studio .stu-card--pad-md {
+  padding: 18px 20px;
+}
+.evg-studio .stu-card--interactive {
+  transition: background var(--dur-mid) var(--ease), border-color var(--dur-mid) var(--ease);
+}
+.evg-studio .stu-card--interactive:hover {
+  background: var(--s3);
+  border-color: var(--line2);
+}
+.evg-studio .stu-card--interactive:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+.evg-studio .stu-skeleton {
+  display: block;
+  background: var(--s3);
+  border-radius: var(--r-md);
+  position: relative;
+  overflow: hidden;
+}
+.evg-studio .stu-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--ac-tint) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: stu-shimmer 1.4s var(--ease) infinite;
+}
+.evg-studio .stu-progress {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+.evg-studio .stu-progress__bar {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--ac);
+  transition: width var(--dur-page) var(--ease);
+}
+.evg-studio .stu-progress--ok .stu-progress__bar {
+  background: var(--ok);
+}
+.evg-studio .stu-progress--warn .stu-progress__bar {
+  background: var(--warn);
+}
+.evg-studio .stu-progress--err .stu-progress__bar {
+  background: var(--err);
+}
+.evg-studio .stu-progress--indeterminate .stu-progress__bar {
+  width: 40% !important;
+  animation: stu-bar-pulse 1.6s var(--ease) infinite;
+}
+
+@keyframes stu-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes stu-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes stu-bar-pulse {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-studio .stu-btn,
+  .evg-studio .stu-icon-btn,
+  .evg-studio .stu-input,
+  .evg-studio .stu-textarea,
+  .evg-studio .stu-select,
+  .evg-studio .stu-card--interactive,
+  .evg-studio .stu-progress__bar {
+    transition: none;
+  }
+  .evg-studio .stu-btn:active:not(:disabled),
+  .evg-studio .stu-icon-btn:active:not(:disabled) {
+    transform: none;
+  }
+  .evg-studio .stu-btn__spinner,
+  .evg-studio .stu-skeleton::after,
+  .evg-studio .stu-progress--indeterminate .stu-progress__bar {
+    animation: none;
+  }
+  .evg-studio .stu-skeleton::after {
+    display: none;
+  }
+}
