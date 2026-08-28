@@ -4,7 +4,6 @@ import "@/styles/studio-dashboard-home.css";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { StudioViewTransition } from "@/components/studio/studio-view-transition";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { useStudioShell } from "@/components/studio/studio-workspace-shell";
@@ -21,7 +20,7 @@ import { brandLockLabel, formatDomain } from "@/lib/brand/brand-profile-display"
 import { BrandProfileView } from "@/components/dashboard/BrandProfileView";
 import { BrandProfileSetupModal, type BrandScanSuggestion } from "@/components/dashboard/BrandProfileSetupModal";
 import { DashboardHomeView } from "@/components/studio/dashboard/dashboard-home-view";
-import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import { StudioMediaLibrary, type MediaItem } from "@/components/studio/media/studio-media-library";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
 import {
   clearHomepageCheckoutParams,
@@ -30,7 +29,6 @@ import {
 } from "@/lib/billing/checkoutClient";
 import { buildGenericBrandProfilePatch, isBrandProfileCompleteFromSettings } from "@/lib/dashboard/brandProfile";
 import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
-import { formatChargeNumber, getMediaDisplayTitle } from "@/lib/dashboard/metadata";
 import { fetchWithRetry } from "@/lib/http/fetchWithRetry";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
 
@@ -49,18 +47,7 @@ type DashboardSummary = {
   plan: string | null;
   degradedBilling?: boolean;
 };
-
-type MediaItem = {
-  id: string;
-  imageUrl: string;
-  title?: string;
-  prompt: string;
-  createdAt: string;
-  aspectRatio: string;
-  resolution: "1K" | "2K" | "4K";
-  outputFormat: "png" | "jpg";
-  generation?: { chargeNumber?: number | null } | null;
-};
+import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
 type TeamMember = {
   id: string;
@@ -92,17 +79,10 @@ type SettingsPayload = {
 };
 
 const TOKENS = STUDIO_TOKENS;
-const STUDIO_EASE = [0.22, 0.68, 0.2, 1] as const;
-const MEDIA_LIGHTBOX_SPRING = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.85 };
 
 
 function normalizeSettings(raw: Partial<SettingsPayload> | SettingsPayload): SettingsPayload {
   return sanitizeDashboardSettings(raw);
-}
-
-function clampText(v: string, max: number) {
-  const s = (v ?? "").trim();
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
 function initialsFromName(name: string) {
@@ -114,47 +94,6 @@ function initialsFromName(name: string) {
 
 function formatDeNumber(n: number) {
   return n.toLocaleString("de-DE");
-}
-
-function formatRelativeTime(iso: string) {
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return "—";
-  const diffMs = Date.now() - t;
-  if (diffMs < 60_000) return "gerade eben";
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 60) return `vor ${mins} Min.`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `vor ${hours} Std.`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "gestern";
-  return `vor ${days} Tagen`;
-}
-
-function getMediaAssetUrl(item: MediaItem): string {
-  if (item.imageUrl.startsWith("/api/kie/download?")) return item.imageUrl;
-  return `/api/kie/download?url=${encodeURIComponent(item.imageUrl)}&format=${item.outputFormat}&taskId=${encodeURIComponent(item.id)}`;
-}
-
-async function downloadMediaItem(item: MediaItem): Promise<string | null> {
-  const response = await fetch(getMediaAssetUrl(item));
-  if (!response.ok) {
-    try {
-      const payload = (await response.json()) as { error?: string };
-      return payload.error ?? "Download fehlgeschlagen.";
-    } catch {
-      return "Download fehlgeschlagen.";
-    }
-  }
-  const blob = await response.blob();
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = objectUrl;
-  anchor.download = `brewai-${item.id}.${item.outputFormat}`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(objectUrl);
-  return null;
 }
 
 
@@ -648,7 +587,7 @@ export function DashboardRedesignShell(props: {
         />
       ) : null}
       {tab === "media" ? (
-        <MediaView
+        <StudioMediaLibrary
           P={P}
           items={media}
           loaded={mediaLoaded}
@@ -762,309 +701,6 @@ export function DashboardRedesignShell(props: {
   );
 }
 
-
-function MediaView({
-  P,
-  items,
-  loaded = true,
-  onItemsChange,
-  hasActivePlan = true,
-  initialQuery = "",
-}: {
-  P: StudioPalette;
-  items: MediaItem[];
-  loaded?: boolean;
-  onItemsChange: (next: MediaItem[]) => void;
-  hasActivePlan?: boolean;
-  initialQuery?: string;
-}) {
-  const reduceMotion = useReducedMotion();
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const [search, setSearch] = useState(initialQuery);
-  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
-  const [titleDraft, setTitleDraft] = useState("");
-  const [titleSaving, setTitleSaving] = useState(false);
-  const [titleError, setTitleError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSearch(initialQuery);
-  }, [initialQuery]);
-
-  useEffect(() => {
-    if (!selectedItem) return;
-    setTitleDraft(getMediaDisplayTitle(selectedItem));
-    setTitleError(null);
-    const focusTimer = window.setTimeout(() => titleInputRef.current?.focus(), reduceMotion ? 0 : 180);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedItem(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [selectedItem, reduceMotion]);
-
-  const openMediaItem = useCallback((item: MediaItem) => {
-    setDownloadError(null);
-    setTitleError(null);
-    setSelectedItem(item);
-  }, []);
-
-  const saveMediaTitle = useCallback(
-    async (item: MediaItem, nextTitle: string) => {
-      const trimmed = nextTitle.trim();
-      if (!trimmed) {
-        setTitleError("Bitte einen Titel eingeben.");
-        return;
-      }
-      if (trimmed === getMediaDisplayTitle(item)) return;
-
-      setTitleSaving(true);
-      setTitleError(null);
-      try {
-        const res = await fetch("/api/dashboard/media", {
-          method: "PATCH",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: item.id, title: trimmed }),
-        });
-        const json = (await res.json().catch(() => null)) as { error?: string; items?: MediaItem[] } | null;
-        if (!res.ok) {
-          setTitleError(json?.error ?? "Titel konnte nicht gespeichert werden.");
-          return;
-        }
-        const nextItems = Array.isArray(json?.items) ? json.items : items.map((entry) => (entry.id === item.id ? { ...entry, title: trimmed } : entry));
-        onItemsChange(nextItems);
-        setSelectedItem((current) => (current?.id === item.id ? { ...current, title: trimmed } : current));
-      } catch {
-        setTitleError("Titel konnte nicht gespeichert werden.");
-      } finally {
-        setTitleSaving(false);
-      }
-    },
-    [items, onItemsChange],
-  );
-
-  const handleDownload = useCallback(async (item: MediaItem) => {
-    setDownloading(true);
-    setDownloadError(null);
-    try {
-      const error = await downloadMediaItem(item);
-      if (error) setDownloadError(error);
-    } catch {
-      setDownloadError("Download fehlgeschlagen.");
-    } finally {
-      setDownloading(false);
-    }
-  }, []);
-
-  const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (it) =>
-        getMediaDisplayTitle(it).toLowerCase().includes(q) ||
-        it.prompt.toLowerCase().includes(q) ||
-        it.aspectRatio.toLowerCase().includes(q) ||
-        it.resolution.toLowerCase().includes(q),
-    );
-  }, [items, search]);
-
-  return (
-    <>
-      <StudioPageHeader
-        eyebrow="Mediathek"
-        title="Deine Motive"
-        meta={`${items.length} Motive`}
-        subtitle="Alle generierten Bilder deiner Marke — sortiert nach Datum."
-      />
-      {items.length > 0 ? (
-        <div style={{ marginTop: 18, maxWidth: 420 }}>
-          <input
-            className="evg-input"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Motive durchsuchen …"
-            aria-label="Mediathek durchsuchen"
-            style={{ width: "100%", height: 36 }}
-          />
-        </div>
-      ) : null}
-      <LayoutGroup id="studio-media-library">
-      {visibleItems.length === 0 ? (
-        <div className="evg-none">
-          {!loaded
-            ? "Motive werden geladen …"
-            : items.length === 0
-              ? (
-                <>
-                  Noch keine Motive.{" "}
-                  <Link href={hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing"}>
-                    {hasActivePlan ? "Jetzt erstellen →" : "Tarif wählen →"}
-                  </Link>
-                </>
-              )
-              : "Keine Motive passen zur Suche."}
-        </div>
-      ) : (
-      <div className="evg-grid" style={{ marginTop: 22 }}>
-          {visibleItems.map((it) => (
-            <button
-              key={it.id}
-              type="button"
-              className="evg-tile"
-              onClick={() => openMediaItem(it)}
-              aria-label={`${getMediaDisplayTitle(it)} in Großansicht öffnen`}
-              style={{ width: "100%", padding: 0, textAlign: "left", font: "inherit", color: "inherit" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <motion.img
-                layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
-                src={getMediaAssetUrl(it)}
-                alt=""
-                transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
-              />
-              <div className="evg-tile__cap">
-                <span>{clampText(getMediaDisplayTitle(it), 48)}</span>
-                <span>{it.aspectRatio}</span>
-              </div>
-            </button>
-          ))}
-      </div>
-      )}
-      <AnimatePresence>
-        {selectedItem ? (
-          <motion.div
-            key="studio-media-lightbox"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Bild in Großansicht"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
-            onClick={() => setSelectedItem(null)}
-            className="evg-scrim"
-            style={{
-              zIndex: 120,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 24,
-            }}
-          >
-            <motion.div
-              onClick={(event) => event.stopPropagation()}
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
-              transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
-              className="evg-dialog"
-              style={{
-                position: "relative",
-                width: "min(1100px, 100%)",
-                maxHeight: "min(92vh, 900px)",
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(240px, 320px)",
-                gap: 16,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: P.surface2,
-                  padding: 20,
-                  minHeight: 280,
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <motion.img
-                  layoutId={reduceMotion ? undefined : `studio-media-${selectedItem.id}`}
-                  src={getMediaAssetUrl(selectedItem)}
-                  alt={getMediaDisplayTitle(selectedItem)}
-                  style={{ maxWidth: "100%", maxHeight: "min(78vh, 760px)", objectFit: "contain" }}
-                  transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
-                />
-              </div>
-              <aside style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <label htmlFor={`media-title-${selectedItem.id}`} className="evg-rubrik">
-                    Motiv-Titel
-                  </label>
-                  <input
-                    id={`media-title-${selectedItem.id}`}
-                    ref={titleInputRef}
-                    className="evg-input"
-                    value={titleDraft}
-                    onChange={(event) => setTitleDraft(event.target.value)}
-                    onBlur={() => {
-                      if (selectedItem) void saveMediaTitle(selectedItem, titleDraft);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        if (selectedItem) void saveMediaTitle(selectedItem, titleDraft);
-                      }
-                    }}
-                    maxLength={120}
-                    disabled={titleSaving}
-                    placeholder="z. B. Hefeweizen · Hero-Glas · Public Viewing"
-                    style={{ marginTop: 8, height: 36, fontWeight: 500 }}
-                  />
-                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontSize: 11.5, color: "var(--fg-5)" }}>Enter oder Speichern</span>
-                    <StudioButton
-                      size="sm"
-                      variant="soft"
-                      disabled={titleSaving || titleDraft.trim() === getMediaDisplayTitle(selectedItem)}
-                      onClick={() => void saveMediaTitle(selectedItem, titleDraft)}
-                    >
-                      Titel speichern
-                    </StudioButton>
-                  </div>
-                  <dl className="evg-sheet" style={{ marginTop: 14 }}>
-                    <dt>Format</dt>
-                    <dd>{selectedItem.resolution} · {selectedItem.aspectRatio} · {selectedItem.outputFormat.toUpperCase()}</dd>
-                    <dt>Zeit</dt>
-                    <dd>{formatRelativeTime(selectedItem.createdAt)}</dd>
-                  </dl>
-                </div>
-                <StudioIconButton aria-label="Schließen" onClick={() => setSelectedItem(null)}>
-                  <StudioIcon name="x" size={16} />
-                </StudioIconButton>
-              </div>
-              {titleError ? <p className="evg-note" style={{ margin: 0, fontSize: 12.5 }}>{titleError}</p> : null}
-              {titleSaving ? (
-                <p style={{ margin: 0, fontSize: 12.5, color: "var(--fg-5)" }}>Titel wird gespeichert …</p>
-              ) : null}
-              {downloadError ? <p className="evg-note" style={{ margin: 0, fontSize: 12.5 }}>{downloadError}</p> : null}
-              <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-                <StudioButton disabled={downloading} onClick={() => void handleDownload(selectedItem)}>
-                  {downloading ? "Wird heruntergeladen …" : "Herunterladen"}
-                </StudioButton>
-                <StudioButton variant="ghost" onClick={() => setSelectedItem(null)}>
-                  Schließen
-                </StudioButton>
-              </div>
-              </aside>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-      </LayoutGroup>
-    </>
-  );
-}
 
 function TeamView({
   members,
