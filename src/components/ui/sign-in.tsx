@@ -161,8 +161,8 @@ export function LoginHero({ mode: _mode }: { mode: AuthMode }) {
         </h1>
 
         <p className={styles.lead} style={{ marginTop: 18, maxWidth: 420 }}>
-          Markenprofil einmal anlegen, danach Bilder, Kampagnen und Clips für Sortiment und Anlässe erzeugen. Tokens
-          statt Abo-Falle.
+          Markenprofil einmal anlegen, danach Motive für Sortiment und Anlässe erstellen und zentral in der Mediathek
+          verwalten.
         </p>
 
         <div className={styles.hook} style={{ marginTop: 20, flexWrap: "wrap" }}>

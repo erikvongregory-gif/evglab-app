@@ -254,6 +254,11 @@
   border: 0;
 }
 
+.evg-studio .studio-settings-toggle:has(.studio-settings-toggle-input:focus-visible) .studio-settings-switch {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
 /* ── Save row ──────────────────────────────────────────────── */
 
 .evg-studio .studio-settings-save-row {

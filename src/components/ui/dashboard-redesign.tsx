@@ -1151,7 +1151,7 @@ function SettingsToggle({
         <div className="studio-settings-toggle__label">{label}</div>
         {hint ? <div className="studio-settings-toggle__hint">{hint}</div> : null}
       </div>
-      <span role="switch" aria-checked={checked} aria-label={label} className="studio-settings-switch">
+      <span className="studio-settings-switch" aria-hidden="true">
         <span className="studio-settings-switch-knob" />
       </span>
       <input
@@ -1159,8 +1159,6 @@ function SettingsToggle({
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
         className="studio-settings-toggle-input"
-        tabIndex={-1}
-        aria-hidden="true"
       />
     </label>
   );
