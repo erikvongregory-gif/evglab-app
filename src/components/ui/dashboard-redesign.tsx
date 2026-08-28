@@ -8,26 +8,19 @@ import { StudioViewTransition } from "@/components/studio/studio-view-transition
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { useStudioShell } from "@/components/studio/studio-workspace-shell";
 import {
-  STUDIO_ON_ACCENT,
   STUDIO_PAD_X,
   STUDIO_TOKENS,
   useStudioPalette,
   type StudioPalette,
 } from "@/components/ui/dashboard-studio-shell";
-import {
-  StudioActivityColumn,
-  StudioSideColumn,
-  StudioStatsRow,
-  type StudioActivityItem,
-  type StudioStat,
-} from "@/components/dashboard/studio-reference-ui";
 import { StudioPricingView } from "@/components/studio/studio-pricing-view";
 import { StudioButton, StudioIconButton, StudioPageHeader } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
 import { brandLockLabel, formatDomain } from "@/lib/brand/brand-profile-display";
 import { BrandProfileView } from "@/components/dashboard/BrandProfileView";
 import { BrandProfileSetupModal, type BrandScanSuggestion } from "@/components/dashboard/BrandProfileSetupModal";
-import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import { DashboardHomeView } from "@/components/studio/dashboard/dashboard-home-view";
+import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
 import {
   clearHomepageCheckoutParams,
@@ -36,30 +29,24 @@ import {
 } from "@/lib/billing/checkoutClient";
 import { buildGenericBrandProfilePatch, isBrandProfileCompleteFromSettings } from "@/lib/dashboard/brandProfile";
 import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
-import { getMediaDisplayTitle } from "@/lib/dashboard/metadata";
+import { formatChargeNumber, getMediaDisplayTitle } from "@/lib/dashboard/metadata";
 import { fetchWithRetry } from "@/lib/http/fetchWithRetry";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
 
 type DashboardTab = "dashboard" | "media" | "team" | "brand" | "settings" | "pricing";
 
 type DashboardSummary = {
-  tokens: { monthly: number; used: number; remaining: number };
+  unlimited?: boolean;
+  tokens: { monthly: number; used: number; remaining: number; unlimited?: boolean };
+  periodEnd?: string | null;
   postsThisMonth: number;
-  activeCampaigns: number;
+  chargesTotal?: number;
+  activeCampaigns?: number;
   teamMembers: number;
   openInvites: number;
   billingStatus: string;
   plan: string | null;
   degradedBilling?: boolean;
-};
-
-type ActivityItem = {
-  id: string;
-  type: "media" | "team" | "billing";
-  title: string;
-  desc: string;
-  time: string;
-  color: "orange" | "blue" | "purple" | "green";
 };
 
 type MediaItem = {
@@ -71,6 +58,7 @@ type MediaItem = {
   aspectRatio: string;
   resolution: "1K" | "2K" | "4K";
   outputFormat: "png" | "jpg";
+  generation?: { chargeNumber?: number | null } | null;
 };
 
 type TeamMember = {
@@ -106,13 +94,6 @@ const TOKENS = STUDIO_TOKENS;
 const STUDIO_EASE = [0.22, 0.68, 0.2, 1] as const;
 const MEDIA_LIGHTBOX_SPRING = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.85 };
 
-const PLAN_LABELS: Record<string, string> = {
-  start: "Brauerei Start",
-  growth: "Brauerei Wachstum",
-  pro: "Brauerei Pro",
-};
-
-const isBrandProfileComplete = isBrandProfileCompleteFromSettings;
 
 function normalizeSettings(raw: Partial<SettingsPayload> | SettingsPayload): SettingsPayload {
   return sanitizeDashboardSettings(raw);
@@ -175,64 +156,8 @@ async function downloadMediaItem(item: MediaItem): Promise<string | null> {
   return null;
 }
 
-function greetingForNow() {
-  const h = new Date().getHours();
-  if (h < 11) return "Guten Morgen";
-  if (h < 17) return "Guten Tag";
-  return "Guten Abend";
-}
 
-function getCalendarWeek(d = new Date()) {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil(((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
-}
-
-function formatNewMotifs(count: number) {
-  if (count === 1) return "1 neues Motiv";
-  return `${count} neue Motive`;
-}
-
-function sparkFromValue(n: number) {
-  const base = Math.max(1, n);
-  return Array.from({ length: 10 }, (_, i) => Math.max(0, Math.round(base * (0.45 + i / 18))));
-}
-
-function buildStudioActivities(
-  media: MediaItem[],
-  activities: ActivityItem[],
-  profileName: string,
-): StudioActivityItem[] {
-  const user = profileName.split(/\s+/)[0] || profileName || "Studio";
-  const fromMedia: StudioActivityItem[] = media.map((m, i) => ({
-    id: m.id,
-    kind: "image" as const,
-    title: clampText(getMediaDisplayTitle(m), 48) || "Bild generiert",
-    desc: `${m.resolution} · ${m.aspectRatio} · Markenstil`,
-    time: formatRelativeTime(m.createdAt),
-    user,
-    tag: "Produktfoto",
-    imageUrl: m.imageUrl,
-    tone: i % 3 === 0 ? "amber" : i % 3 === 1 ? "deep" : "cream",
-  }));
-
-  const fromApi: StudioActivityItem[] = activities
-    .filter((a) => a.type !== "media")
-    .map((a) => ({
-      id: a.id,
-      kind: (a.type === "team" ? "team" : "campaign") as "team" | "campaign",
-      title: a.title,
-      desc: a.desc,
-      time: formatRelativeTime(a.time),
-      user,
-      tag: a.type === "team" ? "Team" : "Kampagne",
-    }));
-
-  return [...fromMedia, ...fromApi].slice(0, 6);
-}
-
+const isBrandProfileComplete = isBrandProfileCompleteFromSettings;
 function WaveMark({ size = 28, color = TOKENS.ink }: { size?: number; color?: string }) {
   const h = (size * 20) / 28;
   return (
@@ -244,40 +169,12 @@ function WaveMark({ size = 28, color = TOKENS.ink }: { size?: number; color?: st
   );
 }
 
-function Eyebrow({
-  children,
-  color = TOKENS.ink3,
-  dot = TOKENS.amber,
-}: {
-  children: React.ReactNode;
-  color?: string;
-  dot?: string;
-}) {
-  return (
-    <div
-      style={{
-        fontFamily: TOKENS.mono,
-        fontSize: 11,
-        letterSpacing: 1.2,
-        textTransform: "uppercase",
-        color,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-      }}
-    >
-      <span style={{ width: 6, height: 6, borderRadius: 999, background: dot, display: "inline-block" }} />
-      {children}
-    </div>
-  );
-}
-
 function Placeholder({
   label,
   w = "100%",
   h = 64,
   tone = "cream",
-  radius = 6,
+  radius = 0,
 }: {
   label: string;
   w?: number | string;
@@ -315,7 +212,7 @@ function Placeholder({
           textTransform: "uppercase",
           background: "rgba(255,255,255,0.55)",
           padding: "2px 6px",
-          borderRadius: 4,
+          borderRadius: 2,
         }}
       >
         {label}
@@ -422,7 +319,8 @@ export function DashboardRedesignShell(props: {
   }, []);
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [mediaLoaded, setMediaLoaded] = useState(false);
   const [team, setTeam] = useState<TeamMember[]>([]);
@@ -496,12 +394,20 @@ export function DashboardRedesignShell(props: {
     void (async () => {
       try {
         const res = await load("/api/dashboard/summary");
-        if (!res || ignore || !res.ok) return;
-        const json = (await res.json()) as { summary?: DashboardSummary; activities?: ActivityItem[] };
-        if (json.summary) setSummary(json.summary);
-        if (Array.isArray(json.activities)) setActivities(json.activities);
+        if (!res || ignore) return;
+        if (res.ok) {
+          const json = (await res.json()) as { summary?: DashboardSummary };
+          if (json.summary) {
+            setSummary(json.summary);
+            setSummaryError(null);
+          }
+        } else {
+          setSummaryError("Übersicht konnte nicht geladen werden.");
+        }
       } catch {
-        /* Summary darf langsam/fehlend sein, ohne Settings zu blockieren */
+        if (!ignore) setSummaryError("Netzwerkfehler beim Laden der Übersicht.");
+      } finally {
+        if (!ignore) setSummaryLoaded(true);
       }
     })();
 
@@ -579,9 +485,8 @@ export function DashboardRedesignShell(props: {
         try {
           const res = await fetch("/api/dashboard/summary", { cache: "no-store", credentials: "include" });
           if (!res.ok) return;
-          const json = (await res.json()) as { summary?: DashboardSummary; activities?: ActivityItem[] };
+          const json = (await res.json()) as { summary?: DashboardSummary };
           if (json.summary) setSummary(json.summary);
-          if (Array.isArray(json.activities)) setActivities(json.activities);
         } catch {
           /* ignore */
         }
@@ -710,11 +615,14 @@ export function DashboardRedesignShell(props: {
     <>
       <StudioViewTransition viewKey={tab} variant="tab">
       {tab === "dashboard" ? (
-        <DashboardOverview
-          P={P}
+        <DashboardHomeView
           summary={summary}
+          summaryLoaded={summaryLoaded}
+          summaryError={summaryError}
           media={media}
-          activities={activities}
+          mediaLoaded={mediaLoaded}
+          settings={settings}
+          settingsLoaded={settingsLoaded}
           profileName={profileName}
           breweryName={breweryName}
           brandProfileComplete={brandProfileComplete}
@@ -723,6 +631,18 @@ export function DashboardRedesignShell(props: {
           onOpenBrandSetup={() => {
             changeTab("brand");
             setBrandProfileSetupOpen(true);
+          }}
+          onRetrySummary={() => {
+            setSummaryLoaded(false);
+            setSummaryError(null);
+            void fetch("/api/dashboard/summary", { cache: "no-store", credentials: "include" })
+              .then(async (res) => {
+                if (!res.ok) throw new Error("fail");
+                const json = (await res.json()) as { summary?: DashboardSummary };
+                if (json.summary) setSummary(json.summary);
+              })
+              .catch(() => setSummaryError("Übersicht konnte nicht geladen werden."))
+              .finally(() => setSummaryLoaded(true));
           }}
         />
       ) : null}
@@ -804,57 +724,29 @@ export function DashboardRedesignShell(props: {
         onClick={() => setShowBrandProfileChoice(false)}
       >
         <div
-          className="studio-brand-choice-modal relative w-full max-w-lg rounded-2xl p-7 shadow-2xl"
-          style={{
-            background: "var(--bg-2)",
-            border: "1px solid var(--line-strong)",
-            color: "var(--tx-0)",
-            boxShadow: "var(--sh-pop)",
-          }}
+          className="evg-dialog relative w-full max-w-lg p-7"
+          style={{ background: "var(--field)", color: "var(--fg)" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div aria-hidden style={{ position: "absolute", top: -1, left: -1, right: -1, height: 1, background: TOKENS.amber, borderRadius: "16px 16px 0 0", opacity: 0.5 }} />
           <button
             type="button"
             aria-label="Schliessen"
             onClick={() => setShowBrandProfileChoice(false)}
-            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full transition"
-            style={{ color: TOKENS.ink3, background: "transparent" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = P.surface)}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            className="evg-btn absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center"
+            style={{ color: "var(--fg-5)", padding: 0 }}
           >
             ×
           </button>
-          <h3 className="text-xl font-semibold" style={{ color: TOKENS.ink, fontFamily: TOKENS.sans }}>Willst du deinen Markenstil fixieren?</h3>
-          <p className="mt-2 text-sm" style={{ color: TOKENS.ink2 }}>
+          <h3 className="evg-h1" style={{ fontSize: 18 }}>Willst du deinen Markenstil fixieren?</h3>
+          <p className="mt-2 text-sm" style={{ color: "var(--fg-3)" }}>
             Gib einfach die Website deiner Marke ein — die KI erkennt Tonality, Farben und Bildsprache und erstellt
             dein Markenprofil. Du kannst das später unter Einstellungen jederzeit ändern.
           </p>
-          <div className="studio-brand-choice-actions mt-6 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleChooseBrandProfileGuided}
-              className="evg-cta inline-flex h-11 items-center rounded-lg px-5 text-sm font-semibold"
-              style={{
-                background: TOKENS.amber,
-                color: STUDIO_ON_ACCENT,
-                border: "none",
-              }}
-            >
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={handleChooseBrandProfileGuided} className="evg-btn evg-btn--primary">
               Ja, Markenprofil anlegen
             </button>
-            <button
-              type="button"
-              onClick={() => void handleSkipBrandProfile()}
-              className="inline-flex h-11 items-center rounded-lg px-5 text-sm transition"
-              style={{
-                background: "transparent",
-                color: TOKENS.ink2,
-                border: `1px solid ${P.ruleStrong}`,
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = P.surface)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
+            <button type="button" onClick={() => void handleSkipBrandProfile()} className="evg-btn">
               Ohne Profil starten (dauerhaft)
             </button>
           </div>
@@ -869,145 +761,6 @@ export function DashboardRedesignShell(props: {
   );
 }
 
-function DashboardOverview({
-  P,
-  summary,
-  media,
-  activities,
-  profileName,
-  breweryName,
-  brandProfileComplete,
-  brandProfileMode,
-  onOpenTab,
-  onOpenBrandSetup,
-}: {
-  P: StudioPalette;
-  summary: DashboardSummary | null;
-  media: MediaItem[];
-  activities: ActivityItem[];
-  profileName: string;
-  breweryName: string;
-  brandProfileComplete: boolean;
-  brandProfileMode: SettingsPayload["brandProfileMode"];
-  onOpenTab: (tab: DashboardTab) => void;
-  onOpenBrandSetup: () => void;
-}) {
-  const firstName = profileName.split(/\s+/)[0] || profileName;
-  const greeting = greetingForNow();
-  const postsCount = summary?.postsThisMonth ?? 0;
-  const headlineBrewery = breweryName || "deine Marke";
-  const remaining = summary?.tokens.remaining ?? 0;
-  const monthly = summary?.tokens.monthly ?? 0;
-  const used = summary?.tokens.used ?? 0;
-  const studioActivities = buildStudioActivities(media, activities, profileName);
-  const planKey = (summary?.plan ?? null) as SubscriptionPlanKey | null;
-  const hasActivePlan = hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus);
-  const planLabel = planKey ? (PLAN_LABELS[planKey] ?? planKey) : "Noch kein Tarif";
-  const baseTokens = planKey ? SUBSCRIPTION_PLAN_TOKENS[planKey] : 0;
-  const extraTokens = Math.max(monthly - baseTokens, 0);
-
-  async function openBillingPortal() {
-    if (!hasActivePlan) {
-      onOpenTab("pricing");
-      return;
-    }
-    try {
-      const res = await fetch("/api/billing/portal", { method: "POST", credentials: "same-origin" });
-      const json = (await res.json().catch(() => null)) as { url?: string } | null;
-      if (json?.url) window.location.href = json.url;
-    } catch {
-      onOpenTab("settings");
-    }
-  }
-
-  const stats: StudioStat[] = [
-    {
-      eyebrow: "Tokens übrig",
-      value: formatDeNumber(remaining),
-      sub: `${formatDeNumber(used)} verbraucht`,
-      delta: monthly > 0 ? `${Math.round((remaining / monthly) * 100)}% verfügbar` : "—",
-      deltaDir: "flat" as const,
-      spark: sparkFromValue(remaining),
-    },
-    {
-      eyebrow: "Posts diesen Monat",
-      value: formatDeNumber(postsCount),
-      sub: "aus deiner Mediathek",
-      delta: postsCount > 0 ? `↗ ${formatDeNumber(postsCount)} neu` : "Noch keine Posts",
-      deltaDir: postsCount > 0 ? ("up" as const) : ("flat" as const),
-      spark: sparkFromValue(postsCount),
-    },
-    {
-      eyebrow: "Kampagnen aktiv",
-      value: formatDeNumber(summary?.activeCampaigns ?? 0),
-      sub: (summary?.activeCampaigns ?? 0) > 0 ? "Aktive Kampagne" : "Noch keine Kampagne",
-      delta: (summary?.activeCampaigns ?? 0) > 0 ? "↗ aktiv" : "—",
-      deltaDir: (summary?.activeCampaigns ?? 0) > 0 ? ("up" as const) : ("flat" as const),
-      spark: sparkFromValue(summary?.activeCampaigns ?? 0),
-    },
-    {
-      eyebrow: "Teammitglieder",
-      value: formatDeNumber(summary?.teamMembers ?? 0),
-      sub: `${formatDeNumber(summary?.openInvites ?? 0)} Einladungen offen`,
-      delta: (summary?.openInvites ?? 0) > 0 ? `${summary?.openInvites} offen` : "Alle aktiv",
-      deltaDir: "flat" as const,
-      spark: sparkFromValue(summary?.teamMembers ?? 0),
-    },
-  ];
-
-  return (
-    <>
-      <StudioPageHeader
-        eyebrow="Übersicht"
-        title={
-          <>
-            Dein <em>Dashboard</em>.
-          </>
-        }
-        subtitle={`${greeting}${firstName ? `, ${firstName}` : ""} · ${formatNewMotifs(postsCount)} für ${headlineBrewery}`}
-        action={
-          <StudioButton
-            href={hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing"}
-            variant="primary"
-            size="sm"
-          >
-            {hasActivePlan ? "Neu erstellen" : "Tarif wählen"}
-          </StudioButton>
-        }
-      />
-
-      {!brandProfileComplete && brandProfileMode !== "skip" ? (
-        <div className="studio-alert" style={{ marginTop: 22 }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: "var(--tx-0)" }}>Markenprofil anlegen — ein Link genügt</div>
-            <div style={{ marginTop: 4, fontSize: 13, color: "var(--tx-2)" }}>
-              Website eingeben, Tonality und Farben werden für alle Generierungen übernommen.
-            </div>
-          </div>
-          <StudioButton type="button" onClick={onOpenBrandSetup} variant="primary" size="sm">
-            Jetzt starten
-          </StudioButton>
-        </div>
-      ) : null}
-
-      <StudioStatsRow stats={stats} />
-
-      <div className="studio-dash-grid" style={{ marginTop: 22 }}>
-        <StudioActivityColumn items={studioActivities} onShowAll={() => onOpenTab("media")} />
-        <StudioSideColumn
-          planLabel={planLabel}
-          hasActivePlan={hasActivePlan}
-          baseTokens={baseTokens}
-          extraTokens={extraTokens}
-          remaining={remaining}
-          monthly={monthly}
-          onTeam={() => onOpenTab("team")}
-          onManagePlan={() => void openBillingPortal()}
-        />
-      </div>
-    </>
-  );
-}
 
 function MediaView({
   P,
@@ -1124,168 +877,66 @@ function MediaView({
 
   return (
     <>
-      <Eyebrow>Mediathek</Eyebrow>
-      <h1 className="studio-dash-page-title" style={{ color: P.ink }}>
-        Deine Motive
-      </h1>
-      <p style={{ marginTop: 10, fontFamily: TOKENS.sans, fontSize: 14.5, color: P.ink2 }}>
-        Alle generierten Bilder deiner Marke — sortiert nach Datum.
-      </p>
+      <StudioPageHeader
+        eyebrow="Mediathek"
+        title="Deine Motive"
+        meta={`${items.length} Motive`}
+        subtitle="Alle generierten Bilder deiner Marke — sortiert nach Datum."
+      />
       {items.length > 0 ? (
         <div style={{ marginTop: 18, maxWidth: 420 }}>
           <input
-            className="studio-field"
+            className="evg-input"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Motive durchsuchen …"
             aria-label="Mediathek durchsuchen"
-            style={{ width: "100%", height: 40, fontSize: 13 }}
+            style={{ width: "100%", height: 36 }}
           />
         </div>
       ) : null}
       <LayoutGroup id="studio-media-library">
-      <div className="studio-media-grid">
-        {visibleItems.length === 0 ? (
-          <div
-            style={{
-              gridColumn: "1 / -1",
-              background: P.surface,
-              border: `1px solid ${P.rule}`,
-              borderRadius: 16,
-              padding: 28,
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div aria-hidden style={{ position: "absolute", top: -60, right: -40, width: 220, height: 220, background: `radial-gradient(circle, ${TOKENS.amber}18 0%, transparent 65%)`, pointerEvents: "none" }} />
-            <p style={{ fontFamily: TOKENS.sans, fontSize: 14, color: P.ink2, position: "relative" }}>
-              {!loaded
-                ? "Motive werden geladen …"
-                : items.length === 0
-                  ? "Noch keine Motive in der Mediathek."
-                  : "Keine Motive passen zur Suche."}
-            </p>
-            {loaded && items.length === 0 ? (
-            <Link
-              href={hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing"}
-              className="evg-cta"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                marginTop: 14,
-                padding: "10px 18px",
-                borderRadius: 10,
-                background: TOKENS.amber,
-                color: STUDIO_ON_ACCENT,
-                fontFamily: TOKENS.sans,
-                fontSize: 13,
-                fontWeight: 650,
-                textDecoration: "none",
-                position: "relative",
-              }}
-            >
-              {hasActivePlan ? "Jetzt erstellen →" : "Tarif wählen →"}
-            </Link>
-            ) : null}
-          </div>
-        ) : (
-          visibleItems.map((it) => (
-            <div
+      {visibleItems.length === 0 ? (
+        <div className="evg-none">
+          {!loaded
+            ? "Motive werden geladen …"
+            : items.length === 0
+              ? (
+                <>
+                  Noch keine Motive.{" "}
+                  <Link href={hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing"}>
+                    {hasActivePlan ? "Jetzt erstellen →" : "Tarif wählen →"}
+                  </Link>
+                </>
+              )
+              : "Keine Motive passen zur Suche."}
+        </div>
+      ) : (
+      <div className="evg-grid" style={{ marginTop: 22 }}>
+          {visibleItems.map((it) => (
+            <button
               key={it.id}
-              className="evg-card"
-              style={{
-                background: P.surface2,
-                border: `1px solid ${P.rule}`,
-                borderRadius: 16,
-                overflow: "hidden",
-              }}
+              type="button"
+              className="evg-tile"
+              onClick={() => openMediaItem(it)}
+              aria-label={`${getMediaDisplayTitle(it)} in Großansicht öffnen`}
+              style={{ width: "100%", padding: 0, textAlign: "left", font: "inherit", color: "inherit" }}
             >
-              <button
-                type="button"
-                onClick={() => openMediaItem(it)}
-                aria-label="Bild in Großansicht öffnen"
-                style={{
-                  display: "block",
-                  width: "100%",
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
-              >
-                <div style={{ position: "relative", aspectRatio: "4 / 3", background: P.surface, overflow: "hidden" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <motion.img
-                    layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
-                    src={getMediaAssetUrl(it)}
-                    alt=""
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
-                  />
-                  <div
-                    aria-hidden
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "rgba(0,0,0,0.35)",
-                      opacity: 0,
-                      transition: "opacity 0.18s ease",
-                    }}
-                    className="studio-media-card-overlay"
-                  >
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "8px 12px",
-                        borderRadius: 999,
-                        background: "rgba(0,0,0,0.55)",
-                        border: "1px solid rgba(255,255,255,0.18)",
-                        color: "#fff",
-                        fontFamily: TOKENS.sans,
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
-                      <StudioIcon name="image" size={14} />
-                      Großansicht
-                    </span>
-                  </div>
-                </div>
-              </button>
-              <div style={{ padding: 14 }}>
-                <div style={{ fontFamily: TOKENS.mono, fontSize: 10.5, letterSpacing: 1.1, textTransform: "uppercase", color: P.ink3 }}>
-                  {it.resolution} · {it.aspectRatio}
-                </div>
-                <div
-                  style={{
-                    marginTop: 8,
-                    fontFamily: TOKENS.sans,
-                    fontSize: 15,
-                    fontWeight: 650,
-                    color: P.ink,
-                    lineHeight: 1.35,
-                  }}
-                >
-                  {clampText(getMediaDisplayTitle(it), 96)}
-                </div>
-                <div style={{ marginTop: 8, fontFamily: TOKENS.mono, fontSize: 10.5, color: P.ink3 }}>{formatRelativeTime(it.createdAt)}</div>
-                <div style={{ marginTop: 12 }}>
-                  <StudioButton size="sm" variant="soft" onClick={() => openMediaItem(it)}>
-                    Ansehen & herunterladen
-                  </StudioButton>
-                </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <motion.img
+                layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
+                src={getMediaAssetUrl(it)}
+                alt=""
+                transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
+              />
+              <div className="evg-tile__cap">
+                <span>{clampText(getMediaDisplayTitle(it), 48)}</span>
+                <span>{it.aspectRatio}</span>
               </div>
-            </div>
-          ))
-        )}
+            </button>
+          ))}
       </div>
+      )}
       <AnimatePresence>
         {selectedItem ? (
           <motion.div
@@ -1298,39 +949,22 @@ function MediaView({
             exit={{ opacity: 0 }}
             transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
             onClick={() => setSelectedItem(null)}
+            className="evg-scrim"
             style={{
-              position: "fixed",
-              inset: 0,
               zIndex: 120,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               padding: 24,
             }}
-            className="studio-media-lightbox-backdrop"
           >
             <motion.div
-              aria-hidden
-              initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-              animate={{ opacity: 1, backdropFilter: "blur(10px)" }}
-              exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-              transition={{ duration: reduceMotion ? 0.12 : 0.28, ease: STUDIO_EASE }}
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: "rgba(0,0,0,0.72)",
-              }}
-            />
-            <motion.div
               onClick={(event) => event.stopPropagation()}
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
-              transition={
-                reduceMotion
-                  ? { duration: 0.12 }
-                  : { duration: 0.32, ease: STUDIO_EASE, delay: 0.03 }
-              }
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+              transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
+              className="evg-dialog"
               style={{
                 position: "relative",
                 width: "min(1100px, 100%)",
@@ -1338,13 +972,8 @@ function MediaView({
                 display: "grid",
                 gridTemplateColumns: "minmax(0, 1fr) minmax(240px, 320px)",
                 gap: 16,
-                background: P.surface,
-                border: `1px solid ${P.rule}`,
-                borderRadius: 18,
                 overflow: "hidden",
-                boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
               }}
-              className="studio-media-lightbox"
             >
               <div
                 style={{
@@ -1361,40 +990,20 @@ function MediaView({
                   layoutId={reduceMotion ? undefined : `studio-media-${selectedItem.id}`}
                   src={getMediaAssetUrl(selectedItem)}
                   alt={getMediaDisplayTitle(selectedItem)}
-                  style={{ maxWidth: "100%", maxHeight: "min(78vh, 760px)", objectFit: "contain", borderRadius: 12 }}
+                  style={{ maxWidth: "100%", maxHeight: "min(78vh, 760px)", objectFit: "contain" }}
                   transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
                 />
               </div>
-              <motion.aside
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 16 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 10 }}
-                transition={
-                  reduceMotion
-                    ? { duration: 0.12 }
-                    : { duration: 0.28, ease: STUDIO_EASE, delay: 0.1 }
-                }
-                style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}
-              >
+              <aside style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <label
-                    htmlFor={`media-title-${selectedItem.id}`}
-                    style={{
-                      display: "block",
-                      fontFamily: TOKENS.mono,
-                      fontSize: 10.5,
-                      letterSpacing: 1.1,
-                      textTransform: "uppercase",
-                      color: P.ink3,
-                    }}
-                  >
+                  <label htmlFor={`media-title-${selectedItem.id}`} className="evg-rubrik">
                     Motiv-Titel
                   </label>
                   <input
                     id={`media-title-${selectedItem.id}`}
                     ref={titleInputRef}
-                    className="studio-field"
+                    className="evg-input"
                     value={titleDraft}
                     onChange={(event) => setTitleDraft(event.target.value)}
                     onBlur={() => {
@@ -1409,17 +1018,10 @@ function MediaView({
                     maxLength={120}
                     disabled={titleSaving}
                     placeholder="z. B. Hefeweizen · Hero-Glas · Public Viewing"
-                    style={{
-                      marginTop: 8,
-                      width: "100%",
-                      height: 42,
-                      fontSize: 14,
-                      fontWeight: 650,
-                      color: P.ink,
-                    }}
+                    style={{ marginTop: 8, height: 36, fontWeight: 500 }}
                   />
                   <div style={{ marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontFamily: TOKENS.sans, fontSize: 11.5, color: P.ink3 }}>Enter oder Speichern</span>
+                    <span style={{ fontSize: 11.5, color: "var(--fg-5)" }}>Enter oder Speichern</span>
                     <StudioButton
                       size="sm"
                       variant="soft"
@@ -1429,52 +1031,22 @@ function MediaView({
                       Titel speichern
                     </StudioButton>
                   </div>
-                  <div style={{ marginTop: 8, fontFamily: TOKENS.mono, fontSize: 10.5, letterSpacing: 1.1, textTransform: "uppercase", color: P.ink3 }}>
-                    {selectedItem.resolution} · {selectedItem.aspectRatio} · {selectedItem.outputFormat.toUpperCase()}
-                  </div>
-                  <div style={{ marginTop: 8, fontFamily: TOKENS.mono, fontSize: 10.5, color: P.ink3 }}>
-                    {formatRelativeTime(selectedItem.createdAt)}
-                  </div>
+                  <dl className="evg-sheet" style={{ marginTop: 14 }}>
+                    <dt>Format</dt>
+                    <dd>{selectedItem.resolution} · {selectedItem.aspectRatio} · {selectedItem.outputFormat.toUpperCase()}</dd>
+                    <dt>Zeit</dt>
+                    <dd>{formatRelativeTime(selectedItem.createdAt)}</dd>
+                  </dl>
                 </div>
                 <StudioIconButton aria-label="Schließen" onClick={() => setSelectedItem(null)}>
                   <StudioIcon name="x" size={16} />
                 </StudioIconButton>
               </div>
-              {titleError ? (
-                <p
-                  style={{
-                    margin: 0,
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(239,68,68,0.35)",
-                    background: "rgba(239,68,68,0.08)",
-                    color: "#fecaca",
-                    fontFamily: TOKENS.sans,
-                    fontSize: 12.5,
-                  }}
-                >
-                  {titleError}
-                </p>
-              ) : null}
+              {titleError ? <p className="evg-note" style={{ margin: 0, fontSize: 12.5 }}>{titleError}</p> : null}
               {titleSaving ? (
-                <p style={{ margin: 0, fontFamily: TOKENS.sans, fontSize: 12.5, color: P.ink3 }}>Titel wird gespeichert …</p>
+                <p style={{ margin: 0, fontSize: 12.5, color: "var(--fg-5)" }}>Titel wird gespeichert …</p>
               ) : null}
-              {downloadError ? (
-                <p
-                  style={{
-                    margin: 0,
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(239,68,68,0.35)",
-                    background: "rgba(239,68,68,0.08)",
-                    color: "#fecaca",
-                    fontFamily: TOKENS.sans,
-                    fontSize: 12.5,
-                  }}
-                >
-                  {downloadError}
-                </p>
-              ) : null}
+              {downloadError ? <p className="evg-note" style={{ margin: 0, fontSize: 12.5 }}>{downloadError}</p> : null}
               <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                 <StudioButton disabled={downloading} onClick={() => void handleDownload(selectedItem)}>
                   {downloading ? "Wird heruntergeladen …" : "Herunterladen"}
@@ -1483,7 +1055,7 @@ function MediaView({
                   Schließen
                 </StudioButton>
               </div>
-              </motion.aside>
+              </aside>
             </motion.div>
           </motion.div>
         ) : null}
@@ -1494,11 +1066,10 @@ function MediaView({
 }
 
 function TeamView({
-  P,
   members,
   onMembersChange,
 }: {
-  P: StudioPalette;
+  P?: StudioPalette;
   members: TeamMember[];
   onMembersChange: (next: TeamMember[]) => void;
 }) {
@@ -1568,127 +1139,102 @@ function TeamView({
 
   return (
     <>
-      <Eyebrow>Team</Eyebrow>
-      <h1 className="studio-dash-page-title" style={{ color: P.ink }}>
-        Mitglieder
-      </h1>
-      <p style={{ marginTop: 10, fontFamily: TOKENS.sans, fontSize: 14.5, color: P.ink2 }}>
-        Lade Kolleginnen und Kollegen ein, um gemeinsam Motive zu erstellen.
-      </p>
+      <StudioPageHeader
+        eyebrow="Team"
+        title="Mitglieder"
+        meta={`${members.length}`}
+        subtitle="Lade Kolleginnen und Kollegen ein, um gemeinsam Motive zu erstellen."
+      />
 
-      <div style={{ marginTop: 18, background: P.surface2, border: `1px solid ${P.rule}`, borderRadius: 14, padding: 16 }}>
-        <div style={{ fontFamily: TOKENS.sans, fontWeight: 650, fontSize: 14, color: P.ink }}>Neues Mitglied einladen</div>
-        <p style={{ marginTop: 4, fontFamily: TOKENS.sans, fontSize: 13, color: P.ink3 }}>
-          Wir schicken eine Einladungs-E-Mail mit Login-Link.
-        </p>
-        <div className="studio-team-invite-grid">
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontFamily: TOKENS.mono, fontSize: 10, color: P.ink3, textTransform: "uppercase", letterSpacing: 1 }}>E-Mail</span>
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="kollege@beispiel.de"
-              style={{ padding: "9px 11px", borderRadius: 8, border: `1px solid ${P.ruleStrong}`, fontFamily: TOKENS.sans, fontSize: 13.5, background: P.surface2 }}
-              disabled={inviting}
-            />
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontFamily: TOKENS.mono, fontSize: 10, color: P.ink3, textTransform: "uppercase", letterSpacing: 1 }}>Name (optional)</span>
-            <input
-              type="text"
-              value={inviteName}
-              onChange={(e) => setInviteName(e.target.value)}
-              placeholder="Vorname Nachname"
-              style={{ padding: "9px 11px", borderRadius: 8, border: `1px solid ${P.ruleStrong}`, fontFamily: TOKENS.sans, fontSize: 13.5, background: P.surface2 }}
-              disabled={inviting}
-            />
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontFamily: TOKENS.mono, fontSize: 10, color: P.ink3, textTransform: "uppercase", letterSpacing: 1 }}>Rolle</span>
+      <div style={{ marginTop: 18 }}>
+        <div className="evg-field">
+          <div>
+            <div className="evg-field__l">E-Mail</div>
+            <div className="evg-field__h">Einladung mit Login-Link</div>
+          </div>
+          <input
+            type="email"
+            className="evg-input"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            placeholder="kollege@beispiel.de"
+            disabled={inviting}
+          />
+        </div>
+        <div className="evg-field">
+          <div>
+            <div className="evg-field__l">Name</div>
+            <div className="evg-field__h">Optional</div>
+          </div>
+          <input
+            type="text"
+            className="evg-input"
+            value={inviteName}
+            onChange={(e) => setInviteName(e.target.value)}
+            placeholder="Vorname Nachname"
+            disabled={inviting}
+          />
+        </div>
+        <div className="evg-field">
+          <div>
+            <div className="evg-field__l">Rolle</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <select
+              className="evg-input"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as "admin" | "editor" | "viewer")}
-              style={{ padding: "9px 11px", borderRadius: 8, border: `1px solid ${P.ruleStrong}`, fontFamily: TOKENS.sans, fontSize: 13.5, background: P.surface2 }}
               disabled={inviting}
+              style={{ flex: 1, minWidth: 140 }}
             >
               <option value="editor">Editor</option>
               <option value="admin">Admin</option>
               <option value="viewer">Viewer</option>
             </select>
-          </label>
-          <button
-            type="button"
-            onClick={sendInvite}
-            disabled={inviting}
-            className="studio-team-invite-submit"
-            style={{
-              padding: "10px 16px",
-              borderRadius: 8,
-              background: TOKENS.amber,
-              color: STUDIO_ON_ACCENT,
-              fontFamily: TOKENS.sans,
-              fontWeight: 650,
-              fontSize: 13,
-              border: "none",
-              cursor: inviting ? "default" : "pointer",
-              opacity: inviting ? 0.7 : 1,
-            }}
-          >
-            {inviting ? "Sende …" : "Einladen"}
-          </button>
+            <button type="button" onClick={sendInvite} disabled={inviting} className="evg-btn evg-btn--primary">
+              {inviting ? "Sende …" : "Einladen"}
+            </button>
+          </div>
         </div>
-        {error ? <p style={{ marginTop: 10, fontFamily: TOKENS.sans, fontSize: 12.5, color: "#A8351A" }}>{error}</p> : null}
-        {notice ? <p style={{ marginTop: 10, fontFamily: TOKENS.sans, fontSize: 12.5, color: "#1F6F3B" }}>{notice}</p> : null}
+        {error ? <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--err)" }}>{error}</p> : null}
+        {notice ? <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--ok)" }}>{notice}</p> : null}
       </div>
 
-      <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-        {members.length === 0 ? (
-          <div style={{ background: P.surface2, border: `1px solid ${P.rule}`, borderRadius: 14, padding: 20, fontFamily: TOKENS.sans, color: P.ink3 }}>Noch keine Teammitglieder.</div>
-        ) : (
-          members.map((m) => (
-            <div key={m.id} className="studio-team-member-row" style={{ background: P.surface2, border: `1px solid ${P.rule}`, borderRadius: 14, padding: 14 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 12, background: P.surface, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: TOKENS.sans, fontWeight: 700 }}>
-                {initialsFromName(m.name || m.email)}
+      {members.length === 0 ? (
+        <div className="evg-none">Noch keine Teammitglieder.</div>
+      ) : (
+        <div style={{ marginTop: 8 }}>
+          {members.map((m) => (
+            <div key={m.id} className="evg-entry">
+              <span className="evg-entry__ico" aria-hidden="true">
+                <StudioIcon name="users" size={16} />
+              </span>
+              <div>
+                <div className="evg-entry__t">{m.name}</div>
+                <div className="evg-entry__s">{m.email}</div>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: TOKENS.sans, fontWeight: 650, color: P.ink, fontSize: 13.5 }}>{m.name}</div>
-                <div style={{ fontFamily: TOKENS.mono, fontSize: 10.5, color: P.ink3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
+              <div className="evg-entry__end" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span className="evg-mark">{m.role}</span>
+                {m.role !== "owner" ? (
+                  <button
+                    type="button"
+                    onClick={() => removeMember(m.id)}
+                    disabled={removingId === m.id}
+                    className="evg-btn evg-btn--danger"
+                  >
+                    {removingId === m.id ? "Entferne …" : "Entfernen"}
+                  </button>
+                ) : null}
               </div>
-              <div style={{ fontFamily: TOKENS.mono, fontSize: 10.5, color: P.ink3, textTransform: "uppercase", letterSpacing: 0.9 }}>
-                {m.role} · {m.status}
-              </div>
-              {m.role !== "owner" ? (
-                <button
-                  type="button"
-                  onClick={() => removeMember(m.id)}
-                  disabled={removingId === m.id}
-                  className="studio-team-member-actions"
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 8,
-                    background: "transparent",
-                    border: `1px solid ${P.ruleStrong}`,
-                    fontFamily: TOKENS.sans,
-                    fontSize: 12,
-                    color: removingId === m.id ? P.ink3 : "#A8351A",
-                    cursor: removingId === m.id ? "default" : "pointer",
-                    minHeight: 44,
-                  }}
-                >
-                  {removingId === m.id ? "Entferne …" : "Entfernen"}
-                </button>
-              ) : null}
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
 
 function SettingsView({
-  P,
   value,
   onChange,
   loaded,
@@ -1700,7 +1246,7 @@ function SettingsView({
   onSkipBrandProfile,
   onResetBrandProfile,
 }: {
-  P: StudioPalette;
+  P?: StudioPalette;
   value: SettingsPayload | null;
   onChange: (v: SettingsPayload) => void;
   loaded: boolean;
@@ -1761,231 +1307,159 @@ function SettingsView({
 
   return (
     <>
-      <Eyebrow>Einstellungen</Eyebrow>
-      <h1 className="studio-dash-page-title" style={{ color: P.ink }}>
-        Profil & Marke
-      </h1>
-      <p style={{ marginTop: 10, fontFamily: TOKENS.sans, fontSize: 14.5, color: P.ink2 }}>
-        Diese Angaben erscheinen in der Begrüßung und in Dashboard-Überschriften.
-      </p>
+      <StudioPageHeader
+        eyebrow="Einstellungen"
+        title="Profil & Marke"
+        subtitle="Diese Angaben erscheinen in der Begrüßung und in Dashboard-Überschriften."
+      />
       {!draft ? (
-        <div
-          style={{
-            marginTop: 18,
-            background: loadError
-              ? "#FBEFE0"
-              : "linear-gradient(180deg, rgba(245,237,223,0.04) 0%, rgba(245,237,223,0.01) 100%)",
-            border: `1px solid ${loadError ? "rgba(193,59,31,0.30)" : P.rule}`,
-            borderRadius: 16,
-            padding: 20,
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
+        <div className="evg-none">
           {!loaded ? (
-            <span style={{ fontFamily: TOKENS.sans, fontSize: 14, color: P.ink2 }}>Lade Einstellungen…</span>
+            "Lade Einstellungen…"
           ) : loadError ? (
             <>
-              <span style={{ fontFamily: TOKENS.sans, fontSize: 14, color: "#A8351A", fontWeight: 600 }}>
-                {loadError}
-              </span>
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                style={{
-                  alignSelf: "flex-start",
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                  background: TOKENS.amber,
-                  color: STUDIO_ON_ACCENT,
-                  fontFamily: TOKENS.sans,
-                  fontWeight: 650,
-                  fontSize: 13,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
+              {loadError}{" "}
+              <button type="button" onClick={() => window.location.reload()}>
                 Erneut versuchen
               </button>
             </>
           ) : (
-            <span style={{ fontFamily: TOKENS.sans, fontSize: 14, color: P.ink2 }}>
-              Keine Einstellungen verfügbar. Bitte Seite neu laden oder Support kontaktieren.
-            </span>
+            "Keine Einstellungen verfügbar."
           )}
         </div>
       ) : (
         <>
           {brandProfileComplete && draft.brandProfileMode !== "skip" ? (
-            <div className="studio-settings-brand-banner">
-              <div className="studio-settings-brand-banner-inner">
-                <div className="studio-settings-brand-banner-left">
-                  <span className="studio-settings-brand-banner-icon" aria-hidden="true">
-                    <StudioIcon name="shield" size={20} />
-                  </span>
-                  <div>
-                    <div className="studio-settings-brand-banner-title">Markenprofil aktiv</div>
-                    <div className="studio-settings-brand-banner-sub">
-                      {draft.brandWebsiteUrl ? formatDomain(draft.brandWebsiteUrl) : draft.breweryName || "Marke"}
-                      {" · "}
-                      Brand-Lock auf „{brandLockLabel(draft.brandLockLevel)}“
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                  <StudioButton type="button" variant="soft" size="sm" onClick={onOpenBrandTab}>
-                    <StudioIcon name="pencil" size={15} />
-                    Profil verwalten
-                  </StudioButton>
-                  <StudioButton
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    style={{ color: "var(--warn)" }}
-                    onClick={() => {
-                      const confirmed = window.confirm(
-                        "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Stil-Vorgaben werden entfernt.",
-                      );
-                      if (!confirmed) return;
-                      void onResetBrandProfile();
-                    }}
-                  >
-                    Generisch nutzen
-                  </StudioButton>
+            <div className="evg-callout" style={{ marginInline: 0, marginTop: 22 }}>
+              <div className="evg-callout__body">
+                <div className="evg-callout__t">Markenprofil aktiv</div>
+                <div className="evg-callout__s">
+                  {draft.brandWebsiteUrl ? formatDomain(draft.brandWebsiteUrl) : draft.breweryName || "Marke"}
+                  {" · "}
+                  Brand-Lock auf „{brandLockLabel(draft.brandLockLevel)}“
                 </div>
               </div>
+              <StudioButton type="button" variant="soft" size="sm" onClick={onOpenBrandTab}>
+                Profil verwalten
+              </StudioButton>
+              <StudioButton
+                type="button"
+                variant="ghost"
+                size="sm"
+                style={{ color: "var(--warn)" }}
+                onClick={() => {
+                  const confirmed = window.confirm(
+                    "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Stil-Vorgaben werden entfernt.",
+                  );
+                  if (!confirmed) return;
+                  void onResetBrandProfile();
+                }}
+              >
+                Generisch nutzen
+              </StudioButton>
             </div>
           ) : (
-            <div style={{ marginTop: 24, background: P.surface2, border: `1px solid ${P.rule}`, borderRadius: 16, padding: 18 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                <div>
-                  <div style={{ fontFamily: TOKENS.sans, fontWeight: 650, fontSize: 15 }}>Markenprofil</div>
-                  <p style={{ marginTop: 6, maxWidth: 520, fontFamily: TOKENS.sans, fontSize: 13, color: P.ink2 }}>
-                    {draft.brandProfileMode === "skip"
-                      ? "Du nutzt BrewAI ohne Markenprofil. Über den Button kannst du jederzeit ein Profil aus deiner Website anlegen."
-                      : "Lege dein Markenprofil fest: Website-Link eingeben, KI wertet Stil und Vorgaben aus."}
-                  </p>
-                  {draft.brandWebsiteUrl ? (
-                    <p style={{ marginTop: 6, fontFamily: TOKENS.mono, fontSize: 11, color: P.ink3 }}>Quelle: {draft.brandWebsiteUrl}</p>
-                  ) : null}
+            <div className="evg-callout" style={{ marginInline: 0, marginTop: 22 }}>
+              <div className="evg-callout__body">
+                <div className="evg-callout__t">Markenprofil</div>
+                <div className="evg-callout__s">
+                  {draft.brandProfileMode === "skip"
+                    ? "Du nutzt BrewAI ohne Markenprofil. Über den Button kannst du jederzeit ein Profil anlegen."
+                    : "Lege dein Markenprofil fest: Website-Link eingeben, KI wertet Stil und Vorgaben aus."}
+                  {brandProfileNotice ? ` · ${brandProfileNotice}` : ""}
                 </div>
-                <button
-                  type="button"
-                  onClick={onOpenBrandSetup}
-                  className="evg-cta"
-                  style={{ padding: "10px 16px", borderRadius: 10, background: TOKENS.amber, color: STUDIO_ON_ACCENT, fontFamily: TOKENS.sans, fontWeight: 650, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 10px 24px -10px rgba(230,106,43,0.55), inset 0 1px 0 rgba(255,255,255,0.18)" }}
-                >
-                  {draft.brandProfileMode === "skip" ? "Markenprofil erstellen" : "Markenprofil erstellen"}
-                </button>
               </div>
-              {brandProfileNotice ? <p style={{ marginTop: 10, fontFamily: TOKENS.sans, fontSize: 13, color: P.ink2 }}>{brandProfileNotice}</p> : null}
+              <StudioButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
+                Markenprofil erstellen
+              </StudioButton>
               {draft.brandProfileMode !== "skip" ? (
-                <button
-                  type="button"
-                  onClick={onSkipBrandProfile}
-                  style={{ marginTop: 14, padding: "8px 12px", borderRadius: 8, border: `1px solid ${P.ruleStrong}`, background: "transparent", fontFamily: TOKENS.sans, fontSize: 12, color: P.ink3 }}
-                >
+                <StudioButton type="button" variant="ghost" size="sm" onClick={onSkipBrandProfile}>
                   Ohne Markenprofil nutzen
-                </button>
+                </StudioButton>
               ) : null}
             </div>
           )}
 
-          <div className="studio-settings-two-col">
-          <div style={{ background: P.surface2, border: `1px solid ${P.rule}`, borderRadius: 16, padding: 18 }}>
-            <div style={{ fontFamily: TOKENS.sans, fontWeight: 650, fontSize: 14.5 }}>Dein Name</div>
-            <p style={{ marginTop: 4, fontSize: 12.5, color: P.ink3 }}>z. B. „Guten Morgen, Team“</p>
-            <input
-              value={draft.profileName}
-              onChange={(e) => setField("profileName", e.target.value)}
-              style={{ marginTop: 12, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${P.ruleStrong}`, fontFamily: TOKENS.sans, fontSize: 14 }}
-            />
-            <label style={{ display: "block", marginTop: 12, fontFamily: TOKENS.mono, fontSize: 10, color: P.ink3, textTransform: "uppercase", letterSpacing: 1 }}>
-              Telefon
+          <div style={{ marginTop: 8 }}>
+            <div className="evg-field">
+              <div>
+                <div className="evg-field__l">Dein Name</div>
+                <div className="evg-field__h">z. B. „Guten Morgen, Team“</div>
+              </div>
               <input
-                value={draft.profilePhone}
-                onChange={(e) => setField("profilePhone", e.target.value)}
-                style={{ marginTop: 6, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${P.ruleStrong}`, fontFamily: TOKENS.sans, fontSize: 14, display: "block" }}
-              />
-            </label>
-          </div>
-          <div style={{ background: P.surface2, border: `1px solid ${P.rule}`, borderRadius: 16, padding: 18 }}>
-            <div style={{ fontFamily: TOKENS.sans, fontWeight: 650, fontSize: 14.5 }}>Marke</div>
-            <p style={{ marginTop: 4, fontSize: 12.5, color: P.ink3 }}>z. B. „… für deine Marke“</p>
-            <input
-              value={draft.breweryName}
-              onChange={(e) => setField("breweryName", e.target.value)}
-              style={{ marginTop: 12, width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${P.ruleStrong}`, fontFamily: TOKENS.sans, fontSize: 14 }}
-            />
-          </div>
-          </div>
-
-          <div style={{ marginTop: 18, background: P.surface2, border: `1px solid ${P.rule}`, borderRadius: 16, padding: 18 }}>
-            <div style={{ fontFamily: TOKENS.sans, fontWeight: 650, fontSize: 14.5 }}>Benachrichtigungen</div>
-            <p style={{ marginTop: 4, fontSize: 12.5, color: P.ink3 }}>
-              Wir schicken dir wichtige Updates und optional einen Wochenrückblick.
-            </p>
-            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-              <SettingsToggle
-                P={P}
-                checked={draft.emailNotifications}
-                onChange={(v) => setField("emailNotifications", v)}
-                label="E-Mail-Benachrichtigungen"
-                hint="Status zu Generierungen, Einladungen und Sicherheit."
-              />
-              <SettingsToggle
-                P={P}
-                checked={draft.weeklySummary}
-                onChange={(v) => setField("weeklySummary", v)}
-                label="Wochenzusammenfassung"
-                hint="Jeden Montag eine kurze E-Mail mit deinen Highlights."
+                className="evg-input"
+                value={draft.profileName}
+                onChange={(e) => setField("profileName", e.target.value)}
               />
             </div>
+            <div className="evg-field">
+              <div>
+                <div className="evg-field__l">Telefon</div>
+              </div>
+              <input
+                className="evg-input"
+                value={draft.profilePhone}
+                onChange={(e) => setField("profilePhone", e.target.value)}
+              />
+            </div>
+            <div className="evg-field">
+              <div>
+                <div className="evg-field__l">Marke</div>
+                <div className="evg-field__h">z. B. „… für deine Marke“</div>
+              </div>
+              <input
+                className="evg-input"
+                value={draft.breweryName}
+                onChange={(e) => setField("breweryName", e.target.value)}
+              />
+            </div>
+            <SettingsToggle
+              checked={draft.emailNotifications}
+              onChange={(v) => setField("emailNotifications", v)}
+              label="E-Mail-Benachrichtigungen"
+              hint="Status zu Generierungen, Einladungen und Sicherheit."
+            />
+            <SettingsToggle
+              checked={draft.weeklySummary}
+              onChange={(v) => setField("weeklySummary", v)}
+              label="Wochenzusammenfassung"
+              hint="Jeden Montag eine kurze E-Mail mit deinen Highlights."
+            />
           </div>
 
-          <div className="studio-settings-save-row">
+          <div className="studio-settings-save-row" style={{ marginTop: 18 }}>
             <button
               type="button"
               onClick={save}
               disabled={saving}
-              className="evg-cta"
-              style={{ padding: "10px 18px", borderRadius: 10, background: TOKENS.amber, color: STUDIO_ON_ACCENT, fontFamily: TOKENS.sans, fontWeight: 650, fontSize: 13.5, border: "none", opacity: saving ? 0.7 : 1, cursor: saving ? "default" : "pointer", boxShadow: "0 10px 24px -10px rgba(230,106,43,0.55), inset 0 1px 0 rgba(255,255,255,0.18)" }}
+              className="evg-btn evg-btn--primary"
+              style={{ opacity: saving ? 0.7 : 1 }}
             >
               {saving ? "Speichert…" : "Speichern"}
             </button>
-            {notice ? <span style={{ fontFamily: TOKENS.sans, fontSize: 13.5, color: P.ink2 }}>{notice}</span> : null}
-            {error ? <span style={{ fontFamily: TOKENS.sans, fontSize: 13.5, color: "#B42318" }}>{error}</span> : null}
+            {notice ? <span style={{ fontSize: 13.5, color: "var(--fg-3)" }}>{notice}</span> : null}
+            {error ? <span style={{ fontSize: 13.5, color: "var(--err)" }}>{error}</span> : null}
           </div>
 
-          <div
-            style={{
-              marginTop: 28,
-              paddingTop: 24,
-              borderTop: `1px solid ${P.rule}`,
-            }}
-          >
-            <div style={{ fontFamily: TOKENS.sans, fontWeight: 600, fontSize: 14, color: P.ink }}>Konto</div>
-            <p style={{ marginTop: 6, fontFamily: TOKENS.sans, fontSize: 13, color: P.ink2, lineHeight: 1.5 }}>
-              Melde dich ab, um die Sitzung auf diesem Gerät zu beenden. Du landest wieder auf der Anmeldeseite.
-            </p>
-            <button
-              type="button"
-              disabled={signingOut}
-              onClick={() => {
-                setSigningOut(true);
-                void signOutAndRedirect();
-              }}
-              className="studio-btn studio-btn-ghost"
-              style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 8, opacity: signingOut ? 0.7 : 1 }}
-            >
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M7 17 H4a1 1 0 0 1-1-1 V4a1 1 0 0 1 1-1h3" />
-                <path d="M13 14 L17 10 L13 6" />
-                <path d="M17 10 H7" />
-              </svg>
-              {signingOut ? "Abmelden …" : "Abmelden"}
-            </button>
+          <div style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid var(--line)" }}>
+            <div className="evg-field">
+              <div>
+                <div className="evg-field__l">Konto</div>
+                <div className="evg-field__h">Sitzung auf diesem Gerät beenden</div>
+              </div>
+              <button
+                type="button"
+                disabled={signingOut}
+                onClick={() => {
+                  setSigningOut(true);
+                  void signOutAndRedirect();
+                }}
+                className="evg-btn"
+                style={{ justifySelf: "start", opacity: signingOut ? 0.7 : 1 }}
+              >
+                {signingOut ? "Abmelden …" : "Abmelden"}
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -1994,72 +1468,27 @@ function SettingsView({
 }
 
 function SettingsToggle({
-  P,
   checked,
   onChange,
   label,
   hint,
 }: {
-  P: StudioPalette;
   checked: boolean;
   onChange: (next: boolean) => void;
   label: string;
   hint?: string;
 }) {
   return (
-    <label
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 14,
-        padding: "10px 12px",
-        borderRadius: 10,
-        border: `1px solid ${P.rule}`,
-        background: P.surface2,
-        cursor: "pointer",
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: TOKENS.sans, fontWeight: 600, fontSize: 13.5, color: P.ink }}>{label}</div>
-        {hint ? (
-          <div style={{ marginTop: 2, fontFamily: TOKENS.sans, fontSize: 12.5, color: P.ink3 }}>{hint}</div>
-        ) : null}
+    <label className="evg-field" style={{ cursor: "pointer" }}>
+      <div>
+        <div className="evg-field__l">{label}</div>
+        {hint ? <div className="evg-field__h">{hint}</div> : null}
       </div>
-      <span
-        role="switch"
-        aria-checked={checked}
-        style={{
-          flexShrink: 0,
-          width: 36,
-          height: 20,
-          borderRadius: 999,
-          background: checked ? P.accent : "#D7CFC1",
-          position: "relative",
-          transition: "background .15s",
-        }}
-      >
-        <span
-          style={{
-            position: "absolute",
-            top: 2,
-            left: checked ? 18 : 2,
-            width: 16,
-            height: 16,
-            borderRadius: 999,
-            background: P.surface2,
-            boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
-            transition: "left .15s",
-          }}
-        />
-      </span>
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
-        tabIndex={-1}
-        aria-hidden="true"
+        style={{ width: 16, height: 16, accentColor: "var(--acc)", justifySelf: "start" }}
       />
     </label>
   );
