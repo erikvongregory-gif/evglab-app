@@ -19,6 +19,12 @@ export function getMediaDisplayTitle(item: Pick<DashboardMediaItem, "title" | "p
   return fallback || "Unbenanntes Motiv";
 }
 
+/** Vierstellige CHARGE-Nummer für Dashboard-/Medien-Badges (z. B. 42 → „0042“). */
+export function formatChargeNumber(n: number | null | undefined): string | null {
+  if (n == null || !Number.isFinite(n) || n < 1) return null;
+  return String(Math.floor(n)).padStart(4, "0");
+}
+
 /**
  * Ein Bier aus dem Sortiment der Brauerei ("Meine Biere") — einmal angelegt,
  * belegt es im Erstell-Flow Bierstil, Flasche, Farbe und Etikett per Klick vor.
