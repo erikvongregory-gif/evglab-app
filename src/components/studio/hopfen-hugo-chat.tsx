@@ -72,13 +72,7 @@ export function HopfenHugoChat({
   );
 
   return (
-    <div
-      className={cn(
-        "evg-hopfenhugo-root fixed z-[96] flex flex-col items-end gap-3",
-        "max-md:bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+6.85rem)] max-md:right-3",
-        "md:bottom-6 md:right-6",
-      )}
-    >
+    <div className="evg-hopfenhugo-root">
       <AnimatePresence>
         {isOpen ? (
           <motion.div
@@ -156,6 +150,7 @@ export function HopfenHugoChat({
                   className="evg-hopfenhugo-input"
                   maxLength={1200}
                   autoComplete="off"
+                  aria-label="Nachricht an Hopfen Hugo"
                 />
                 <button
                   type="submit"

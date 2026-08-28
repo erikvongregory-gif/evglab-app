@@ -1,0 +1,414 @@
+/* BrewAI Studio — Hopfen Hugo (globaler Assistent, T5c visual alignment) */
+
+.evg-hopfenhugo-root {
+  position: fixed;
+  z-index: 96;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-5, 12px);
+  font-family: var(--f-sans);
+  bottom: calc(var(--sp-9, 24px) + env(safe-area-inset-bottom, 0px));
+  right: var(--sp-9, 24px);
+  pointer-events: none;
+}
+
+.evg-hopfenhugo-root > * {
+  pointer-events: auto;
+}
+
+/* ── Chat panel ─────────────────────────────────────────── */
+
+.evg-hopfenhugo-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(400px, calc(100vw - var(--sp-9, 24px) * 2));
+  max-height: min(560px, calc(100dvh - var(--sp-11, 48px) * 2));
+  overflow: hidden;
+  border: 1px solid var(--line2);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  color: var(--t1);
+  box-shadow: var(--sh-toast);
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+
+.evg-hopfenhugo-head {
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  padding: var(--sp-6, 14px) var(--sp-7, 16px);
+  background: var(--s2);
+}
+
+.evg-hopfenhugo-head-glow {
+  display: none;
+}
+
+.evg-hopfenhugo-head-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5, 12px);
+}
+
+.evg-hopfenhugo-avatar-wrap {
+  position: relative;
+  flex: none;
+}
+
+.evg-hopfenhugo-status {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--ok);
+  border: 1.5px solid var(--s2);
+  box-shadow: 0 0 0 1px var(--ok-dim);
+}
+
+.evg-hopfenhugo-head-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.evg-hopfenhugo-name {
+  margin: 0;
+  font-size: var(--t-15);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--t1);
+  letter-spacing: -0.01em;
+}
+
+.evg-hopfenhugo-role {
+  margin: 3px 0 0;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-hopfenhugo-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg-4);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.evg-hopfenhugo-close:hover {
+  background: var(--s3);
+  color: var(--t1);
+  border-color: var(--line2);
+}
+
+.evg-hopfenhugo-close:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+/* ── Messages ─────────────────────────────────────────────── */
+
+.evg-hopfenhugo-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5, 12px);
+  flex: 1;
+  min-height: 0;
+  height: min(360px, 48vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--sp-7, 16px);
+  background: var(--s1);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line2) transparent;
+}
+
+.evg-hopfenhugo-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.evg-hopfenhugo-messages::-webkit-scrollbar-thumb {
+  background: var(--line2);
+  border-radius: var(--r-pill);
+}
+
+.evg-hopfenhugo-row {
+  display: flex;
+  gap: var(--sp-3, 8px);
+  align-items: flex-end;
+}
+
+.evg-hopfenhugo-row--user {
+  flex-direction: row-reverse;
+  align-self: flex-end;
+}
+
+.evg-hopfenhugo-msg-avatar {
+  flex: none;
+  line-height: 0;
+}
+
+.evg-hopfenhugo-bubble {
+  max-width: min(88%, 280px);
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  font-size: var(--t-14);
+  line-height: 1.5;
+  color: var(--t2);
+}
+
+.evg-hopfenhugo-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.evg-hopfenhugo-bubble-label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--f-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-hopfenhugo-bubble--assistant {
+  border-color: var(--line);
+  background: var(--s2);
+}
+
+.evg-hopfenhugo-bubble--user {
+  background: var(--ac);
+  color: var(--ac-ink);
+  border-color: transparent;
+}
+
+.evg-hopfenhugo-bubble--user .evg-hopfenhugo-bubble-label {
+  color: rgba(26, 18, 7, 0.65);
+}
+
+.evg-hopfenhugo-bubble--typing {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 16px;
+}
+
+.evg-hopfenhugo-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--fg-4);
+  animation: evg-hopfenhugo-bounce 1.2s ease-in-out infinite;
+}
+
+.evg-hopfenhugo-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.evg-hopfenhugo-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes evg-hopfenhugo-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+
+  40% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+/* ── Footer / input ─────────────────────────────────────── */
+
+.evg-hopfenhugo-foot {
+  flex: none;
+  border-top: 1px solid var(--line);
+  padding: var(--sp-5, 12px) var(--sp-6, 14px) var(--sp-6, 14px);
+  background: var(--s2);
+}
+
+.evg-hopfenhugo-form {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3, 8px);
+}
+
+.evg-hopfenhugo-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--sp-5, 12px);
+  border: 1px solid var(--line2);
+  border-radius: var(--r-md);
+  background: var(--s1);
+  color: var(--t1);
+  font-family: var(--f-sans);
+  font-size: var(--t-14);
+  line-height: 1.4;
+  outline: none;
+  transition: border-color var(--dur) var(--ease);
+}
+
+.evg-hopfenhugo-input::placeholder {
+  color: var(--t3);
+}
+
+.evg-hopfenhugo-input:focus {
+  border-color: var(--ac);
+}
+
+.evg-hopfenhugo-input:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
+}
+
+.evg-hopfenhugo-send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--ac);
+  color: var(--ac-ink);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+
+.evg-hopfenhugo-send:hover:not(:disabled) {
+  background: var(--ac-2);
+}
+
+.evg-hopfenhugo-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.evg-hopfenhugo-send:focus-visible {
+  outline: 2px solid var(--ac-2);
+  outline-offset: 2px;
+}
+
+.evg-hopfenhugo-policy {
+  margin: var(--sp-4, 10px) var(--sp-2, 4px) 0;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--t3);
+  text-align: center;
+}
+
+.evg-hopfenhugo-policy a {
+  color: var(--fg-4);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.evg-hopfenhugo-policy a:hover {
+  color: var(--t2);
+}
+
+/* ── FAB ──────────────────────────────────────────────────── */
+
+.evg-hopfenhugo-fab {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid var(--line2);
+  border-radius: var(--r-pill);
+  background: var(--s2);
+  color: var(--t1);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur-mid) var(--ease),
+    box-shadow var(--dur-mid) var(--ease);
+}
+
+.evg-hopfenhugo-fab:hover {
+  border-color: var(--ac-line);
+  background: var(--s3);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+}
+
+.evg-hopfenhugo-fab:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 3px;
+}
+
+.evg-hopfenhugo-fab--open {
+  background: var(--s3);
+  border-color: var(--ac-line);
+  color: var(--t1);
+}
+
+.evg-hopfenhugo-fab-icon {
+  width: 34px;
+  height: 34px;
+}
+
+/* ── Mobile (Bottom-Nav clearance) ──────────────────────── */
+
+@media (max-width: 768px) {
+  .evg-hopfenhugo-root {
+    bottom: calc(var(--bottom-nav-h, 62px) + env(safe-area-inset-bottom, 0px) + var(--sp-5, 12px));
+    right: var(--sp-5, 12px);
+  }
+
+  .evg-hopfenhugo-panel {
+    width: min(400px, calc(100vw - var(--sp-5, 12px) * 2));
+    max-height: min(
+      calc(100dvh - var(--bottom-nav-h, 62px) - env(safe-area-inset-bottom, 0px) - 88px),
+      72dvh
+    );
+  }
+
+  .evg-hopfenhugo-messages {
+    height: min(320px, calc(100dvh - var(--bottom-nav-h, 62px) - 240px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evg-hopfenhugo-dot {
+    animation: none;
+    opacity: 0.7;
+  }
+
+  .evg-hopfenhugo-close,
+  .evg-hopfenhugo-fab,
+  .evg-hopfenhugo-send,
+  .evg-hopfenhugo-input {
+    transition: none;
+  }
+}
