@@ -7,6 +7,7 @@
 @import "../styles/studio-media.css";
 @import "../styles/studio-brand.css";
 @import "../styles/studio-pricing.css";
+@import "../styles/studio-settings.css";
 @import "../styles/studio-primitives.css";
 @custom-variant dark (&:where(.dark, .dark *));
 /* Explizit alle TS/TSX unter src scannen (u. a. components/ui – Neon-Button-Klassen) */

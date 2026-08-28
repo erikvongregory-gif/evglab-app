@@ -828,7 +828,7 @@ function TeamView({
               <option value="admin">Admin</option>
               <option value="viewer">Viewer</option>
             </select>
-            <button type="button" onClick={sendInvite} disabled={inviting} className="evg-btn evg-btn--primary">
+            <button type="button" onClick={() => void sendInvite()} disabled={inviting} className="evg-btn evg-btn--primary">
               {inviting ? "Sende …" : "Einladen"}
             </button>
           </div>
@@ -855,7 +855,7 @@ function TeamView({
                 {m.role !== "owner" ? (
                   <button
                     type="button"
-                    onClick={() => removeMember(m.id)}
+                    onClick={() => void removeMember(m.id)}
                     disabled={removingId === m.id}
                     className="evg-btn evg-btn--danger"
                   >
@@ -943,14 +943,15 @@ function SettingsView({
   };
 
   return (
-    <>
-      <StudioPageHeader
-        eyebrow="Einstellungen"
-        title="Profil & Marke"
-        subtitle="Diese Angaben erscheinen in der Begrüßung und in Dashboard-Überschriften."
-      />
+    <div className="studio-settings-page">
+      <header className="studio-settings-header">
+        <span className="studio-settings-header__eyebrow">Einstellungen</span>
+        <h1 className="studio-settings-title">Profil & Marke</h1>
+        <p className="studio-settings-sub">Diese Angaben erscheinen in der Begrüßung und in Dashboard-Überschriften.</p>
+      </header>
+
       {!draft ? (
-        <div className="evg-none">
+        <div className="studio-settings-empty">
           {!loaded ? (
             "Lade Einstellungen…"
           ) : loadError ? (
@@ -967,140 +968,141 @@ function SettingsView({
       ) : (
         <>
           {brandProfileComplete && draft.brandProfileMode !== "skip" ? (
-            <div className="evg-callout" style={{ marginInline: 0, marginTop: 22 }}>
-              <div className="evg-callout__body">
-                <div className="evg-callout__t">Markenprofil aktiv</div>
-                <div className="evg-callout__s">
+            <div className="studio-settings-callout">
+              <div className="studio-settings-callout__body">
+                <div className="studio-settings-callout__title">Markenprofil aktiv</div>
+                <div className="studio-settings-callout__sub">
                   {draft.brandWebsiteUrl ? formatDomain(draft.brandWebsiteUrl) : draft.breweryName || "Marke"}
                   {" · "}
                   Brand-Lock auf „{brandLockLabel(draft.brandLockLevel)}“
                 </div>
               </div>
-              <StudioButton type="button" variant="soft" size="sm" onClick={onOpenBrandTab}>
-                Profil verwalten
-              </StudioButton>
-              <StudioButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                style={{ color: "var(--warn)" }}
-                onClick={() => {
-                  const confirmed = window.confirm(
-                    "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Stil-Vorgaben werden entfernt.",
-                  );
-                  if (!confirmed) return;
-                  void onResetBrandProfile();
-                }}
-              >
-                Generisch nutzen
-              </StudioButton>
+              <div className="studio-settings-callout__actions">
+                <StudioButton type="button" variant="soft" size="sm" onClick={onOpenBrandTab}>
+                  Profil verwalten
+                </StudioButton>
+                <StudioButton
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  style={{ color: "var(--warn)" }}
+                  onClick={() => {
+                    const confirmed = window.confirm(
+                      "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Stil-Vorgaben werden entfernt.",
+                    );
+                    if (!confirmed) return;
+                    void onResetBrandProfile();
+                  }}
+                >
+                  Generisch nutzen
+                </StudioButton>
+              </div>
             </div>
           ) : (
-            <div className="evg-callout" style={{ marginInline: 0, marginTop: 22 }}>
-              <div className="evg-callout__body">
-                <div className="evg-callout__t">Markenprofil</div>
-                <div className="evg-callout__s">
+            <div className="studio-settings-callout">
+              <div className="studio-settings-callout__body">
+                <div className="studio-settings-callout__title">Markenprofil</div>
+                <div className="studio-settings-callout__sub">
                   {draft.brandProfileMode === "skip"
                     ? "Du nutzt BrewAI ohne Markenprofil. Über den Button kannst du jederzeit ein Profil anlegen."
                     : "Lege dein Markenprofil fest: Website-Link eingeben, KI wertet Stil und Vorgaben aus."}
                   {brandProfileNotice ? ` · ${brandProfileNotice}` : ""}
                 </div>
               </div>
-              <StudioButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
-                Markenprofil erstellen
-              </StudioButton>
-              {draft.brandProfileMode !== "skip" ? (
-                <StudioButton type="button" variant="ghost" size="sm" onClick={onSkipBrandProfile}>
-                  Ohne Markenprofil nutzen
+              <div className="studio-settings-callout__actions">
+                <StudioButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
+                  Markenprofil erstellen
                 </StudioButton>
-              ) : null}
+                {draft.brandProfileMode !== "skip" ? (
+                  <StudioButton type="button" variant="ghost" size="sm" onClick={onSkipBrandProfile}>
+                    Ohne Markenprofil nutzen
+                  </StudioButton>
+                ) : null}
+              </div>
             </div>
           )}
 
-          <div style={{ marginTop: 8 }}>
-            <div className="evg-field">
-              <div>
-                <div className="evg-field__l">Dein Name</div>
-                <div className="evg-field__h">z. B. „Guten Morgen, Team“</div>
+          <div className="studio-settings-stack">
+            <section className="studio-settings-section">
+              <h2 className="studio-settings-section__title">Profil</h2>
+              <div className="studio-settings-fields">
+                <label className="studio-settings-field">
+                  <span className="studio-settings-field__label">Dein Name</span>
+                  <span className="studio-settings-field__hint">z. B. „Guten Morgen, Team“</span>
+                  <input
+                    className="studio-settings-input"
+                    value={draft.profileName}
+                    onChange={(e) => setField("profileName", e.target.value)}
+                  />
+                </label>
+                <label className="studio-settings-field">
+                  <span className="studio-settings-field__label">Telefon</span>
+                  <input
+                    className="studio-settings-input"
+                    value={draft.profilePhone}
+                    onChange={(e) => setField("profilePhone", e.target.value)}
+                  />
+                </label>
+                <label className="studio-settings-field">
+                  <span className="studio-settings-field__label">Marke</span>
+                  <span className="studio-settings-field__hint">z. B. „… für deine Marke“</span>
+                  <input
+                    className="studio-settings-input"
+                    value={draft.breweryName}
+                    onChange={(e) => setField("breweryName", e.target.value)}
+                  />
+                </label>
               </div>
-              <input
-                className="evg-input"
-                value={draft.profileName}
-                onChange={(e) => setField("profileName", e.target.value)}
+            </section>
+
+            <section className="studio-settings-section">
+              <h2 className="studio-settings-section__title">Benachrichtigungen</h2>
+              <SettingsToggle
+                checked={draft.emailNotifications}
+                onChange={(v) => setField("emailNotifications", v)}
+                label="E-Mail-Benachrichtigungen"
+                hint="Status zu Generierungen, Einladungen und Sicherheit."
               />
-            </div>
-            <div className="evg-field">
-              <div>
-                <div className="evg-field__l">Telefon</div>
-              </div>
-              <input
-                className="evg-input"
-                value={draft.profilePhone}
-                onChange={(e) => setField("profilePhone", e.target.value)}
+              <SettingsToggle
+                checked={draft.weeklySummary}
+                onChange={(v) => setField("weeklySummary", v)}
+                label="Wochenzusammenfassung"
+                hint="Jeden Montag eine kurze E-Mail mit deinen Highlights."
               />
-            </div>
-            <div className="evg-field">
-              <div>
-                <div className="evg-field__l">Marke</div>
-                <div className="evg-field__h">z. B. „… für deine Marke“</div>
-              </div>
-              <input
-                className="evg-input"
-                value={draft.breweryName}
-                onChange={(e) => setField("breweryName", e.target.value)}
-              />
-            </div>
-            <SettingsToggle
-              checked={draft.emailNotifications}
-              onChange={(v) => setField("emailNotifications", v)}
-              label="E-Mail-Benachrichtigungen"
-              hint="Status zu Generierungen, Einladungen und Sicherheit."
-            />
-            <SettingsToggle
-              checked={draft.weeklySummary}
-              onChange={(v) => setField("weeklySummary", v)}
-              label="Wochenzusammenfassung"
-              hint="Jeden Montag eine kurze E-Mail mit deinen Highlights."
-            />
+            </section>
           </div>
 
-          <div className="studio-settings-save-row" style={{ marginTop: 18 }}>
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="evg-btn evg-btn--primary"
-              style={{ opacity: saving ? 0.7 : 1 }}
-            >
+          <div className="studio-settings-save-row">
+            <StudioButton type="button" variant="primary" size="sm" disabled={saving} onClick={() => void save()}>
               {saving ? "Speichert…" : "Speichern"}
-            </button>
-            {notice ? <span style={{ fontSize: 13.5, color: "var(--fg-3)" }}>{notice}</span> : null}
-            {error ? <span style={{ fontSize: 13.5, color: "var(--err)" }}>{error}</span> : null}
+            </StudioButton>
+            {notice ? <span className="studio-settings-notice">{notice}</span> : null}
+            {error ? <span className="studio-settings-error">{error}</span> : null}
           </div>
 
-          <div style={{ marginTop: 28, paddingTop: 24, borderTop: "1px solid var(--line)" }}>
-            <div className="evg-field">
+          <section className="studio-settings-account">
+            <div className="studio-settings-account__row">
               <div>
-                <div className="evg-field__l">Konto</div>
-                <div className="evg-field__h">Sitzung auf diesem Gerät beenden</div>
+                <div className="studio-settings-account__label">Konto</div>
+                <div className="studio-settings-account__hint">Sitzung auf diesem Gerät beenden</div>
               </div>
-              <button
+              <StudioButton
                 type="button"
+                variant="ghost"
+                size="sm"
                 disabled={signingOut}
                 onClick={() => {
                   setSigningOut(true);
                   void signOutAndRedirect();
                 }}
-                className="evg-btn"
-                style={{ justifySelf: "start", opacity: signingOut ? 0.7 : 1 }}
               >
                 {signingOut ? "Abmelden …" : "Abmelden"}
-              </button>
+              </StudioButton>
             </div>
-          </div>
+          </section>
         </>
       )}
-    </>
+    </div>
   );
 }
 
@@ -1116,16 +1118,21 @@ function SettingsToggle({
   hint?: string;
 }) {
   return (
-    <label className="evg-field" style={{ cursor: "pointer" }}>
-      <div>
-        <div className="evg-field__l">{label}</div>
-        {hint ? <div className="evg-field__h">{hint}</div> : null}
+    <label className={`studio-settings-toggle${checked ? " on" : ""}`}>
+      <div className="studio-settings-toggle__copy">
+        <div className="studio-settings-toggle__label">{label}</div>
+        {hint ? <div className="studio-settings-toggle__hint">{hint}</div> : null}
       </div>
+      <span role="switch" aria-checked={checked} aria-label={label} className="studio-settings-switch">
+        <span className="studio-settings-switch-knob" />
+      </span>
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        style={{ width: 16, height: 16, accentColor: "var(--acc)", justifySelf: "start" }}
+        className="studio-settings-toggle-input"
+        tabIndex={-1}
+        aria-hidden="true"
       />
     </label>
   );
