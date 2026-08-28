@@ -1,0 +1,325 @@
+/* T9 — Einstellungen (BrewAI Studio Final) */
+
+.evg-studio .studio-settings-page {
+  max-width: 660px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.evg-studio .studio-settings-page .studio-faint {
+  color: var(--t3);
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+
+.evg-studio .studio-settings-header {
+  margin-bottom: var(--sp-7);
+}
+
+.evg-studio .studio-settings-header__eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-settings-title {
+  margin: 0;
+  font-size: var(--t-19);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--t1);
+  line-height: 1.2;
+}
+
+.evg-studio .studio-settings-sub {
+  margin: 5px 0 0;
+  font-size: var(--t-13);
+  color: var(--t3);
+  max-width: 52ch;
+  line-height: 1.55;
+}
+
+/* ── Loading / empty ─────────────────────────────────────── */
+
+.evg-studio .studio-settings-empty {
+  margin-top: var(--sp-7);
+  padding: var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  text-align: center;
+  font-size: var(--t-13);
+  color: var(--t3);
+}
+
+.evg-studio .studio-settings-empty button {
+  font: inherit;
+  color: var(--ac-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ── Brand callout ───────────────────────────────────────── */
+
+.evg-studio .studio-settings-callout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  margin-top: var(--sp-7);
+  padding: var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+}
+
+.evg-studio .studio-settings-callout__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.evg-studio .studio-settings-callout__title {
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-settings-callout__sub {
+  margin-top: 4px;
+  font-size: var(--t-12);
+  line-height: 1.55;
+  color: var(--t2);
+}
+
+.evg-studio .studio-settings-callout__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+/* ── Sections ──────────────────────────────────────────────── */
+
+.evg-studio .studio-settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  margin-top: var(--sp-5);
+}
+
+.evg-studio .studio-settings-section {
+  padding: var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--s2);
+}
+
+.evg-studio .studio-settings-section__title {
+  margin: 0 0 var(--sp-5);
+  font-size: var(--t-14);
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.evg-studio .studio-settings-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-5);
+}
+
+.evg-studio .studio-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evg-studio .studio-settings-field__label {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-settings-field__hint {
+  font-size: var(--t-11);
+  color: var(--t3);
+  line-height: 1.45;
+}
+
+.evg-studio .studio-settings-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 11px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  color: var(--t1);
+  font-family: var(--f-sans);
+  font-size: var(--t-13);
+  outline: none;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.evg-studio .studio-settings-input:focus {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--ac-tint);
+}
+
+/* ── Toggle rows ───────────────────────────────────────────── */
+
+.evg-studio .studio-settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.evg-studio .studio-settings-toggle:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.evg-studio .studio-settings-toggle__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.evg-studio .studio-settings-toggle__label {
+  font-size: var(--t-13);
+  font-weight: 500;
+  color: var(--t1);
+}
+
+.evg-studio .studio-settings-toggle__hint {
+  margin-top: 3px;
+  font-size: var(--t-11);
+  line-height: 1.55;
+  color: var(--t3);
+}
+
+.evg-studio .studio-settings-switch {
+  flex: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--s3);
+  transition: background var(--dur-mid) var(--ease), border-color var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-settings-toggle.on .studio-settings-switch {
+  border-color: var(--ac-line);
+  background: var(--ac);
+}
+
+.evg-studio .studio-settings-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--t3);
+  transition: transform var(--dur-mid) var(--ease), background var(--dur-mid) var(--ease);
+}
+
+.evg-studio .studio-settings-toggle.on .studio-settings-switch-knob {
+  transform: translateX(16px);
+  background: var(--ac-ink);
+}
+
+.evg-studio .studio-settings-toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.evg-studio .studio-settings-toggle:has(.studio-settings-toggle-input:focus-visible) .studio-settings-switch {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+/* ── Save row ──────────────────────────────────────────────── */
+
+.evg-studio .studio-settings-save-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-6);
+}
+
+.evg-studio .studio-settings-notice {
+  font-size: var(--t-13);
+  color: var(--ok);
+}
+
+.evg-studio .studio-settings-error {
+  font-size: var(--t-13);
+  color: var(--err);
+}
+
+/* ── Account ───────────────────────────────────────────────── */
+
+.evg-studio .studio-settings-account {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-7);
+  border-top: 1px solid var(--line);
+}
+
+.evg-studio .studio-settings-account__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+}
+
+.evg-studio .studio-settings-account__label {
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.evg-studio .studio-settings-account__hint {
+  margin-top: 4px;
+  font-size: var(--t-11);
+  color: var(--t3);
+}
+
+@media (max-width: 640px) {
+  .evg-studio .studio-settings-callout {
+    flex-direction: column;
+  }
+
+  .evg-studio .studio-settings-callout__actions {
+    width: 100%;
+  }
+
+  .evg-studio .studio-settings-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

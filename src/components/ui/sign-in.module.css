@@ -1,40 +1,42 @@
-/* BrewAI Login — from Login.html + styles.css (studio redesign) */
+/* T11 — Login / Auth (BrewAI Studio Final tokens) */
 
 .shell {
-  --acc: #c8602a;
-  --colw: 380px;
-  --glow: 20;
+  --acc: #c9a24d;
+  --colw: 352px;
+  --glow: 18;
 
-  --bg-0: #131211;
-  --bg-1: #1a1816;
-  --bg-2: #201d1b;
-  --bg-3: #272320;
-  --bg-4: #312c28;
+  --bg-0: #0f0906;
+  --bg-1: #16100b;
+  --bg-2: #1e1710;
+  --bg-3: #271e16;
+  --bg-4: #332618;
 
-  --line: rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.12);
-  --line-accent: color-mix(in srgb, var(--acc) 45%, transparent);
+  --line: #2e2418;
+  --line-strong: #3d3021;
+  --line-accent: rgba(201, 162, 77, 0.28);
 
-  --tx-0: #f4f1ec;
-  --tx-1: #c4bdb3;
-  --tx-2: #8a837a;
-  --tx-3: #635c54;
+  --tx-0: #f3ede4;
+  --tx-1: #b3a694;
+  --tx-2: #b3a694;
+  --tx-3: #7e7263;
 
-  --acc-hi: color-mix(in oklab, var(--acc), white 15%);
-  --acc-lo: color-mix(in oklab, var(--acc), black 24%);
-  --acc-soft: color-mix(in srgb, var(--acc) 14%, transparent);
-  --acc-softer: color-mix(in srgb, var(--acc) 7%, transparent);
-  --acc-ink: color-mix(in oklab, var(--acc), black 82%);
+  --acc-hi: #ddba6a;
+  --acc-lo: #a9853a;
+  --acc-soft: rgba(201, 162, 77, 0.14);
+  --acc-softer: rgba(201, 162, 77, 0.1);
+  --acc-ink: #1a1207;
 
-  --ok: #6fae84;
-  --ok-soft: rgba(111, 174, 132, 0.14);
+  --ok: #6fa96f;
+  --ok-soft: rgba(111, 169, 111, 0.14);
+  --err: #d0604c;
+  --err-soft: rgba(208, 96, 76, 0.14);
 
-  --r-xs: 7px;
-  --r-sm: 10px;
-  --r-pill: 999px;
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-pill: 100px;
 
-  --sans: var(--font-hanken), "Hanken Grotesk", system-ui, sans-serif;
-  --mono: var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
+  --sans: var(--font-work-sans), "Work Sans", system-ui, sans-serif;
+  --mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
   --headline: var(--sans);
 
   /* Mobile-first: Formular zuerst, kompakter Brand-Header */
@@ -43,8 +45,8 @@
   display: grid;
   grid-template-columns: 1fr;
   grid-template-areas:
-    "hero"
-    "form";
+    "form"
+    "hero";
   overflow-x: clip;
   overflow-y: auto;
   background: var(--bg-0);
@@ -229,9 +231,10 @@
 }
 
 .heroHeadline {
-  font-size: clamp(52px, 7.4vw, 96px);
-  line-height: 0.98;
-  letter-spacing: -0.028em;
+  font-size: clamp(22px, 4.2vw, 26px);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  font-weight: 600;
 }
 
 .heroHeadline em {
@@ -350,17 +353,18 @@
 
 .formTitle {
   font-family: var(--headline);
-  font-size: clamp(24px, 7vw, 32px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.04;
+  font-size: clamp(22px, 6vw, 22px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
   color: var(--tx-0);
 }
 
 .lead {
-  margin-top: 10px;
-  color: var(--tx-2);
-  font-size: 14.5px;
+  margin-top: 6px;
+  color: var(--tx-3);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .modeToggle {
@@ -413,11 +417,12 @@
 .fieldLabel {
   font-family: var(--mono);
   font-size: 10px;
-  letter-spacing: 0.14em;
+  font-weight: 500;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--tx-3);
   display: block;
-  margin-bottom: 9px;
+  margin-bottom: 6px;
 }
 
 .labelRow {
@@ -464,7 +469,7 @@
 
 .field {
   width: 100%;
-  height: 48px;
+  height: 38px;
   background: var(--bg-1);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
@@ -472,7 +477,7 @@
   font-family: var(--sans);
   /* ≥16px verhindert iOS-Zoom beim Fokus */
   font-size: 16px;
-  padding: 0 14px;
+  padding: 0 12px;
   padding-left: 44px;
   transition:
     border-color 0.14s,
@@ -486,9 +491,9 @@
 
 .field:focus {
   outline: none;
-  border-color: var(--line-accent);
+  border-color: var(--acc);
   box-shadow: 0 0 0 3px var(--acc-softer);
-  background: var(--bg-0);
+  background: var(--bg-1);
 }
 
 .fieldPw {
@@ -538,23 +543,20 @@
 
 .btnPrimary {
   width: 100%;
-  height: 48px;
+  height: 40px;
   padding: 0 22px;
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
   border-radius: var(--r-sm);
-  border: 1px solid var(--acc-lo);
+  border: none;
   background: var(--acc);
   color: var(--acc-ink);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18) inset,
-    0 1px 2px rgba(0, 0, 0, 0.4);
   cursor: pointer;
   transition:
-    background 0.16s ease,
-    transform 0.06s ease;
+    background 0.18s var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)),
+    transform 0.08s ease;
 }
 
 .btnPrimary:hover:not(:disabled) {
@@ -562,7 +564,8 @@
 }
 
 .btnPrimary:active:not(:disabled) {
-  transform: translateY(0.5px);
+  transform: scale(0.98);
+  background: var(--acc-lo);
 }
 
 .btnPrimary:disabled {
@@ -704,15 +707,18 @@
   .shell {
     height: 100dvh;
     min-height: 100dvh;
-    grid-template-columns: 1.04fr 1px 0.96fr;
-    grid-template-areas: "hero divider form";
+    grid-template-columns: 1fr 1px 1fr;
+    grid-template-areas: "form divider hero";
     overflow: hidden;
     padding: 0;
   }
 
   .hero {
-    padding: 52px 64px 48px;
-    justify-content: space-between;
+    grid-area: hero;
+    padding: 48px;
+    justify-content: center;
+    border-left: 1px solid var(--line);
+    background: var(--bg-0);
   }
 
   .heroBody,
@@ -725,30 +731,31 @@
   }
 
   .divider {
-    display: block;
-    grid-area: divider;
+    display: none;
   }
 
   .formwrap {
+    grid-area: form;
     place-items: center;
     padding: 48px;
     overflow-y: auto;
     min-height: 0;
+    background: var(--bg-1);
   }
 
   .formTitle {
-    font-size: 32px;
+    font-size: 22px;
   }
 
   .field {
-    height: 44px;
-    font-size: 14px;
+    height: 38px;
+    font-size: 13px;
   }
 
   .btnPrimary,
   .btnGoogle {
-    height: 46px;
-    font-size: 14.5px;
+    height: 40px;
+    font-size: 13.5px;
   }
 }
 
