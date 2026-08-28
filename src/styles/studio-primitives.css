@@ -404,22 +404,492 @@
   animation: stu-bar-pulse 1.6s var(--ease) infinite;
 }
 
-@keyframes stu-spin {
+/* ── T2b: Checkbox / Radio / Switch ─────────────────────── */
+
+.evg-studio .stu-check,
+.evg-studio .stu-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--t2);
+  font-family: var(--f-sans);
+  font-size: var(--t-14);
+  user-select: none;
+}
+.evg-studio .stu-check--disabled,
+.evg-studio .stu-radio--disabled,
+.evg-studio .stu-switch-row--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.evg-studio .stu-check__input,
+.evg-studio .stu-radio__input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.evg-studio .stu-check__box {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  color: var(--ac-ink);
+  display: grid;
+  place-items: center;
+  transition: background var(--dur-mid) var(--ease), border-color var(--dur-mid) var(--ease);
+}
+.evg-studio .stu-check__input:focus-visible + .stu-check__box,
+.evg-studio .stu-radio__input:focus-visible + .stu-radio__dot {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+.evg-studio .stu-check__input:checked + .stu-check__box,
+.evg-studio .stu-check__input:indeterminate + .stu-check__box {
+  background: var(--ac);
+  border-color: var(--ac);
+}
+.evg-studio .stu-check__label,
+.evg-studio .stu-radio__label,
+.evg-studio .stu-switch__label {
+  color: var(--t1);
+}
+.evg-studio .stu-radio__dot {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  display: grid;
+  place-items: center;
+  transition: border-color var(--dur-mid) var(--ease), background var(--dur-mid) var(--ease);
+}
+.evg-studio .stu-radio__dot::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--ac);
+  transform: scale(0);
+  transition: transform var(--dur-mid) var(--ease);
+}
+.evg-studio .stu-radio__input:checked + .stu-radio__dot {
+  border-color: var(--ac);
+  background: var(--ac-tint);
+}
+.evg-studio .stu-radio__input:checked + .stu-radio__dot::after {
+  transform: scale(1);
+}
+.evg-studio .stu-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.evg-studio .stu-switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.evg-studio .stu-switch {
+  width: 44px;
+  height: 26px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line2);
+  background: var(--s3);
+  padding: 2px;
+  cursor: pointer;
+  transition: background var(--dur-mid) var(--ease), border-color var(--dur-mid) var(--ease);
+}
+.evg-studio .stu-switch:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+.evg-studio .stu-switch--on {
+  background: var(--ac);
+  border-color: var(--ac);
+}
+.evg-studio .stu-switch__thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-pill);
+  background: var(--t1);
+  transition: transform var(--dur-mid) var(--ease);
+}
+.evg-studio .stu-switch--on .stu-switch__thumb {
+  transform: translateX(18px);
+  background: var(--ac-ink);
+}
+
+/* ── T2b: Tabs ──────────────────────────────────────────── */
+
+.evg-studio .stu-tabs__list {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+}
+.evg-studio .stu-tabs__trigger {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--t3);
+  font-family: var(--f-sans);
+  font-size: var(--t-13);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--dur-mid) var(--ease), box-shadow var(--dur-mid) var(--ease);
+}
+.evg-studio .stu-tabs__trigger:hover:not(:disabled) {
+  color: var(--t1);
+}
+.evg-studio .stu-tabs__trigger[data-state="active"] {
+  color: var(--ac);
+  box-shadow: inset 0 -2px 0 var(--ac);
+}
+.evg-studio .stu-tabs__trigger:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+.evg-studio .stu-tabs__trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.evg-studio .stu-tabs__content {
+  padding-top: 16px;
+  color: var(--t2);
+  font-size: var(--t-14);
+  line-height: 1.55;
+}
+
+/* ── T2b: Tooltip / Menu / Dialog / Toast ───────────────── */
+
+.evg-studio .stu-tooltip,
+.stu-tooltip.evg-studio {
+  z-index: 80;
+  max-width: 240px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  background: var(--s4);
+  border: 1px solid var(--line2);
+  color: var(--t1);
+  font-family: var(--f-sans);
+  font-size: 11.5px;
+  line-height: 1.4;
+  box-shadow: var(--sh-toast);
+  animation: stu-tooltip-in 120ms var(--ease);
+}
+.stu-tooltip.evg-studio[data-state="closed"] {
+  animation: stu-tooltip-out 80ms ease-out;
+}
+
+.stu-menu.evg-studio {
+  z-index: 70;
+  min-width: 180px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 6px;
+  border-radius: var(--r-md);
+  background: var(--s2);
+  border: 1px solid var(--line2);
+  box-shadow: var(--sh-toast);
+  animation: stu-pop-in 160ms var(--ease);
+}
+.stu-menu.evg-studio[data-state="closed"] {
+  animation: stu-pop-out 120ms var(--ease);
+}
+.evg-studio .stu-menu__item,
+.stu-menu.evg-studio .stu-menu__item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t1);
+  font-family: var(--f-sans);
+  font-size: var(--t-13);
+  text-align: left;
+  cursor: pointer;
+}
+.stu-menu.evg-studio .stu-menu__item:hover:not(:disabled),
+.stu-menu.evg-studio .stu-menu__item:focus-visible {
+  background: var(--ac-tint);
+  outline: none;
+}
+.stu-menu.evg-studio .stu-menu__item--danger {
+  color: var(--err);
+}
+.stu-menu.evg-studio .stu-menu__item--danger:hover:not(:disabled) {
+  background: var(--err-dim);
+}
+.stu-menu.evg-studio .stu-menu__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.stu-menu.evg-studio .stu-menu__sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--line);
+}
+
+.stu-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--scrim);
+  animation: stu-overlay-in 180ms var(--ease);
+}
+.stu-dialog-overlay[data-state="closed"] {
+  animation: stu-overlay-out 160ms var(--ease);
+}
+.stu-dialog.evg-studio {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 101;
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(86vh, 720px);
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  padding: 20px;
+  border-radius: var(--r-lg);
+  background: var(--s2);
+  border: 1px solid var(--line2);
+  box-shadow: var(--sh-modal);
+  color: var(--t2);
+  animation: stu-modal-in 220ms var(--ease);
+}
+.stu-dialog.evg-studio[data-state="closed"] {
+  animation: stu-modal-out 160ms var(--ease);
+}
+.stu-dialog.evg-studio .stu-dialog__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+}
+.stu-dialog.evg-studio .stu-dialog__close:hover {
+  background: var(--s3);
+  color: var(--t1);
+}
+.stu-dialog.evg-studio .stu-dialog__close:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+.stu-dialog.evg-studio .stu-dialog__header {
+  display: grid;
+  gap: 8px;
+  padding-right: 28px;
+  margin-bottom: 16px;
+}
+.stu-dialog.evg-studio .stu-dialog__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--t1);
+}
+.stu-dialog.evg-studio .stu-dialog__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--t3);
+}
+.stu-dialog.evg-studio .stu-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+@media (max-width: 639px) {
+  .stu-dialog.evg-studio.stu-dialog--sheet-mobile {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    transform: none;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    animation: stu-sheet-in 240ms var(--ease);
+  }
+  .stu-dialog.evg-studio.stu-dialog--sheet-mobile[data-state="closed"] {
+    animation: stu-sheet-out 180ms var(--ease);
+  }
+}
+
+.stu-toaster {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.stu-toast {
+  pointer-events: auto;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--s2);
+  border: 1px solid var(--line2);
+  box-shadow: var(--sh-toast);
+  color: var(--t2);
+  animation: stu-toast-in 240ms var(--ease);
+}
+.stu-toast--success {
+  border-color: var(--ok);
+}
+.stu-toast--error {
+  border-color: var(--err);
+}
+.stu-toast--warning {
+  border-color: var(--warn);
+}
+.stu-toast--info {
+  border-color: var(--info);
+}
+.stu-toast__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+}
+.stu-toast__desc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--t3);
+}
+.stu-toast__close {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+}
+.stu-toast__close:hover {
+  background: var(--s3);
+  color: var(--t1);
+}
+.stu-toast__close:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+@keyframes stu-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
-@keyframes stu-shimmer {
-  100% {
-    transform: translateX(100%);
+@keyframes stu-tooltip-out {
+  to {
+    opacity: 0;
   }
 }
-@keyframes stu-bar-pulse {
-  0% {
-    transform: translateX(-120%);
+@keyframes stu-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
   }
-  100% {
-    transform: translateX(280%);
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes stu-pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes stu-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes stu-overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes stu-modal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 4%)) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes stu-modal-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 4%)) scale(0.98);
+  }
+}
+@keyframes stu-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes stu-sheet-out {
+  to {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes stu-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -430,7 +900,12 @@
   .evg-studio .stu-textarea,
   .evg-studio .stu-select,
   .evg-studio .stu-card--interactive,
-  .evg-studio .stu-progress__bar {
+  .evg-studio .stu-progress__bar,
+  .evg-studio .stu-check__box,
+  .evg-studio .stu-radio__dot,
+  .evg-studio .stu-switch,
+  .evg-studio .stu-switch__thumb,
+  .evg-studio .stu-tabs__trigger {
     transition: none;
   }
   .evg-studio .stu-btn:active:not(:disabled),
@@ -439,8 +914,13 @@
   }
   .evg-studio .stu-btn__spinner,
   .evg-studio .stu-skeleton::after,
-  .evg-studio .stu-progress--indeterminate .stu-progress__bar {
-    animation: none;
+  .evg-studio .stu-progress--indeterminate .stu-progress__bar,
+  .stu-tooltip.evg-studio,
+  .stu-menu.evg-studio,
+  .stu-dialog-overlay,
+  .stu-dialog.evg-studio,
+  .stu-toast {
+    animation: none !important;
   }
   .evg-studio .stu-skeleton::after {
     display: none;

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** Dev-only Prüfansicht für T2a-Primitives — keine Produktivnavigation. */
+/** Dev-only Prüfansicht für Studio-UI (T2a/T2b) — keine Produktivnavigation. */
 export default function StudioUiKitPage() {
   if (process.env.NODE_ENV === "production") {
     return (

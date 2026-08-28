@@ -16,7 +16,7 @@ export {
   type StudioStatIconTone,
 } from "./legacy";
 
-/** T2a FINAL Primitives — neue Studio-UI-Schicht (`stu-*`). */
+/** T2a FINAL Primitives */
 export { StudioUiButton, type StudioUiButtonProps, type StudioUiButtonSize, type StudioUiButtonVariant } from "./button";
 export {
   StudioUiIconButton,
@@ -39,3 +39,55 @@ export {
   type StudioUiHintTone,
   type StudioUiLabelProps,
 } from "./field";
+
+/** T2b FINAL interactive / overlay */
+export { StudioUiCheckbox, type StudioUiCheckboxProps } from "./checkbox";
+export { StudioUiRadio, StudioUiRadioGroup, type StudioUiRadioGroupProps, type StudioUiRadioProps } from "./radio";
+export { StudioUiSwitch, type StudioUiSwitchProps } from "./switch";
+export {
+  StudioUiTabs,
+  StudioUiTabsContent,
+  StudioUiTabsList,
+  StudioUiTabsTrigger,
+  type StudioUiTabsContentProps,
+  type StudioUiTabsProps,
+  type StudioUiTabsTriggerProps,
+} from "./tabs";
+export {
+  StudioUiTooltip,
+  StudioUiTooltipContent,
+  StudioUiTooltipProvider,
+  StudioUiTooltipTrigger,
+  type StudioUiTooltipContentProps,
+} from "./tooltip";
+export {
+  StudioUiDropdownMenu,
+  StudioUiDropdownMenuAnchor,
+  StudioUiDropdownMenuContent,
+  StudioUiDropdownMenuItem,
+  StudioUiDropdownMenuSeparator,
+  StudioUiDropdownMenuTrigger,
+  type StudioUiDropdownMenuContentProps,
+  type StudioUiDropdownMenuItemProps,
+} from "./dropdown-menu";
+export {
+  StudioUiDialog,
+  StudioUiDialogClose,
+  StudioUiDialogContent,
+  StudioUiDialogDescription,
+  StudioUiDialogFooter,
+  StudioUiDialogHeader,
+  StudioUiDialogOverlay,
+  StudioUiDialogPortal,
+  StudioUiDialogTitle,
+  StudioUiDialogTrigger,
+  type StudioUiDialogContentProps,
+} from "./dialog";
+export { StudioUiConfirmDialog, type StudioUiConfirmDialogProps } from "./confirm-dialog";
+export {
+  StudioUiToaster,
+  dismissStudioToast,
+  showStudioToast,
+  type StudioUiToastInput,
+  type StudioUiToastItem,
+} from "./toast";
