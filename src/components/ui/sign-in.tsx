@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import React, { startTransition, useCallback, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { AuthCard, type AuthMode as CardAuthMode } from "@/components/ui/auth-card";
 import { loginFontClassName } from "@/lib/fonts/studio-fonts";
 import { LOGIN_WAITLIST_ENABLED } from "@/lib/featureFlags";
 import { EvglabMark } from "@/components/studio/evglab-mark";
@@ -14,9 +15,13 @@ type AuthMode = "signin" | "register";
 
 function resolveAuthMode(searchParams: URLSearchParams, fallback: AuthMode): AuthMode {
   const modeParam = searchParams.get("mode");
-  if (modeParam === "register") return "register";
-  if (modeParam === "signin") return "signin";
+  if (modeParam === "register" || modeParam === "signup") return "register";
+  if (modeParam === "signin" || modeParam === "login") return "signin";
   return fallback;
+}
+
+function toCardMode(mode: AuthMode): CardAuthMode {
+  return mode === "register" ? "signup" : "login";
 }
 
 const GoogleG = () => (
@@ -167,7 +172,16 @@ export function LoginHero({ mode: _mode }: { mode: AuthMode }) {
 
         <div className={styles.hook} style={{ marginTop: 20, flexWrap: "wrap" }}>
           {["Markenprofil", "Sortiment", "Anlässe & Feste", "Mediathek"].map((chip) => (
-            <span key={chip} style={{ padding: "5px 11px", borderRadius: 100, border: "1px solid var(--line-strong)", fontSize: 12, color: "var(--tx-1)" }}>
+            <span
+              key={chip}
+              style={{
+                padding: "5px 11px",
+                borderRadius: 100,
+                border: "1px solid var(--line-strong)",
+                fontSize: 12,
+                color: "var(--tx-1)",
+              }}
+            >
               {chip}
             </span>
           ))}
@@ -209,7 +223,6 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   const mode = resolveAuthMode(searchParams, initialMode);
   const [localError, setLocalError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
-  const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState("");
   const [waitlistJoined, setWaitlistJoined] = useState(false);
   const [waitlistPending, setWaitlistPending] = useState(false);
@@ -256,7 +269,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
       const form = event.currentTarget;
       const password = String(new FormData(form).get("password") ?? "");
       const passwordConfirm = String(new FormData(form).get("passwordConfirm") ?? "");
-      if (password !== passwordConfirm) {
+      if (passwordConfirm && password !== passwordConfirm) {
         event.preventDefault();
         setLocalError("Passwörter stimmen nicht überein.");
         return;
@@ -358,82 +371,57 @@ export const SignInPage: React.FC<SignInPageProps> = ({
     );
   }
 
-  return (
-    <div className={`${styles.shell} ${loginFontClassName}`}>
-      <LoginHero mode={mode} />
-      <div className={styles.divider} aria-hidden />
+  // Admin lock-in keeps the compact legacy form (signInOnly).
+  if (signInOnly) {
+    return (
+      <div className={`${styles.shell} ${loginFontClassName}`}>
+        <LoginHero mode={mode} />
+        <div className={styles.divider} aria-hidden />
 
-      <section className={styles.formwrap}>
-        <div className={`${styles.formcol} ${styles.stagger}`}>
-          <h2 className={styles.formTitle}>{signInOnly ? "Admin-Anmeldung" : isRegister ? "Konto erstellen" : "Willkommen zurück"}</h2>
-          <p className={styles.lead}>
-            {signInOnly ? (
-              <>Nur für BrewAI-Administratoren. Nach dem Login folgt ein E-Mail-Sicherheitscode.</>
-            ) : isRegister ? (
-              <>
-                Bereits Konto?{" "}
-                <button type="button" className={styles.modeToggle} onClick={() => setMode("signin")}>
-                  Anmelden →
-                </button>
-              </>
-            ) : (
-              <>
-                Melde dich an, um Motive für deine Brauerei zu erstellen.{" "}
-                Noch kein Konto?{" "}
-                <button type="button" className={styles.modeToggle} onClick={() => setMode("register")}>
-                  Kostenlos starten →
-                </button>
-              </>
-            )}
-          </p>
+        <section className={styles.formwrap}>
+          <div className={`${styles.formcol} ${styles.stagger}`}>
+            <h2 className={styles.formTitle}>Admin-Anmeldung</h2>
+            <p className={styles.lead}>Nur für BrewAI-Administratoren. Nach dem Login folgt ein E-Mail-Sicherheitscode.</p>
 
-          {inviteOnly && isRegister && !inviteToken ? (
-            <div className={`${styles.feedback} ${styles.feedbackError}`} role="status">
-              Registrierung ist nur mit Einladung möglich. Bitte nutze deinen Einladungslink.
-            </div>
-          ) : null}
-
-          {feedbackNotice ? (
-            <div className={`${styles.feedback} ${styles.feedbackNotice}`} role="status">
-              {feedbackNotice}
-            </div>
-          ) : null}
-
-          {displayError ? (
-            <div className={`${styles.feedback} ${styles.feedbackError}`} role="alert">
-              {displayError}
-            </div>
-          ) : null}
-
-          <form key={mode} className={styles.formBlock} {...formProps}>
-            <input type="hidden" name="next" value={nextPath} />
-            {inviteToken ? <input type="hidden" name="inviteToken" value={inviteToken} /> : null}
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel} htmlFor="auth-email">
-                E-Mail
-              </label>
-              <div className={styles.fieldIco}>
-                <input
-                  id="auth-email"
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="name@beispiel.de"
-                  className={styles.field}
-                />
-                <MailIcon />
+            {feedbackNotice ? (
+              <div className={`${styles.feedback} ${styles.feedbackNotice}`} role="status">
+                {feedbackNotice}
               </div>
-            </div>
+            ) : null}
 
-            <div className={isRegister ? styles.fieldGroup : styles.fieldGroupLast}>
-              <div className={isRegister ? undefined : styles.labelRow}>
-                <label className={styles.fieldLabel} htmlFor="auth-password">
-                  Passwort
+            {displayError ? (
+              <div className={`${styles.feedback} ${styles.feedbackError}`} role="alert">
+                {displayError}
+              </div>
+            ) : null}
+
+            <form key={mode} className={styles.formBlock} {...formProps}>
+              <input type="hidden" name="next" value={nextPath} />
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel} htmlFor="auth-email">
+                  E-Mail
                 </label>
-                {!isRegister ? (
-                  onResetPassword ? (
+                <div className={styles.fieldIco}>
+                  <input
+                    id="auth-email"
+                    name="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="name@beispiel.de"
+                    className={styles.field}
+                  />
+                  <MailIcon />
+                </div>
+              </div>
+
+              <div className={styles.fieldGroupLast}>
+                <div className={styles.labelRow}>
+                  <label className={styles.fieldLabel} htmlFor="auth-password">
+                    Passwort
+                  </label>
+                  {onResetPassword ? (
                     <a
                       href="#"
                       className={styles.forgot}
@@ -448,108 +436,91 @@ export const SignInPage: React.FC<SignInPageProps> = ({
                     <Link href={resetPasswordHref} className={styles.forgot}>
                       Vergessen?
                     </Link>
-                  )
-                ) : null}
-              </div>
-              <div className={styles.fieldIco}>
-                <input
-                  id="auth-password"
-                  name="password"
-                  type={showPw ? "text" : "password"}
-                  required
-                  minLength={isRegister ? 8 : undefined}
-                  autoComplete={isRegister ? "new-password" : "current-password"}
-                  placeholder="••••••••"
-                  className={`${styles.field} ${styles.fieldPw}`}
-                />
-                <LockIcon />
-                <button
-                  type="button"
-                  className={styles.pwToggle}
-                  onClick={() => setShowPw((value) => !value)}
-                  aria-label={showPw ? "Passwort verbergen" : "Passwort anzeigen"}
-                >
-                  <EyeIcon off={showPw} />
-                </button>
-              </div>
-            </div>
-
-            <div className={`${styles.confirmWrap} ${isRegister ? styles.confirmWrapOpen : ""}`}>
-              <div className={styles.confirmInner}>
-                <div className={styles.fieldGroupLast}>
-                  <label className={styles.fieldLabel} htmlFor="auth-password-confirm">
-                    Passwort bestätigen
-                  </label>
-                  <div className={styles.fieldIco}>
-                    <input
-                      id="auth-password-confirm"
-                      name="passwordConfirm"
-                      type={showPwConfirm ? "text" : "password"}
-                      required={isRegister}
-                      disabled={!isRegister}
-                      autoComplete="new-password"
-                      placeholder="••••••••"
-                      className={`${styles.field} ${styles.fieldPw}`}
-                      tabIndex={isRegister ? 0 : -1}
-                      aria-hidden={!isRegister}
-                    />
-                    <LockIcon />
-                    <button
-                      type="button"
-                      className={styles.pwToggle}
-                      onClick={() => setShowPwConfirm((value) => !value)}
-                      aria-label={showPwConfirm ? "Passwort verbergen" : "Passwort anzeigen"}
-                      tabIndex={isRegister ? 0 : -1}
-                    >
-                      <EyeIcon off={showPwConfirm} />
-                    </button>
-                  </div>
+                  )}
+                </div>
+                <div className={styles.fieldIco}>
+                  <input
+                    id="auth-password"
+                    name="password"
+                    type={showPw ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    className={`${styles.field} ${styles.fieldPw}`}
+                  />
+                  <LockIcon />
+                  <button
+                    type="button"
+                    className={styles.pwToggle}
+                    onClick={() => setShowPw((value) => !value)}
+                    aria-label={showPw ? "Passwort verbergen" : "Passwort anzeigen"}
+                  >
+                    <EyeIcon off={showPw} />
+                  </button>
                 </div>
               </div>
-            </div>
 
-            <AuthSubmitInner mode={mode} />
-          </form>
+              <AuthSubmitInner mode={mode} />
+            </form>
 
-          {showGoogle ? (
-            <>
-              <div className={styles.or}>oder</div>
-              {onGoogleSignIn ? (
-                <button
-                  type="button"
-                  onClick={onGoogleSignIn}
-                  disabled={googlePending}
-                  className={styles.btnGoogle}
-                >
-                  <GoogleG />
-                  {googlePending
-                    ? "Weiter zu Google …"
-                    : isRegister
-                      ? "Mit Google registrieren"
-                      : "Mit Google anmelden"}
-                </button>
-              ) : (
-                <a href={googleHref} className={styles.btnGoogle} rel="noopener">
-                  <GoogleG />
-                  {isRegister ? "Mit Google registrieren" : "Mit Google anmelden"}
-                </a>
-              )}
-            </>
-          ) : null}
+            {showGoogle ? (
+              <>
+                <div className={styles.or}>oder</div>
+                {onGoogleSignIn ? (
+                  <button
+                    type="button"
+                    onClick={onGoogleSignIn}
+                    disabled={googlePending}
+                    className={styles.btnGoogle}
+                  >
+                    <GoogleG />
+                    {googlePending ? "Weiter zu Google …" : "Mit Google anmelden"}
+                  </button>
+                ) : (
+                  <a href={googleHref} className={styles.btnGoogle} rel="noopener">
+                    <GoogleG />
+                    Mit Google anmelden
+                  </a>
+                )}
+              </>
+            ) : null}
+          </div>
+        </section>
+      </div>
+    );
+  }
 
-          <p className={styles.legal}>
-            Mit der {isRegister ? "Registrierung" : "Anmeldung"} akzeptierst du unsere{" "}
-            <Link href="/agb" target="_blank" rel="noopener noreferrer">
-              AGB
-            </Link>{" "}
-            und{" "}
-            <Link href="/datenschutz" target="_blank" rel="noopener noreferrer">
-              Datenschutzerklärung
-            </Link>
-            .
-          </p>
-        </div>
-      </section>
-    </div>
+  const errorText =
+    typeof displayError === "string"
+      ? displayError
+      : displayError
+        ? String(displayError)
+        : null;
+
+  return (
+    <AuthCard
+      mode={toCardMode(mode)}
+      onModeChange={(next) => setMode(next === "signup" ? "register" : "signin")}
+      onSubmit={async () => {
+        /* When formAction is set, native POST to /auth/signin|/auth/signup runs. */
+      }}
+      onOAuth={(provider) => {
+        if (provider === "google") {
+          if (onGoogleSignIn) onGoogleSignIn();
+          else if (typeof window !== "undefined") window.location.assign(googleHref);
+        }
+      }}
+      onForgotPassword={onResetPassword}
+      error={errorText}
+      formAction={postTarget}
+      nextPath={nextPath}
+      inviteToken={inviteToken}
+      oauthProviders={showGoogle ? ["google"] : []}
+      googleHref={onGoogleSignIn ? undefined : googleHref}
+      feedbackNotice={feedbackNotice}
+      inviteBlocked={Boolean(inviteOnly && isRegister && !inviteToken)}
+      forgotPasswordHref={resetPasswordHref}
+      showModeSwitch={!signInOnly}
+    />
   );
 };

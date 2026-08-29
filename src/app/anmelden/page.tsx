@@ -60,7 +60,11 @@ export default async function AnmeldenPage({
     "invite_email_mismatch",
   ]);
   const initialMode =
-    mode === "register" || (urlError && registerErrors.has(urlError)) ? "register" : "signin";
+    mode === "register" ||
+    mode === "signup" ||
+    (urlError && registerErrors.has(urlError))
+      ? "register"
+      : "signin";
 
   return (
     <Suspense fallback={null}>

@@ -106,7 +106,11 @@ export function LoginForm({
 
   const modeParam = searchParams.get("mode");
   const resolvedMode =
-    modeParam === "register" || initialMode === "register" ? ("register" as const) : ("signin" as const);
+    modeParam === "register" ||
+    modeParam === "signup" ||
+    initialMode === "register"
+      ? ("register" as const)
+      : ("signin" as const);
   const registerErrors = new Set([
     "invite_required",
     "invite_expired",
