@@ -18,6 +18,43 @@ export type BillingReceiptData = {
 
 type Stage = "processing" | "printing" | "complete";
 
+const toothCount = 40;
+const toothDepth = 4;
+const toothPoints = Array.from({ length: toothCount * 2 }, (_, index) => {
+  const x = 100 - ((index + 1) * 100) / (toothCount * 2);
+  const y = index % 2 === 0 ? "100%" : `calc(100% - ${toothDepth}px)`;
+  return `${x}% ${y}`;
+}).join(", ");
+const receiptClipPath = `polygon(0 0, 100% 0, 100% calc(100% - ${toothDepth}px), ${toothPoints})`;
+
+const printingTransformKeyframes = [
+  "translateY(calc(-100% + 2px))",
+  "translateY(-91%)",
+  "translateY(-91%)",
+  "translateY(-81%)",
+  "translateY(-81%)",
+  "translateY(-70%)",
+  "translateY(-70%)",
+  "translateY(-58%)",
+  "translateY(-58%)",
+  "translateY(-45%)",
+  "translateY(-45%)",
+  "translateY(-32%)",
+  "translateY(-32%)",
+  "translateY(-20%)",
+  "translateY(-20%)",
+  "translateY(-10%)",
+  "translateY(-10%)",
+  "translateY(-3%)",
+  "translateY(-3%)",
+  "translateY(0%)",
+];
+
+const printingKeyframeTimes = [
+  0, 0.075, 0.105, 0.18, 0.21, 0.285, 0.315, 0.39, 0.42, 0.495, 0.525, 0.6, 0.63, 0.705, 0.735, 0.81,
+  0.84, 0.915, 0.945, 1,
+];
+
 export function BillingReceiptPrinter({
   data,
   open,
@@ -32,21 +69,33 @@ export function BillingReceiptPrinter({
 
   useEffect(() => {
     if (!open) return;
-    if (reduce) {
-      setStage("complete");
-      return;
-    }
-    setStage("processing");
-    const t1 = window.setTimeout(() => setStage("printing"), 700);
-    const t2 = window.setTimeout(() => setStage("complete"), 700 + 1750);
+    let t1 = 0;
+    let t2 = 0;
+    // defer stage kickoff so open/reduce props don't sync-set in the effect body
+    const start = window.setTimeout(() => {
+      if (reduce) {
+        setStage("complete");
+        return;
+      }
+      setStage("processing");
+      t1 = window.setTimeout(() => setStage("printing"), 700);
+      t2 = window.setTimeout(() => setStage("complete"), 700 + 1750);
+    }, 0);
     return () => {
+      window.clearTimeout(start);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
   }, [open, reduce, data.sessionRef, data.productLabel]);
 
   const statusLabel =
-    stage === "processing" ? "Zahlung wird bestätigt …" : stage === "printing" ? "Beleg wird gedruckt …" : "Zahlung bestätigt";
+    stage === "processing"
+      ? "Zahlung wird bestätigt …"
+      : stage === "printing"
+        ? "Beleg wird gedruckt …"
+        : "Zahlung bestätigt";
+
+  const paperVisible = stage !== "processing";
 
   return (
     <AnimatePresence>
@@ -62,31 +111,35 @@ export function BillingReceiptPrinter({
           aria-label="Zahlungsbeleg"
         >
           <div className={styles.scrim} onClick={onClose} aria-hidden />
-          <section className={styles.machine} aria-labelledby="receipt-status">
+          <section className={styles.machine} aria-labelledby="receipt-status" data-stage={stage}>
             {data.preview ? <p className={styles.previewBadge}>Admin-Preview · keine echte Zahlung</p> : null}
             <div className={styles.screen}>
               <p id="receipt-status" className={styles.status} aria-live="polite">
                 {statusLabel}
               </p>
             </div>
-            <div className={styles.output} aria-hidden={stage === "processing"}>
+            <div className={styles.output} aria-hidden={!paperVisible}>
               <motion.article
                 className={styles.paper}
-                initial={reduce ? false : { y: -120, opacity: 0 }}
-                animate={
-                  stage === "processing"
-                    ? { y: -120, opacity: 0 }
-                    : reduce
-                      ? { y: 0, opacity: 1 }
-                      : { y: 0, opacity: 1 }
-                }
-                transition={
-                  reduce
-                    ? { duration: 0 }
-                    : stage === "printing"
-                      ? { duration: 1.75, ease: [0.65, 0, 0.35, 1] }
-                      : { duration: 0.18 }
-                }
+                style={{ clipPath: receiptClipPath }}
+                initial={false}
+                animate={{
+                  opacity: paperVisible ? 1 : 0,
+                  transform:
+                    stage === "printing" && !reduce
+                      ? printingTransformKeyframes
+                      : paperVisible || reduce
+                        ? "translateY(0%)"
+                        : "translateY(calc(-100% + 2px))",
+                }}
+                transition={{
+                  opacity: { duration: reduce ? 0 : 0.16 },
+                  transform: {
+                    duration: reduce ? 0 : stage === "printing" ? 1.75 : 0.18,
+                    ease: stage === "printing" && !reduce ? "linear" : [0.65, 0, 0.35, 1],
+                    times: stage === "printing" && !reduce ? printingKeyframeTimes : undefined,
+                  },
+                }}
               >
                 <p className={styles.paperBrand}>BrewAI</p>
                 <p className={styles.paperMeta}>{data.dateLabel}</p>
