@@ -24,6 +24,13 @@ export async function GET(request: Request) {
 
   const cookieJar = createNoStoreRedirect(`${appOrigin}/anmelden`, requestId);
   const supabase = await createAuthRouteHandlerClient(cookieJar);
+  // Clear any prior session so Google account-switch cannot inherit the old identity.
+  const {
+    data: { user: existingUser },
+  } = await supabase.auth.getUser();
+  if (existingUser) {
+    await supabase.auth.signOut();
+  }
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo, skipBrowserRedirect: true },

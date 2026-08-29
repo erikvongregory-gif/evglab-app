@@ -62,6 +62,12 @@ export default async function DashboardEmail2FAPage({ searchParams }: Props) {
   const pendingToken = cookieStore.get(getPendingCookieName())?.value ?? null;
   const hasPendingCode = hasValidPending2FAForUser(pendingToken, user.id);
   const ownerHasBackupCode = isOwnerUser(user) && Boolean(process.env.OWNER_2FA_BACKUP_CODE);
+  const devMailForward =
+    process.env.NODE_ENV === "development" ? process.env.RESEND_DEV_FORWARD_TO?.trim() : undefined;
+  const showDevForward =
+    Boolean(devMailForward) &&
+    Boolean(user.email) &&
+    devMailForward!.toLowerCase() !== user.email!.trim().toLowerCase();
 
   return (
     <div className="evg-studio" style={{ minHeight: "100vh", background: "var(--bg-0, #131211)", padding: "32px 16px" }}>
@@ -71,8 +77,8 @@ export default async function DashboardEmail2FAPage({ searchParams }: Props) {
           <p style={{ marginTop: 8, fontSize: 14, color: "var(--tx-2)", lineHeight: 1.5 }}>
             {hasPendingCode ? (
               <>
-                Wir haben einen 6-stelligen Code an <strong style={{ color: "var(--tx-1)" }}>{user.email}</strong>{" "}
-                gesendet. Nach der Bestätigung merken wir uns dieses Gerät 30 Tage.
+                Wir haben einen 6-stelligen Code für <strong style={{ color: "var(--tx-1)" }}>{user.email}</strong>{" "}
+                ausgestellt. Nach der Bestätigung merken wir uns dieses Gerät 30 Tage.
               </>
             ) : (
               <>
@@ -81,6 +87,20 @@ export default async function DashboardEmail2FAPage({ searchParams }: Props) {
               </>
             )}
           </p>
+          {showDevForward ? (
+            <p
+              style={{
+                ...bannerStyle,
+                border: "1px solid rgba(201, 162, 77, 0.4)",
+                background: "rgba(201, 162, 77, 0.1)",
+                color: "#ddba6a",
+              }}
+            >
+              Dev-Mail-Sink aktiv (<code style={{ fontSize: 12 }}>RESEND_DEV_FORWARD_TO</code>): physische Zustellung
+              an <strong>{devMailForward}</strong>. Logische Identität bleibt{" "}
+              <strong>{user.email}</strong>.
+            </p>
+          ) : null}
 
           {notice === "resent" ? (
             <p

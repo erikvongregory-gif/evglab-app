@@ -230,24 +230,8 @@ export async function handleAuthCallbackGet(request: Request) {
   const supabase = await createAuthRouteHandlerClient(redirectResponse);
 
   try {
-    const {
-      data: { user: existingUser },
-    } = await supabase.auth.getUser();
-    if (existingUser) {
-      completeOAuthCode(code);
-      return redirectAfterOAuthSuccess(request, {
-        requestId,
-        appOrigin,
-        postAuthNext,
-        isPasswordRecovery,
-        redirectResponse,
-        startedAt,
-        user: existingUser,
-        logEvent: "oauth_session_exists",
-        oauthCode: code,
-      });
-    }
-
+    // Always exchange the OAuth code. Never short-circuit on an existing session —
+    // that kept a previous admin identity when a different Google account signed in.
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
@@ -280,18 +264,8 @@ export async function handleAuthCallbackGet(request: Request) {
 
     completeOAuthCode(code);
 
-    if (authErrorParam(error.code) === "oauth_state") {
-      logAuthEvent({
-        event: "oauth_callback_finish_recovery",
-        level: "info",
-        requestId,
-        status: 200,
-        durationMs: Date.now() - startedAt,
-        meta: { code: error.code },
-      });
-      return sessionPollerResponse(appOrigin, postAuthNext, requestId, redirectResponse);
-    }
-
+    // oauth_state without a bridge must not fall through to a session poller —
+    // leftover cookies from an unrelated account would look like OAuth success.
     logAuthEvent({
       event: "callback_exchange_error",
       level: "warn",

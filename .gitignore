@@ -49,3 +49,6 @@ next-env.d.ts
 # T-ONB2 local prototype extract (nicht committen)
 _t-onb2-prototype/
 
+# Local auth identity gate artifacts
+_auth-gate/
+

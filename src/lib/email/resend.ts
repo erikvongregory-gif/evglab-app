@@ -125,7 +125,9 @@ export async function sendResendEmail(input: SendResendEmailInput, options?: { f
         return;
       } catch (sandboxError) {
         const sandboxMessage = sandboxError instanceof Error ? sandboxError.message : "";
-        const forward = process.env.RESEND_DEV_FORWARD_TO?.trim();
+        // Same local-only guard as resolveDevEmailForward — never sink mail in production.
+        const forward =
+          process.env.NODE_ENV === "development" ? process.env.RESEND_DEV_FORWARD_TO?.trim() : undefined;
         if (
           forward &&
           isResendSandboxRecipientError(sandboxMessage) &&
@@ -142,7 +144,8 @@ export async function sendResendEmail(input: SendResendEmailInput, options?: { f
     }
 
     if (isResendSandboxRecipientError(message)) {
-      const forward = process.env.RESEND_DEV_FORWARD_TO?.trim();
+      const forward =
+        process.env.NODE_ENV === "development" ? process.env.RESEND_DEV_FORWARD_TO?.trim() : undefined;
       if (forward && input.to.toLowerCase() !== forward.toLowerCase()) {
         await postResendEmail({ apiKey: config.apiKey, from: RESEND_SANDBOX_FROM }, { ...input, to: forward });
         return;
