@@ -54,6 +54,14 @@ function aspectCssRatio(aspect: string): string {
   return `${w} / ${h}`;
 }
 
+function splitMeta(meta?: string): string[] {
+  if (!meta?.trim()) return [];
+  return meta
+    .split("·")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 export function MotivBriefPanel({
   brandName,
   brandStyleActive,
@@ -90,6 +98,10 @@ export function MotivBriefPanel({
 }: MotivBriefPanelProps) {
   const balanceAfter =
     tokensRemaining === null ? null : Math.max(0, tokensRemaining - tokenCost);
+  const productChips = [productLabel, ...splitMeta(productMeta)].filter(Boolean);
+  const sceneChips = splitMeta(sceneLabel).length ? splitMeta(sceneLabel) : sceneLabel ? [sceneLabel] : [];
+  const moodChips = moodLabel ? [moodLabel] : [];
+  const brandInitial = (brandName || "B").trim().charAt(0).toUpperCase() || "B";
 
   return (
     <div className={styles.wrap}>
@@ -97,9 +109,6 @@ export function MotivBriefPanel({
         <div className={styles.headerBrand}>
           <p className={styles.kicker}>Motiv-Composer</p>
           <h1 className={styles.title}>Brief &amp; Start</h1>
-          <p className={styles.brandMeta}>
-            {brandStyleActive ? `Markenstil aktiv · ${brandName || "Brauerei"}` : brandName || "Ohne Markenstil"}
-          </p>
         </div>
         <nav className={styles.steps} aria-label="Brief-Schritte">
           {STEP_LABELS.map((step) => {
@@ -118,164 +127,198 @@ export function MotivBriefPanel({
             );
           })}
         </nav>
+        <div className={styles.brandPill} title={brandName || "Brauerei"}>
+          <span className={styles.brandMark} aria-hidden>
+            {brandInitial}
+          </span>
+          <span className={styles.brandPillText}>
+            Markenstil{" "}
+            <strong>{brandStyleActive ? brandName || "Brauerei" : "inaktiv"}</strong>
+            {brandStyleActive ? " aktiv" : ""}
+          </span>
+        </div>
       </header>
 
       <div className={styles.grid}>
         <div className={styles.main}>
           <section className={styles.section} aria-labelledby="brief-summary-title">
-            <div className={styles.sectionHead}>
-              <h2 id="brief-summary-title" className={styles.sectionTitle}>
+            <div className={styles.sectionIntro}>
+              <h2 id="brief-summary-title" className={styles.sectionTitleLg}>
                 Das hast du gebrieft
               </h2>
-            </div>
-
-            <div className={styles.sectionHead}>
-              <h3 className={styles.sectionTitle}>Produkt</h3>
-              <button type="button" className={styles.change} onClick={() => onJump("produkt")} disabled={loading}>
-                Ändern
-              </button>
-            </div>
-            <p className={styles.value}>
-              <span className={styles.valueStrong}>{productLabel}</span>
-              {productMeta ? ` · ${productMeta}` : null}
-            </p>
-
-            <div className={styles.sectionHead} style={{ marginTop: 14 }}>
-              <h3 className={styles.sectionTitle}>Szene</h3>
-              <button type="button" className={styles.change} onClick={() => onJump("szene")} disabled={loading}>
-                Ändern
-              </button>
-            </div>
-            <p className={styles.value}>{sceneLabel}</p>
-
-            <div className={styles.sectionHead} style={{ marginTop: 14 }}>
-              <h3 className={styles.sectionTitle}>Stimmung</h3>
-              <button type="button" className={styles.change} onClick={() => onJump("stimmung")} disabled={loading}>
-                Ändern
-              </button>
-            </div>
-            <p className={styles.value}>{moodLabel}</p>
-
-            <div className={styles.sectionHead} style={{ marginTop: 14 }}>
-              <h3 className={styles.sectionTitle}>Extras</h3>
-              <button type="button" className={styles.change} onClick={() => onJump("extras")} disabled={loading}>
-                Ändern
-              </button>
-            </div>
-            {extras.length ? (
-              <div className={styles.chips}>
-                {extras.map((extra) => (
-                  <span key={extra} className={styles.chip}>
-                    {extra}
-                    <button
-                      type="button"
-                      className={styles.remove}
-                      aria-label={`${extra} entfernen`}
-                      disabled={loading}
-                      onClick={() => onRemoveExtra(extra)}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className={styles.value}>Keine Extras gewählt</p>
-            )}
-          </section>
-
-          <section className={styles.section} aria-labelledby="brief-readiness-title">
-            <div className={styles.sectionHead}>
-              <h2 id="brief-readiness-title" className={styles.sectionTitle}>
-                Brief-Vollständigkeit
-              </h2>
-            </div>
-            <div className={styles.readiness}>
-              <div className={styles.readinessMeta}>
-                <span>{completenessLabel}</span>
-                <span>{completenessScore}/100</span>
-              </div>
-              <div className={styles.bar} aria-hidden>
-                <div className={styles.barFill} style={{ width: `${Math.min(100, completenessScore)}%` }} />
-              </div>
-              <p className={styles.hint}>
-                Transparente Checkliste aus deinen Angaben — keine KI-Qualitätsbewertung.
+              <p className={styles.sectionLead}>
+                Vier Bausteine, aus denen der Prompt gebaut wird. Klick eine Zeile an, um sie zu ändern —
+                du landest wieder hier.
               </p>
             </div>
 
-            {openItems.length ? (
-              <>
-                <h3 className={styles.sectionTitle} style={{ marginTop: 14 }}>
-                  Offene Punkte
-                </h3>
-                <ul className={styles.todoList}>
-                  {openItems.map((item) => (
-                    <li key={item.label} className={styles.todo}>
-                      <span>{item.label}</span>
-                      <button type="button" className={styles.change} onClick={() => onJump(item.target)} disabled={loading}>
-                        Öffnen
-                      </button>
-                    </li>
+            <div className={styles.rows}>
+              <div className={styles.row}>
+                <div className={styles.rowLabel}>Produkt</div>
+                <div className={styles.chips}>
+                  {productChips.map((chip, i) => (
+                    <span key={chip} className={`${styles.chip} ${i === 0 ? styles.chipStrong : ""}`}>
+                      {chip}
+                    </span>
                   ))}
-                </ul>
-              </>
+                </div>
+                <button type="button" className={styles.change} onClick={() => onJump("produkt")} disabled={loading}>
+                  Ändern
+                </button>
+              </div>
+
+              <div className={styles.row}>
+                <div className={styles.rowLabel}>Szene</div>
+                <div className={styles.chips}>
+                  {sceneChips.map((chip, i) => (
+                    <span key={chip} className={`${styles.chip} ${i === 0 ? styles.chipStrong : ""}`}>
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+                <button type="button" className={styles.change} onClick={() => onJump("szene")} disabled={loading}>
+                  Ändern
+                </button>
+              </div>
+
+              <div className={styles.row}>
+                <div className={styles.rowLabel}>Stimmung</div>
+                <div className={styles.chips}>
+                  {moodChips.map((chip) => (
+                    <span key={chip} className={`${styles.chip} ${styles.chipAccent}`}>
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+                <button type="button" className={styles.change} onClick={() => onJump("stimmung")} disabled={loading}>
+                  Ändern
+                </button>
+              </div>
+
+              <div className={`${styles.row} ${styles.rowLast}`}>
+                <div className={styles.rowLabel}>Extras</div>
+                <div className={styles.chips}>
+                  {extras.length ? (
+                    extras.map((extra) => (
+                      <span key={extra} className={styles.chip}>
+                        {extra}
+                        <button
+                          type="button"
+                          className={styles.remove}
+                          aria-label={`${extra} entfernen`}
+                          disabled={loading}
+                          onClick={() => onRemoveExtra(extra)}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    <span className={styles.chipMuted}>Keine Extras gewählt</span>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.addExtra}
+                    onClick={() => onJump("extras")}
+                    disabled={loading}
+                  >
+                    + Extra
+                  </button>
+                </div>
+                <div className={styles.extraCount}>{extras.length}</div>
+              </div>
+            </div>
+          </section>
+
+          <section className={styles.section} aria-labelledby="brief-readiness-title">
+            <div className={styles.readinessHead}>
+              <h2 id="brief-readiness-title" className={styles.sectionTitleLg}>
+                {completenessLabel || "Brief-Vollständigkeit"}
+              </h2>
+              <span className={styles.scoreNum}>Brief-Vollständigkeit {completenessScore}/100</span>
+            </div>
+            <p className={styles.sectionLead}>
+              Transparente Checkliste aus deinen Angaben — keine KI-Qualitätsbewertung.
+            </p>
+            <div className={styles.bar} aria-hidden>
+              <div className={styles.barFill} style={{ width: `${Math.min(100, completenessScore)}%` }} />
+            </div>
+            <div className={styles.barScale} aria-hidden>
+              <span>Roh</span>
+              <span>Solide</span>
+              <span>Markenreif</span>
+            </div>
+
+            {openItems.length ? (
+              <div className={styles.todoStack}>
+                {openItems.map((item) => (
+                  <div key={item.label} className={styles.todoWarn}>
+                    <span className={styles.todoWarnIcon} aria-hidden>
+                      !
+                    </span>
+                    <div className={styles.todoWarnBody}>
+                      <div className={styles.todoWarnTitle}>{item.label}</div>
+                    </div>
+                    <button type="button" className={styles.todoCta} onClick={() => onJump(item.target)} disabled={loading}>
+                      Öffnen
+                    </button>
+                  </div>
+                ))}
+              </div>
             ) : null}
 
             {doneItems.length ? (
-              <>
-                <h3 className={styles.sectionTitle} style={{ marginTop: 14 }}>
-                  Erledigt
-                </h3>
-                <ul className={styles.todoList}>
-                  {doneItems.slice(0, 4).map((item) => (
-                    <li key={item.label} className={`${styles.todo} ${styles.todoDone}`}>
-                      <span>{item.label}</span>
-                    </li>
+              <div className={styles.doneBlock}>
+                <p className={styles.doneSummary}>{doneItems.length} Punkte erledigt</p>
+                <ul className={styles.doneList}>
+                  {doneItems.slice(0, 6).map((item) => (
+                    <li key={item.label}>{item.label}</li>
                   ))}
                 </ul>
-              </>
+              </div>
             ) : null}
           </section>
 
           <section className={styles.section} aria-labelledby="brief-note-title">
-            <div className={styles.sectionHead}>
-              <h2 id="brief-note-title" className={styles.sectionTitle}>
+            <div className={styles.noteHead}>
+              <h2 id="brief-note-title" className={styles.sectionTitleLg}>
                 Feinschliff in eigenen Worten
               </h2>
+              <span className={styles.noteMeta}>
+                Optional · {note.length}/{noteMaxLength}
+              </span>
             </div>
-            <label className={styles.hint} htmlFor="motiv-brief-note">
-              Optionaler Zusatzwunsch (wie bisher im Create-Flow)
-            </label>
+            <p className={styles.sectionLead}>
+              Ein Satz, der die Stimmung genauer trifft. Deutsch oder Englisch — beides funktioniert.
+            </p>
             <textarea
               id="motiv-brief-note"
               className={styles.textarea}
               value={note}
               maxLength={noteMaxLength}
               disabled={loading}
-              placeholder='z. B. „mit Blick auf unseren Kirchturm“ oder „Etikett zur Kamera gedreht“'
+              placeholder="z. B. Kastanien über dem Tisch, Lichterketten weich außerhalb des Fokus"
               onChange={(e) => onNoteChange(e.target.value)}
             />
-            <p className={styles.hint}>
-              {note.length}/{noteMaxLength}
-            </p>
           </section>
         </div>
 
         <aside className={styles.rail} aria-label="Ausgabe und Generieren">
-          <p className={styles.kicker}>So kommt es raus</p>
-          <h2 className={styles.railTitle}>Format &amp; Varianten</h2>
-          <div
-            className={styles.preview}
-            style={{ ["--preview-ratio" as string]: aspectCssRatio(aspectValue) }}
-            aria-hidden
-          >
-            Vorschau · {aspectValue}
-            <br />
-            keine Fake-KI-Motive
+          <div className={styles.railBlock}>
+            <p className={styles.kicker}>So kommt es raus</p>
+            <div
+              className={styles.preview}
+              style={{ ["--preview-ratio" as string]: aspectCssRatio(aspectValue) }}
+              aria-hidden
+            >
+              <span className={styles.previewTag}>{aspectValue}</span>
+            </div>
+            <p className={styles.previewCaption}>
+              {brandName || "Dein Motiv"} · {variantCount} Variante(n)
+            </p>
           </div>
-          <p className={styles.previewCaption}>{brandName || "Dein Motiv"} · {variantCount} Variante(n)</p>
 
-          <div>
+          <div className={styles.railBlock}>
             <p className={styles.kicker}>Format</p>
             <div className={styles.formats} role="radiogroup" aria-label="Bildformat">
               {aspectOptions.map((opt) => {
@@ -297,8 +340,11 @@ export function MotivBriefPanel({
             </div>
           </div>
 
-          <div>
-            <p className={styles.kicker}>Varianten</p>
+          <div className={styles.railBlock}>
+            <div className={styles.variantHead}>
+              <p className={styles.kicker}>Varianten</p>
+              <span className={styles.hintInline}>1–3 verfügbar</span>
+            </div>
             <div className={styles.variants} role="radiogroup" aria-label="Anzahl Varianten">
               {variantOptions.map((opt) => {
                 const active = opt.value === variantCount;
