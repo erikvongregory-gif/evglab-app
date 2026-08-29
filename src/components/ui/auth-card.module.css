@@ -6,16 +6,19 @@
   --strength-good: #b8a24d;
   --strength-strong: var(--ok, #6fa96f);
 
+  position: relative;
   min-height: 100dvh;
   min-height: 100svh;
   display: grid;
   place-items: center;
   padding:
-    max(24px, env(safe-area-inset-top, 0px))
-    max(16px, env(safe-area-inset-right, 0px))
-    max(24px, env(safe-area-inset-bottom, 0px))
-    max(16px, env(safe-area-inset-left, 0px));
-  background: var(--bg, #0f0906);
+    max(48px, env(safe-area-inset-top, 0px))
+    max(32px, env(safe-area-inset-right, 0px))
+    max(48px, env(safe-area-inset-bottom, 0px))
+    max(32px, env(safe-area-inset-left, 0px));
+  background:
+    radial-gradient(90% 70% at 50% 6%, rgba(201, 162, 77, 0.11), transparent 62%),
+    var(--bg, #0f0906);
   color: var(--t1, #f3ede4);
   font-family: var(--f-sans, var(--font-work-sans), "Work Sans", system-ui, sans-serif);
   font-size: 13.5px;
@@ -23,6 +26,43 @@
   -webkit-font-smoothing: antialiased;
   overflow-x: clip;
   animation: authMount 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.pageGrid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(243, 237, 228, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(243, 237, 228, 0.022) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  width: min(1040px, 100%);
+}
+
+.brandAbove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 26px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.brandStudio {
+  font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--t3, #7e7263);
+  border-left: 1px solid var(--line2, #3d3021);
+  padding-left: 10px;
+  margin-left: 2px;
 }
 
 @keyframes authMount {
@@ -38,36 +78,40 @@
 
 .card {
   position: relative;
-  width: min(1040px, 100%);
+  width: 100%;
   height: 556px;
   overflow: hidden;
   border-radius: 20px;
   background: var(--s1, #16100b);
   border: 1px solid var(--line, #2e2418);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55);
 }
 
 .formPane {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 2;
+  /* Above .curve so titles/inputs aren't covered by the curved panel edge */
+  z-index: 4;
   width: 50%;
   height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 36px clamp(28px, 4vw, 48px);
+  padding: 0 clamp(30px, 4.6vw, 62px);
   transition: transform 0.62s cubic-bezier(0.65, 0, 0.35, 1);
-  background: var(--s1, #16100b);
+  /* Transparent so the curve silhouette still shows in the overlap zone */
+  background: transparent;
 }
 
 .formPaneLogin {
   transform: translateX(100%);
+  padding-left: clamp(40px, 5vw, 72px);
 }
 
 .formPaneSignup {
   transform: translateX(0);
+  padding-right: clamp(40px, 5vw, 72px);
 }
 
 .curve {
@@ -85,6 +129,12 @@
   border-radius: 0 44% 44% 0 / 0 50% 50% 0;
   transition: transform 0.62s cubic-bezier(0.65, 0, 0.35, 1);
   overflow: hidden;
+  /* Form sits above; keep panel CTA clickable in the clear area */
+  pointer-events: none;
+}
+
+.curve .panelCta {
+  pointer-events: auto;
 }
 
 .curveLogin {
@@ -155,25 +205,84 @@
 
 .panelCta {
   appearance: none;
-  border: 1px solid var(--ac-line, rgba(201, 162, 77, 0.28));
-  background: var(--ac-tint, rgba(201, 162, 77, 0.1));
-  color: var(--ac-2, #ddba6a);
-  border-radius: 11px;
+  align-self: flex-start;
+  margin-top: 26px;
+  border: 1px solid var(--ac, #c9a24d);
+  background: none;
+  color: var(--ac, #c9a24d);
+  border-radius: 100px;
   min-height: 44px;
-  padding: 0 18px;
+  padding: 0 22px;
   font: inherit;
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   cursor: pointer;
   transition:
     background 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
     color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .panelCta:hover {
+  background: var(--ac, #c9a24d);
+  color: var(--ac-ink, #1a1207);
+}
+
+.facts {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fact {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--t2, #b3a694);
+}
+
+.factIcon {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
   background: var(--ac-tint2, rgba(201, 162, 77, 0.2));
-  border-color: var(--ac, #c9a24d);
-  color: var(--t1, #f3ede4);
+  border: 1px solid var(--ac-line, rgba(201, 162, 77, 0.28));
+  flex: none;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ac, #c9a24d);
+}
+
+.oauthIcon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 12px;
+  padding: 0;
+}
+
+.oauthHint {
+  font-size: 11.5px;
+  color: var(--t3, #7e7263);
+  margin-left: 4px;
+}
+
+.pageFoot {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--t3, #7e7263);
 }
 
 .panelCta:focus-visible {
@@ -500,9 +609,27 @@
     animation: none;
   }
 
+  .shell {
+    width: 100%;
+  }
+
+  .brandAbove {
+    margin: 0;
+    padding: 18px 24px 0;
+    justify-content: flex-start;
+  }
+
+  .pageFoot {
+    display: none;
+  }
+
+  .facts {
+    display: none;
+  }
+
   .card {
     height: auto;
-    min-height: 100dvh;
+    min-height: calc(100dvh - 56px);
     border-radius: 0;
     border: 0;
     box-shadow: none;
@@ -519,6 +646,7 @@
     transform: none;
     padding: 24px;
     order: 1;
+    background: var(--s1, #16100b);
   }
 
   .curve,
@@ -532,6 +660,7 @@
     border-top: 1px solid var(--line, #2e2418);
     order: 2;
     padding: 28px 24px 36px;
+    pointer-events: auto;
   }
 
   .curveInner,

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Beer, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Beer, Check, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import React, { useId, useState } from "react";
 import { EvglabMark } from "@/components/studio/evglab-mark";
 import { studioFontClassName } from "@/lib/fonts/studio-fonts";
@@ -175,18 +175,33 @@ export function AuthCard({
     ? { action: formAction, method: "post" as const, onSubmit: handleSubmit }
     : { onSubmit: handleSubmit };
 
+  const panelFacts = isSignup
+    ? [
+        "Markenprofil, Sortiment und Mediathek an einem Ort",
+        "Team-Zugriff auf dieselbe Bibliothek",
+        "Weiterarbeiten dort, wo du aufgehört hast",
+      ]
+    : [
+        "300 Tokens Startguthaben nach Onboarding",
+        "Keine Kreditkarte für den Einstieg",
+        "Alle Rechte bleiben bei deiner Brauerei",
+      ];
+
   return (
     <div className={`${styles.page} ${studioFontClassName} evg-studio`}>
-      <div className={styles.card}>
+      <div className={styles.pageGrid} aria-hidden />
+      <div className={styles.shell}>
+        <a href={MARKETING_SITE_URL} className={styles.brandAbove} aria-label="BrewAI Startseite">
+          <EvglabMark />
+          <span className={styles.brandName}>BrewAI</span>
+          <span className={styles.brandStudio}>STUDIO</span>
+        </a>
+
+        <div className={styles.card}>
         <section
           className={`${styles.formPane} ${isSignup ? styles.formPaneSignup : styles.formPaneLogin}`}
           aria-label={isSignup ? "Konto anlegen" : "Anmelden"}
         >
-          <a href={MARKETING_SITE_URL} className={styles.brandRow} aria-label="BrewAI Startseite">
-            <EvglabMark />
-            <span className={styles.brandName}>BrewAI</span>
-          </a>
-
           <p className={styles.kicker}>{isSignup ? "Konto anlegen" : "Anmelden"}</p>
           <h1 className={styles.formTitle}>{isSignup ? "Brauerei anlegen" : "Willkommen zurück"}</h1>
           <p className={styles.formLead}>
@@ -367,22 +382,29 @@ export function AuthCard({
               <div className={styles.oauthRow}>
                 {oauthProviders.includes("google") ? (
                   googleHref ? (
-                    <a href={googleHref} className={styles.oauthBtn} rel="noopener">
+                    <a
+                      href={googleHref}
+                      className={`${styles.oauthBtn} ${styles.oauthIcon}`}
+                      rel="noopener"
+                      aria-label="Mit Google"
+                      title="Mit Google"
+                    >
                       <GoogleG />
-                      Google
                     </a>
                   ) : (
                     <button
                       type="button"
-                      className={styles.oauthBtn}
+                      className={`${styles.oauthBtn} ${styles.oauthIcon}`}
                       disabled={loading}
                       onClick={() => onOAuth("google")}
+                      aria-label="Mit Google"
+                      title="Mit Google"
                     >
                       <GoogleG />
-                      Google
                     </button>
                   )
                 ) : null}
+                <span className={styles.oauthHint}>Login über Anbieter</span>
               </div>
             </>
           ) : null}
@@ -428,6 +450,16 @@ export function AuthCard({
                 ? "Melde dich an — Markenstil, Sorten und Anlässe sind hinterlegt und werden automatisch mitgegeben."
                 : "Markenprofil anlegen, Sortiment hinterlegen, in unter zwei Minuten das erste Motiv."}
             </p>
+            <div className={styles.facts}>
+              {panelFacts.map((fact) => (
+                <div key={fact} className={styles.fact}>
+                  <span className={styles.factIcon} aria-hidden>
+                    <Check size={9} strokeWidth={2.5} />
+                  </span>
+                  <span>{fact}</span>
+                </div>
+              ))}
+            </div>
             {showModeSwitch ? (
               <button
                 type="button"
@@ -439,6 +471,12 @@ export function AuthCard({
             ) : null}
           </div>
         </aside>
+        </div>
+
+        <div className={styles.pageFoot}>
+          <span>app.brewai.de · Studio</span>
+          <span>Rechte bei deiner Brauerei</span>
+        </div>
       </div>
     </div>
   );
