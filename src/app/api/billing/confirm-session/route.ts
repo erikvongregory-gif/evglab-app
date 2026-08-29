@@ -77,6 +77,15 @@ export async function POST(req: Request) {
         return NextResponse.json({
           ok: true,
           alreadyGranted: !claimed,
+          receipt: {
+            kind: "token_pack" as const,
+            productLabel: `Token-Paket · ${tokens.toLocaleString("de-DE")} Tokens`,
+            tokensGranted: claimed ? tokens : null,
+            remainingTokens: row ? Math.max(row.monthly_tokens - row.used_tokens, 0) : null,
+            amountLabel: formatStripeAmount(session.amount_total, session.currency),
+            sessionRef: session.id.slice(-8),
+            dateLabel: new Date().toLocaleString("de-DE"),
+          },
           state: row
             ? {
                 plan: row.plan,
@@ -132,6 +141,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
+      receipt: {
+        kind: "subscription" as const,
+        productLabel: `BrewAI ${plan.charAt(0).toUpperCase()}${plan.slice(1)}`,
+        plan,
+        remainingTokens: row ? Math.max(row.monthly_tokens - row.used_tokens, 0) : null,
+        amountLabel: formatStripeAmount(session.amount_total, session.currency),
+        sessionRef: session.id.slice(-8),
+        dateLabel: new Date().toLocaleString("de-DE"),
+      },
       state: row
         ? {
             plan: row.plan,
@@ -145,6 +163,19 @@ export async function POST(req: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Session-Bestätigung fehlgeschlagen.";
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+function formatStripeAmount(amountTotal: number | null, currency: string | null): string | null {
+  if (typeof amountTotal !== "number" || !Number.isFinite(amountTotal)) return null;
+  const cur = (currency ?? "eur").toUpperCase();
+  try {
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: cur,
+    }).format(amountTotal / 100);
+  } catch {
+    return `${(amountTotal / 100).toFixed(2)} ${cur}`;
   }
 }
 

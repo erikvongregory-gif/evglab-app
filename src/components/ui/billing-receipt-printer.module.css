@@ -1,0 +1,128 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 9, 6, 0.72);
+}
+
+.machine {
+  position: relative;
+  width: min(420px, 100%);
+  border-radius: 20px;
+  border: 1px solid var(--line, #2e2418);
+  background:
+    linear-gradient(180deg, var(--s3, #271e16), var(--s1, #16100b));
+  padding: 22px 20px 18px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+  color: var(--t1, #f3ede4);
+  font-family: var(--f-sans, var(--font-work-sans), "Work Sans", system-ui, sans-serif);
+}
+
+.previewBadge {
+  margin: 0 0 12px;
+  font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ac, #c9a24d);
+}
+
+.screen {
+  border-radius: 12px;
+  border: 1px solid var(--line2, #3d3021);
+  background: var(--s2, #1e1710);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.status {
+  margin: 0;
+  font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ac-2, #ddba6a);
+}
+
+.output {
+  min-height: 220px;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #1a1410;
+  border: 1px solid var(--line, #2e2418);
+  padding: 16px;
+}
+
+.paper {
+  width: min(280px, 100%);
+  background: #f4eee4;
+  color: #1a1207;
+  border-radius: 4px;
+  padding: 18px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.paperBrand {
+  margin: 0;
+  font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.paperMeta,
+.paperLine,
+.paperRef,
+.paperFoot {
+  margin: 6px 0 0;
+  font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.paperTitle {
+  margin: 12px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.paperFoot {
+  margin-top: 14px;
+  color: #6fa96f;
+}
+
+.close {
+  appearance: none;
+  margin-top: 14px;
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(180deg, var(--ac-2, #ddba6a), var(--ac, #c9a24d));
+  color: var(--ac-ink, #1a1207);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--ac, #c9a24d);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper {
+    transform: none !important;
+  }
+}

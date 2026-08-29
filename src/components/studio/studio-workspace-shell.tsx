@@ -23,6 +23,10 @@ import {
 import { runBillingBootstrap } from "@/lib/billing/clientBootstrap";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
 import { HopfenHugoAssistant } from "@/components/studio/hopfen-hugo-assistant";
+import {
+  BillingReceiptPrinter,
+  type BillingReceiptData,
+} from "@/components/ui/billing-receipt-printer";
 
 type StudioShellContextValue = {
   setBrandProfileActive: (active: boolean) => void;
@@ -107,6 +111,7 @@ export function StudioWorkspaceShell({
   const [tokensRemaining, setTokensRemaining] = useState<number | undefined>();
   const [tokensMonthly, setTokensMonthly] = useState<number | undefined>();
   const [hasActivePlan, setHasActivePlan] = useState(initialHasActivePlan);
+  const [receipt, setReceipt] = useState<BillingReceiptData | null>(null);
 
   const isCreateRoute = pathname.startsWith("/inhalte-erstellen");
   const isVideoCreateRoute = pathname.startsWith("/videos-erstellen");
@@ -154,18 +159,25 @@ export function StudioWorkspaceShell({
     };
 
     void (async () => {
-      await runBillingBootstrap();
+      const boot = await runBillingBootstrap();
+      if (!ignore && boot.receipt) setReceipt(boot.receipt);
       await refreshBillingUi();
     })();
 
     const onBillingUpdated = () => {
       void refreshBillingUi();
     };
+    const onBillingReceipt = (event: Event) => {
+      const detail = (event as CustomEvent<BillingReceiptData>).detail;
+      if (detail) setReceipt(detail);
+    };
     window.addEventListener("evglab-billing-updated", onBillingUpdated);
+    window.addEventListener("evglab-billing-receipt", onBillingReceipt);
 
     return () => {
       ignore = true;
       window.removeEventListener("evglab-billing-updated", onBillingUpdated);
+      window.removeEventListener("evglab-billing-receipt", onBillingReceipt);
     };
   }, [pathname]);
 
@@ -218,6 +230,9 @@ export function StudioWorkspaceShell({
       <Suspense fallback={null}>
         <HopfenHugoAssistant />
       </Suspense>
+      {receipt ? (
+        <BillingReceiptPrinter open data={receipt} onClose={() => setReceipt(null)} />
+      ) : null}
     </StudioShellContext.Provider>
   );
 }
