@@ -16,6 +16,7 @@ import { FLASCHEN_TYPEN, isDoseTyp } from "@/app/(dashboard)/inhalte-erstellen/l
 import { BEER_STYLE_OPTIONS, findBeerStyle, beerStyleLabel, type BeerStyleOption } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
 import type { OccasionTemplate } from "@/app/(dashboard)/inhalte-erstellen/lib/occasion-templates";
 import { calculateGenerationTokenCost } from "@/lib/billing/generationTokenCost";
+import { MotivBriefPanel, type BriefStepId } from "@/components/ui/motiv-brief-panel";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { hasUsableBeerEtikett, type DashboardBeer } from "@/lib/dashboard/metadata";
 import { readAndCompressImage } from "@/lib/images/compress-image";
@@ -1798,6 +1799,73 @@ export function InhalteErstellenRedesign({
           onSelectBeer={applyBeer}
           onPickTemplate={applyTemplate}
           onPickCustom={startCustomWizard}
+        />
+      ) : isReviewStep ? (
+        <MotivBriefPanel
+          brandName={breweryName || brandLabel}
+          brandStyleActive={profileActive}
+          productLabel={selectedBeer?.name?.trim() || was.label}
+          productMeta={`${behaelterLabel}${selectedBeer?.name ? ` · ${was.label}` : ""}`}
+          sceneLabel={`${wo.label} · ${wie.label}`}
+          moodLabel={`${stimmungLabel}${shotType ? ` · ${SHOT_TYPE_OPTIONS.find((s) => s.code === shotType)?.label ?? ""}` : ""}`}
+          extras={extras}
+          onRemoveExtra={toggleExtra}
+          completenessScore={coachScore}
+          completenessLabel={coachLabel}
+          openItems={coachChecks
+            .filter((c) => !c.done)
+            .map((c) => ({
+              label: c.label,
+              target: c.label.includes("Etikett")
+                ? "referenz"
+                : c.label.includes("Person") || c.label.includes("Gruppe")
+                  ? "personen"
+                  : c.label.includes("Stimmung")
+                    ? "stimmung"
+                    : c.label.includes("Shot")
+                      ? "shot"
+                      : c.label.includes("Extras")
+                        ? "extras"
+                        : "bierstil",
+            }))}
+          doneItems={coachChecks.filter((c) => c.done).map((c) => ({ label: c.label }))}
+          note={occasionNote}
+          noteMaxLength={280}
+          onNoteChange={setOccasionNote}
+          aspectOptions={ASPECT_CHIP_OPTIONS}
+          aspectValue={wofuer.aspectRatio}
+          onAspectChange={handleAspectChange}
+          variantOptions={VARIANT_COUNT_OPTIONS.map((o) => ({
+            value: Number(o.code),
+            label: o.label,
+          }))}
+          variantCount={variantCount}
+          onVariantChange={(value) => setVariantCount(value as VariantCount)}
+          tokenCost={generationTokenCost}
+          tokensRemaining={tokensRemaining}
+          formatToken={formatDeNumber}
+          onJump={(target) => {
+            const briefMap: Record<BriefStepId, string> = {
+              produkt: "bierstil",
+              szene: "schauplatz",
+              stimmung: "stimmung",
+              extras: "extras",
+              brief: "review",
+            };
+            const microId = (briefMap as Record<string, string>)[target] ?? target;
+            const idx = microStepIds.indexOf(microId);
+            if (idx >= 0) jumpToStep(idx);
+          }}
+          onGenerate={() => void generate()}
+          onBack={() => {
+            if (hasGenerated || fromTemplate || microStepIndex === 0) backToStart();
+            else goMicroPrev();
+          }}
+          loading={loading}
+          generateDisabled={!canProceedMicro || loading}
+          generationStep={generationStep || undefined}
+          error={error}
+          durationHint="Dauer variiert je nach Auslastung (ca. 1–3 Min.)."
         />
       ) : (
       <MarketingPromptCreateShell
