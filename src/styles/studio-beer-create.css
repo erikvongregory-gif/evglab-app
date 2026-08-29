@@ -1,0 +1,677 @@
+﻿/* Premium „Neue Sorte anlegen“ — namespace: .studio-beer-create-* */
+
+.studio-beer-create {
+  --beer-create-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 920px;
+  margin-inline: auto;
+  background: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.studio-beer-create *,
+.studio-beer-create *::before,
+.studio-beer-create *::after {
+  box-sizing: border-box;
+}
+
+.studio-beer-create-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.studio-beer-create-header-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.studio-beer-create-title {
+  margin: 0;
+  font-family: var(--f-sans, "Work Sans", system-ui, sans-serif);
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--t1);
+}
+
+.studio-beer-create-lead {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--t2);
+  max-width: 46ch;
+}
+
+.studio-beer-create-manual-btn {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  color: var(--t3);
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 140ms var(--beer-create-ease),
+    border-color 140ms var(--beer-create-ease),
+    background 140ms var(--beer-create-ease);
+}
+
+.studio-beer-create-manual-btn:hover:not(:disabled) {
+  color: var(--t1);
+  border-color: var(--line2);
+  background: var(--s2);
+}
+
+.studio-beer-create-manual-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.studio-beer-create-body {
+  display: grid;
+  grid-template-columns: minmax(0, 0.4fr) minmax(0, 0.6fr);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.studio-beer-create--manual .studio-beer-create-body {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.studio-beer-create--manual .studio-beer-create-form {
+  width: 100%;
+  max-width: 720px;
+  border-left: none;
+}
+
+.studio-beer-create-media {
+  padding: 18px;
+  min-width: 0;
+  display: flex;
+}
+
+.studio-beer-create-drop {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  max-height: 380px;
+  min-height: 240px;
+  border-radius: 14px;
+  border: 1px dashed rgba(201, 162, 77, 0.35);
+  background:
+    linear-gradient(165deg, rgba(201, 162, 77, 0.06), transparent 55%),
+    rgba(48, 34, 20, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition:
+    border-color 160ms var(--beer-create-ease),
+    background 160ms var(--beer-create-ease),
+    transform 160ms var(--beer-create-ease);
+}
+
+.studio-beer-create-drop.is-drag {
+  border-color: var(--ac);
+  background:
+    linear-gradient(165deg, rgba(201, 162, 77, 0.14), transparent 50%),
+    rgba(56, 38, 20, 0.7);
+  transform: scale(1.004);
+}
+
+.studio-beer-create-drop.is-drag .studio-beer-create-bottle {
+  transform: translateY(-3px) scale(1.025);
+}
+
+.studio-beer-create-drop-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 24px 16px;
+  max-width: 220px;
+}
+
+.studio-beer-create-bottle {
+  width: 34px;
+  height: 68px;
+  color: var(--ac);
+  opacity: 0.72;
+  margin-bottom: 4px;
+  transition: transform 160ms var(--beer-create-ease);
+}
+
+.studio-beer-create-drop-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--t1);
+}
+
+.studio-beer-create-drop-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--t3);
+}
+
+.studio-beer-create-file-btn {
+  margin-top: 8px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 162, 77, 0.45);
+  background: rgba(201, 162, 77, 0.14);
+  color: var(--ac);
+  font-size: 12.5px;
+  font-weight: 560;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition:
+    background 140ms var(--beer-create-ease),
+    border-color 140ms var(--beer-create-ease),
+    transform 80ms ease;
+}
+
+.studio-beer-create-file-btn:hover {
+  background: rgba(201, 162, 77, 0.22);
+  border-color: var(--ac);
+}
+
+.studio-beer-create-file-btn:active {
+  transform: scale(0.985);
+}
+
+.studio-beer-create-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.studio-beer-create-drop-preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(18, 12, 8, 0.35);
+}
+
+.studio-beer-create-drop-preview img {
+  max-width: 100%;
+  max-height: calc(100% - 44px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.studio-beer-create-drop-change {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 7px;
+  border: 1px solid var(--line2);
+  background: var(--s2);
+  color: var(--t2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.studio-beer-create-drop-change:hover:not(:disabled) {
+  color: var(--t1);
+}
+
+.studio-beer-create-form {
+  padding: 18px 20px 16px;
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.studio-beer-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.studio-beer-create-label {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.studio-beer-create-input {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line2);
+  background: var(--bg, var(--s1));
+  color: var(--t1);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition:
+    border-color 120ms var(--beer-create-ease),
+    box-shadow 120ms var(--beer-create-ease);
+}
+
+.studio-beer-create-input:focus-visible {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--ac-tint, rgba(201, 162, 77, 0.1));
+}
+
+.studio-beer-create-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.studio-beer-create-chip {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--s2);
+  color: var(--t2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition:
+    background 150ms var(--beer-create-ease),
+    border-color 150ms var(--beer-create-ease),
+    color 150ms var(--beer-create-ease),
+    transform 140ms var(--beer-create-ease);
+}
+
+.studio-beer-create-chip:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--line2);
+  color: var(--t1);
+}
+
+.studio-beer-create-chip.is-on {
+  border-color: var(--ac);
+  background: var(--ac-tint, rgba(201, 162, 77, 0.12));
+  color: var(--t1);
+  animation: studio-beer-create-chip-in 150ms var(--beer-create-ease);
+}
+
+.studio-beer-create-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
+.studio-beer-create-chip--swatch {
+  padding-left: 8px;
+}
+
+.studio-beer-create-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex: none;
+}
+
+.studio-beer-create-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--t3);
+}
+
+.studio-beer-create-attrs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.studio-beer-create-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(196, 92, 74, 0.35);
+  background: rgba(196, 92, 74, 0.1);
+  font-size: 12px;
+  color: var(--err, #c45c4a);
+}
+
+.studio-beer-create-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.studio-beer-create-save {
+  height: 36px;
+  min-width: 160px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--ac);
+  color: var(--ac-ink, #1a1207);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    background 140ms var(--beer-create-ease),
+    transform 80ms ease;
+}
+
+.studio-beer-create-save:hover:not(:disabled) {
+  background: var(--ac-2, #ddba6a);
+  transform: translateY(-1px);
+}
+
+.studio-beer-create-save:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.studio-beer-create-save:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.studio-beer-create-save.is-success {
+  background: rgba(90, 140, 100, 0.85);
+  color: #e8f2ea;
+}
+
+.studio-beer-create-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(26, 18, 7, 0.25);
+  border-top-color: var(--ac-ink, #1a1207);
+  animation: studio-beer-create-spin 0.7s linear infinite;
+}
+
+.studio-beer-create-cancel {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line2);
+  background: transparent;
+  color: var(--t2);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 140ms var(--beer-create-ease);
+}
+
+.studio-beer-create-cancel:hover:not(:disabled) {
+  color: var(--t1);
+}
+
+.studio-beer-create-actions-hint {
+  font-size: 11px;
+  color: var(--t3);
+  margin-left: 2px;
+}
+
+.studio-beer-create-preview {
+  border-top: 1px solid var(--line);
+  padding: 12px 18px 14px;
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) 1fr;
+  gap: 12px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.studio-beer-create-preview-label {
+  font-family: var(--f-mono, "IBM Plex Mono", monospace);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--t3);
+  line-height: 1.4;
+}
+
+.studio-beer-create-preview-surface {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--s2);
+}
+
+.studio-beer-create-preview-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.14), transparent 55%);
+  transition: background 180ms var(--beer-create-ease);
+}
+
+.studio-beer-create-preview-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--t2);
+  min-width: 0;
+}
+
+.studio-beer-create-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.studio-beer-create-host {
+  width: 100%;
+  max-width: 920px;
+  margin-top: 4px;
+}
+
+.studio-beer-create-add {
+  align-self: flex-start;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 162, 77, 0.4);
+  background: rgba(201, 162, 77, 0.1);
+  color: var(--ac);
+  font-size: 12.5px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 140ms var(--beer-create-ease),
+    transform 80ms ease;
+}
+
+.studio-beer-create-add:hover:not(:disabled) {
+  background: rgba(201, 162, 77, 0.18);
+}
+
+.studio-beer-create-add:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.studio-beer-create-add:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.evg-onb-beer-row.is-fresh,
+.studio-beer-card.is-fresh {
+  animation: studio-beer-create-fresh 700ms var(--beer-create-ease);
+}
+
+@keyframes studio-beer-create-chip-in {
+  from {
+    transform: scale(0.97);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes studio-beer-create-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes studio-beer-create-fresh {
+  0% {
+    background: rgba(201, 162, 77, 0.16);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (max-width: 900px) {
+  .studio-beer-create-body {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-beer-create-form {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .studio-beer-create-drop {
+    aspect-ratio: 16 / 10;
+    max-height: 260px;
+    min-height: 200px;
+  }
+
+  .studio-beer-create-preview {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .studio-beer-create {
+    max-width: none;
+    border-radius: 14px;
+  }
+
+  .studio-beer-create-header {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .studio-beer-create-manual-btn {
+    align-self: flex-start;
+  }
+
+  .studio-beer-create-media,
+  .studio-beer-create-form {
+    padding: 14px 16px;
+  }
+
+  .studio-beer-create-drop {
+    aspect-ratio: 5 / 4;
+    max-height: 230px;
+    min-height: 180px;
+  }
+
+  .studio-beer-create-bottle {
+    width: 26px;
+    height: 52px;
+  }
+
+  .studio-beer-create-actions {
+    flex-direction: column;
+    align-items: stretch;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 0 -16px -16px;
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    background: var(--s1);
+    border-top: 1px solid var(--line);
+  }
+
+  .studio-beer-create-save,
+  .studio-beer-create-cancel {
+    width: 100%;
+  }
+
+  .studio-beer-create-actions-hint {
+    text-align: center;
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-beer-create-drop,
+  .studio-beer-create-bottle,
+  .studio-beer-create-chip,
+  .studio-beer-create-save,
+  .studio-beer-create-preview-swatch {
+    transition: none !important;
+  }
+
+  .studio-beer-create-chip.is-on,
+  .evg-onb-beer-row.is-fresh,
+  .studio-beer-card.is-fresh {
+    animation: none !important;
+  }
+
+  .studio-beer-create-drop.is-drag {
+    transform: none;
+  }
+
+  .studio-beer-create-drop.is-drag .studio-beer-create-bottle {
+    transform: none;
+  }
+
+  .studio-beer-create-spinner {
+    animation: none;
+    border-top-color: transparent;
+  }
+}

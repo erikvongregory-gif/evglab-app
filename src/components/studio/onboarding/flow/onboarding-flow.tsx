@@ -14,6 +14,8 @@ import {
   type OnboardingBootstrap,
   type OnboardingBrandDraft,
 } from "./onboarding-types";
+import type { BeerCreateDraft } from "@/components/studio/beers/beer-create-panel";
+import { splitDataUrl } from "@/lib/images/compress-image";
 import { OnboardingAssortmentStep } from "./steps/onboarding-assortment-step";
 import { OnboardingBrandStep } from "./steps/onboarding-brand-step";
 import { OnboardingBreweryStep } from "./steps/onboarding-brewery-step";
@@ -59,8 +61,6 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
   const [brandError, setBrandError] = useState("");
 
   const [beers, setBeers] = useState<DashboardBeer[]>(bootstrap.beers);
-  const [beerName, setBeerName] = useState("");
-  const [beerStyle, setBeerStyle] = useState("helles");
   const [beerError, setBeerError] = useState("");
 
   const [team, setTeam] = useState<DashboardTeamMember[]>(bootstrap.team);
@@ -241,7 +241,9 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
     return true;
   };
 
-  const persistBeers = async (next: DashboardBeer[]) => {
+  const persistBeers = async (
+    next: Array<DashboardBeer & { etikettPayload?: { base64: string; mime: string } }>,
+  ) => {
     const res = await fetch("/api/dashboard/my-beers", {
       method: "PUT",
       credentials: "include",
@@ -255,6 +257,7 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
           flaschenfarbe: b.flaschenfarbe || "braun",
           etikettUrl: b.etikettUrl || "",
           createdAt: b.createdAt || new Date().toISOString(),
+          ...(b.etikettPayload ? { etikettPayload: b.etikettPayload } : {}),
         })),
       }),
     });
@@ -263,33 +266,49 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
       throw new Error(json.error || "Sortiment konnte nicht gespeichert werden.");
     }
     const data = (await res.json()) as { beers?: DashboardBeer[] };
-    setBeers(data.beers ?? next);
+    const saved =
+      data.beers ??
+      next.map((item) => {
+        const beer = { ...item };
+        delete beer.etikettPayload;
+        return beer;
+      });
+    setBeers(saved);
+    return saved;
   };
 
-  const addBeer = async () => {
-    const name = beerName.trim();
-    if (!name) {
-      setBeerError("Bitte einen Sortennamen eingeben.");
-      return;
-    }
+  const createBeer = async (draft: BeerCreateDraft) => {
     setBeerError("");
-    const next: DashboardBeer[] = [
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? `beer-${crypto.randomUUID()}`
+        : `beer-${Date.now()}`;
+    const payload = draft.etikettDataUrl ? splitDataUrl(draft.etikettDataUrl) : null;
+    const etikettPayload =
+      payload &&
+      (payload.mime === "image/jpeg" || payload.mime === "image/png" || payload.mime === "image/webp")
+        ? { base64: payload.base64, mime: payload.mime as "image/jpeg" | "image/png" | "image/webp" }
+        : undefined;
+    const next = [
       ...beers,
       {
-        id: `beer-${crypto.randomUUID()}`,
-        name: name.slice(0, 80),
-        bierstil: (beerStyle.trim() || "helles").slice(0, 60),
-        flaschenTyp: "nrw_500",
-        flaschenfarbe: "braun",
+        id,
+        name: draft.name.slice(0, 80),
+        bierstil: (draft.bierstil || "helles").slice(0, 60),
+        flaschenTyp: draft.flaschenTyp || "nrw_500",
+        flaschenfarbe: draft.flaschenfarbe || "braun",
         etikettUrl: "",
         createdAt: new Date().toISOString(),
+        ...(etikettPayload ? { etikettPayload } : {}),
       },
     ];
     try {
-      await persistBeers(next);
-      setBeerName("");
+      const saved = await persistBeers(next);
+      return saved.find((b) => b.id === id) ?? saved[saved.length - 1] ?? null;
     } catch (err) {
-      setBeerError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+      const message = err instanceof Error ? err.message : "Speichern fehlgeschlagen.";
+      setBeerError(message);
+      throw err instanceof Error ? err : new Error(message);
     }
   };
 
@@ -534,13 +553,10 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
           {step === 3 ? (
             <OnboardingAssortmentStep
               beers={beers}
-              draftName={beerName}
-              draftStyle={beerStyle}
+              brandTone={brand.brandTone}
               error={beerError}
               reducedMotion={reducedMotion}
-              onChangeName={setBeerName}
-              onChangeStyle={setBeerStyle}
-              onAdd={() => void addBeer()}
+              onCreate={createBeer}
               onRemove={(id) => void removeBeer(id)}
             />
           ) : null}

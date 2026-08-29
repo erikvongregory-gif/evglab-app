@@ -11,6 +11,7 @@
 @import "../styles/studio-team.css";
 @import "../styles/studio-search.css";
 @import "../styles/studio-onboarding-flow.css";
+@import "../styles/studio-beer-create.css";
 @import "../styles/studio-primitives.css";
 @custom-variant dark (&:where(.dark, .dark *));
 /* Explizit alle TS/TSX unter src scannen (u. a. components/ui – Neon-Button-Klassen) */

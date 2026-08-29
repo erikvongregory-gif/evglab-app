@@ -5,12 +5,13 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { StudioPalette } from "@/components/ui/dashboard-studio-shell";
 import { STUDIO_TOKENS } from "@/components/ui/dashboard-studio-shell";
 import { StudioIcon } from "@/components/studio/icons";
+import {
+  BeerCreatePanel,
+  type BeerCreateDraft,
+} from "@/components/studio/beers/beer-create-panel";
 import { hasUsableBeerEtikett, type DashboardBeer } from "@/lib/dashboard/metadata";
 import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
-import {
-  BEER_STYLE_OPTIONS,
-  beerStyleLabel,
-} from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
+import { beerStyleLabel } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
 import {
   OCCASION_TEMPLATES,
   seasonBadgeLabel,
@@ -24,30 +25,6 @@ const FLASCHEN_CHOICES = Object.entries(FLASCHEN_TYPEN).map(([code, item]) => ({
   label: item.pillLabel,
 }));
 
-const FARBE_CHOICES = [
-  { code: "braun" as const, label: "Braun" },
-  { code: "gruen" as const, label: "Grün" },
-  { code: "klar" as const, label: "Klar" },
-];
-
-type BeerDraft = {
-  name: string;
-  bierstil: string;
-  flaschenTyp: string;
-  flaschenfarbe: "braun" | "gruen" | "klar";
-  etikettDataUrl: string;
-  etikettName: string;
-};
-
-const EMPTY_DRAFT: BeerDraft = {
-  name: "",
-  bierstil: "helles",
-  flaschenTyp: "nrw_500",
-  flaschenfarbe: "braun",
-  etikettDataUrl: "",
-  etikettName: "",
-};
-
 function flaschenLabel(code: string): string {
   return FLASCHEN_CHOICES.find((f) => f.code === code)?.label ?? code;
 }
@@ -58,8 +35,9 @@ function beerInitials(name: string): string {
 }
 
 export function InhalteErstellenStart({
-  P,
+  P: _P,
   breweryName,
+  brandTone = "",
   selectedBeerId,
   onSelectBeer,
   onPickTemplate,
@@ -67,18 +45,19 @@ export function InhalteErstellenStart({
 }: {
   P: StudioPalette;
   breweryName: string;
+  brandTone?: string;
   selectedBeerId: string | null;
   onSelectBeer: (beer: DashboardBeer | null) => void;
   onPickTemplate: (template: OccasionTemplate) => void;
   onPickCustom: () => void;
 }) {
+  void _P;
   const [beers, setBeers] = useState<DashboardBeer[]>([]);
   const [beersLoaded, setBeersLoaded] = useState(false);
   const [beersError, setBeersError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
-  const [draft, setDraft] = useState<BeerDraft>(EMPTY_DRAFT);
-  const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [freshId, setFreshId] = useState<string | null>(null);
 
   const sortedTemplates = useMemo(() => sortTemplatesForDate(OCCASION_TEMPLATES, new Date()), []);
 
@@ -122,42 +101,42 @@ export function InhalteErstellenStart({
     [],
   );
 
-  const handleSaveDraft = useCallback(async () => {
-    const name = draft.name.trim();
-    if (!name) {
-      setFormError("Bitte gib deinem Bier einen Namen.");
-      return;
-    }
-    if (!draft.etikettDataUrl) {
-      setFormError("Bitte lade ein Flaschenfoto mit Etikett hoch — das wird 1:1 ins generierte Bild übernommen.");
-      return;
-    }
-    setSaving(true);
-    setFormError("");
-    try {
+  const handleCreate = useCallback(
+    async (draft: BeerCreateDraft) => {
+      setFormError("");
       const payload = draft.etikettDataUrl ? splitDataUrl(draft.etikettDataUrl) : null;
+      const etikettPayload =
+        payload &&
+        (payload.mime === "image/jpeg" || payload.mime === "image/png" || payload.mime === "image/webp")
+          ? { base64: payload.base64, mime: payload.mime as "image/jpeg" | "image/png" | "image/webp" }
+          : undefined;
       const newBeer = {
         id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `beer-${Date.now()}`,
-        name,
+        name: draft.name,
         bierstil: draft.bierstil,
         flaschenTyp: draft.flaschenTyp,
         flaschenfarbe: draft.flaschenfarbe,
         etikettUrl: "",
         createdAt: new Date().toISOString(),
-        ...(payload ? { etikettPayload: payload } : {}),
+        ...(etikettPayload ? { etikettPayload } : {}),
       };
-      const saved = await persistBeers([...beers, newBeer]);
-      setBeers(saved);
-      const created = saved.find((b) => b.id === newBeer.id) ?? saved[saved.length - 1] ?? null;
-      if (created) onSelectBeer(created);
-      setDraft(EMPTY_DRAFT);
-      setFormOpen(false);
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
-    } finally {
-      setSaving(false);
-    }
-  }, [beers, draft, onSelectBeer, persistBeers]);
+      try {
+        const saved = await persistBeers([...beers, newBeer]);
+        setBeers(saved);
+        const created = saved.find((b) => b.id === newBeer.id) ?? saved[saved.length - 1] ?? null;
+        if (created) {
+          onSelectBeer(created);
+          setFreshId(created.id);
+          window.setTimeout(() => setFreshId(null), 750);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Speichern fehlgeschlagen.";
+        setFormError(message);
+        throw err instanceof Error ? err : new Error(message);
+      }
+    },
+    [beers, onSelectBeer, persistBeers],
+  );
 
   const handleDeleteBeer = useCallback(
     async (beer: DashboardBeer) => {
@@ -173,18 +152,6 @@ export function InhalteErstellenStart({
     },
     [beers, onSelectBeer, persistBeers, selectedBeerId],
   );
-
-  const handleEtikettFile = useCallback(async (file: File) => {
-    setFormError("");
-    try {
-      if (!file.type.startsWith("image/")) throw new Error("Bitte ein Bild auswählen (PNG, JPG, WEBP).");
-      if (file.size > 12 * 1024 * 1024) throw new Error("Datei zu groß — bitte unter 12 MB.");
-      const dataUrl = await readAndCompressImage(file);
-      setDraft((d) => ({ ...d, etikettDataUrl: dataUrl, etikettName: file.name }));
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload fehlgeschlagen.");
-    }
-  }, []);
 
   const handleAttachEtikett = useCallback(
     async (beer: DashboardBeer, file: File) => {
@@ -247,7 +214,10 @@ export function InhalteErstellenStart({
             beers.map((beer) => {
               const active = beer.id === selectedBeerId;
               return (
-                <div key={beer.id} className={active ? "studio-beer-card on" : "studio-beer-card"}>
+                <div
+                  key={beer.id}
+                  className={`studio-beer-card${active ? " on" : ""}${freshId === beer.id ? " is-fresh" : ""}`}
+                >
                   <button
                     type="button"
                     className="studio-beer-card-main"
@@ -302,12 +272,12 @@ export function InhalteErstellenStart({
             })
           )}
 
-          {beersLoaded && beers.length < 8 ? (
+          {beersLoaded && beers.length < 8 && !formOpen ? (
             <button
               type="button"
               className="studio-beer-card studio-beer-card--add"
               onClick={() => {
-                setFormOpen((v) => !v);
+                setFormOpen(true);
                 setFormError("");
               }}
             >
@@ -329,109 +299,16 @@ export function InhalteErstellenStart({
         ) : null}
 
         {formOpen ? (
-          <div className="studio-beer-form">
-            <div className="studio-beer-form-grid">
-              <label className="studio-beer-form-field studio-beer-form-field--wide">
-                <span className="studio-field-label">Name der Sorte</span>
-                <input
-                  type="text"
-                  value={draft.name}
-                  maxLength={80}
-                  placeholder="z. B. Falter Hell"
-                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void handleSaveDraft();
-                  }}
-                />
-              </label>
-              <label className="studio-beer-form-field">
-                <span className="studio-field-label">Bierstil</span>
-                <select
-                  value={draft.bierstil}
-                  onChange={(e) => setDraft((d) => ({ ...d, bierstil: e.target.value }))}
-                >
-                  {BEER_STYLE_OPTIONS.map((o) => (
-                    <option key={o.bierstil} value={o.bierstil}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="studio-beer-form-field">
-                <span className="studio-field-label">Flasche / Dose</span>
-                <select
-                  value={draft.flaschenTyp}
-                  onChange={(e) => setDraft((d) => ({ ...d, flaschenTyp: e.target.value }))}
-                >
-                  {FLASCHEN_CHOICES.map((o) => (
-                    <option key={o.code} value={o.code}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="studio-beer-form-field">
-                <span className="studio-field-label">Glasfarbe</span>
-                <div className="studio-beer-form-pills">
-                  {FARBE_CHOICES.map((o) => (
-                    <button
-                      key={o.code}
-                      type="button"
-                      className={draft.flaschenfarbe === o.code ? "studio-chip on" : "studio-chip"}
-                      onClick={() => setDraft((d) => ({ ...d, flaschenfarbe: o.code }))}
-                    >
-                      {o.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="studio-beer-form-field">
-                <span className="studio-field-label">Etikett (Pflicht)</span>
-                <div className="studio-beer-form-pills">
-                  <label className="studio-chip" style={{ cursor: "pointer" }}>
-                    {draft.etikettName ? "Anderes Bild" : "Etikett hochladen"}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void handleEtikettFile(file);
-                        e.currentTarget.value = "";
-                      }}
-                    />
-                  </label>
-                  {draft.etikettDataUrl ? (
-                    <span className="studio-beer-form-etikett-preview">
-                      <img src={draft.etikettDataUrl} alt="Etikett Vorschau" />
-                    </span>
-                  ) : (
-                    <small style={{ color: P.ink3, alignSelf: "center" }}>Flaschenfoto mit lesbarem Etikett — wird 1:1 übernommen.</small>
-                  )}
-                </div>
-              </div>
-            </div>
-            {formError ? (
-              <p className="studio-create-error" role="alert">
-                {formError}
-              </p>
-            ) : null}
-            <div className="studio-beer-form-actions">
-              <button type="button" className="studio-btn studio-btn-primary studio-btn-sm" disabled={saving} onClick={() => void handleSaveDraft()}>
-                {saving ? "Speichere …" : "Bier speichern"}
-              </button>
-              <button
-                type="button"
-                className="studio-btn studio-btn-ghost studio-btn-sm"
-                disabled={saving}
-                onClick={() => {
-                  setFormOpen(false);
-                  setFormError("");
-                }}
-              >
-                Abbrechen
-              </button>
-            </div>
+          <div className="studio-beer-create-host">
+            <BeerCreatePanel
+              brandTone={brandTone}
+              error={formError}
+              onSave={handleCreate}
+              onCancel={() => {
+                setFormOpen(false);
+                setFormError("");
+              }}
+            />
           </div>
         ) : null}
       </section>

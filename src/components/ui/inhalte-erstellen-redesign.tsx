@@ -825,6 +825,7 @@ export function InhalteErstellenRedesign({
   const [wofuer, setWofuer] = useState(WOFUER_OPTIONS[0]);
   const [extras, setExtras] = useState<string[]>([]);
   const [breweryName, setBreweryName] = useState(initialBreweryName?.trim() || "");
+  const [brandTone, setBrandTone] = useState("");
   const [etikettUrl, setEtikettUrl] = useState("");
   const [referenceImagesStale, setReferenceImagesStale] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -906,6 +907,7 @@ export function InhalteErstellenRedesign({
         const json = (await settingsRes.json()) as {
           settings?: {
             breweryName?: string;
+            brandTone?: string;
             brandProfileMode?: "undecided" | "guided" | "skip";
             brandReferenceImageUrls?: string[];
             brandLabelReferenceUrl?: string;
@@ -913,6 +915,7 @@ export function InhalteErstellenRedesign({
           };
         };
         if (json.settings?.breweryName?.trim()) setBreweryName(json.settings.breweryName.trim());
+        if (typeof json.settings?.brandTone === "string") setBrandTone(json.settings.brandTone.trim());
         const settingsMode = json.settings?.brandProfileMode;
         if (settingsMode === "guided" || settingsMode === "skip" || settingsMode === "undecided") {
           setProfileMode(settingsMode);
@@ -1790,6 +1793,7 @@ export function InhalteErstellenRedesign({
         <InhalteErstellenStart
           P={P}
           breweryName={breweryName || initialBreweryName?.trim() || ""}
+          brandTone={brandTone}
           selectedBeerId={selectedBeer?.id ?? null}
           onSelectBeer={applyBeer}
           onPickTemplate={applyTemplate}
