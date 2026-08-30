@@ -65,7 +65,6 @@ export function BillingReceiptPrinter({
   onClose?: () => void;
 }) {
   const reduceHook = useReducedMotion();
-  // Always start at processing — hook/media can differ SSR vs client; effect advances stages.
   const [stage, setStage] = useState<Stage>("processing");
   const [preferReduce, setPreferReduce] = useState(false);
 
@@ -83,7 +82,6 @@ export function BillingReceiptPrinter({
     if (!open) return;
     let t1 = 0;
     let t2 = 0;
-    // defer stage kickoff so open/reduce props don't sync-set in the effect body
     const start = window.setTimeout(() => {
       if (reduce) {
         setStage("complete");
@@ -108,6 +106,7 @@ export function BillingReceiptPrinter({
         : "Zahlung bestätigt";
 
   const paperVisible = stage !== "processing";
+  const shouldFeed = stage === "printing" && !reduce;
 
   return (
     <AnimatePresence>
@@ -123,59 +122,78 @@ export function BillingReceiptPrinter({
           aria-label="Zahlungsbeleg"
         >
           <div className={styles.scrim} onClick={onClose} aria-hidden />
-          <section className={styles.machine} aria-labelledby="receipt-status" data-stage={stage}>
+
+          <div className={styles.root} data-stage={stage} data-qa="receipt-device">
             {data.preview ? <p className={styles.previewBadge}>Admin-Preview · keine echte Zahlung</p> : null}
-            <div className={styles.screen}>
-              <p id="receipt-status" className={styles.status} aria-live="polite">
-                {statusLabel}
-              </p>
-            </div>
+
+            {/* Physical printer housing — bezel + screen + recessed slot bay */}
+            <section className={styles.machine} aria-labelledby="receipt-status">
+              <div className={styles.bezel} aria-hidden>
+                <span>BrewAI Terminal</span>
+                <span className={styles.bezelDot} />
+              </div>
+              <div className={styles.screen}>
+                <p id="receipt-status" className={styles.status} aria-live="polite">
+                  {statusLabel}
+                </p>
+              </div>
+              <div className={styles.slotBay} aria-hidden>
+                <div className={styles.slot} />
+              </div>
+            </section>
+
+            {/* Paper feeds FROM the slot (sibling below housing, clipped) */}
             <div className={styles.output} aria-hidden={!paperVisible}>
-              <motion.article
-                className={styles.paper}
-                style={{ clipPath: receiptClipPath }}
-                initial={false}
-                animate={{
-                  opacity: paperVisible ? 1 : 0,
-                  transform:
-                    stage === "printing" && !reduce
-                      ? printingTransformKeyframes
-                      : paperVisible || reduce
-                        ? "translateY(0%)"
-                        : "translateY(calc(-100% + 2px))",
-                }}
-                transition={{
-                  opacity: { duration: reduce ? 0 : 0.16 },
-                  transform: {
-                    duration: reduce ? 0 : stage === "printing" ? 1.75 : 0.18,
-                    ease: stage === "printing" && !reduce ? "linear" : [0.65, 0, 0.35, 1],
-                    times: stage === "printing" && !reduce ? printingKeyframeTimes : undefined,
-                  },
-                }}
-              >
-                <p className={styles.paperBrand}>BrewAI</p>
-                <p className={styles.paperMeta}>{data.dateLabel}</p>
-                <h2 className={styles.paperTitle}>{data.productLabel}</h2>
-                {data.amountLabel ? <p className={styles.paperLine}>Betrag · {data.amountLabel}</p> : null}
-                {data.plan ? <p className={styles.paperLine}>Plan · {data.plan}</p> : null}
-                {typeof data.tokensGranted === "number" ? (
-                  <p className={styles.paperLine}>Tokens · +{data.tokensGranted.toLocaleString("de-DE")}</p>
-                ) : null}
-                {typeof data.remainingTokens === "number" ? (
-                  <p className={styles.paperLine}>
-                    Guthaben · {data.remainingTokens.toLocaleString("de-DE")} Tokens
-                  </p>
-                ) : null}
-                {data.sessionRef ? <p className={styles.paperRef}>Ref · …{data.sessionRef}</p> : null}
-                <p className={styles.paperFoot}>Status · bestätigt</p>
-              </motion.article>
+              {paperVisible ? (
+                <>
+                  <div className={styles.slotShade} aria-hidden />
+                  <motion.article
+                    className={styles.paper}
+                    style={{ clipPath: receiptClipPath }}
+                    initial={
+                      shouldFeed
+                        ? { opacity: 1, transform: "translateY(calc(-100% + 2px))" }
+                        : { opacity: 1, transform: "translateY(0%)" }
+                    }
+                    animate={{
+                      opacity: 1,
+                      transform: shouldFeed ? printingTransformKeyframes : "translateY(0%)",
+                    }}
+                    transition={{
+                      opacity: { duration: reduce ? 0 : 0.16 },
+                      transform: {
+                        duration: reduce ? 0 : shouldFeed ? 1.75 : 0,
+                        ease: shouldFeed ? "linear" : [0.65, 0, 0.35, 1],
+                        times: shouldFeed ? printingKeyframeTimes : undefined,
+                      },
+                    }}
+                  >
+                    <p className={styles.paperBrand}>BrewAI</p>
+                    <p className={styles.paperMeta}>{data.dateLabel}</p>
+                    <h2 className={styles.paperTitle}>{data.productLabel}</h2>
+                    {data.amountLabel ? <p className={styles.paperLine}>Betrag · {data.amountLabel}</p> : null}
+                    {data.plan ? <p className={styles.paperLine}>Plan · {data.plan}</p> : null}
+                    {typeof data.tokensGranted === "number" ? (
+                      <p className={styles.paperLine}>Tokens · +{data.tokensGranted.toLocaleString("de-DE")}</p>
+                    ) : null}
+                    {typeof data.remainingTokens === "number" ? (
+                      <p className={styles.paperLine}>
+                        Guthaben · {data.remainingTokens.toLocaleString("de-DE")} Tokens
+                      </p>
+                    ) : null}
+                    {data.sessionRef ? <p className={styles.paperRef}>Ref · …{data.sessionRef}</p> : null}
+                    <p className={styles.paperFoot}>Status · bestätigt</p>
+                  </motion.article>
+                </>
+              ) : null}
             </div>
+
             {stage === "complete" && onClose ? (
               <button type="button" className={styles.close} onClick={onClose}>
                 Weiter
               </button>
             ) : null}
-          </section>
+          </div>
         </motion.div>
       ) : null}
     </AnimatePresence>
