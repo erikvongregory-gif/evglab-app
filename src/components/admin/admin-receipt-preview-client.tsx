@@ -6,6 +6,7 @@ import {
   type BillingReceiptData,
 } from "@/components/ui/billing-receipt-printer";
 
+/** Feste Mock-Daten — kein `new Date()` auf Modul-Ebene (sonst SSR/Client-Hydration-Mismatch → White Screen). */
 const PREVIEW_RECEIPT: BillingReceiptData = {
   kind: "subscription",
   productLabel: "BrewAI Growth",
@@ -13,7 +14,7 @@ const PREVIEW_RECEIPT: BillingReceiptData = {
   remainingTokens: 3000,
   amountLabel: "149,00 €",
   sessionRef: "PREVIEW1",
-  dateLabel: new Date().toLocaleString("de-DE"),
+  dateLabel: "30.08.2026, 12:00:00",
   preview: true,
 };
 

@@ -64,8 +64,20 @@ export function BillingReceiptPrinter({
   open: boolean;
   onClose?: () => void;
 }) {
-  const reduce = useReducedMotion();
-  const [stage, setStage] = useState<Stage>(reduce ? "complete" : "processing");
+  const reduceHook = useReducedMotion();
+  // Always start at processing — hook/media can differ SSR vs client; effect advances stages.
+  const [stage, setStage] = useState<Stage>("processing");
+  const [preferReduce, setPreferReduce] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setPreferReduce(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const reduce = Boolean(reduceHook) || preferReduce;
 
   useEffect(() => {
     if (!open) return;
