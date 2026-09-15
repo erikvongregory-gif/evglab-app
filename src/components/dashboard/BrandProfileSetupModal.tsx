@@ -19,6 +19,15 @@ export type BrandReferenceImagePayload = {
   mime: string;
 };
 
+export type BrandSuggestedBeer = {
+  name: string;
+  bierstil: string;
+  flaschenTyp: string;
+  flaschenfarbe: "braun" | "gruen" | "klar";
+  glasTyp: string;
+  etikettUrl: string;
+};
+
 export type BrandScanSuggestion = {
   breweryName: string;
   brandTone: string;
@@ -32,6 +41,8 @@ export type BrandScanSuggestion = {
   brandProfileSource: BrandProfileSource;
   /** Bester Packshot (Etikett-Traeger) aus der Analyse — fuer Etikett-Treue bei der Generierung. */
   brandLabelReferenceUrl?: string;
+  /** Aus Sortiment-/Produktseiten erkannte Biersorten — werden beim Aktivieren angelegt. */
+  suggestedBeers?: BrandSuggestedBeer[];
 };
 
 type Slot = {
@@ -55,6 +66,7 @@ const EMPTY_SLOTS: Slot[] = Array.from({ length: 5 }, () => ({ file: null, previ
 const ANALYSIS_STEPS = [
   "Website wird geladen…",
   "Unterseiten werden gelesen…",
+  "Sortiment wird erkannt…",
   "Texte & Tonalität werden erkannt…",
   "Bilder werden ausgewertet…",
   "Markenprofil wird erstellt…",
@@ -68,7 +80,7 @@ const INSTAGRAM_ANALYSIS_STEPS = [
 ];
 
 /** Pausen (ms) zwischen den Checklisten-Schritten — der letzte Schritt bleibt aktiv bis zur Antwort. */
-const ANALYSIS_STEP_DURATIONS_MS = [2600, 4500, 7000, 10000];
+const ANALYSIS_STEP_DURATIONS_MS = [2400, 4200, 6200, 8600, 11000];
 
 /** Hochwertiger Startpunkt fuer den Express-Weg ohne Analyse — Kunde ergaenzt nur den Namen. */
 function manualTemplateReview(): BrandScanSuggestion {
@@ -108,6 +120,43 @@ function emptyReview(): BrandScanSuggestion {
     brandInstagramUrl: "",
     brandWebsiteUrl: "",
     brandProfileSource: "url",
+  };
+}
+
+function parseSuggestedBeers(value: unknown): BrandSuggestedBeer[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const beers: BrandSuggestedBeer[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Partial<BrandSuggestedBeer>;
+    if (typeof item.name !== "string" || !item.name.trim()) continue;
+    beers.push({
+      name: item.name.trim().slice(0, 80),
+      bierstil: typeof item.bierstil === "string" && item.bierstil.trim() ? item.bierstil.trim() : "helles",
+      flaschenTyp: typeof item.flaschenTyp === "string" && item.flaschenTyp.trim() ? item.flaschenTyp.trim() : "nrw_500",
+      flaschenfarbe: item.flaschenfarbe === "gruen" || item.flaschenfarbe === "klar" ? item.flaschenfarbe : "braun",
+      glasTyp: typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim() : "willibecher",
+      etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",
+    });
+    if (beers.length >= 8) break;
+  }
+  return beers.length > 0 ? beers : undefined;
+}
+
+function suggestionFromPartial(s: Partial<BrandScanSuggestion>, defaults: Partial<BrandScanSuggestion>): BrandScanSuggestion {
+  return {
+    breweryName: s.breweryName ?? "",
+    brandTone: s.brandTone ?? "",
+    brandColors: s.brandColors ?? "",
+    brandDos: s.brandDos ?? "",
+    brandDonts: s.brandDonts ?? "",
+    referenceImageUrls: Array.isArray(s.referenceImageUrls) ? s.referenceImageUrls : [],
+    referenceImagePayloads: Array.isArray(s.referenceImagePayloads) ? s.referenceImagePayloads : undefined,
+    brandInstagramUrl: typeof s.brandInstagramUrl === "string" ? s.brandInstagramUrl : defaults.brandInstagramUrl ?? "",
+    brandWebsiteUrl: typeof s.brandWebsiteUrl === "string" ? s.brandWebsiteUrl : defaults.brandWebsiteUrl ?? "",
+    brandProfileSource: defaults.brandProfileSource ?? "url",
+    brandLabelReferenceUrl: typeof s.brandLabelReferenceUrl === "string" ? s.brandLabelReferenceUrl : "",
+    suggestedBeers: parseSuggestedBeers(s.suggestedBeers),
   };
 }
 
@@ -154,6 +203,7 @@ function buildActivateRequestBody(suggestion: BrandScanSuggestion): Record<strin
       hasUsableReferenceUrls(rest.referenceImageUrls) || !referenceImagePayloads?.length
         ? undefined
         : referenceImagePayloads,
+    ...(rest.suggestedBeers?.length ? { suggestedBeers: rest.suggestedBeers } : {}),
   };
 }
 
@@ -481,19 +531,10 @@ export function BrandProfileSetupModal({
         throw new Error("Ungueltige Server-Antwort.");
       }
 
-      const suggestion: BrandScanSuggestion = {
-        breweryName: s.breweryName,
-        brandTone: s.brandTone,
-        brandColors: s.brandColors,
-        brandDos: s.brandDos,
-        brandDonts: s.brandDonts,
-        referenceImageUrls: Array.isArray(s.referenceImageUrls) ? s.referenceImageUrls : [],
-        referenceImagePayloads: Array.isArray(s.referenceImagePayloads) ? s.referenceImagePayloads : undefined,
-        brandInstagramUrl: "",
-        brandWebsiteUrl: typeof s.brandWebsiteUrl === "string" ? s.brandWebsiteUrl : url,
+      const suggestion = suggestionFromPartial(s, {
+        brandWebsiteUrl: url,
         brandProfileSource: "url",
-        brandLabelReferenceUrl: typeof s.brandLabelReferenceUrl === "string" ? s.brandLabelReferenceUrl : "",
-      };
+      });
       setSourceMeta(data.sourceMeta ?? null);
       setReview(suggestion);
       setStep("review");
@@ -635,17 +676,10 @@ export function BrandProfileSetupModal({
         throw new Error("Ungueltige Server-Antwort.");
       }
 
-      const suggestion: BrandScanSuggestion = {
-        breweryName: s.breweryName,
-        brandTone: s.brandTone,
-        brandColors: s.brandColors,
-        brandDos: s.brandDos,
-        brandDonts: s.brandDonts,
-        referenceImageUrls: Array.isArray(s.referenceImageUrls) ? s.referenceImageUrls : [],
+      const suggestion = suggestionFromPartial(s, {
         brandInstagramUrl: typeof s.brandInstagramUrl === "string" ? s.brandInstagramUrl : instagramStatus.profileUrl ?? "",
-        brandWebsiteUrl: "",
         brandProfileSource: "instagram",
-      };
+      });
       setSourceMeta(data.sourceMeta ?? null);
       applySuggestion(suggestion);
     } catch (e) {

@@ -7,6 +7,7 @@
 @import "../styles/studio-media.css";
 @import "../styles/studio-brand.css";
 @import "../styles/studio-pricing.css";
+@import "../styles/studio-locked.css";
 @import "../styles/studio-settings.css";
 @import "../styles/studio-team.css";
 @import "../styles/studio-search.css";
@@ -45,32 +46,33 @@
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-serif), Georgia, "Times New Roman", serif;
-  /* Studio-Tailwind: Work Sans nur über --font-work-sans (studioFontClassName) */
-  --font-studio-sans: var(--font-work-sans), "Work Sans", system-ui, sans-serif;
+  /* Studio-Tailwind: Inter Tight über --font-inter-tight (studioFontClassName) */
+  --font-studio-sans: var(--font-inter-tight), "Inter Tight", system-ui, sans-serif;
   --font-studio-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  --font-studio-brand: var(--font-newsreader), "Newsreader", Georgia, serif;
 
   --color-background: #ffffff;
   --color-foreground: #0f172a;
 
-  /* BrewAI Studio — FINAL Handoff (an .evg-studio Tokens angeglichen) */
-  --color-bg: #0F0906;
-  --color-surface: #16100B;
-  --color-surface-2: #1E1710;
-  --color-surface-hover: #271E16;
-  --color-border: #2E2418;
-  --color-strong: #3D3021;
-  --color-fg: #F3EDE4;
-  --color-muted: #B3A694;
-  --color-faint: #7E7263;
-  --color-acc: #C9A24D;
-  --color-acc-deep: #A9853A;
-  --color-acc-hover: #DDBA6A;
-  --color-acc-fg: #1A1207;
-  --color-acc-dim: rgba(201, 162, 77, 0.10);
-  --color-ok: #6FA96F;
-  --color-warn: #DE8F3C;
-  --color-err: #D0604C;
-  --color-mode-hyperreal: #C9A24D;
+  /* BrewAI Studio — B2B Light */
+  --color-bg: #F6F6F4;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #FAFAF8;
+  --color-surface-hover: #F1F0EC;
+  --color-border: #E5E3DE;
+  --color-strong: #D8D5CE;
+  --color-fg: #18140F;
+  --color-muted: #4A4339;
+  --color-faint: #5E574E;
+  --color-acc: #C7691E;
+  --color-acc-deep: #A85518;
+  --color-acc-hover: #D4782A;
+  --color-acc-fg: #FFFFFF;
+  --color-acc-dim: #FBEFE0;
+  --color-ok: #2F7A4A;
+  --color-warn: #B86A1C;
+  --color-err: #C0392B;
+  --color-mode-hyperreal: #C7691E;
   --color-mode-studio: #7E96AE;
   --color-mode-isolate: #8E82B0;
   --color-mode-campaign: #B0808C;

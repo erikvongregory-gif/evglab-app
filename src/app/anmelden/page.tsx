@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AuthLinkBootstrap } from "@/components/auth/auth-link-bootstrap";
+import { isWaitlistBypassCookieValid } from "@/lib/auth/waitlistBypass";
 import { SITE } from "@/lib/siteConfig";
 import { resolveAuthCallbackRedirect } from "@/lib/supabase/authEntryRedirect";
 import { isInviteOnlyEnabled } from "@/lib/supabase/env";
@@ -66,6 +68,9 @@ export default async function AnmeldenPage({
       ? "register"
       : "signin";
 
+  const cookieStore = await cookies();
+  const waitlistBypassActive = isWaitlistBypassCookieValid(cookieStore.get("brewai_waitlist_bypass")?.value);
+
   return (
     <Suspense fallback={null}>
       <AuthLinkBootstrap searchParams={params} />
@@ -74,7 +79,7 @@ export default async function AnmeldenPage({
         initialMode={initialMode}
         inviteToken={typeof invite === "string" ? invite : undefined}
         inviteOnly={isInviteOnlyEnabled()}
-        waitlistMode={LOGIN_WAITLIST_ENABLED}
+        waitlistMode={LOGIN_WAITLIST_ENABLED && !waitlistBypassActive}
         urlError={typeof urlError === "string" ? urlError : undefined}
         urlNotice={typeof urlNotice === "string" ? urlNotice : undefined}
       />

@@ -27,10 +27,17 @@ export default async function AdminAnmeldenPage({
   const ntc = params.notice;
   const urlError = Array.isArray(err) ? err[0] : err;
   const urlNotice = Array.isArray(ntc) ? ntc[0] : ntc;
+  const nextRaw = params.next;
+  const nextParam = Array.isArray(nextRaw) ? nextRaw[0] : nextRaw;
+  const nextPath =
+    typeof nextParam === "string" && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/admin";
 
   return (
     <Suspense fallback={null}>
       <AdminLoginForm
+        nextPath={nextPath}
         urlError={typeof urlError === "string" ? urlError : undefined}
         urlNotice={typeof urlNotice === "string" ? urlNotice : undefined}
       />

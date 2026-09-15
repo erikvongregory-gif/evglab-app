@@ -1,15 +1,24 @@
-/* BrewAI Studio — Hopfen Hugo (globaler Assistent, T5c visual alignment) */
+/* BrewAI Studio — Hopfen Hugo (Design Comp, dark studio tokens) */
+
+@keyframes evg-hopfenhugo-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.9; }
+}
+@keyframes evg-hopfenhugo-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
 
 .evg-hopfenhugo-root {
   position: fixed;
-  z-index: 96;
+  z-index: 115;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--sp-5, 12px);
+  gap: 12px;
   font-family: var(--f-sans);
-  bottom: calc(var(--sp-9, 24px) + env(safe-area-inset-bottom, 0px));
-  right: var(--sp-9, 24px);
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  right: 24px;
   pointer-events: none;
 }
 
@@ -17,55 +26,97 @@
   pointer-events: auto;
 }
 
-/* ── Chat panel ─────────────────────────────────────────── */
-
+/* Panel hugt Content — kein leerer Scrollraum */
 .evg-hopfenhugo-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
-  width: min(400px, calc(100vw - var(--sp-9, 24px) * 2));
-  max-height: min(560px, calc(100dvh - var(--sp-11, 48px) * 2));
+  width: min(352px, calc(100vw - 32px));
+  max-height: min(560px, calc(100dvh - 96px));
   overflow: hidden;
-  border: 1px solid var(--line2);
-  border-radius: var(--r-lg);
-  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg, 10px);
+  background: var(--s1);
   color: var(--t1);
-  box-shadow: var(--sh-toast);
+  box-shadow: var(--sh-card, 0 1px 2px rgba(24, 20, 15, 0.04));
 }
 
-/* ── Header ───────────────────────────────────────────────── */
+.evg-hopfenhugo-panel-shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--ac) 25%,
+    var(--ac-2) 50%,
+    var(--ac) 75%,
+    transparent
+  );
+  z-index: 1;
+  pointer-events: none;
+}
 
 .evg-hopfenhugo-head {
   flex: none;
   border-bottom: 1px solid var(--line);
-  padding: var(--sp-6, 14px) var(--sp-7, 16px);
-  background: var(--s2);
-}
-
-.evg-hopfenhugo-head-glow {
-  display: none;
+  padding: 16px 16px 14px;
+  background: var(--s1);
 }
 
 .evg-hopfenhugo-head-inner {
   display: flex;
   align-items: center;
-  gap: var(--sp-5, 12px);
+  gap: 11px;
 }
 
 .evg-hopfenhugo-avatar-wrap {
   position: relative;
+  width: 38px;
+  height: 38px;
   flex: none;
+}
+
+.evg-hopfenhugo-avatar-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--ac), transparent 35%, transparent 65%, var(--ac));
+  opacity: 0.4;
+  filter: blur(3px);
+  animation: evg-hopfenhugo-glow 2.6s ease-in-out infinite;
+}
+
+.evg-hopfenhugo-avatar-bob {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(155deg, var(--ac-2), var(--ac-3));
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 16px rgba(201, 162, 77, 0.28);
+  animation: evg-hopfenhugo-bob 3.2s ease-in-out infinite;
+  overflow: hidden;
+}
+
+.evg-hopfenhugo-avatar-bob svg {
+  /* dunkler Avatar-Kreis raus — nur Figur auf Gold */
+  border-radius: 50%;
 }
 
 .evg-hopfenhugo-status {
   position: absolute;
   right: 1px;
   bottom: 1px;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--r-pill);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
   background: var(--ok);
-  border: 1.5px solid var(--s2);
-  box-shadow: 0 0 0 1px var(--ok-dim);
+  border: 2px solid var(--s1);
+  z-index: 1;
 }
 
 .evg-hopfenhugo-head-copy {
@@ -75,7 +126,7 @@
 
 .evg-hopfenhugo-name {
   margin: 0;
-  font-size: var(--t-15);
+  font-size: 14.5px;
   font-weight: 600;
   line-height: 1.25;
   color: var(--t1);
@@ -83,11 +134,11 @@
 }
 
 .evg-hopfenhugo-role {
-  margin: 3px 0 0;
+  margin: 2px 0 0;
   font-family: var(--f-mono);
-  font-size: var(--t-9);
-  font-weight: 500;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
 }
@@ -96,24 +147,20 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: transparent;
-  color: var(--fg-4);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--s2);
+  color: var(--t2);
   cursor: pointer;
-  transition:
-    background var(--dur) var(--ease),
-    color var(--dur) var(--ease),
-    border-color var(--dur) var(--ease);
+  transition: border-color 0.16s, color 0.16s, background 0.16s;
 }
 
 .evg-hopfenhugo-close:hover {
   background: var(--s3);
   color: var(--t1);
-  border-color: var(--line2);
 }
 
 .evg-hopfenhugo-close:focus-visible {
@@ -121,18 +168,15 @@
   outline-offset: 2px;
 }
 
-/* ── Messages ─────────────────────────────────────────────── */
-
 .evg-hopfenhugo-messages {
+  flex: none;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5, 12px);
-  flex: 1;
-  min-height: 0;
-  height: min(360px, 48vh);
+  gap: 0;
+  max-height: 320px;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: var(--sp-7, 16px);
+  padding: 16px 16px 6px;
   background: var(--s1);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
@@ -145,34 +189,54 @@
 
 .evg-hopfenhugo-messages::-webkit-scrollbar-thumb {
   background: var(--line2);
-  border-radius: var(--r-pill);
+  border-radius: 999px;
 }
 
 .evg-hopfenhugo-row {
   display: flex;
-  gap: var(--sp-3, 8px);
-  align-items: flex-end;
+  gap: 9px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.evg-hopfenhugo-row + .evg-hopfenhugo-row,
+.evg-hopfenhugo-row + .evg-hopfenhugo-suggestions,
+.evg-hopfenhugo-suggestions + .evg-hopfenhugo-row {
+  margin-top: 14px;
 }
 
 .evg-hopfenhugo-row--user {
   flex-direction: row-reverse;
-  align-self: flex-end;
+}
+
+.evg-hopfenhugo-row-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .evg-hopfenhugo-msg-avatar {
   flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: linear-gradient(155deg, var(--ac-2), var(--ac-3));
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   line-height: 0;
 }
 
 .evg-hopfenhugo-bubble {
-  max-width: min(88%, 280px);
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid var(--line2);
+  border-radius: 14px;
   background: var(--s2);
-  font-size: var(--t-14);
-  line-height: 1.5;
-  color: var(--t2);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--t1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
 }
 
 .evg-hopfenhugo-bubble p {
@@ -180,32 +244,30 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
+  text-wrap: pretty;
 }
 
 .evg-hopfenhugo-bubble-label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-family: var(--f-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--t3);
+  color: var(--ac);
 }
 
 .evg-hopfenhugo-bubble--assistant {
-  border-color: var(--line);
+  border-color: var(--line2);
   background: var(--s2);
 }
 
 .evg-hopfenhugo-bubble--user {
-  background: var(--ac);
+  background: linear-gradient(155deg, var(--ac-2), var(--ac));
   color: var(--ac-ink);
   border-color: transparent;
-}
-
-.evg-hopfenhugo-bubble--user .evg-hopfenhugo-bubble-label {
-  color: rgba(26, 18, 7, 0.65);
+  box-shadow: 0 8px 20px rgba(201, 162, 77, 0.2);
 }
 
 .evg-hopfenhugo-bubble--typing {
@@ -213,99 +275,119 @@
   align-items: center;
   gap: 5px;
   padding: 14px 16px;
+  width: auto;
 }
 
 .evg-hopfenhugo-dot {
   width: 5px;
   height: 5px;
-  border-radius: var(--r-pill);
-  background: var(--fg-4);
+  border-radius: 999px;
+  background: var(--t3);
   animation: evg-hopfenhugo-bounce 1.2s ease-in-out infinite;
 }
 
-.evg-hopfenhugo-dot:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.evg-hopfenhugo-dot:nth-child(3) {
-  animation-delay: 0.3s;
-}
+.evg-hopfenhugo-dot:nth-child(2) { animation-delay: 0.15s; }
+.evg-hopfenhugo-dot:nth-child(3) { animation-delay: 0.3s; }
 
 @keyframes evg-hopfenhugo-bounce {
-  0%,
-  80%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.45;
-  }
-
-  40% {
-    transform: translateY(-3px);
-    opacity: 1;
-  }
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+  40% { transform: translateY(-3px); opacity: 1; }
 }
 
-/* ── Footer / input ─────────────────────────────────────── */
+.evg-hopfenhugo-time {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--t3);
+}
+
+.evg-hopfenhugo-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-left: 31px;
+  margin-top: 14px;
+}
+
+.evg-hopfenhugo-chip {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line2);
+  background: var(--s2);
+  color: var(--t2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.16s, color 0.16s, background 0.16s;
+}
+
+.evg-hopfenhugo-chip:hover {
+  border-color: var(--ac-line);
+  color: var(--ac-2);
+  background: var(--ac-tint);
+}
 
 .evg-hopfenhugo-foot {
   flex: none;
-  border-top: 1px solid var(--line);
-  padding: var(--sp-5, 12px) var(--sp-6, 14px) var(--sp-6, 14px);
-  background: var(--s2);
+  padding: 14px 16px 16px;
+  background: var(--s1);
 }
 
 .evg-hopfenhugo-form {
   display: flex;
   align-items: center;
-  gap: var(--sp-3, 8px);
+  gap: 8px;
+  border-radius: 13px;
+  border: 1px solid var(--line2);
+  background: var(--s2);
+  padding: 5px 5px 5px 15px;
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+
+.evg-hopfenhugo-form:focus-within {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--ac-tint);
 }
 
 .evg-hopfenhugo-input {
   flex: 1;
   min-width: 0;
   height: 36px;
-  padding: 0 var(--sp-5, 12px);
-  border: 1px solid var(--line2);
-  border-radius: var(--r-md);
-  background: var(--s1);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--t1);
   font-family: var(--f-sans);
-  font-size: var(--t-14);
+  font-size: 13px;
   line-height: 1.4;
   outline: none;
-  transition: border-color var(--dur) var(--ease);
+  box-shadow: none;
 }
 
 .evg-hopfenhugo-input::placeholder {
   color: var(--t3);
 }
 
-.evg-hopfenhugo-input:focus {
-  border-color: var(--ac);
-}
-
-.evg-hopfenhugo-input:focus-visible {
-  outline: 2px solid var(--ac);
-  outline-offset: 1px;
-}
-
 .evg-hopfenhugo-send {
   display: grid;
   place-items: center;
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border: 0;
-  border-radius: var(--r-md);
-  background: var(--ac);
-  color: var(--ac-ink);
+  border-radius: 10px;
+  background: linear-gradient(155deg, var(--ac-2), var(--ac));
+  color: #fff;
   cursor: pointer;
-  transition: background var(--dur) var(--ease);
+  box-shadow: 0 6px 16px rgba(201, 162, 77, 0.28);
+  transition: transform 0.16s, box-shadow 0.16s, opacity 0.16s;
 }
 
 .evg-hopfenhugo-send:hover:not(:disabled) {
-  background: var(--ac-2);
+  transform: translateY(-1px);
 }
 
 .evg-hopfenhugo-send:disabled {
@@ -319,24 +401,21 @@
 }
 
 .evg-hopfenhugo-policy {
-  margin: var(--sp-4, 10px) var(--sp-2, 4px) 0;
-  font-size: 10.5px;
+  margin: 10px 0 0;
+  font-size: 11px;
   line-height: 1.45;
   color: var(--t3);
-  text-align: center;
+  text-align: left;
 }
 
 .evg-hopfenhugo-policy a {
-  color: var(--fg-4);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  color: var(--ac);
+  text-decoration: none;
 }
 
 .evg-hopfenhugo-policy a:hover {
-  color: var(--t2);
+  color: var(--ac-2);
 }
-
-/* ── FAB ──────────────────────────────────────────────────── */
 
 .evg-hopfenhugo-fab {
   display: grid;
@@ -345,15 +424,12 @@
   height: 52px;
   padding: 0;
   border: 1px solid var(--line2);
-  border-radius: var(--r-pill);
+  border-radius: 999px;
   background: var(--s2);
   color: var(--t1);
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  transition:
-    border-color var(--dur) var(--ease),
-    background var(--dur-mid) var(--ease),
-    box-shadow var(--dur-mid) var(--ease);
+  transition: border-color 0.16s, background 0.2s, box-shadow 0.2s;
 }
 
 .evg-hopfenhugo-fab:hover {
@@ -367,27 +443,19 @@
   outline-offset: 3px;
 }
 
-.evg-hopfenhugo-fab--open {
-  background: var(--s3);
-  border-color: var(--ac-line);
-  color: var(--t1);
-}
-
 .evg-hopfenhugo-fab-icon {
   width: 34px;
   height: 34px;
 }
 
-/* ── Mobile (Bottom-Nav clearance) ──────────────────────── */
-
 @media (max-width: 768px) {
   .evg-hopfenhugo-root {
-    bottom: calc(var(--bottom-nav-h, 62px) + env(safe-area-inset-bottom, 0px) + var(--sp-5, 12px));
-    right: var(--sp-5, 12px);
+    bottom: calc(var(--bottom-nav-h, 62px) + env(safe-area-inset-bottom, 0px) + 12px);
+    right: 12px;
   }
 
   .evg-hopfenhugo-panel {
-    width: min(400px, calc(100vw - var(--sp-5, 12px) * 2));
+    width: min(352px, calc(100vw - 24px));
     max-height: min(
       calc(100dvh - var(--bottom-nav-h, 62px) - env(safe-area-inset-bottom, 0px) - 88px),
       72dvh
@@ -395,20 +463,149 @@
   }
 
   .evg-hopfenhugo-messages {
-    height: min(320px, calc(100dvh - var(--bottom-nav-h, 62px) - 240px));
+    max-height: min(280px, calc(100dvh - var(--bottom-nav-h, 62px) - 240px));
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .evg-hopfenhugo-dot {
+  .evg-hopfenhugo-dot,
+  .evg-hopfenhugo-avatar-glow,
+  .evg-hopfenhugo-avatar-bob {
     animation: none;
-    opacity: 0.7;
   }
 
   .evg-hopfenhugo-close,
   .evg-hopfenhugo-fab,
   .evg-hopfenhugo-send,
-  .evg-hopfenhugo-input {
+  .evg-hopfenhugo-chip {
     transition: none;
   }
+}
+
+/* BrewAI assistant as full dashboard tab */
+.evg-brewai-page {
+  display: flex;
+  flex-direction: column;
+  min-height: min(720px, calc(100dvh - var(--topbar-h, 52px) - 48px));
+  height: calc(100dvh - var(--topbar-h, 52px) - 48px);
+  max-height: calc(100dvh - var(--topbar-h, 52px) - 32px);
+}
+
+.evg-hopfenhugo-panel--page {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  height: 100%;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-lg, 10px);
+  border: 1px solid var(--line);
+  background: var(--s1);
+  box-shadow: var(--sh-card, none);
+  overflow: hidden;
+}
+
+.evg-hopfenhugo-panel--page .evg-hopfenhugo-panel-shine,
+.evg-hopfenhugo-panel--page .evg-hopfenhugo-avatar-glow {
+  display: none;
+}
+
+.evg-hopfenhugo-panel--page .evg-hopfenhugo-messages {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+
+.evg-hopfenhugo-panel--page .evg-hopfenhugo-avatar-bob {
+  animation: none;
+}
+
+@media (max-width: 768px) {
+  .evg-brewai-page {
+    height: calc(100dvh - var(--topbar-h-mobile, 52px) - var(--bottom-nav-h, 62px) - 24px);
+    min-height: 420px;
+  }
+
+  .evg-hopfenhugo-panel--page {
+    max-width: none;
+    border-radius: var(--r-md, 8px);
+  }
+}
+
+.evg-brewai-page--column {
+  height: auto;
+  min-height: 0;
+  max-height: inherit;
+}
+
+.evg-hopfenhugo-panel--column {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  height: auto;
+  max-height: inherit;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-lg, 10px);
+  border: 1px solid var(--line);
+  background: var(--s1);
+  box-shadow: var(--sh-card, none);
+  overflow: hidden;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-panel-shine,
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-avatar-glow {
+  display: none;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-messages {
+  flex: 1 1 auto;
+  max-height: 220px;
+  min-height: 120px;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-avatar-bob {
+  animation: none;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-head {
+  padding: 10px 12px;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-avatar-wrap,
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-avatar-bob {
+  width: 30px;
+  height: 30px;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-name {
+  font-size: 13px;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-role {
+  font-size: 10.5px;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-foot {
+  padding: 8px 10px 10px;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-suggestions {
+  padding: 0 10px 8px;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-chip {
+  height: 26px;
+  font-size: 11.5px;
+  padding: 0 10px;
+}
+
+.evg-hopfenhugo-panel--column .evg-hopfenhugo-policy {
+  display: none;
 }

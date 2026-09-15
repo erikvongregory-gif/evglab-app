@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCampaignTextPrompt } from "./campaign-text";
-import { buildHyperrealisticPrompt, buildProductPlacementPrompt } from "./hyperrealistic";
+import { buildHyperrealisticPrompt, buildProductPlacementPrompt, applyClientIntentOverrides } from "./hyperrealistic";
 import { buildProductIsolatePrompt } from "./product-isolate";
 import { DEFAULT_GLAS_BY_STIL, buildProductStudioPrompt, resolveStudioGlas } from "./product-studio";
 import { campaignTextSchema, hyperrealisticSchema, productIsolateSchema, productStudioSchema } from "../schemas";
@@ -50,9 +50,149 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(prompt).not.toMatch(/EXACT TEXT/);
     expect(prompt).toMatch(/not an advertisement/i);
     expect(prompt).toMatch(/Kodak Portra 400/);
-    expect(prompt).toMatch(/product-preservation/);
-    expect(prompt).toMatch(/Forbidden look/i);
+    expect(prompt).toMatch(/Integrate the bottle from Image 1/);
+    expect(prompt).toMatch(/HYPERREALISM LOCK/);
+    expect(prompt).toMatch(/NEGATIVE \(hyperreal\)/);
+    expect(prompt).toMatch(/Forbidden/);
     expect(prompt).toMatch(/single pour/);
+  });
+
+  it("lets free-text intent override biergarten defaults for mountain toasting", () => {
+    const next = applyClientIntentOverrides({
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "goldene_stunde",
+      stimmung: "gesellig",
+      zusatzWunsch: "auf dem berg anstoßen",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(next.szene).toBe("alpenpanorama");
+    expect(next.personenModus).toBe("E");
+
+    const prompt = buildProductPlacementPrompt(next);
+    expect(prompt.startsWith("HYPERREALISM LOCK")).toBe(true);
+    expect(prompt).toMatch(/USER SCENE/);
+    expect(prompt).toMatch(/auf dem berg anstoßen/);
+    expect(prompt).toMatch(/COMPLETELY DISCARD Image 1's background/i);
+    expect(prompt).toMatch(/hands holding glasses|mid-clink|Anstoßen/i);
+    expect(prompt).toMatch(/floating bottle/i);
+    expect(prompt).toMatch(/alpine mountain/i);
+    expect(prompt).toMatch(/NEGATIVE \(hyperreal\)/);
+  });
+
+  it("maps brewery toasting freitext to brauereihof with people", () => {
+    const next = applyClientIntentOverrides({
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "goldene_stunde",
+      stimmung: "gesellig",
+      zusatzWunsch: "in der brauerei wird angestoßen",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(next.szene).toBe("brauereihof");
+    expect(next.personenModus).toBe("E");
+    const prompt = buildProductPlacementPrompt(next);
+    expect(prompt).toMatch(/hands holding glasses|Anstoßen/i);
+    expect(prompt).not.toMatch(/No people and no hands/);
+  });
+
+  it("maps laughing brewer freitext to person hero + brewery scene", () => {
+    const next = applyClientIntentOverrides({
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "goldene_stunde",
+      stimmung: "gesellig",
+      zusatzWunsch: "brauer lacht sich schlapp über neues bier",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(next.szene).toBe("brauereihof");
+    expect(next.personenModus).toBe("D");
+    expect(next.personImBild).toBe(true);
+
+    const prompt = buildProductPlacementPrompt(next);
+    expect(prompt).toMatch(/HERO PERSON|PEOPLE FROM USER SCENE|laughing|mandatory/i);
+    expect(prompt).toMatch(/brauer lacht sich schlapp/i);
+    expect(prompt).toMatch(/lonely bottle\+glass|still life|empty product table|omitting the people/i);
+  });
+
+  it("forces two older Bavarians into the prompt instead of No-people packshot", () => {
+    const next = applyClientIntentOverrides({
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "goldene_stunde",
+      stimmung: "gesellig",
+      zusatzWunsch: "zwei alte urbayer trinken gemütlich auf einer parkbank am marienplatz in münchen ihr bier",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(next.personenModus).toBe("E");
+    expect(next.personImBild).toBe(true);
+    expect(next.gruppenAnzahl).toBe("2");
+    expect(next.personAlter).toBe("aelter");
+
+    const prompt = buildProductPlacementPrompt(next);
+    expect(prompt).toMatch(/PEOPLE FROM USER SCENE|mandatory/i);
+    expect(prompt).toMatch(/zwei alte urbayer/i);
+    expect(prompt).not.toMatch(/No people and no hands/);
+    expect(prompt).toMatch(/omitting the people|empty product table|lonely bottle/i);
+  });
+
+  it("never emits hard No-people when freitext exists even for unknown synonyms", () => {
+    const prompt = buildProductPlacementPrompt({
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "goldene_stunde",
+      stimmung: "gesellig",
+      zusatzWunsch: "stammtischveteranen genießen ihr helles am rathausplatz",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(prompt).toMatch(/Follow USER SCENE for people/i);
+    expect(prompt).toMatch(/stammtischveteranen/i);
+    expect(prompt).not.toMatch(/No people and no hands/);
   });
 
   it("haelt das Glas auf Flaschenvolumen (kein 0,5-l-Krug neben 0,33 l)", () => {

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** Wellen-Mark — identisch zur Marketing-Seite und Anmeldung. */
+/** Wellen-Mark — Original-Logo (identisch zu Marketing / brewai-mark.svg). */
 export function EvglabMark({ size = 28, className }: { size?: number; className?: string }) {
   return (
     <svg

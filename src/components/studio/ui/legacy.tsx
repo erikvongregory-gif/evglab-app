@@ -9,8 +9,8 @@ export type StudioButtonSize = "default" | "sm" | "lg";
 
 const btnVariantClass: Record<StudioButtonVariant, string> = {
   primary: "evg-btn evg-btn--primary",
-  ghost: "evg-btn",
-  soft: "evg-btn", // ponytail: soft → ghost
+  ghost: "evg-btn evg-btn--ghost",
+  soft: "evg-btn evg-btn--ghost", // ponytail: soft → ghost
 };
 
 const btnSizeStyle: Record<StudioButtonSize, React.CSSProperties | undefined> = {

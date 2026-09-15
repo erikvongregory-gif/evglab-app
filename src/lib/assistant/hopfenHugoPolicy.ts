@@ -1,5 +1,5 @@
 /**
- * Nutzungsrichtlinien für Hopfen Hugo — gemeinsame Basis für System-Prompt und UI.
+ * Nutzungsrichtlinien für den BrewAI-Assistenten — gemeinsame Basis für System-Prompt und UI.
  */
 
 export const HOPFEN_HUGO_USAGE_POLICY = {
@@ -12,11 +12,11 @@ export const HOPFEN_HUGO_USAGE_POLICY = {
 } as const;
 
 export const HOPFEN_HUGO_GREETING =
-  "Prost! Ich bin Hopfen Hugo — dein KI-Assistent in BrewAI. Frag mich zu allem: BrewAI, Marketing, Brauerei, Prompts, Ideen oder allgemeine Themen. Bei Bildern und Kampagnen bin ich besonders stark.";
+  "Hallo — ich bin BrewAI, dein KI-Assistent im Studio. Frag mich zu BrewAI, Marketing, Brauerei, Prompts, Ideen oder allgemeinen Themen. Bei Bildern und Kampagnen bin ich besonders stark.";
 
 export function buildHopfenHugoSystemPrompt(): string {
   return [
-    "Du bist Hopfen Hugo, der freundliche KI-Assistent im BrewAI Studio (KI-Marketing für Brauereien und Marken).",
+    "Du bist BrewAI, der freundliche KI-Assistent im BrewAI Studio (KI-Marketing für Brauereien und Marken).",
     "",
     "AUFGABE:",
     "- Beantworte Fragen wie ein hilfreicher, kompetenter Assistent — allgemein und zu BrewAI.",

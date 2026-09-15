@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Suspense,
   createContext,
   useCallback,
   useContext,
@@ -19,10 +18,10 @@ import { StudioOnboardingHints } from "@/components/studio/onboarding/onboarding
 import {
   DashboardStudioShell,
   type StudioNavKey,
+  type StudioRecentMediaItem,
 } from "@/components/ui/dashboard-studio-shell";
 import { runBillingBootstrap } from "@/lib/billing/clientBootstrap";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
-import { HopfenHugoAssistant } from "@/components/studio/hopfen-hugo-assistant";
 import {
   BillingReceiptPrinter,
   type BillingReceiptData,
@@ -50,6 +49,7 @@ function resolveDashboardTab(tabParam: string): StudioNavKey {
   if (tabParam === "brand") return "brand";
   if (tabParam === "settings") return "settings";
   if (tabParam === "pricing") return "pricing";
+  if (tabParam === "assistant") return "assistant";
   return "dashboard";
 }
 
@@ -57,6 +57,8 @@ function breadcrumbForNav(nav: StudioNavKey): string {
   switch (nav) {
     case "dashboard":
       return "Dashboard";
+    case "assistant":
+      return "BrewAI";
     case "media":
       return "Mediathek";
     case "team":
@@ -80,7 +82,7 @@ export function StudioLayoutFallback() {
   return (
     <div
       className="evg-studio"
-      style={{ minHeight: "100vh", background: "var(--bg-0, #131211)" }}
+      style={{ minHeight: "100vh", background: "var(--bg-0, #F6F6F4)" }}
       aria-hidden
     />
   );
@@ -112,6 +114,7 @@ export function StudioWorkspaceShell({
   const [tokensMonthly, setTokensMonthly] = useState<number | undefined>();
   const [hasActivePlan, setHasActivePlan] = useState(initialHasActivePlan);
   const [receipt, setReceipt] = useState<BillingReceiptData | null>(null);
+  const [recentMedia, setRecentMedia] = useState<StudioRecentMediaItem[]>([]);
 
   const isCreateRoute = pathname.startsWith("/inhalte-erstellen");
   const isVideoCreateRoute = pathname.startsWith("/videos-erstellen");
@@ -158,25 +161,72 @@ export function StudioWorkspaceShell({
       }
     };
 
+    const refreshRecentMedia = async () => {
+      try {
+        const res = await fetch("/api/dashboard/media", { cache: "no-store", credentials: "include" });
+        if (!res.ok || ignore) return;
+        const json = (await res.json()) as {
+          items?: Array<{
+            id: string;
+            imageUrl: string;
+            title?: string;
+            prompt: string;
+            createdAt: string;
+            aspectRatio: string;
+            resolution: "1K" | "2K" | "4K";
+            generation?: { chargeNumber?: number | null } | null;
+          }>;
+        };
+        const items = Array.isArray(json.items) ? json.items : [];
+        // Neueste zuerst; max. 6 Kacheln (3×2-Grid).
+        const mapped: StudioRecentMediaItem[] = items
+          .slice()
+          .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+          .slice(0, 6)
+          .map((item, index, arr) => ({
+            id: item.id,
+            imageUrl: item.imageUrl,
+            title: (item.title?.trim() || item.prompt).slice(0, 120),
+            prompt: item.prompt,
+            createdAt: item.createdAt,
+            aspectRatio: item.aspectRatio,
+            resolution: item.resolution,
+            // Fallback: Positionsnummer in der Mediathek, falls keine echte Charge gesetzt ist.
+            chargeNumber:
+              typeof item.generation?.chargeNumber === "number"
+                ? item.generation.chargeNumber
+                : arr.length - index,
+          }));
+        setRecentMedia(mapped);
+      } catch {
+        /* Chargen bleiben leer / unverändert */
+      }
+    };
+
     void (async () => {
       const boot = await runBillingBootstrap();
       if (!ignore && boot.receipt) setReceipt(boot.receipt);
-      await refreshBillingUi();
+      await Promise.all([refreshBillingUi(), refreshRecentMedia()]);
     })();
 
     const onBillingUpdated = () => {
       void refreshBillingUi();
+    };
+    const onMediaUpdated = () => {
+      void refreshRecentMedia();
     };
     const onBillingReceipt = (event: Event) => {
       const detail = (event as CustomEvent<BillingReceiptData>).detail;
       if (detail) setReceipt(detail);
     };
     window.addEventListener("evglab-billing-updated", onBillingUpdated);
+    window.addEventListener("evglab-media-updated", onMediaUpdated);
     window.addEventListener("evglab-billing-receipt", onBillingReceipt);
 
     return () => {
       ignore = true;
       window.removeEventListener("evglab-billing-updated", onBillingUpdated);
+      window.removeEventListener("evglab-media-updated", onMediaUpdated);
       window.removeEventListener("evglab-billing-receipt", onBillingReceipt);
     };
   }, [pathname]);
@@ -220,16 +270,14 @@ export function StudioWorkspaceShell({
           hasActivePlan={hasActivePlan}
           tokensRemaining={tokensRemaining}
           tokensMonthly={tokensMonthly}
+          recentMedia={recentMedia}
         >
           {children}
         </DashboardStudioShell>
         <StudioOnboardingWelcome />
-        <StudioOnboardingChecklist />
+        {activeNav !== "dashboard" ? <StudioOnboardingChecklist /> : null}
         <StudioOnboardingHints area={activeNav} />
       </StudioOnboardingProvider>
-      <Suspense fallback={null}>
-        <HopfenHugoAssistant />
-      </Suspense>
       {receipt ? (
         <BillingReceiptPrinter open data={receipt} onClose={() => setReceipt(null)} />
       ) : null}

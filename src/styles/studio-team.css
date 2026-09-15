@@ -27,16 +27,16 @@
   font-family: var(--f-mono);
   font-size: var(--t-9);
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
 }
 
 .evg-studio .studio-team-title {
   margin: 0;
-  font-size: var(--t-19);
+  font-size: var(--t-page);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--t1);
   line-height: 1.2;
 }
@@ -46,7 +46,7 @@
   font-size: var(--t-13);
   color: var(--t3);
   max-width: 52ch;
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .evg-studio .studio-team-meta {
@@ -110,7 +110,7 @@
   font-family: var(--f-mono);
   font-size: var(--t-10);
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
 }

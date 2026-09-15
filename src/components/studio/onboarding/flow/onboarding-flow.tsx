@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DashboardBeer, DashboardTeamMember } from "@/lib/dashboard/metadata";
@@ -28,8 +28,6 @@ const SCAN_STEPS = [
   "Farben & Tonalität werden ausgewertet",
   "Markenprofil wird vorbereitet",
 ];
-
-const EASE = [0.2, 0.7, 0.2, 1] as const;
 
 function focusStepTitle() {
   window.requestAnimationFrame(() => {
@@ -165,6 +163,14 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
           referenceImageUrls?: string[];
           referenceImagePayloads?: { base64: string; mime: string }[];
           brandLabelReferenceUrl?: string;
+          suggestedBeers?: Array<{
+            name: string;
+            bierstil: string;
+            flaschenTyp: string;
+            flaschenfarbe: "braun" | "gruen" | "klar";
+            glasTyp: string;
+            etikettUrl: string;
+          }>;
         };
       };
       if (!res.ok || !data.suggestion) {
@@ -183,6 +189,7 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
         brandLabelReferenceUrl: (s.brandLabelReferenceUrl || "").trim(),
         referenceImageUrls: Array.isArray(s.referenceImageUrls) ? s.referenceImageUrls.filter(Boolean).slice(0, 10) : [],
         referenceImagePayloads: s.referenceImagePayloads,
+        suggestedBeers: Array.isArray(s.suggestedBeers) ? s.suggestedBeers : undefined,
       };
       if (!brandLooksReady(next)) {
         throw new Error("Analyse lieferte kein vollständiges Markenprofil.");
@@ -226,6 +233,9 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
     if (brand.referenceImagePayloads?.length) {
       body.referenceImagePayloads = brand.referenceImagePayloads;
     }
+    if (brand.suggestedBeers?.length) {
+      body.suggestedBeers = brand.suggestedBeers;
+    }
     const res = await fetch("/api/brand/activate-profile", {
       method: "POST",
       credentials: "include",
@@ -255,6 +265,7 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
           bierstil: b.bierstil,
           flaschenTyp: b.flaschenTyp || "nrw_500",
           flaschenfarbe: b.flaschenfarbe || "braun",
+          glasTyp: b.glasTyp,
           etikettUrl: b.etikettUrl || "",
           createdAt: b.createdAt || new Date().toISOString(),
           ...(b.etikettPayload ? { etikettPayload: b.etikettPayload } : {}),
@@ -297,6 +308,7 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
         bierstil: (draft.bierstil || "helles").slice(0, 60),
         flaschenTyp: draft.flaschenTyp || "nrw_500",
         flaschenfarbe: draft.flaschenfarbe || "braun",
+        glasTyp: draft.glasTyp || "willibecher",
         etikettUrl: "",
         createdAt: new Date().toISOString(),
         ...(etikettPayload ? { etikettPayload } : {}),
@@ -469,16 +481,6 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nur Initial-Resume
   }, []);
 
-  const variants = {
-    enter: (dir: number) =>
-      reducedMotion
-        ? { opacity: 0 }
-        : { opacity: 0, x: dir > 0 ? 14 : -14, y: dir > 0 ? 4 : 0 },
-    center: { opacity: 1, x: 0, y: 0 },
-    exit: (dir: number) =>
-      reducedMotion ? { opacity: 0 } : { opacity: 0, x: dir > 0 ? -10 : 10 },
-  };
-
   const footer =
     step < 5 ? (
       <div className="evg-onb-footer">
@@ -508,90 +510,76 @@ export function OnboardingFlow({ bootstrap }: { bootstrap: OnboardingBootstrap }
   return (
     <OnboardingShell
       step={step}
+      direction={direction}
       maxReached={maxReached}
       reducedMotion={reducedMotion}
       profileName={bootstrap.profileName}
       onJump={onJump}
       footer={footer}
     >
-      <AnimatePresence mode="wait" initial={false} custom={direction}>
-        <motion.div
-          key={`step-${step}`}
-          custom={direction}
-          variants={variants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{
-            duration: reducedMotion ? 0.08 : direction > 0 ? 0.24 : 0.22,
-            ease: EASE,
-          }}
-        >
-          {step === 1 ? (
-            <OnboardingBreweryStep
-              breweryName={breweryName}
-              websiteUrl={websiteUrl}
-              error={breweryError}
-              onChangeName={setBreweryName}
-              onChangeWebsite={setWebsiteUrl}
-            />
-          ) : null}
-          {step === 2 ? (
-            <OnboardingBrandStep
-              websiteUrl={websiteUrl || brand.brandWebsiteUrl}
-              draft={brand}
-              scanning={scanning}
-              scanIndex={scanIndex}
-              scanSteps={SCAN_STEPS}
-              reveal={brandReveal}
-              error={brandError}
-              onAnalyze={() => void analyzeBrand()}
-              onChangeTone={(v) => setBrand((b) => ({ ...b, brandTone: v }))}
-              onChangeColors={(v) => setBrand((b) => ({ ...b, brandColors: v }))}
-            />
-          ) : null}
-          {step === 3 ? (
-            <OnboardingAssortmentStep
-              beers={beers}
-              brandTone={brand.brandTone}
-              error={beerError}
-              reducedMotion={reducedMotion}
-              onCreate={createBeer}
-              onRemove={(id) => void removeBeer(id)}
-            />
-          ) : null}
-          {step === 4 ? (
-            <OnboardingTeamStep
-              members={team}
-              userEmail={bootstrap.userEmail}
-              inviteEmail={inviteEmail}
-              inviteRole={inviteRole}
-              error={inviteError}
-              inviting={inviting}
-              onChangeEmail={setInviteEmail}
-              onChangeRole={setInviteRole}
-              onInvite={() => void inviteMember()}
-            />
-          ) : null}
-          {step === 5 ? (
-            <OnboardingCompleteStep
-              profileName={bootstrap.profileName}
-              breweryName={breweryName || brand.breweryName}
-              brandReady={brandLooksReady(brand) || Boolean(bootstrap.settings?.brandTone)}
-              beerCount={beers.length}
-              teamCount={team.filter((m) => m.role !== "owner").length}
-              tokens={tokens}
-              hasActivePlan={hasActivePlan}
-              finishing={finishing}
-              completed={completed}
-              bonusError={bonusError}
-              onRetryBonus={() => void finishFlow()}
-              onCreate={() => router.push(hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing")}
-              onDashboard={() => router.push("/dashboard")}
-            />
-          ) : null}
-        </motion.div>
-      </AnimatePresence>
+      {step === 1 ? (
+        <OnboardingBreweryStep
+          breweryName={breweryName}
+          websiteUrl={websiteUrl}
+          error={breweryError}
+          onChangeName={setBreweryName}
+          onChangeWebsite={setWebsiteUrl}
+        />
+      ) : null}
+      {step === 2 ? (
+        <OnboardingBrandStep
+          websiteUrl={websiteUrl || brand.brandWebsiteUrl}
+          draft={brand}
+          scanning={scanning}
+          scanIndex={scanIndex}
+          scanSteps={SCAN_STEPS}
+          reveal={brandReveal}
+          error={brandError}
+          onAnalyze={() => void analyzeBrand()}
+          onChangeTone={(v) => setBrand((b) => ({ ...b, brandTone: v }))}
+          onChangeColors={(v) => setBrand((b) => ({ ...b, brandColors: v }))}
+        />
+      ) : null}
+      {step === 3 ? (
+        <OnboardingAssortmentStep
+          beers={beers}
+          brandTone={brand.brandTone}
+          error={beerError}
+          reducedMotion={reducedMotion}
+          onCreate={createBeer}
+          onRemove={(id) => void removeBeer(id)}
+        />
+      ) : null}
+      {step === 4 ? (
+        <OnboardingTeamStep
+          members={team}
+          userEmail={bootstrap.userEmail}
+          inviteEmail={inviteEmail}
+          inviteRole={inviteRole}
+          error={inviteError}
+          inviting={inviting}
+          onChangeEmail={setInviteEmail}
+          onChangeRole={setInviteRole}
+          onInvite={() => void inviteMember()}
+        />
+      ) : null}
+      {step === 5 ? (
+        <OnboardingCompleteStep
+          profileName={bootstrap.profileName}
+          breweryName={breweryName || brand.breweryName}
+          brandReady={brandLooksReady(brand) || Boolean(bootstrap.settings?.brandTone)}
+          beerCount={beers.length}
+          teamCount={team.filter((m) => m.role !== "owner").length}
+          tokens={tokens}
+          hasActivePlan={hasActivePlan}
+          finishing={finishing}
+          completed={completed}
+          bonusError={bonusError}
+          onRetryBonus={() => void finishFlow()}
+          onCreate={() => router.push(hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing")}
+          onDashboard={() => router.push("/dashboard")}
+        />
+      ) : null}
     </OnboardingShell>
   );
 }

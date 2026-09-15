@@ -6,6 +6,8 @@ import { studioFontClassName } from "@/lib/fonts/studio-fonts";
 import { useStudioOnboarding } from "@/components/studio/onboarding/onboarding-context";
 
 const CELEBRATION_MS = 5_000;
+const RING_R = 10.5;
+const RING_C = 2 * Math.PI * RING_R;
 
 function Dock({ children }: { children: ReactNode }) {
   return <div className={`evg-studio ${studioFontClassName} studio-onb-dock`}>{children}</div>;
@@ -15,19 +17,62 @@ function CheckIcon({ done }: { done: boolean }) {
   return (
     <span className="studio-onb-check" data-done={done ? "true" : "false"} aria-hidden="true">
       {done ? (
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3.5 8.5 L6.5 11.5 L12.5 4.5" />
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path
+            d="M2.5 6.2l2.4 2.4 4.6-5.2"
+            stroke="var(--ac-ink)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       ) : null}
     </span>
   );
 }
 
-export function StudioOnboardingChecklist() {
+function ProgressRing({ done, total }: { done: number; total: number }) {
+  const frac = total > 0 ? done / total : 0;
+  return (
+    <div
+      className="studio-onb-ring"
+      role="progressbar"
+      aria-label="Onboarding-Fortschritt"
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-valuenow={done}
+    >
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+        <circle cx="13" cy="13" r={RING_R} fill="none" stroke="var(--line2)" strokeWidth="2.4" />
+        <circle
+          className="studio-onb-ring-fill"
+          cx="13"
+          cy="13"
+          r={RING_R}
+          fill="none"
+          stroke="var(--ac)"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeDasharray={`${RING_C * frac} ${RING_C}`}
+        />
+      </svg>
+      <span className="studio-onb-ring-count">{done}</span>
+    </div>
+  );
+}
+
+export function StudioOnboardingChecklist({
+  placement = "dock",
+}: {
+  placement?: "dock" | "inline";
+}) {
   const onboarding = useStudioOnboarding();
   // Auf Handys startet die Checkliste eingeklappt — sie liegt dort über dem Inhalt.
   const [expanded, setExpanded] = useState(
-    () => typeof window === "undefined" || !window.matchMedia("(max-width: 639px)").matches,
+    () =>
+      placement === "inline" ||
+      typeof window === "undefined" ||
+      !window.matchMedia("(max-width: 639px)").matches,
   );
 
   const celebrating = Boolean(onboarding?.complete) && !onboarding?.state.celebrated;
@@ -44,111 +89,104 @@ export function StudioOnboardingChecklist() {
   if (onboarding.welcomeOpen || onboarding.state.checklistDismissed) return null;
   if (onboarding.complete && !celebrating) return null;
 
+  const widgetClass =
+    placement === "inline" ? "studio-onb-widget studio-onb-widget--inline" : "studio-onb-widget";
+
   if (celebrating) {
-    return (
-      <Dock>
-        <aside className="studio-onb-widget" aria-live="polite">
-          <div className="studio-onb-done">
-            <CheckIcon done />
-            <div>
-              <div className="studio-onb-widget-title">Alles erledigt</div>
-              <p className="studio-faint studio-onb-done-text">
-                Du bist startklar. Die Checkliste blendet sich jetzt aus.
-              </p>
-            </div>
+    const done = (
+      <aside className={widgetClass} aria-live="polite">
+        <div className="studio-onb-done">
+          <CheckIcon done />
+          <div>
+            <div className="studio-onb-widget-title">Alles erledigt</div>
+            <p className="studio-faint studio-onb-done-text">
+              Du bist startklar. Die Checkliste blendet sich jetzt aus.
+            </p>
           </div>
-        </aside>
-      </Dock>
+        </div>
+      </aside>
     );
+    return placement === "inline" ? done : <Dock>{done}</Dock>;
   }
 
   const { tasks, doneCount, totalCount } = onboarding;
   const firstOpen = tasks.find((task) => !task.optional && !task.done);
-  const pct = Math.round((doneCount / totalCount) * 100);
 
-  return (
-    <Dock>
-      <aside
-        className="studio-onb-widget"
-        data-expanded={expanded ? "true" : "false"}
-        aria-label="Erste Schritte"
-      >
-        <div className="studio-onb-widget-head">
-          <button
-            type="button"
-            className="studio-onb-widget-toggle"
-            onClick={() => setExpanded((prev) => !prev)}
-            aria-expanded={expanded}
+  const body = (
+    <aside
+      className={widgetClass}
+      data-expanded={expanded ? "true" : "false"}
+      aria-label="Erste Schritte"
+    >
+      <div className="studio-onb-widget-head">
+        <ProgressRing done={doneCount} total={totalCount} />
+        <button
+          type="button"
+          className="studio-onb-widget-toggle"
+          onClick={() => setExpanded((prev) => !prev)}
+          aria-expanded={expanded}
+        >
+          <span className="studio-onb-widget-title">Erste Schritte</span>
+          <span className="evg-mono studio-onb-widget-count">
+            {doneCount}/{totalCount}
+          </span>
+          <svg
+            className="studio-onb-widget-chevron"
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            fill="none"
+            aria-hidden="true"
           >
-            <span className="studio-onb-widget-title">Erste Schritte</span>
-            <span className="evg-mono studio-onb-widget-count">
-              {doneCount}/{totalCount}
-            </span>
-            <svg
-              className="studio-onb-widget-chevron"
-              width="14"
-              height="14"
-              viewBox="0 0 16 16"
-              fill="none"
+            <path
+              d="M1.5 6.5l3.5-3 3.5 3"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="1.4"
               strokeLinecap="round"
               strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M4 6 L8 10 L12 6" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="studio-onb-widget-close"
-            onClick={onboarding.dismissChecklist}
-            aria-label="Checkliste ausblenden"
-            title="Checkliste ausblenden"
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-              <path d="M4 4 L12 12 M12 4 L4 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div
-          className="studio-onb-progress"
-          role="progressbar"
-          aria-label="Onboarding-Fortschritt"
-          aria-valuemin={0}
-          aria-valuemax={totalCount}
-          aria-valuenow={doneCount}
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="studio-onb-widget-close"
+          onClick={onboarding.dismissChecklist}
+          aria-label="Checkliste ausblenden"
+          title="Checkliste ausblenden"
         >
-          <div className="studio-onb-progress-fill" style={{ width: `${pct}%` }} />
-        </div>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
 
-        {expanded ? (
-          <ul className="studio-onb-tasks">
-            {tasks.map((task) => (
-              <li key={task.id}>
-                <Link
-                  href={task.href}
-                  scroll={false}
-                  className="studio-onb-task"
-                  data-done={task.done ? "true" : "false"}
-                >
-                  <CheckIcon done={task.done} />
-                  <span className="studio-onb-task-body">
-                    <span className="studio-onb-task-label">
-                      {task.label}
-                      {task.optional ? <span className="studio-onb-task-optional">Optional</span> : null}
-                    </span>
-                    {!task.done && task.id === firstOpen?.id ? (
-                      <span className="studio-faint studio-onb-task-desc">{task.description}</span>
-                    ) : null}
+      {expanded ? (
+        <ul className="studio-onb-tasks">
+          {tasks.map((task) => (
+            <li key={task.id}>
+              <Link
+                href={task.href}
+                scroll={false}
+                className="studio-onb-task"
+                data-done={task.done ? "true" : "false"}
+              >
+                <CheckIcon done={task.done} />
+                <span className="studio-onb-task-body">
+                  <span className="studio-onb-task-label">
+                    {task.label}
+                    {task.optional ? <span className="studio-onb-task-optional">Optional</span> : null}
                   </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </aside>
-    </Dock>
+                  {!task.done && task.id === firstOpen?.id ? (
+                    <span className="studio-faint studio-onb-task-desc">{task.description}</span>
+                  ) : null}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </aside>
   );
+
+  return placement === "inline" ? body : <Dock>{body}</Dock>;
 }

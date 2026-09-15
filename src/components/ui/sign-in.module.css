@@ -35,9 +35,9 @@
   --r-sm: 8px;
   --r-pill: 100px;
 
-  --sans: var(--font-work-sans), "Work Sans", system-ui, sans-serif;
+  --sans: var(--font-inter-tight), "Inter Tight", system-ui, sans-serif;
   --mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
-  --headline: var(--sans);
+  --headline: var(--font-newsreader), "Newsreader", Georgia, serif;
 
   /* Mobile-first: Formular zuerst, kompakter Brand-Header */
   min-height: 100dvh;
@@ -205,9 +205,9 @@
 
 .eyebrow {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--tx-3);
   display: inline-flex;
@@ -224,7 +224,7 @@
 
 .display {
   font-family: var(--headline);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.04;
   color: var(--tx-0);
@@ -240,7 +240,7 @@
 .heroHeadline em {
   font-style: italic;
   color: var(--acc-hi);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .heroHeadlineStack {
@@ -364,7 +364,7 @@
   margin-top: 6px;
   color: var(--tx-3);
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .modeToggle {
@@ -416,9 +416,9 @@
 
 .fieldLabel {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--tx-3);
   display: block;
@@ -438,8 +438,8 @@
 
 .forgot {
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--tx-2);
   text-decoration: none;
@@ -580,8 +580,8 @@
   margin: 22px 0;
   color: var(--tx-3);
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -665,7 +665,7 @@
 .waitlistTitle {
   font-family: var(--headline);
   font-size: clamp(26px, 5vw, 32px);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin-bottom: 10px;
 }

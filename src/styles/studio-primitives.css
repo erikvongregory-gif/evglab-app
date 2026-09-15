@@ -6,7 +6,9 @@
   align-items: center;
   justify-content: center;
   gap: var(--sp-3);
+  box-sizing: border-box;
   min-height: 34px;
+  height: 34px;
   padding: 0 14px;
   border-radius: var(--r-md);
   border: 1px solid transparent;
@@ -25,8 +27,8 @@
     transform 80ms ease;
 }
 .evg-studio .stu-btn:focus-visible {
-  outline: 2px solid var(--ac);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ac-tint);
 }
 .evg-studio .stu-btn:active:not(:disabled):not([aria-disabled="true"]) {
   transform: scale(0.97);
@@ -93,16 +95,19 @@
 }
 
 .evg-studio .stu-btn--sm {
-  min-height: 28px;
+  min-height: 30px;
+  height: 30px;
   padding: 0 10px;
   font-size: var(--t-12);
   border-radius: var(--r-sm);
 }
 .evg-studio .stu-btn--md {
   min-height: 34px;
+  height: 34px;
 }
 .evg-studio .stu-btn--lg {
-  min-height: 44px;
+  min-height: 40px;
+  height: 40px;
   padding: 0 18px;
 }
 
@@ -137,8 +142,8 @@
     transform 80ms ease;
 }
 .evg-studio .stu-icon-btn:focus-visible {
-  outline: 2px solid var(--ac);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ac-tint);
 }
 .evg-studio .stu-icon-btn:hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--s3);
@@ -189,7 +194,7 @@
   font-family: var(--f-mono);
   font-size: var(--t-10);
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
 }
@@ -246,9 +251,9 @@
 .evg-studio .stu-input:focus-visible,
 .evg-studio .stu-textarea:focus-visible,
 .evg-studio .stu-select:focus-visible {
-  outline: 2px solid var(--ac);
-  outline-offset: 2px;
+  outline: none;
   border-color: var(--ac-line);
+  box-shadow: 0 0 0 3px var(--ac-tint);
 }
 .evg-studio .stu-input:disabled,
 .evg-studio .stu-textarea:disabled,
@@ -294,9 +299,9 @@
   padding: 3px 8px;
   border-radius: var(--r-sm);
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   border: 1px solid transparent;
   line-height: 1.2;
@@ -333,22 +338,23 @@
 }
 
 .evg-studio .stu-card {
-  background: var(--s2);
+  background: var(--s1);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   color: var(--t2);
+  box-shadow: var(--sh-card);
 }
 .evg-studio .stu-card--pad-sm {
-  padding: 13px 15px;
+  padding: 12px 14px;
 }
 .evg-studio .stu-card--pad-md {
-  padding: 18px 20px;
+  padding: 16px;
 }
 .evg-studio .stu-card--interactive {
-  transition: background var(--dur-mid) var(--ease), border-color var(--dur-mid) var(--ease);
+  transition: background var(--dur-mid) var(--ease), border-color var(--dur-mid) var(--ease), box-shadow var(--dur-mid) var(--ease);
 }
 .evg-studio .stu-card--interactive:hover {
-  background: var(--s3);
+  background: var(--s2);
   border-color: var(--line2);
 }
 .evg-studio .stu-card--interactive:focus-visible {
@@ -587,7 +593,7 @@
   padding-top: 16px;
   color: var(--t2);
   font-size: var(--t-14);
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 /* ── T2b: Tooltip / Menu / Dialog / Toast ───────────────── */
@@ -729,7 +735,7 @@
 .stu-dialog.evg-studio .stu-dialog__desc {
   margin: 0;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.45;
   color: var(--t3);
 }
 .stu-dialog.evg-studio .stu-dialog__footer {

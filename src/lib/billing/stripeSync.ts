@@ -5,11 +5,10 @@ import {
   getBillingRow,
   type BillingRow,
   setStripeCustomerId,
-  updateByStripeSubscription,
 } from "@/lib/billing/store";
 import { mapPriceIdToPlan as mapPriceIdToPlanFromEnv } from "@/lib/billing/stripePrices";
 import { getStripeClient } from "@/lib/billing/stripeServer";
-import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
 export { getStripeClient } from "@/lib/billing/stripeServer";
 
@@ -24,35 +23,12 @@ export function toIsoFromUnix(seconds?: number | null) {
 
 export function getCurrentPeriodEndUnix(subscription: Stripe.Subscription) {
   const value = (subscription as Stripe.Subscription & { current_period_end?: number }).current_period_end;
-  return typeof value === "number" ? value : null;
+  return typeof value === "number" ? value : subscription.items.data[0]?.current_period_end ?? null;
 }
 
 export function mapStatusToBillingStatus(status: Stripe.Subscription.Status) {
   if (status === "incomplete_expired" || status === "paused") return "incomplete" as const;
   return status as "active" | "trialing" | "past_due" | "canceled" | "incomplete" | "unpaid";
-}
-
-async function getPurchasedTokenTotal(stripe: Stripe, customerId: string, userId: string): Promise<number> {
-  let total = 0;
-  let cursor: string | undefined;
-  for (let page = 0; page < 20; page += 1) {
-    const sessions = await stripe.checkout.sessions.list({
-      customer: customerId,
-      limit: 100,
-      ...(cursor ? { starting_after: cursor } : {}),
-    });
-    for (const session of sessions.data) {
-      if (session.mode !== "payment") continue;
-      if (session.payment_status !== "paid" && session.status !== "complete") continue;
-      if (session.metadata?.kind !== "token_pack") continue;
-      if (session.metadata?.user_id !== userId) continue;
-      const tokens = Number.parseInt(session.metadata?.tokens ?? "0", 10);
-      if (Number.isFinite(tokens) && tokens > 0) total += tokens;
-    }
-    if (!sessions.has_more || sessions.data.length === 0) break;
-    cursor = sessions.data[sessions.data.length - 1]?.id;
-  }
-  return total;
 }
 
 type SyncArgs = {
@@ -99,13 +75,10 @@ export async function syncBillingFromStripe(args: SyncArgs) {
 
   const planFromMeta = (preferred.metadata?.plan as SubscriptionPlanKey | undefined) ?? null;
   const planFromPrice = mapPriceIdToPlan(preferred.items.data[0]?.price?.id ?? null);
-  const plan = planFromMeta ?? planFromPrice;
+  const plan = planFromPrice ?? planFromMeta;
   if (!plan) {
     return { synced: false as const, reason: "Price-ID konnte keinem Plan zugeordnet werden." };
   }
-
-  const purchasedTokenTotal = await getPurchasedTokenTotal(stripe, customerId, args.userId);
-  const expectedMonthlyTokens = SUBSCRIPTION_PLAN_TOKENS[plan] + purchasedTokenTotal;
 
   await activatePlanForUser({
     userId: args.userId,
@@ -114,10 +87,6 @@ export async function syncBillingFromStripe(args: SyncArgs) {
     stripeCustomerId: customerId,
     stripeSubscriptionId: preferred.id,
     currentPeriodEnd: toIsoFromUnix(getCurrentPeriodEndUnix(preferred)),
-    preserveTokenBalance: true,
-  });
-  await updateByStripeSubscription(preferred.id, {
-    monthly_tokens: expectedMonthlyTokens,
   });
   return { synced: true as const, plan };
 }

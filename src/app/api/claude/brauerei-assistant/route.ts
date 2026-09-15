@@ -40,7 +40,7 @@ function fallbackAnswer(question: string): string {
   if (/token|billing|budget|kosten sparen|umgeh|hack/i.test(q)) {
     return policyRefusalAnswer();
   }
-  return "Prost! Ich bin Hopfen Hugo — frag mich zu BrewAI, Marketing, Brauerei oder allgemeinen Themen. Bei Bild-Prompts bin ich besonders stark.";
+  return "Hallo — ich bin BrewAI. Frag mich zu BrewAI, Marketing, Brauerei oder allgemeinen Themen. Bei Bild-Prompts bin ich besonders stark.";
 }
 
 function hasUsableAnthropicKey(value: string | undefined): value is string {

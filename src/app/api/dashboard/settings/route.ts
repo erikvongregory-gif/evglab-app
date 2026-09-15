@@ -60,6 +60,21 @@ const settingsSchema = z.object({
       }
     }),
   brandAnalyzedAt: z.string().max(64).optional(),
+  brandHeadlineFontName: z.string().max(80).optional().default(""),
+  brandFontFileUrl: z
+    .string()
+    .max(1200)
+    .optional()
+    .default("")
+    .transform((value) => {
+      try {
+        const parsed = new URL(value.trim());
+        return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : "";
+      } catch {
+        return "";
+      }
+    }),
+  brandFontWeight: z.string().max(8).optional().default("700"),
 });
 
 export async function GET(req: Request) {
@@ -122,6 +137,10 @@ export async function GET(req: Request) {
     brandLabelReferenceUrl:
       typeof settings?.brandLabelReferenceUrl === "string" ? settings.brandLabelReferenceUrl : "",
     brandAnalyzedAt: typeof settings?.brandAnalyzedAt === "string" ? settings.brandAnalyzedAt : undefined,
+    brandHeadlineFontName:
+      typeof settings?.brandHeadlineFontName === "string" ? settings.brandHeadlineFontName : "",
+    brandFontFileUrl: typeof settings?.brandFontFileUrl === "string" ? settings.brandFontFileUrl : "",
+    brandFontWeight: typeof settings?.brandFontWeight === "string" ? settings.brandFontWeight : "700",
   };
 
   // Wichtig: KEIN Schreib-Side-Effect mehr im GET — der Repair-Status wird nur

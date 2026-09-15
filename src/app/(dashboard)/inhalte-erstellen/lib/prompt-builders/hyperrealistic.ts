@@ -288,6 +288,8 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
   return `
 ${buildHyperrealismLockFragment()}
 
+${input.zusatzWunsch ? `CLIENT INTENT OVERRIDES PRESETS (fulfill exactly — location, action, people): ${input.zusatzWunsch}` : ""}
+
 ${subjectBlock}
 ${bottleShapeLock ? `\n${bottleShapeLock}\n` : ""}${glassShapeLock ? `\n${glassShapeLock}\n` : ""}${closureLogic ? `\n${closureLogic}\n` : ""}
 ${beerPhysicsPart}
@@ -305,7 +307,7 @@ ${brandLock}
 
 CAMERA: ${cameraPart}
 
-${input.zusatzWunsch ? `ADDITIONAL: ${input.zusatzWunsch}` : ""}
+${input.zusatzWunsch ? `CLIENT INTENT WINS OVER SCENE PRESETS (fulfill exactly): ${input.zusatzWunsch}` : ""}
 
 NEGATIVE: ${sceneNegative}${bottleShapeNegative}${closureNegative}${glassOnlyNegative}${labelNegative}${HYPERREALISM_NEGATIVE}.
   `.trim();
@@ -319,44 +321,225 @@ const PEOPLE_PLACEMENT: Record<NonNullable<HyperrealisticInput["personenModus"]>
   E: "A small group of ordinary adults, candid, not posing for an ad.",
 };
 
+/** Freitext → Personen/Gruppe/Alter/Toast. Verhindert „No people“ gegen User-Szene. */
+export function detectPeopleIntent(raw: string): {
+  toasting: boolean;
+  hasPeople: boolean;
+  group: boolean;
+  groupCount?: "2" | "3" | "4_5";
+  older: boolean;
+  maleLean: boolean;
+} {
+  const toasting = /anst(o|ö)ß|ansto(ss|ßen)|angesto(ss|ß)en|prost|cheers|\btoast\b/i.test(raw);
+  const hasPeopleNoun =
+    /brauer|braumeister|brewer|mitarbeiter|gast(?:e|en)?|person(?:en)?|mann|männer|maenner|frau(?:en)?|kerl(?:e)?|leute|menschen|paar|freunde|freundinnen|oma|opa|senior(?:en)?|rentner(?:in)?|bayer(?:in|n)?|urbayer|trinker|besucher|toururin|tourist(?:en)?|gruppe|family|familie|couple|\bmen\b|\bwomen\b|\bpeople\b|\bguys\b|\bhumans?\b/i.test(
+      raw,
+    );
+  const hasPeopleAction =
+    /trink(?:en|t|st)?|\btrinken\b|sitz(?:en|t)?|steh(?:en|t)?|unterhalt|gespräch|gespraech|lacht|lachen|grinst|freut|schlapp|jubel|feier|gemütlich|gemuetlich|genieß|geniess|prost/i.test(
+      raw,
+    );
+  const older = /\b(alt(?:e|er|en)?|älter|aelter|senior|opa|oma|rentner)\b/i.test(raw);
+  const maleLean = /\b(mann|männer|maenner|kerl|urbayer|bayer(?!isch)|opa|rentner)\b/i.test(raw);
+  const groupCountMatch = raw.match(/\b(zwei|2|drei|3|vier|4|fünf|fuenf|5)\b/i);
+  let groupCount: "2" | "3" | "4_5" | undefined;
+  if (groupCountMatch) {
+    const n = groupCountMatch[1]!.toLowerCase();
+    if (n === "zwei" || n === "2") groupCount = "2";
+    else if (n === "drei" || n === "3") groupCount = "3";
+    else groupCount = "4_5";
+  }
+  const group =
+    toasting ||
+    Boolean(groupCount) ||
+    /\b(gruppe|paar|freunde|leute|menschen|together|beide)\b/i.test(raw);
+  const hasPeople = toasting || hasPeopleNoun || (hasPeopleAction && (hasPeopleNoun || older || group || Boolean(groupCount)));
+  // „trinken“ allein reicht mit Alters-/Bayer-Hinweis oder Anzahl
+  const hasPeopleLoose =
+    hasPeople ||
+    (hasPeopleAction && (older || maleLean || Boolean(groupCount))) ||
+    (older && (maleLean || hasPeopleAction));
+
+  return {
+    toasting,
+    hasPeople: hasPeopleLoose,
+    group: group || toasting || Boolean(groupCount),
+    groupCount,
+    older,
+    maleLean,
+  };
+}
+
+/** Erkennt Handlungs-/Ort-Wünsche im Freitext und korrigiert Defaults, die dagegen arbeiten. */
+export function applyClientIntentOverrides(input: HyperrealisticInput): HyperrealisticInput {
+  const raw = input.zusatzWunsch?.trim();
+  if (!raw) return input;
+
+  const next: HyperrealisticInput = { ...input };
+  const mountain = /berg|gipfel|alpen|mountain|hütte|huette|\balm\b/i.test(raw);
+  const breweryPlace = /brauerei|sudhaus|braukessel|copper kettle|brewery/i.test(raw);
+  const intent = detectPeopleIntent(raw);
+
+  if (intent.toasting) {
+    next.personenModus = "E";
+    next.personImBild = true;
+    next.gruppenAnzahl = input.gruppenAnzahl ?? intent.groupCount ?? "2";
+    next.gruppenTyp = input.gruppenTyp ?? (intent.maleLean ? "maenner" : "gemischt");
+    next.gruppenDynamik = input.gruppenDynamik ?? "E2";
+  } else if (intent.hasPeople && (intent.group || intent.groupCount)) {
+    next.personenModus = "E";
+    next.personImBild = true;
+    next.gruppenAnzahl = input.gruppenAnzahl ?? intent.groupCount ?? "2";
+    next.gruppenTyp = input.gruppenTyp ?? (intent.maleLean ? "maenner" : "gemischt");
+    next.gruppenDynamik = input.gruppenDynamik ?? "E3";
+    if (intent.older) next.personAlter = input.personAlter ?? "aelter";
+    if (intent.maleLean) next.personGender = input.personGender ?? "maennlich";
+  } else if (intent.hasPeople) {
+    next.personenModus = "D";
+    next.personImBild = true;
+    const laughing = /lacht|lachen|grinst|freut|schlapp|jubel|feier/i.test(raw);
+    next.personMood = input.personMood ?? (laughing ? "lachend" : "entspannt");
+    next.shotType = input.shotType === "A" ? "B" : input.shotType;
+    if (intent.older) next.personAlter = input.personAlter ?? "aelter";
+    if (intent.maleLean) next.personGender = input.personGender ?? "maennlich";
+  }
+
+  if (mountain) {
+    next.szene = "alpenpanorama";
+  } else if (breweryPlace || /brauer|braumeister|brewer/i.test(raw)) {
+    next.szene = "brauereihof";
+  }
+
+  return next;
+}
+
 /**
  * Kurzer i2i-Prompt: das Produktfoto bleibt, nur die Szene wechselt.
  * Bewusst ohne Markenname/Etikett-Beschreibung — die Bild-KI soll das Foto kopieren,
  * nicht ein Label aus Text erfinden.
+ *
+ * Wichtig: Wenn ein Freitext (`zusatzWunsch`) gesetzt ist, steht die User-Szene ZUERST.
+ * Sonst reproduziert images/edits oft 1:1 die Biergarten-Komposition aus Image 1.
  */
 export function buildProductPlacementPrompt(input: HyperrealisticInput): string {
   const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
   const personenModus = input.personenModus ?? (input.personImBild ? "D" : "A");
   const scene = SZENE_DESCRIPTIONS[input.szene];
   const light = TAGESZEIT_LIGHTING[input.tageszeit];
-  const people = PEOPLE_PLACEMENT[personenModus] ?? PEOPLE_PLACEMENT.A;
-  const vessel =
-    behaelter === "G" ? "glass only, no bottle" : behaelter === "F" ? "the bottle from Image 1 only, no poured glass" : "the bottle from Image 1 plus a poured beer glass beside it";
   const extra = input.zusatzWunsch?.trim();
+  const intent = extra ? detectPeopleIntent(extra) : null;
+  const toasting = Boolean(intent?.toasting);
+  const heroPerson = Boolean(intent?.hasPeople && !intent.toasting && !intent.group);
+  const groupPeople = Boolean(intent?.hasPeople && (intent.group || intent.toasting));
+  const hasPeople = personenModus !== "A" || Boolean(intent?.hasPeople);
+
+  let people = PEOPLE_PLACEMENT[hasPeople && personenModus === "A" ? "D" : personenModus] ?? PEOPLE_PLACEMENT.A;
+  if (toasting) {
+    people =
+      "Anstoßen = real people: at least two visible adult hands holding glasses and clinking them (Prost). Faces optional. NEVER a floating bottle toasting a floating glass. NEVER products leaning into each other without hands.";
+  } else if (groupPeople || (intent?.hasPeople && personenModus === "E")) {
+    people =
+      "PEOPLE FROM USER SCENE (mandatory, sharp, readable): include every person described — faces/bodies visible in the foreground or mid-ground, matching age/clothing/action. Sitting/standing as described. NEVER replace them with an empty bottle+glass table still life. NEVER background-only silhouettes.";
+  } else if (heroPerson || (intent?.hasPeople && personenModus === "D")) {
+    people =
+      "HERO PERSON (mandatory, sharp enough to read emotion): one real adult matching the USER SCENE — natural face, real hands, clearly present. Not a tiny background blur. Not a static packshot without people.";
+  } else if (extra && personenModus === "A") {
+    // Strukturelle Absicherung: Freitext + Default „keine Personen“ darf sich nie widersprechen.
+    // Unbekannte Synonyme (Kunde schreibt „Veteranen“, „Stammtischrunde“ …) bleiben so sicher.
+    people =
+      "Follow USER SCENE for people: if it describes any person(s), hands, or human activity, those people are MANDATORY sharp subjects in frame — never omit them for a product-only bottle+glass still life. Only if USER SCENE clearly has no people, keep product-only with no hands.";
+  }
+
+  // Harte „No people“-Zeile nie zusammen mit Freitext ausgeben (auch nach Heuristik-Lücken).
+  if (extra && /No people/i.test(people)) {
+    people =
+      "Follow USER SCENE for people: if people are described, show them sharp and readable; never replace them with an empty product still life.";
+  }
+
+  const vessel = toasting
+    ? "two people toasting: glasses held in hands mid-clink in the foreground; the bottle from Image 1 stands on a surface nearby or is held by someone — products must rest on real hands or a real surface, never hover"
+    : intent?.hasPeople
+      ? "the people from USER SCENE are the main subjects; the bottle from Image 1 is held or stands next to them in frame — NOT a lonely bottle+glass table still life"
+      : behaelter === "G"
+        ? "glass only, no bottle"
+        : behaelter === "F"
+          ? "the bottle from Image 1 only, no poured glass"
+          : "the bottle from Image 1 plus a poured beer glass beside it";
+
   const glassPour =
     behaelter !== "F" && input.glasTyp
       ? glassPourPromptDescription(input.glasTyp, pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter))
       : "";
   const bottleLitres = flascheVolumeMl(input.flaschenTyp) / 1000;
   const pourLock =
-    behaelter === "B" && glassPour
+    !toasting && !intent?.hasPeople && behaelter === "B" && glassPour
       ? `Beside it: one poured ${glassPour}. The glass is a single pour from this ${bottleLitres} L bottle — never a larger mug than the bottle (no 0.5 L Seidel next to a 0.33 L bottle, no 1 L Maß).`
       : "";
 
+  const labelLock =
+    "Keep unchanged from Image 1: bottle silhouette, glass color, and the entire printed label — logo, crest, pattern, colors, layout, and every letter. Do not redraw, restyle, recolor, or invent a different label.";
+
+  const hyperrealHead = buildHyperrealismLockFragment();
+  const hyperrealTail = [
+    buildAuthenticityFragment({ ...input, personenModus: hasPeople ? (personenModus === "A" ? (groupPeople || toasting ? "E" : "D") : personenModus) : personenModus }),
+    `NEGATIVE (hyperreal): ${HYPERREALISM_NEGATIVE}`,
+  ].join(" ");
+
+  const camera =
+    "Camera: handheld Canon EOS R6, 50mm f/4, Kodak Portra 400, ISO 400, fine analog grain. Slightly muted color. Not centered. Not everything razor-sharp.";
+  const forbidden = toasting
+    ? "Forbidden: floating bottle, floating glass, bottle and glass toasting each other without hands, cutout collage, hard mask edges, recreating Image 1's table packshot, CGI, HDR, plastic foam, sticker condensation."
+    : intent?.hasPeople
+      ? "Forbidden: empty product table shot with no people, bottle+glass still life only, omitting the people from USER SCENE, recreating Image 1 biergarten packshot, cutout collage, CGI, beauty-filter face, tiny unreadable background figure."
+      : "Forbidden: recreating Image 1's background or table layout, catalog packshot, cutout collage, hard mask edges, CGI, HDR, beauty retouch, floating product, plastic foam, sticker condensation.";
+
+  const extraRefCount = input.extraReferenceImages?.filter(Boolean).length ?? 0;
+  const extraRefLine =
+    extraRefCount > 0
+      ? `Image 2${extraRefCount > 1 ? `–${1 + extraRefCount}` : ""}: optional context only (crate, location, props, mood). Use for environment cues. Never copy foreign brands/logos/text from these onto the beer. Image 1 remains the only product identity.`
+      : "";
+
+  // Freitext-Pfad: User-Szene ist Pflicht — Image 1 nur Produktidentität.
+  if (extra) {
+    return [
+      hyperrealHead,
+      `USER SCENE (mandatory — fulfill exactly, this is the photograph to create): ${extra}`,
+      "Image 1 is ONLY a product identity reference (the real beer bottle + printed label from the selected beer).",
+      "COMPLETELY DISCARD Image 1's background, wooden table, coaster, napkin, glass placement, people, trees, and camera framing. Do not remake Image 1. Invent a wholly new environment for the USER SCENE.",
+      extraRefLine,
+      labelLock,
+      `Composition for the NEW scene: ${vessel}.`,
+      people,
+      `Fallback location hint (ignore if it conflicts with USER SCENE): ${scene}.`,
+      `Light: ${light}. Match lighting to the NEW scene so the bottle looks physically photographed there — real glass refraction, true contact shadows, physically plausible condensation (irregular, not sticker grid).`,
+      camera,
+      forbidden,
+      hyperrealTail,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  const integrate =
+    hasPeople
+      ? "Integrate the bottle from Image 1 as a physically photographed object *inside* this real moment — matched lighting, perspective, occlusion, and contact shadows. Not a cutout collage."
+      : "Integrate the bottle from Image 1 as a physically photographed object in this scene — matched lighting, perspective, natural contact shadow. Not a cutout collage.";
+
   return [
-    "Image 1 is a photograph of the real beer bottle. Place that exact same physical bottle into a new photograph — preserve the product, invent only the environment (product-preservation, not a redraw).",
-    "Keep unchanged from Image 1: bottle silhouette, glass color, and the entire printed label — logo, crest, pattern, colors, layout, and every letter. Do not redraw, restyle, recolor, or invent a different label. Do not add new brand names or badges.",
-    "The bottle sits on a real surface with a natural contact shadow. Bottle glass reflects THIS room, not a white studio cove.",
+    hyperrealHead,
+    "Image 1 is a photograph of the real beer bottle from the selected beer variety.",
+    integrate,
+    extraRefLine,
+    labelLock,
     `Composition: ${vessel}.`,
     pourLock,
     people,
     `Setting: ${scene}.`,
-    `Light: ${light}. Large soft source on the packaging (window or overcast sky), not a beauty dish, not rim-light hero glow. Some shadow remains.`,
-    extra ? `Scene detail: ${extra}` : "",
-    "Camera: handheld Canon EOS R6, 50mm f/4, Kodak Portra 400, ISO 400, fine analog grain. Slightly muted color. Not centered. Not everything razor-sharp.",
+    `Light: ${light}. Large soft source on the packaging (window or overcast sky), not a beauty dish, not rim-light hero glow. Some shadow remains. Real glass refraction and irregular condensation.`,
+    camera,
     "This is not an advertisement, not CGI, not cinematic orange glow, not beauty-filtered skin.",
-    "Forbidden look: Octane/Unreal, catalog packshot, HDR, photorealistic commercial product shot, ultra-detailed, professionally retouched, plastic foam, uniform condensation stickers, floating product.",
-    buildAuthenticityFragment(input),
+    forbidden,
+    hyperrealTail,
   ]
     .filter(Boolean)
     .join(" ");

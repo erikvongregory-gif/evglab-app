@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { StudioViewTransition } from "@/components/studio/studio-view-transition";
 import { StudioTokenBadge, type StudioTokenCharge } from "@/components/studio/studio-token-badge";
@@ -15,6 +15,7 @@ import {
   StudioTopbarSearchMobile,
 } from "@/components/studio/studio-global-search";
 import { useStudioOnboarding } from "@/components/studio/onboarding/onboarding-context";
+import { EvglabMark } from "@/components/studio/evglab-mark";
 import {
   StudioUiDialog,
   StudioUiDialogContent,
@@ -29,10 +30,11 @@ import {
 } from "@/components/studio/ui";
 import { cn } from "@/lib/utils";
 
-const RAIL_COLLAPSE_KEY = "evg-studio-rail-collapsed";
 const PRICING_HREF = "/dashboard?tab=pricing";
-const DESKTOP_MIN = 1240;
 const MOBILE_MAX = 639;
+/** Intent-Delay wie Studio-Sidebars: nicht bei jedem Streifen sofort auf. */
+const RAIL_OPEN_MS = 90;
+const RAIL_CLOSE_MS = 120;
 
 export type StudioRecentMediaItem = {
   id: string;
@@ -46,7 +48,7 @@ export type StudioRecentMediaItem = {
 };
 
 /** Content gutter — matches BrewAI Studio redesign */
-export const STUDIO_PAD_X = 40;
+export const STUDIO_PAD_X = 24;
 
 /** Studio design tokens (CSS vars on .evg-studio) — mapped to Sudbuch vars */
 export const STUDIO_TOKENS = {
@@ -60,8 +62,8 @@ export const STUDIO_TOKENS = {
   ember: "var(--acc)",
   glow: "var(--acc-dim)",
   sans: "var(--f-sans)",
+  /** Kein Serif in Produkt-UI — Newsreader nur über --f-brand am Logo */
   accentSerif: "var(--f-sans)",
-  /** @deprecated Display-Alias — Serif im Studio entfernt */
   serif: "var(--f-sans)",
   mono: "var(--f-mono)",
   gradientBrand: "var(--acc)",
@@ -88,6 +90,7 @@ export type StudioPalette = {
 
 export type StudioNavKey =
   | "dashboard"
+  | "assistant"
   | "create"
   | "create-video"
   | "media"
@@ -132,121 +135,122 @@ function useMediaQuery(query: string) {
 function BrewAILogoMark() {
   return (
     <span className="evg-rail__mark" aria-hidden="true">
-      <svg width="18" height="11" viewBox="0 0 26 16" fill="none" aria-hidden="true">
-        <path
-          d="M1 12C4 4 7 4 9 8C11 12 14 12 16 8C18 4 21 4 25 12"
-          stroke="currentColor"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-        />
-      </svg>
+      <EvglabMark size={22} />
     </span>
   );
 }
 
-function RailCollapseButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      className="evg-rail__collapse"
-      aria-label={collapsed ? "Navigation ausklappen" : "Navigation einklappen"}
-      aria-pressed={collapsed}
-      onClick={onClick}
-    >
-      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-        {collapsed ? (
-          <path d="M6 4 L10 8 L6 12" strokeLinecap="round" strokeLinejoin="round" />
-        ) : (
-          <>
-            <path d="M3 2 V14" strokeLinecap="round" />
-            <path d="M12 5 L9 8 L12 11" strokeLinecap="round" strokeLinejoin="round" />
-          </>
-        )}
-      </svg>
-    </button>
-  );
-}
-
+/** Nav icons — Iconsax Linear (24px), stroke 1.5, currentColor */
 function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: string }) {
-  const s = 18;
-  const sw = 1.6;
   const map: Record<string, React.ReactNode> = {
     home: (
       <>
-        <path d="M3 9 L10 3 L17 9 V16 H3 Z" />
-        <path d="M8 16 V12 H12 V16" />
+        <path d="M9.02 2.84 L3.63 7.04 C2.73 7.74 2 9.23 2 10.36 V17.77 C2 20.09 3.89 21.99 6.21 21.99 H17.79 C20.11 21.99 22 20.09 22 17.78 V10.5 C22 9.29 21.19 7.74 20.2 7.05 L14.02 2.72 C12.62 1.74 10.37 1.79 9.02 2.84 Z" />
+        <path d="M12 18 V15" />
       </>
     ),
     dash: (
       <>
-        <rect x="3" y="3" width="6" height="6" rx="0" />
-        <rect x="11" y="3" width="6" height="4" rx="0" />
-        <rect x="11" y="9" width="6" height="8" rx="0" />
-        <rect x="3" y="11" width="6" height="6" rx="0" />
+        <path d="M22 10.9 V4.1 C22 2.6 21.36 2 19.77 2 H15.73 C14.14 2 13.5 2.6 13.5 4.1 V10.9 C13.5 12.4 14.14 13 15.73 13 H19.77 C21.36 13 22 12.4 22 10.9 Z" />
+        <path d="M22 19.9 V18.1 C22 16.6 21.36 16 19.77 16 H15.73 C14.14 16 13.5 16.6 13.5 18.1 V19.9 C13.5 21.4 14.14 22 15.73 22 H19.77 C21.36 22 22 21.4 22 19.9 Z" />
+        <path d="M10.5 13.1 V19.9 C10.5 21.4 9.86 22 8.27 22 H4.23 C2.64 22 2 21.4 2 19.9 V13.1 C2 11.6 2.64 11 4.23 11 H8.27 C9.86 11 10.5 11.6 10.5 13.1 Z" />
+        <path d="M10.5 4.1 V5.9 C10.5 7.4 9.86 8 8.27 8 H4.23 C2.64 8 2 7.4 2 5.9 V4.1 C2 2.6 2.64 2 4.23 2 H8.27 C9.86 2 10.5 2.6 10.5 4.1 Z" />
       </>
     ),
-    spark: <path d="M10 3 L11.5 8 L16.5 9.5 L11.5 11 L10 16 L8.5 11 L3.5 9.5 L8.5 8 Z" />,
+    spark: (
+      <>
+        <path d="M3.5 20.5 C4.33 21.33 5.67 21.33 6.5 20.5 L19.5 7.5 C20.33 6.67 20.33 5.33 19.5 4.5 C18.67 3.67 17.33 3.67 16.5 4.5 L3.5 17.5 C2.67 18.33 2.67 19.67 3.5 20.5 Z" />
+        <path d="M18.01 8.99 L15.01 5.99" />
+        <path d="M8.5 2.44 L10 2 L9.56 3.5 L10 5 L8.5 4.56 L7 5 L7.44 3.5 L7 2 L8.5 2.44 Z" />
+        <path d="M4.5 8.44 L6 8 L5.56 9.5 L6 11 L4.5 10.56 L3 11 L3.44 9.5 L3 8 L4.5 8.44 Z" />
+        <path d="M19.5 13.44 L21 13 L20.56 14.5 L21 16 L19.5 15.56 L18 16 L18.44 14.5 L18 13 L19.5 13.44 Z" />
+      </>
+    ),
+    chat: (
+      <>
+        <path d="M16 2 H8 C4 2 2 4 2 8 V21 C2 21.55 2.45 22 3 22 H16 C20 22 22 20 22 16 V8 C22 4 20 2 16 2 Z" />
+        <path d="M7 9.5 H17" />
+        <path d="M7 14.5 H14" />
+      </>
+    ),
     video: (
       <>
-        <rect x="3" y="5" width="14" height="10" rx="0" />
-        <path d="M8 10 L13 12.5 V7.5 Z" fill={color} stroke="none" />
+        <path d="M12.53 20.42 H6.21 C3.05 20.42 2 18.32 2 16.21 V7.79 C2 4.63 3.05 3.58 6.21 3.58 H12.53 C15.69 3.58 16.74 4.63 16.74 7.79 V16.21 C16.74 19.37 15.68 20.42 12.53 20.42 Z" />
+        <path d="M19.52 17.1 L16.74 15.15 V8.84 L19.52 6.89 C20.88 5.94 22 6.52 22 8.19 V15.81 C22 17.48 20.88 18.06 19.52 17.1 Z" />
+        <path d="M11.5 11 C12.3284 11 13 10.3284 13 9.5 C13 8.67157 12.3284 8 11.5 8 C10.6716 8 10 8.67157 10 9.5 C10 10.3284 10.6716 11 11.5 11 Z" />
       </>
     ),
     media: (
       <>
-        <rect x="3" y="3" width="14" height="14" rx="0" />
-        <path d="M3 13 L7 9 L11 13 L14 10 L17 13" />
-        <circle cx="13.5" cy="6.5" r="1.3" />
+        <path d="M9 22 H15 C20 22 22 20 22 15 V9 C22 4 20 2 15 2 H9 C4 2 2 4 2 9 V15 C2 20 4 22 9 22 Z" />
+        <path d="M9 10 C10.1046 10 11 9.10457 11 8 C11 6.89543 10.1046 6 9 6 C7.89543 6 7 6.89543 7 8 C7 9.10457 7.89543 10 9 10 Z" />
+        <path d="M2.67 18.95 L7.6 15.64 C8.39 15.11 9.53 15.17 10.24 15.78 L10.57 16.07 C11.35 16.74 12.61 16.74 13.39 16.07 L17.55 12.5 C18.33 11.83 19.59 11.83 20.37 12.5 L22 13.9" />
       </>
     ),
     team: (
       <>
-        <circle cx="7" cy="8" r="2.6" />
-        <circle cx="13" cy="8" r="2.6" />
-        <path d="M3 16 C3 13.5 5 12 7 12 C9 12 11 13.5 11 16 M9 16 C9 13.5 11 12 13 12 C15 12 17 13.5 17 16" />
+        <path d="M9.16 10.87 C9.06 10.86 8.94 10.86 8.83 10.87 C6.45 10.79 4.56 8.84 4.56 6.44 C4.56 3.99 6.54 2 9 2 C11.45 2 13.44 3.99 13.44 6.44 C13.43 8.84 11.54 10.79 9.16 10.87 Z" />
+        <path d="M16.41 4 C18.35 4 19.91 5.57 19.91 7.5 C19.91 9.39 18.41 10.93 16.54 11 C16.46 10.99 16.37 10.99 16.28 11" />
+        <path d="M4.16 14.56 C1.74 16.18 1.74 18.82 4.16 20.43 C6.91 22.27 11.42 22.27 14.17 20.43 C16.59 18.81 16.59 16.17 14.17 14.56 C11.43 12.73 6.92 12.73 4.16 14.56 Z" />
+        <path d="M18.34 20 C19.06 19.85 19.74 19.56 20.3 19.13 C21.86 17.96 21.86 16.03 20.3 14.86 C19.75 14.44 19.08 14.16 18.37 14" />
       </>
     ),
     gear: (
       <>
-        <circle cx="10" cy="10" r="3" />
-        <path d="M10 2 V4 M10 16 V18 M2 10 H4 M16 10 H18 M4.3 4.3 L5.7 5.7 M14.3 14.3 L15.7 15.7 M4.3 15.7 L5.7 14.3 M14.3 5.7 L15.7 4.3" />
+        <path d="M12 15 C13.6569 15 15 13.6569 15 12 C15 10.3431 13.6569 9 12 9 C10.3431 9 9 10.3431 9 12 C9 13.6569 10.3431 15 12 15 Z" />
+        <path d="M2 12.88 V11.12 C2 10.08 2.85 9.22 3.9 9.22 C5.71 9.22 6.45 7.94 5.54 6.37 C5.02 5.47 5.33 4.3 6.24 3.78 L7.97 2.79 C8.76 2.32 9.78 2.6 10.25 3.39 L10.36 3.58 C11.26 5.15 12.74 5.15 13.65 3.58 L13.76 3.39 C14.23 2.6 15.25 2.32 16.04 2.79 L17.77 3.78 C18.68 4.3 18.99 5.47 18.47 6.37 C17.56 7.94 18.3 9.22 20.11 9.22 C21.15 9.22 22.01 10.07 22.01 11.12 V12.88 C22.01 13.92 21.16 14.78 20.11 14.78 C18.3 14.78 17.56 16.06 18.47 17.63 C18.99 18.54 18.68 19.7 17.77 20.22 L16.04 21.21 C15.25 21.68 14.23 21.4 13.76 20.61 L13.65 20.42 C12.75 18.85 11.27 18.85 10.36 20.42 L10.25 20.61 C9.78 21.4 8.76 21.68 7.97 21.21 L6.24 20.22 C5.33 19.7 5.02 18.53 5.54 17.63 C6.45 16.06 5.71 14.78 3.9 14.78 C2.85 14.78 2 13.92 2 12.88 Z" />
       </>
     ),
     brand: (
       <>
-        <rect x="4" y="4" width="12" height="12" rx="0" />
-        <path d="M8 13 V9.5" />
-        <circle cx="8" cy="7.5" r="1" fill={color} stroke="none" />
-        <path d="M12 13 V8" />
-        <circle cx="12" cy="6.5" r="1" fill={color} stroke="none" />
+        <path d="M14 16 C14 17.77 13.23 19.37 12 20.46 C10.94 21.42 9.54 22 8 22 C4.69 22 2 19.31 2 16 C2 13.24 3.88 10.9 6.42 10.21 C7.11 11.95 8.59 13.29 10.42 13.79 C10.92 13.93 11.45 14 12 14 C12.55 14 13.08 13.93 13.58 13.79 C13.85 14.47 14 15.22 14 16 Z" />
+        <path d="M18 8 C18 8.78 17.85 9.53 17.58 10.21 C16.89 11.95 15.41 13.29 13.58 13.79 C13.08 13.93 12.55 14 12 14 C11.45 14 10.92 13.93 10.42 13.79 C8.59 13.29 7.11 11.95 6.42 10.21 C6.15 9.53 6 8.78 6 8 C6 4.69 8.69 2 12 2 C15.31 2 18 4.69 18 8 Z" />
+        <path d="M22 16 C22 19.31 19.31 22 16 22 C14.46 22 13.06 21.42 12 20.46 C13.23 19.37 14 17.77 14 16 C14 15.22 13.85 14.47 13.58 13.79 C15.41 13.29 16.89 11.95 17.58 10.21 C20.12 10.9 22 13.24 22 16 Z" />
       </>
     ),
-    bolt: <path d="M9 2 L4 9 H8 L7 14 L12 7 H8 Z" strokeLinejoin="round" />,
+    card: (
+      <>
+        <path d="M2 8.5 H22" />
+        <path d="M6 16.5 H8" />
+        <path d="M10.5 16.5 H14.5" />
+        <path d="M6.44 3.5 H17.55 C21.11 3.5 22 4.38 22 7.89 V16.1 C22 19.61 21.11 20.49 17.56 20.49 H6.44 C2.89 20.5 2 19.62 2 16.11 V7.89 C2 4.38 2.89 3.5 6.44 3.5 Z" />
+      </>
+    ),
+    bolt: (
+      <>
+        <path d="M2 8.5 H22" />
+        <path d="M6 16.5 H8" />
+        <path d="M10.5 16.5 H14.5" />
+        <path d="M6.44 3.5 H17.55 C21.11 3.5 22 4.38 22 7.89 V16.1 C22 19.61 21.11 20.49 17.56 20.49 H6.44 C2.89 20.5 2 19.62 2 16.11 V7.89 C2 4.38 2.89 3.5 6.44 3.5 Z" />
+      </>
+    ),
     help: (
       <>
-        <circle cx="10" cy="10" r="7.5" />
-        <path d="M7.8 8 C7.8 6.6 8.8 5.8 10 5.8 C11.2 5.8 12.2 6.6 12.2 7.8 C12.2 9 10 9.5 10 11" />
-        <circle cx="10" cy="13.5" r="0.6" fill={color} stroke="none" />
+        <path d="M17 18.43 H13 L8.55 21.39 C7.89 21.83 7 21.36 7 20.56 V18.43 C4 18.43 2 16.43 2 13.43 V7.43 C2 4.43 4 2.43 7 2.43 H17 C20 2.43 22 4.43 22 7.43 V13.43 C22 16.43 20 18.43 17 18.43 Z" />
+        <path d="M12 11.36 V11.15 C12 10.47 12.42 10.11 12.84 9.82 C13.25 9.54 13.66 9.18 13.66 8.52 C13.66 7.6 12.92 6.86 12 6.86 C11.08 6.86 10.34 7.6 10.34 8.52" />
+        <path d="M11.995 13.75 H12.005" strokeWidth="2" />
       </>
     ),
     more: (
       <>
-        <circle cx="4" cy="10" r="1.2" fill={color} stroke="none" />
-        <circle cx="10" cy="10" r="1.2" fill={color} stroke="none" />
-        <circle cx="16" cy="10" r="1.2" fill={color} stroke="none" />
+        <path d="M5 10 H5.01" strokeWidth="2.4" />
+        <path d="M12 10 H12.01" strokeWidth="2.4" />
+        <path d="M19 10 H19.01" strokeWidth="2.4" />
       </>
     ),
   };
   return (
     <svg
-      width={s}
-      height={s}
-      viewBox="0 0 20 20"
+      width={20}
+      height={20}
+      viewBox="0 0 24 24"
       fill="none"
       stroke={color}
-      strokeWidth={sw}
+      strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
+      className="evg-ico"
+      data-ico={name}
       style={{ flexShrink: 0 }}
       aria-hidden="true"
     >
@@ -258,17 +262,17 @@ function SidebarIcon({ name, color = "currentColor" }: { name: string; color?: s
 export function useStudioPalette(): StudioPalette {
   return useMemo(
     () => ({
-      bg: "#0F0906",
-      surface: "#16100B",
-      surface2: "#1E1710",
-      ink: "#F3EDE4",
-      ink2: "#DED5CA",
-      ink3: "#7E7263",
-      muted: "#7E7263",
-      rule: "#2E2418",
-      ruleStrong: "#3D3021",
-      accent: "#C9A24D",
-      accent2: "#DDBA6A",
+      bg: "#F6F6F4",
+      surface: "#FFFFFF",
+      surface2: "#FAFAF8",
+      ink: "#18140F",
+      ink2: "#2C271F",
+      ink3: "#6B645A",
+      muted: "#4A4339",
+      rule: "#E5E3DE",
+      ruleStrong: "#D8D5CE",
+      accent: "#C7691E",
+      accent2: "#D4782A",
     }),
     [],
   );
@@ -394,6 +398,7 @@ type NavItemDef = { key: StudioNavKey; label: string; icon: string; href: string
 
 const NAV_WORKSPACE: NavItemDef[] = [
   { key: "dashboard", label: "Dashboard", icon: "dash", href: "/dashboard" },
+  { key: "assistant", label: "BrewAI", icon: "chat", href: "/dashboard?tab=assistant" },
   { key: "create", label: "Bilder erstellen", icon: "spark", href: "/inhalte-erstellen" },
   { key: "create-video", label: "Videos erstellen", icon: "video", href: "/videos-erstellen" },
   { key: "media", label: "Mediathek", icon: "media", href: "/dashboard?tab=media" },
@@ -405,7 +410,7 @@ const NAV_BRAND: NavItemDef[] = [
 ];
 
 const NAV_ACCOUNT: NavItemDef[] = [
-  { key: "pricing", label: "Abonnement", icon: "bolt", href: "/dashboard?tab=pricing" },
+  { key: "pricing", label: "Abonnement", icon: "card", href: "/dashboard?tab=pricing" },
   { key: "settings", label: "Einstellungen", icon: "gear", href: "/dashboard?tab=settings" },
 ];
 
@@ -446,15 +451,26 @@ function WorkspaceNavItem({
       onClick={onNavigate}
       title={!collapsed && locked ? tip : undefined}
     >
-      <SidebarIcon name={item.icon} />
-      {!collapsed ? <span className="evg-hide-collapsed" style={{ flex: 1, minWidth: 0 }}>{item.label}</span> : null}
-      {!collapsed && locked ? (
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="evg-hide-collapsed">
+      <span className="evg-rail__icon" data-ico={item.icon} aria-hidden="true">
+        <SidebarIcon name={item.icon} />
+      </span>
+      <span className="evg-rail__reveal">{item.label}</span>
+      {locked ? (
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+          className="evg-rail__reveal"
+        >
           <rect x="3" y="7" width="10" height="7" rx="0" />
           <path d="M5.5 7 V5.5a2.5 2.5 0 0 1 5 0 V7" strokeLinecap="round" />
         </svg>
       ) : null}
-      {!collapsed && item.badge ? <span className="evg-nav__badge">{item.badge}</span> : null}
+      {item.badge ? <span className="evg-nav__badge evg-rail__reveal">{item.badge}</span> : null}
     </Link>
   );
 
@@ -500,10 +516,24 @@ function RecentMediaRail({
   if (collapsed) return null;
 
   return (
-    <div className="evg-chargen evg-hide-collapsed" data-tour="recent-media">
-      <div className="evg-rubrik">Chargen</div>
+    <div className="evg-chargen evg-rail__reveal" data-tour="recent-media">
+      <div className="evg-chargen__label">Chargen</div>
       {items.length === 0 ? (
-        <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--fg-5)" }}>Deine Motive erscheinen hier</p>
+        <div className="evg-chargen__empty">
+          <div className="evg-chargen__empty-icon" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="1.5" y="2.5" width="13" height="11" rx="1.8" stroke="currentColor" strokeWidth="1.3" />
+              <circle cx="5.5" cy="6.5" r="1.3" stroke="currentColor" strokeWidth="1.2" />
+              <path
+                d="M2.5 11.5l3.5-3.5 2 2 3-3.5 2.5 2.5"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <p className="evg-chargen__empty-copy">Deine Motive erscheinen hier</p>
+        </div>
       ) : (
         <>
           <div className="evg-chargen__grid">
@@ -550,6 +580,8 @@ function AccountSidebarFooter({
   isAdmin = false,
   adminRouteActive = false,
   collapsed = false,
+  busy = false,
+  onMenuOpenChange,
 }: {
   accountName: string;
   userEmail?: string;
@@ -557,10 +589,16 @@ function AccountSidebarFooter({
   isAdmin?: boolean;
   adminRouteActive?: boolean;
   collapsed?: boolean;
+  busy?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
 }) {
   const [signingOut, setSigningOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    onMenuOpenChange?.(menuOpen);
+  }, [menuOpen, onMenuOpenChange]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -587,27 +625,33 @@ function AccountSidebarFooter({
       aria-label={collapsed ? `Konto: ${accountName}` : undefined}
       onClick={() => setMenuOpen((v) => !v)}
     >
-      <div className="evg-avatar">{initials}</div>
-      {!collapsed ? (
-        <>
-          <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
-            <div className="evg-rail__foot-name">{accountName}</div>
-            <div className="evg-rail__foot-email">{userEmail ?? ""}</div>
-          </div>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            aria-hidden="true"
-            className="evg-rail__foot-chevron"
-          >
-            <path d="M4 6 L8 10 L12 6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </>
-      ) : null}
+      <div className="evg-avatar">
+        {initials}
+        <span className="evg-avatar__pulse" data-busy={busy ? "true" : undefined} aria-hidden="true" />
+      </div>
+      <div className="evg-rail__foot-copy evg-rail__reveal">
+        <div className="evg-rail__foot-status">
+          <span className="evg-rail__foot-status-dot" aria-hidden="true" />
+          <span className="evg-rail__foot-name">{busy ? "Compiling…" : accountName}</span>
+        </div>
+        <div className="evg-rail__foot-email">{userEmail ?? ""}</div>
+      </div>
+      <svg
+        width="11"
+        height="11"
+        viewBox="0 0 10 10"
+        fill="none"
+        aria-hidden="true"
+        className="evg-rail__foot-chevron evg-rail__reveal"
+      >
+        <path
+          d="M2 3.5l3 3 3-3"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </button>
   );
 
@@ -690,6 +734,7 @@ function StudioMobileBottomNav({
     activeNav === "team" ||
     activeNav === "settings" ||
     activeNav === "pricing" ||
+    activeNav === "assistant" ||
     activeNav === "create-video";
 
   return (
@@ -754,6 +799,7 @@ function StudioMobileMoreSheet({
   const close = () => onOpenChange(false);
 
   const sheetItems: NavItemDef[] = [
+    { key: "assistant", label: "BrewAI", icon: "chat", href: "/dashboard?tab=assistant" },
     ...NAV_BRAND,
     ...(videosEnabled
       ? [{ key: "create-video" as const, label: "Videos", icon: "video", href: "/videos-erstellen" }]
@@ -775,7 +821,7 @@ function StudioMobileMoreSheet({
         </StudioUiDialogHeader>
 
         <div className="evg-more-sheet-list" role="navigation" aria-label="Weitere Bereiche">
-          <div className="stu-label">Marke & Konto</div>
+          <div className="stu-label">Navigation</div>
           {sheetItems.map((item) => {
             const active = item.key === activeNav || (item.key === "brand" && brandProfileActive);
             return (
@@ -860,7 +906,7 @@ function NavGroup({
 }) {
   return (
     <div className="evg-nav-group">
-      <div className="evg-nav-group__label">{label}</div>
+      <div className="evg-nav-group__label evg-rail__reveal">{label}</div>
       {items.map((it) => (
         <WorkspaceNavItem
           key={it.key}
@@ -924,34 +970,57 @@ export function DashboardStudioShell({
   void onOpenBrandProfile;
   const pathname = usePathname();
   const mainRef = useRef<HTMLElement>(null);
+  const railCloseTimer = useRef<number | null>(null);
+  const railOpenTimer = useRef<number | null>(null);
   const reduceMotion = useReducedMotion();
   const [moreOpen, setMoreOpen] = useState(false);
-  const [railCollapsed, setRailCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return localStorage.getItem(RAIL_COLLAPSE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  const [railHovered, setRailHovered] = useState(false);
+  const [footMenuOpen, setFootMenuOpen] = useState(false);
   const workspaceNav = useWorkspaceNavItems();
-  const isNarrow = useMediaQuery(`(max-width: ${DESKTOP_MIN - 1}px)`);
   const isMobile = useMediaQuery(`(max-width: ${MOBILE_MAX}px)`);
-  /** Tablet/Mid erzwingen Icon-Rail; Desktop-Preference bleibt in localStorage. */
-  const effectiveCollapsed = isNarrow || railCollapsed;
+  const railOpen = !isMobile && (railHovered || footMenuOpen);
 
-  const toggleRail = () => {
-    if (isNarrow) return;
-    setRailCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(RAIL_COLLAPSE_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  };
+  const clearRailTimers = useCallback(() => {
+    if (railCloseTimer.current != null) {
+      window.clearTimeout(railCloseTimer.current);
+      railCloseTimer.current = null;
+    }
+    if (railOpenTimer.current != null) {
+      window.clearTimeout(railOpenTimer.current);
+      railOpenTimer.current = null;
+    }
+  }, []);
+
+  const openRail = useCallback(() => {
+    if (railCloseTimer.current != null) {
+      window.clearTimeout(railCloseTimer.current);
+      railCloseTimer.current = null;
+    }
+    if (railHovered) return;
+    if (railOpenTimer.current != null) return;
+    railOpenTimer.current = window.setTimeout(() => {
+      setRailHovered(true);
+      railOpenTimer.current = null;
+    }, reduceMotion ? 0 : RAIL_OPEN_MS);
+  }, [railHovered, reduceMotion]);
+
+  const scheduleCloseRail = useCallback(() => {
+    if (railOpenTimer.current != null) {
+      window.clearTimeout(railOpenTimer.current);
+      railOpenTimer.current = null;
+    }
+    if (railCloseTimer.current != null) {
+      window.clearTimeout(railCloseTimer.current);
+    }
+    railCloseTimer.current = window.setTimeout(() => {
+      setRailHovered(false);
+      railCloseTimer.current = null;
+    }, reduceMotion ? 0 : RAIL_CLOSE_MS);
+  }, [reduceMotion]);
+
+  useEffect(() => {
+    return () => clearRailTimers();
+  }, [clearRailTimers]);
 
   useEffect(() => {
     if (!contentKey || !mainRef.current) return;
@@ -993,6 +1062,9 @@ export function DashboardStudioShell({
   const initials = initialsFromName(accountName);
   const pad = contentPadding ?? "var(--sp-8)";
 
+  const labeledSidebar = !isMobile;
+  const iconOnly = labeledSidebar ? false : !railOpen;
+
   return (
     <StudioSearchProvider>
       <StudioUiTooltipProvider delayDuration={280}>
@@ -1001,25 +1073,34 @@ export function DashboardStudioShell({
             studioFontClassName,
             "evg-studio",
             "evg-app",
-            effectiveCollapsed && "evg-app--collapsed",
+            labeledSidebar ? "evg-app--sidebar-labeled" : "evg-app--rail-flyout",
             isMobile && "evg-app--mobile",
           )}
         >
-          <aside className="evg-rail" aria-label="Seitennavigation">
+          <aside
+            className="evg-rail"
+            aria-label="Seitennavigation"
+            data-open={labeledSidebar || railOpen ? "true" : "false"}
+            onMouseEnter={labeledSidebar ? undefined : openRail}
+            onMouseLeave={labeledSidebar ? undefined : scheduleCloseRail}
+            onFocusCapture={labeledSidebar ? undefined : openRail}
+            onBlurCapture={
+              labeledSidebar
+                ? undefined
+                : (e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                      scheduleCloseRail();
+                    }
+                  }
+            }
+          >
             <div className="evg-rail__scroll">
               <div className="evg-rail__brand">
                 <BrewAILogoMark />
-                {!effectiveCollapsed ? (
-                  <div style={{ minWidth: 0, flex: 1 }} className="evg-hide-collapsed">
-                    <div className="evg-rail__name">BrewAI</div>
-                    <div className="evg-rail__sub" title={liveBreweryName || undefined}>
-                      {liveBreweryName || "STUDIO"}
-                    </div>
-                  </div>
-                ) : null}
-                {!isNarrow ? (
-                  <RailCollapseButton collapsed={railCollapsed} onClick={toggleRail} />
-                ) : null}
+                <div className="evg-rail__brand-copy evg-rail__reveal">
+                  <div className="evg-rail__name">BrewAI</div>
+                  <div className="evg-rail__sub">STUDIO</div>
+                </div>
               </div>
 
               <nav className="evg-nav" data-tour="nav" aria-label="Arbeitsbereich">
@@ -1029,7 +1110,7 @@ export function DashboardStudioShell({
                   activeNav={activeNav}
                   brandProfileActive={brandProfileActive}
                   hasActivePlan={hasActivePlan}
-                  collapsed={effectiveCollapsed}
+                  collapsed={iconOnly}
                 />
                 <NavGroup
                   label="Marke"
@@ -1037,7 +1118,7 @@ export function DashboardStudioShell({
                   activeNav={activeNav}
                   brandProfileActive={brandProfileActive}
                   hasActivePlan={hasActivePlan}
-                  collapsed={effectiveCollapsed}
+                  collapsed={iconOnly}
                 />
                 <NavGroup
                   label="Konto"
@@ -1045,22 +1126,23 @@ export function DashboardStudioShell({
                   activeNav={activeNav}
                   brandProfileActive={brandProfileActive}
                   hasActivePlan={hasActivePlan}
-                  collapsed={effectiveCollapsed}
+                  collapsed={iconOnly}
                 />
               </nav>
 
-              <RecentMediaRail items={recentMedia} collapsed={effectiveCollapsed} />
+              <RecentMediaRail items={recentMedia} collapsed={iconOnly} />
             </div>
 
             <div className="evg-rail__bottom">
-              {!effectiveCollapsed ? <div className="evg-rail__foot-divider" aria-hidden="true" /> : null}
               <AccountSidebarFooter
                 accountName={accountName}
                 userEmail={userEmail}
                 initials={initials}
                 isAdmin={isAdmin}
                 adminRouteActive={adminRouteActive}
-                collapsed={effectiveCollapsed}
+                collapsed={iconOnly}
+                busy={contentPending}
+                onMenuOpenChange={setFootMenuOpen}
               />
             </div>
           </aside>
@@ -1074,7 +1156,12 @@ export function DashboardStudioShell({
               billingPlan={billingPlan}
               periodEnd={periodEnd}
               recentCharges={recentCharges}
-              showCreateCta={activeNav !== "create" && activeNav !== "create-video"}
+              showCreateCta={
+                activeNav !== "create" &&
+                activeNav !== "create-video" &&
+                activeNav !== "dashboard" &&
+                activeNav !== "assistant"
+              }
               hasActivePlan={hasActivePlan}
               accountInitials={initials}
               breweryLabel={accountName}

@@ -10,6 +10,8 @@ export const BRAND_SETTINGS_LIMITS = {
   brandColors: 300,
   brandDos: 600,
   brandDonts: 600,
+  brandHeadlineFontName: 80,
+  brandFontWeight: 8,
 } as const;
 
 function clampText(value: unknown, max: number): string | undefined {
@@ -25,11 +27,15 @@ export function clampBrandSettingsFields(input: Record<string, unknown>): Record
   const brandColors = clampText(next.brandColors, BRAND_SETTINGS_LIMITS.brandColors);
   const brandDos = clampText(next.brandDos, BRAND_SETTINGS_LIMITS.brandDos);
   const brandDonts = clampText(next.brandDonts, BRAND_SETTINGS_LIMITS.brandDonts);
+  const brandHeadlineFontName = clampText(next.brandHeadlineFontName, BRAND_SETTINGS_LIMITS.brandHeadlineFontName);
+  const brandFontWeight = clampText(next.brandFontWeight, BRAND_SETTINGS_LIMITS.brandFontWeight);
   if (breweryName !== undefined) next.breweryName = breweryName;
   if (brandTone !== undefined) next.brandTone = brandTone;
   if (brandColors !== undefined) next.brandColors = brandColors;
   if (brandDos !== undefined) next.brandDos = brandDos;
   if (brandDonts !== undefined) next.brandDonts = brandDonts;
+  if (brandHeadlineFontName !== undefined) next.brandHeadlineFontName = brandHeadlineFontName;
+  if (brandFontWeight !== undefined) next.brandFontWeight = brandFontWeight;
   return next;
 }
 
@@ -94,6 +100,9 @@ export function sanitizeDashboardSettings(input: unknown): DashboardSettings {
     brandDonts: asString(cleaned.brandDonts),
     brandReferenceImageUrls: asReferenceUrls(cleaned.brandReferenceImageUrls),
     brandLabelReferenceUrl: asString(cleaned.brandLabelReferenceUrl).trim(),
+    brandHeadlineFontName: asString(cleaned.brandHeadlineFontName),
+    brandFontFileUrl: asString(cleaned.brandFontFileUrl).trim(),
+    brandFontWeight: asString(cleaned.brandFontWeight) || "700",
     ...(analyzedAt ? { brandAnalyzedAt: analyzedAt } : {}),
   };
 }

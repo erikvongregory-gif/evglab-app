@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       mode: "campaign_text",
       prompt,
       images,
-      model: "gpt-image-2-2026-04-21",
+      model: "gpt-image-2.5-flare",
       userId: guard.userId,
       billing: charge.billing,
     });

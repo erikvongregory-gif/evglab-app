@@ -23,7 +23,7 @@
   align-items: center;
   width: min(360px, calc(100vw - 32px));
   color: var(--t1, #f3ede4);
-  font-family: var(--f-sans, var(--font-work-sans), "Work Sans", system-ui, sans-serif);
+  font-family: var(--f-sans, var(--font-inter-tight), "Inter Tight", system-ui, sans-serif);
 }
 
 .previewBadge {
@@ -31,8 +31,8 @@
   margin: 0 0 12px;
   text-align: center;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ac, #c9a24d);
 }
@@ -93,8 +93,8 @@
   margin-bottom: 12px;
   padding: 0 2px;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 9px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: rgba(221, 186, 106, 0.55);
 }
@@ -128,7 +128,7 @@
   margin: 0;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
   font-size: 11px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ac-2, #ddba6a);
 }
@@ -207,8 +207,8 @@
 .paperBrand {
   margin: 0;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 

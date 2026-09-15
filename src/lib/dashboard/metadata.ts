@@ -37,6 +37,8 @@ export type DashboardBeer = {
   /** Flaschentyp-Code, z. B. "nrw_500" (siehe FLASCHEN_TYPEN). */
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
+  /** Bevorzugtes Servierglas, z. B. "masskrug", "willibecher" (siehe GLAS_TYPEN). */
+  glasTyp?: string;
   /** HTTPS-URL des Sorten-Etiketts (nie Base64 — JWT/Cookie-Limit). */
   etikettUrl: string;
   createdAt: string;
@@ -74,6 +76,8 @@ export function sanitizeDashboardBeers(value: unknown): DashboardBeer[] {
         typeof item.flaschenTyp === "string" && item.flaschenTyp.trim() ? item.flaschenTyp.trim().slice(0, 60) : "nrw_500",
       flaschenfarbe:
         item.flaschenfarbe === "gruen" || item.flaschenfarbe === "klar" ? item.flaschenfarbe : "braun",
+      glasTyp:
+        typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim().slice(0, 40) : undefined,
       etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",
       createdAt: typeof item.createdAt === "string" ? item.createdAt.slice(0, 40) : "",
     });
@@ -113,6 +117,12 @@ export type DashboardSettings = {
   brandLabelReferenceUrl: string;
   /** ISO-Zeitstempel der letzten Website-/Marken-Analyse */
   brandAnalyzedAt?: string;
+  /** Anzeigename der Marken-Headline-Schrift (Social/Kampagnen-Overlay). */
+  brandHeadlineFontName: string;
+  /** Öffentliche URL zur hochgeladenen Schriftdatei (.woff2/.woff/.ttf/.otf). */
+  brandFontFileUrl: string;
+  /** CSS font-weight für Headlines, z. B. 700. */
+  brandFontWeight: string;
 };
 
 export type DashboardMetadata = {

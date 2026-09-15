@@ -20,7 +20,7 @@
     radial-gradient(90% 70% at 50% 6%, rgba(201, 162, 77, 0.11), transparent 62%),
     var(--bg, #0f0906);
   color: var(--t1, #f3ede4);
-  font-family: var(--f-sans, var(--font-work-sans), "Work Sans", system-ui, sans-serif);
+  font-family: var(--f-sans, var(--font-inter-tight), "Inter Tight", system-ui, sans-serif);
   font-size: 13.5px;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
@@ -56,9 +56,9 @@
 
 .brandStudio {
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   color: var(--t3, #7e7263);
   border-left: 1px solid var(--line2, #3d3021);
   padding-left: 10px;
@@ -162,9 +162,9 @@
 
 .kicker {
   font-family: var(--f-mono, var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ac, #c9a24d);
   margin: 0 0 10px;
@@ -280,8 +280,8 @@
   gap: 16px;
   flex-wrap: wrap;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   color: var(--t3, #7e7263);
 }
 
@@ -327,9 +327,9 @@
 
 .label {
   font-family: var(--f-mono, var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3, #7e7263);
 }
@@ -443,8 +443,8 @@
 
 .strengthLabel {
   font-family: var(--f-mono, var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3, #7e7263);
 }
@@ -523,8 +523,8 @@
   margin: 14px 0;
   color: var(--t3, #7e7263);
   font-family: var(--f-mono, var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 

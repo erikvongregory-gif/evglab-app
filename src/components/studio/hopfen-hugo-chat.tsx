@@ -1,9 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
-import { AnimatePresence, motion, type Variants } from "framer-motion";
-import { HopfenHugoAvatar } from "@/components/branding/HopfenHugoAvatar";
-import { HopfenHugoIcon } from "@/components/branding/HopfenHugoIcon";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export type HopfenHugoMessage = {
@@ -12,53 +10,46 @@ export type HopfenHugoMessage = {
 };
 
 type HopfenHugoChatProps = {
-  isOpen: boolean;
-  onToggle: () => void;
   messages: HopfenHugoMessage[];
   inputValue: string;
   onInputChange: (value: string) => void;
   onSubmit: () => void;
+  onSendText?: (text: string) => void;
   loading?: boolean;
-  onboardingAttr?: string;
+  /** page = eigener Tab; column = Dashboard-Spalte */
+  variant?: "page" | "column";
 };
 
-const panelVariants: Variants = {
-  hidden: { opacity: 0, y: 16, scale: 0.96, transformOrigin: "bottom right" },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { type: "spring", damping: 26, stiffness: 320 },
-  },
-  exit: { opacity: 0, y: 12, scale: 0.97, transition: { duration: 0.18 } },
-};
+const SUGGESTIONS = ["Kampagnen-Idee", "Bild-Prompt", "Marketing-Tipp"] as const;
+const ASSISTANT_NAME = "BrewAI";
 
-const msgVariants: Variants = {
+const msgVariants = {
   hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 480, damping: 32 } },
+  visible: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 480, damping: 32 } },
 };
 
 export function HopfenHugoChat({
-  isOpen,
-  onToggle,
   messages,
   inputValue,
   onInputChange,
   onSubmit,
+  onSendText,
   loading = false,
-  onboardingAttr,
+  variant = "page",
 }: HopfenHugoChatProps) {
   const widgetId = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [typingPulse, setTypingPulse] = useState(false);
 
   const isThinking = loading || typingPulse;
+  const showSuggestions =
+    !isThinking && messages.length === 1 && messages[0]?.role === "assistant";
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, isThinking, isOpen]);
+  }, [messages, isThinking, showSuggestions]);
 
   const handleSubmit = useCallback(
     (e: FormEvent) => {
@@ -71,129 +62,164 @@ export function HopfenHugoChat({
     [inputValue, loading, onSubmit],
   );
 
-  return (
-    <div className="evg-hopfenhugo-root">
-      <AnimatePresence>
-        {isOpen ? (
-          <motion.div
-            key="hopfenhugo-panel"
-            variants={panelVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="evg-hopfenhugo-panel"
-            aria-labelledby={widgetId}
-          >
-            <header className="evg-hopfenhugo-head">
-              <div className="evg-hopfenhugo-head-glow" aria-hidden />
-              <div className="evg-hopfenhugo-head-inner">
-                <div className="evg-hopfenhugo-avatar-wrap">
-                  <HopfenHugoAvatar size={42} thinking={isThinking} />
-                  <span className="evg-hopfenhugo-status" aria-hidden />
-                </div>
-                <div className="evg-hopfenhugo-head-copy">
-                  <h3 id={widgetId} className="evg-hopfenhugo-name">
-                    Hopfen Hugo
-                  </h3>
-                  <p className="evg-hopfenhugo-role">KI-Assistent · BrewAI Studio</p>
-                </div>
-                <button type="button" className="evg-hopfenhugo-close" onClick={onToggle} aria-label="Chat schließen">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                    <path d="M4 4 L12 12 M12 4 L4 12" />
-                  </svg>
-                </button>
-              </div>
-            </header>
+  const handleSuggestion = useCallback(
+    (label: string) => {
+      if (loading) return;
+      setTypingPulse(true);
+      onSendText?.(label);
+      window.setTimeout(() => setTypingPulse(false), 800);
+    },
+    [loading, onSendText],
+  );
 
-            <div ref={scrollRef} className="evg-hopfenhugo-messages">
-              {messages.map((msg, index) => (
-                <motion.div
-                  key={`${msg.role}-${index}`}
-                  variants={msgVariants}
-                  initial="hidden"
-                  animate="visible"
-                  className={cn("evg-hopfenhugo-row", msg.role === "user" && "evg-hopfenhugo-row--user")}
+  return (
+    <div
+      className={cn("evg-brewai-page", variant === "column" && "evg-brewai-page--column")}
+      data-tour="brewai-assistant"
+    >
+      <div
+        className={cn(
+          "evg-hopfenhugo-panel",
+          variant === "column" ? "evg-hopfenhugo-panel--column" : "evg-hopfenhugo-panel--page",
+        )}
+        aria-labelledby={widgetId}
+      >
+        <header className="evg-hopfenhugo-head">
+          <div className="evg-hopfenhugo-head-inner">
+            <div className="evg-hopfenhugo-avatar-wrap">
+              <div className="evg-hopfenhugo-avatar-bob" aria-hidden>
+                <svg width="19" height="19" viewBox="0 0 22 22" fill="none">
+                  <path
+                    d="M11 3c-3 0-5 3-5 6.5C6 14 8.3 17 11 19c2.7-2 5-5 5-9.5C16 6 14 3 11 3z"
+                    fill="#fff"
+                    opacity="0.95"
+                  />
+                  <path
+                    d="M8.6 8.3c.4-1 1.3-1.6 2.4-1.6s2 .6 2.4 1.6"
+                    stroke="var(--ac-3)"
+                    strokeWidth="1"
+                    strokeLinecap="round"
+                    opacity="0.7"
+                  />
+                </svg>
+              </div>
+              <span className="evg-hopfenhugo-status" aria-hidden />
+            </div>
+            <div className="evg-hopfenhugo-head-copy">
+              <h1 id={widgetId} className="evg-hopfenhugo-name">
+                {ASSISTANT_NAME}
+              </h1>
+              <p className="evg-hopfenhugo-role">KI-Assistent · Studio</p>
+            </div>
+          </div>
+        </header>
+
+        <div ref={scrollRef} className="evg-hopfenhugo-messages">
+          {messages.map((msg, index) => (
+            <motion.div
+              key={`${msg.role}-${index}`}
+              variants={msgVariants}
+              initial="hidden"
+              animate="visible"
+              className={cn("evg-hopfenhugo-row", msg.role === "user" && "evg-hopfenhugo-row--user")}
+            >
+              {msg.role === "assistant" ? (
+                <div className="evg-hopfenhugo-msg-avatar" aria-hidden>
+                  <svg width="11" height="11" viewBox="0 0 22 22" fill="none">
+                    <path
+                      d="M11 3c-3 0-5 3-5 6.5C6 14 8.3 17 11 19c2.7-2 5-5 5-9.5C16 6 14 3 11 3z"
+                      fill="#fff"
+                    />
+                  </svg>
+                </div>
+              ) : null}
+              <div className="evg-hopfenhugo-row-body">
+                <div
+                  className={cn(
+                    "evg-hopfenhugo-bubble",
+                    msg.role === "user" ? "evg-hopfenhugo-bubble--user" : "evg-hopfenhugo-bubble--assistant",
+                  )}
                 >
                   {msg.role === "assistant" ? (
-                    <div className="evg-hopfenhugo-msg-avatar" aria-hidden>
-                      <HopfenHugoAvatar size={28} thinking={false} />
-                    </div>
+                    <span className="evg-hopfenhugo-bubble-label">{ASSISTANT_NAME}</span>
                   ) : null}
-                  <div className={cn("evg-hopfenhugo-bubble", msg.role === "user" ? "evg-hopfenhugo-bubble--user" : "evg-hopfenhugo-bubble--assistant")}>
-                    {msg.role === "assistant" ? <span className="evg-hopfenhugo-bubble-label">Hopfen Hugo</span> : null}
-                    <p>{msg.text}</p>
-                  </div>
-                </motion.div>
-              ))}
+                  <p>{msg.text}</p>
+                </div>
+                {msg.role === "assistant" && index === 0 ? (
+                  <div className="evg-hopfenhugo-time">gerade eben</div>
+                ) : null}
+              </div>
+            </motion.div>
+          ))}
 
-              {isThinking ? (
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="evg-hopfenhugo-row">
-                  <div className="evg-hopfenhugo-msg-avatar" aria-hidden>
-                    <HopfenHugoAvatar size={28} thinking />
-                  </div>
-                  <div className="evg-hopfenhugo-bubble evg-hopfenhugo-bubble--assistant evg-hopfenhugo-bubble--typing">
-                    <span className="evg-hopfenhugo-dot" />
-                    <span className="evg-hopfenhugo-dot" />
-                    <span className="evg-hopfenhugo-dot" />
-                  </div>
-                </motion.div>
-              ) : null}
-            </div>
-
-            <footer className="evg-hopfenhugo-foot">
-              <form className="evg-hopfenhugo-form" onSubmit={handleSubmit}>
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => onInputChange(e.target.value)}
-                  placeholder="Frag mich zu allem …"
-                  className="evg-hopfenhugo-input"
-                  maxLength={1200}
-                  autoComplete="off"
-                  aria-label="Nachricht an Hopfen Hugo"
-                />
+          {showSuggestions ? (
+            <div className="evg-hopfenhugo-suggestions">
+              {SUGGESTIONS.map((label) => (
                 <button
-                  type="submit"
-                  className="evg-hopfenhugo-send"
-                  disabled={!inputValue.trim() || loading}
-                  aria-label="Nachricht senden"
+                  key={label}
+                  type="button"
+                  className="evg-hopfenhugo-chip"
+                  onClick={() => handleSuggestion(label)}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M22 2 L11 13" />
-                    <path d="M22 2 L15 22 L11 13 L2 9 Z" />
-                  </svg>
+                  {label}
                 </button>
-              </form>
-              <p className="evg-hopfenhugo-policy">
-                Antworten folgen den{" "}
-                <a href="/agb" target="_blank" rel="noopener noreferrer">
-                  Nutzungsrichtlinien
-                </a>
-                . Keine Rechts-, Medizin- oder Finanzberatung.
-              </p>
-            </footer>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+              ))}
+            </div>
+          ) : null}
 
-      <motion.button
-        type="button"
-        whileHover={{ scale: 1.04 }}
-        whileTap={{ scale: 0.96 }}
-        onClick={onToggle}
-        data-onboarding={onboardingAttr}
-        className={cn("evg-hopfenhugo-fab", isOpen && "evg-hopfenhugo-fab--open")}
-        aria-label={isOpen ? "Hopfen Hugo schließen" : "Hopfen Hugo öffnen"}
-        aria-expanded={isOpen}
-      >
-        {isOpen ? (
-          <svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 4 L12 12 M12 4 L4 12" />
-          </svg>
-        ) : (
-          <HopfenHugoIcon className="evg-hopfenhugo-fab-icon" title="Hopfen Hugo" />
-        )}
-      </motion.button>
+          {isThinking ? (
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="evg-hopfenhugo-row">
+              <div className="evg-hopfenhugo-msg-avatar" aria-hidden>
+                <svg width="11" height="11" viewBox="0 0 22 22" fill="none">
+                  <path
+                    d="M11 3c-3 0-5 3-5 6.5C6 14 8.3 17 11 19c2.7-2 5-5 5-9.5C16 6 14 3 11 3z"
+                    fill="#fff"
+                  />
+                </svg>
+              </div>
+              <div className="evg-hopfenhugo-row-body">
+                <div className="evg-hopfenhugo-bubble evg-hopfenhugo-bubble--assistant evg-hopfenhugo-bubble--typing">
+                  <span className="evg-hopfenhugo-dot" />
+                  <span className="evg-hopfenhugo-dot" />
+                  <span className="evg-hopfenhugo-dot" />
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
+        </div>
+
+        <footer className="evg-hopfenhugo-foot">
+          <form className="evg-hopfenhugo-form" onSubmit={handleSubmit}>
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => onInputChange(e.target.value)}
+              placeholder="Frag BrewAI zu allem …"
+              className="evg-hopfenhugo-input"
+              maxLength={1200}
+              autoComplete="off"
+              aria-label="Nachricht an BrewAI"
+            />
+            <button
+              type="submit"
+              className="evg-hopfenhugo-send"
+              disabled={!inputValue.trim() || loading}
+              aria-label="Nachricht senden"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M1.5 8L14 2.2 9.4 14.5l-2.3-5.1L1.5 8z" fill="#fff" />
+              </svg>
+            </button>
+          </form>
+          <p className="evg-hopfenhugo-policy">
+            Antworten folgen den{" "}
+            <a href="/agb" target="_blank" rel="noopener noreferrer">
+              Nutzungsrichtlinien
+            </a>
+            . Keine Rechts-, Medizin- oder Finanzberatung.
+          </p>
+        </footer>
+      </div>
     </div>
   );
 }

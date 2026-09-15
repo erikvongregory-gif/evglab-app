@@ -66,19 +66,16 @@ function AnimatedPriceValue({ value }: { value: number }) {
 
 function PlanCheckIcon() {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="var(--acc)"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="studio-pricing-check"
-      aria-hidden="true"
-    >
-      <path d="m5 12.5 4.5 4.5L19 7" />
+    <svg width="14" height="14" viewBox="0 0 14 14" className="studio-pricing-check" aria-hidden="true">
+      <circle cx="7" cy="7" r="7" fill="var(--ac-tint)" />
+      <path
+        d="M4 7.2l2 2 4-4.4"
+        fill="none"
+        stroke="var(--ac)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -289,7 +286,7 @@ export function StudioPricingView({
           </div>
         </div>
 
-        <div>
+        <div className="studio-pricing-summary__tokens">
           <div className="studio-pricing-summary__tokens-head">
             <span className="studio-field-label">Tokens · aktueller Zyklus</span>
             <span className="studio-pricing-summary__pct">{tokenPct}% genutzt</span>
@@ -305,8 +302,8 @@ export function StudioPricingView({
           </div>
         </div>
 
-        <div>
-          <div className="studio-faint studio-pricing-summary__billing-label">Abrechnung</div>
+        <div className="studio-pricing-summary__billing">
+          <div className="studio-pricing-summary__billing-label">Abrechnung</div>
           <div className="studio-pricing-summary__billing-value">{currentPlan ? "Aktives Abonnement" : "Noch kein Plan"}</div>
         </div>
 

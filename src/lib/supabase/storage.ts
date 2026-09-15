@@ -108,3 +108,48 @@ export async function uploadGeneratedImageToStorage(args: {
     folder: "generated",
   });
 }
+
+const FONT_MIME: Record<string, string> = {
+  woff2: "font/woff2",
+  woff: "font/woff",
+  ttf: "font/ttf",
+  otf: "font/otf",
+};
+
+/** Marken-Schriftdatei für Social-Post-Overlays (.woff2 bevorzugt). */
+export async function uploadBrandFontToStorage(args: {
+  userId: string;
+  buffer: Buffer;
+  ext: "woff2" | "woff" | "ttf" | "otf";
+}): Promise<string> {
+  const contentType = FONT_MIME[args.ext] ?? "application/octet-stream";
+  const path = `brand-fonts/${args.userId}/${Date.now()}-${randomUUID()}.${args.ext}`;
+
+  const admin = createAdminClient();
+  const { error } = await admin.storage.from(BUCKET).upload(path, args.buffer, {
+    contentType,
+    cacheControl: "31536000",
+    upsert: false,
+  });
+  if (error) {
+    throw new Error(`Schrift-Upload fehlgeschlagen: ${error.message}`);
+  }
+
+  const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
+  if (!data?.publicUrl) {
+    await admin.storage.from(BUCKET).remove([path]).catch(() => undefined);
+    throw new Error("Supabase Storage lieferte keine öffentliche Schrift-URL.");
+  }
+
+  const probe = await assertPublicUrlReachable(data.publicUrl);
+  if (!probe.ok) {
+    if (probe.definitive) {
+      await admin.storage.from(BUCKET).remove([path]).catch(() => undefined);
+    }
+    throw new Error(
+      `Öffentliche Schrift-URL nicht erreichbar (HTTP ${probe.status || "timeout"}). Bucket „${BUCKET}“ muss öffentlich sein.`,
+    );
+  }
+
+  return data.publicUrl;
+}

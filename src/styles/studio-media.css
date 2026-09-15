@@ -17,9 +17,9 @@
 
 .evg-studio .studio-media-head__main h1 {
   margin: 0;
-  font-size: var(--t-19);
+  font-size: var(--t-page);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--t1);
 }
 
@@ -29,7 +29,7 @@
   font-family: var(--f-mono);
   font-size: var(--t-9);
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
 }
@@ -39,7 +39,7 @@
   font-size: var(--t-13);
   color: var(--t3);
   max-width: 52ch;
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .evg-studio .studio-media-head__actions {
@@ -260,10 +260,10 @@
 /* ── Empty / Search empty ─────────────────────────────────── */
 
 .evg-studio .studio-media-empty {
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: var(--r-lg);
   background: var(--s2);
-  padding: 56px 24px;
+  padding: 28px 20px;
   text-align: center;
 }
 
@@ -271,27 +271,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin: 0 auto 14px;
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 10px;
   border-radius: var(--r-md);
-  border: 1px dashed var(--line2);
+  border: 0;
+  background: var(--s3);
   color: var(--t3);
 }
 
 .evg-studio .studio-media-empty__title {
   margin: 0;
-  font-size: 16px;
+  font-family: var(--f-sans);
+  font-size: 15px;
   font-weight: 600;
   color: var(--t1);
 }
 
 .evg-studio .studio-media-empty__text {
-  margin: 8px auto 0;
+  margin: 6px auto 0;
   max-width: 400px;
   font-size: var(--t-13);
-  line-height: 1.6;
-  color: var(--t3);
+  line-height: 1.5;
+  color: var(--t2);
 }
 
 .evg-studio .studio-media-empty__actions {
@@ -299,7 +301,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--sp-3);
-  margin-top: var(--sp-7);
+  margin-top: 14px;
 }
 
 .evg-studio .studio-media-search-empty {

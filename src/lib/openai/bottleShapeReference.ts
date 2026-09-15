@@ -1,25 +1,22 @@
+import { FLASCHEN_TYPEN, type FlaschenTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
+import type { OpenAiReferenceImage } from "@/lib/openai/generateImage";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { FlaschenTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
-import type { OpenAiReferenceImage } from "@/lib/openai/generateImage";
 
 const BUCKET = process.env.SUPABASE_GENERATED_IMAGES_BUCKET?.trim() || "generated-images";
 const PREFIX = "bottle-references";
 
 /**
- * Flaschentypen, fuer die ein kanonisches Form-Referenzfoto (sauberer Studioshot
- * auf Weiss) in Supabase Storage unter `bottle-references/<typ>.png` liegt.
- * Wird genutzt, um gpt-image-2 per image-to-image die EXAKTE Flaschen-Silhouette
- * vorzugeben (Form, nicht Etikett). Liste erweitern, sobald weitere Referenzfotos
- * hochgeladen sind.
+ * Flaschentypen mit kanonischem Form-Referenzfoto (Studio auf Weiss).
+ * Quelle der Wahrheit: FLASCHEN_TYPEN.hasShapeReference.
  */
-export const BOTTLE_SHAPE_REFERENCE_TYPES: ReadonlySet<FlaschenTyp> = new Set<FlaschenTyp>([
-  "nrw_500",
-]);
+export const BOTTLE_SHAPE_REFERENCE_TYPES: ReadonlySet<FlaschenTyp> = new Set(
+  (Object.keys(FLASCHEN_TYPEN) as FlaschenTyp[]).filter((typ) => FLASCHEN_TYPEN[typ].hasShapeReference),
+);
 
 export function hasBottleShapeReference(flaschenTyp: FlaschenTyp): boolean {
-  return BOTTLE_SHAPE_REFERENCE_TYPES.has(flaschenTyp);
+  return Boolean(FLASCHEN_TYPEN[flaschenTyp]?.hasShapeReference);
 }
 
 // Referenzfotos sind statisch — pro Prozess einmal laden und cachen.

@@ -51,7 +51,9 @@ type MarketingPromptCreateShellProps = {
 function aspectRatioCss(value: string): string {
   if (value === "9:16") return "9 / 16";
   if (value === "4:5") return "4 / 5";
+  if (value === "3:4") return "3 / 4";
   if (value === "16:9") return "16 / 9";
+  if (value === "4:3") return "4 / 3";
   return "1 / 1";
 }
 
@@ -120,7 +122,7 @@ function FeedColumn({
                     />
                   </svg>
                 </div>
-                <div className="evg-marketing-create__render-label">KI generiert</div>
+                <div className="evg-marketing-create__render-label">BrewAI generiert</div>
               </div>
             </div>
           ))}
@@ -174,7 +176,7 @@ function FeedColumn({
                       />
                     </svg>
                   </div>
-                  <div className="evg-marketing-create__render-label">KI generiert</div>
+                  <div className="evg-marketing-create__render-label">BrewAI generiert</div>
                 </div>
               )}
             </div>

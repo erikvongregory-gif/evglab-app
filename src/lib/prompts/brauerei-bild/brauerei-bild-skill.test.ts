@@ -47,6 +47,6 @@ describe("brauerei-bild skill", () => {
 
     expect(brief.markenname).toBe("Paulaner");
     expect(brief.glasTyp).toBe("Willibecher");
-    expect(brief.kiPlattform).toBe("GPT Image 2 (OpenAI gpt-image-2)");
+    expect(brief.kiPlattform).toBe("GPT Image 2.5 Sunburst (OpenAI gpt-image-2.5-sunburst)");
   });
 });

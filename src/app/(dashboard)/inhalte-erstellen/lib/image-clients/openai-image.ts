@@ -1,20 +1,12 @@
 import OpenAI from "openai";
 import { toFile } from "openai/uploads";
 import sharp from "sharp";
+import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 
-const MODEL = "gpt-image-2-2026-04-21";
+const MODEL = "gpt-image-2.5-sunburst";
 
-let openAiClient: OpenAI | null = null;
-
-function getOpenAiClient(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY fehlt.");
-  }
-  if (!openAiClient) {
-    openAiClient = new OpenAI({ apiKey });
-  }
-  return openAiClient;
+function createOpenAiClient(): OpenAI {
+  return new OpenAI({ apiKey: requireOpenAiImageApiKey() });
 }
 
 export type ImageSize = "1024x1024" | "1024x1280" | "1024x1536" | "1024x1792" | "1792x1024" | "1280x1024";
@@ -32,13 +24,17 @@ interface GenerateParams {
   resolveReferenceUrl?: ReferenceUrlResolver;
 }
 
-export function aspectRatioToImageSize(aspectRatio: "1:1" | "2:3" | "4:5" | "9:16" | "16:9"): ImageSize {
+export function aspectRatioToImageSize(
+  aspectRatio: "1:1" | "2:3" | "3:4" | "4:3" | "4:5" | "9:16" | "16:9",
+): ImageSize {
   const sizes = {
     "1:1": "1024x1024",
     "2:3": "1024x1536",
+    "3:4": "1024x1536",
     "4:5": "1024x1280",
     "9:16": "1024x1792",
     "16:9": "1792x1024",
+    "4:3": "1280x1024",
   } as const;
   return sizes[aspectRatio];
 }
@@ -75,10 +71,6 @@ async function urlsToFiles(urls: string[], resolveReferenceUrl?: ReferenceUrlRes
 }
 
 export async function generateImage(params: GenerateParams) {
-  if (!process.env.OPENAI_API_KEY?.trim()) {
-    throw new Error("OPENAI_API_KEY fehlt.");
-  }
-
   const hasRefs = Boolean(params.referenceImageUrls?.length);
   const baseParams = {
     model: MODEL,
@@ -90,7 +82,7 @@ export async function generateImage(params: GenerateParams) {
 
   if (hasRefs) {
     const files = await urlsToFiles(params.referenceImageUrls ?? [], params.resolveReferenceUrl);
-    const client = getOpenAiClient();
+    const client = createOpenAiClient();
     const editParams = {
       ...baseParams,
       image: files.length === 1 ? files[0] : files,
@@ -99,7 +91,7 @@ export async function generateImage(params: GenerateParams) {
     return result.data;
   }
 
-  const client = getOpenAiClient();
+  const client = createOpenAiClient();
   const generateParams = baseParams as unknown as Parameters<typeof client.images.generate>[0];
   const result = (await client.images.generate(generateParams)) as { data: ImageApiData };
   return result.data;

@@ -20,6 +20,9 @@ function makeProfile(overrides: Partial<BrandProfile> = {}): BrandProfile {
     brandDonts: "Keine sterilen Studio-Hintergründe",
     brandReferenceImageUrls: ["https://cdn.example.com/szene.jpg"],
     brandLabelReferenceUrl: "https://cdn.example.com/flasche.png",
+    brandHeadlineFontName: "Falter Display",
+    brandFontFileUrl: "https://cdn.example.com/font.woff2",
+    brandFontWeight: "700",
     ...overrides,
   };
 }

@@ -34,12 +34,7 @@ function isUndefinedTableTolerated(): boolean {
 function normalizeBillingStatus(status: string | null | undefined): BillingStatus {
   const allowed: BillingStatus[] = ["active", "trialing", "past_due", "canceled", "incomplete", "unpaid", "none"];
   if (status && allowed.includes(status as BillingStatus)) return status as BillingStatus;
-  return "active";
-}
-
-function getBaseTokensForPlan(plan: SubscriptionPlanKey | null | undefined): number {
-  if (!plan) return 0;
-  return SUBSCRIPTION_PLAN_TOKENS[plan] ?? 0;
+  return "incomplete";
 }
 
 export async function ensureBillingRow(userId: string) {
@@ -86,50 +81,24 @@ export async function activatePlanForUser(args: {
   stripeCustomerId: string;
   stripeSubscriptionId: string;
   currentPeriodEnd: string | null;
-  preserveTokenBalance?: boolean;
 }) {
-  const current = args.preserveTokenBalance ? await getBillingRow(args.userId) : null;
-  const baseMonthly = SUBSCRIPTION_PLAN_TOKENS[args.plan];
-  const purchasedExtras = current ? Math.max(current.monthly_tokens - getBaseTokensForPlan(current.plan), 0) : 0;
-  const nextMonthlyTokens = current ? baseMonthly + purchasedExtras : baseMonthly;
-  const nextUsedTokens = current ? current.used_tokens : 0;
-  const admin = createAdminClient();
-  const { error } = await admin.from("billing_subscriptions").upsert(
-    {
-      user_id: args.userId,
-      plan: args.plan,
-      monthly_tokens: nextMonthlyTokens,
-      used_tokens: nextUsedTokens,
-      stripe_customer_id: args.stripeCustomerId,
-      stripe_subscription_id: args.stripeSubscriptionId,
-      subscription_status: normalizeBillingStatus(args.subscriptionStatus),
-      current_period_end: args.currentPeriodEnd,
-    },
-    { onConflict: "user_id" },
-  );
-  if (error) {
-    throw new Error(`activatePlanForUser fehlgeschlagen: ${error.message}`);
-  }
+  const { error } = await createAdminClient().rpc("billing_activate_plan_atomic", {
+    p_user_id: args.userId,
+    p_plan: args.plan,
+    p_allowance: SUBSCRIPTION_PLAN_TOKENS[args.plan],
+    p_status: normalizeBillingStatus(args.subscriptionStatus),
+    p_customer_id: args.stripeCustomerId,
+    p_subscription_id: args.stripeSubscriptionId,
+    p_period_end: args.currentPeriodEnd,
+  });
+  if (error) throw new Error(`activatePlanForUser fehlgeschlagen: ${error.message}`);
 }
 
-export async function updateByStripeSubscription(
-  stripeSubscriptionId: string,
-  patch: Partial<
-    Pick<
-      BillingRow,
-      "plan" | "monthly_tokens" | "used_tokens" | "subscription_status" | "current_period_end" | "stripe_customer_id"
-    >
-  >,
-) {
-  const admin = createAdminClient();
-  const safePatch = { ...patch } as typeof patch;
-  if (safePatch.subscription_status) {
-    safePatch.subscription_status = normalizeBillingStatus(safePatch.subscription_status);
-  }
-  const { error } = await admin.from("billing_subscriptions").update(safePatch).eq("stripe_subscription_id", stripeSubscriptionId);
-  if (error) {
-    throw new Error(`updateByStripeSubscription fehlgeschlagen: ${error.message}`);
-  }
+export async function cancelBillingSubscription(subscriptionId: string, periodEnd: string | null) {
+  const { error } = await createAdminClient().rpc("billing_cancel_subscription_atomic", {
+    p_subscription_id: subscriptionId, p_period_end: periodEnd,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function getByStripeCustomerId(customerId: string): Promise<BillingRow | null> {
@@ -152,22 +121,15 @@ export async function getByStripeSubscriptionId(subscriptionId: string): Promise
   return (data as BillingRow | null) ?? null;
 }
 
-/** Setzt used_tokens bei Abo-Verlängerung zurück; gekaufte Token-Packs bleiben erhalten. */
+/** Erneuert das Monatskontingent einmal je Periode; nur ungenutzte Extras bleiben erhalten. */
 export async function renewBillingPeriodTokens(args: {
   stripeSubscriptionId: string;
   currentPeriodEnd: string | null;
 }) {
-  const row = await getByStripeSubscriptionId(args.stripeSubscriptionId);
-  if (!row?.plan) return;
-
-  const baseMonthly = SUBSCRIPTION_PLAN_TOKENS[row.plan];
-  const purchasedExtras = Math.max(row.monthly_tokens - getBaseTokensForPlan(row.plan), 0);
-
-  await updateByStripeSubscription(args.stripeSubscriptionId, {
-    monthly_tokens: baseMonthly + purchasedExtras,
-    used_tokens: 0,
-    current_period_end: args.currentPeriodEnd,
+  const { error } = await createAdminClient().rpc("billing_renew_period_atomic", {
+    p_subscription_id: args.stripeSubscriptionId, p_period_end: args.currentPeriodEnd,
   });
+  if (error) throw new Error(`Token-Verlängerung fehlgeschlagen: ${error.message}`);
 }
 
 /** Synthetischer Billing-Stand für Owner-Konten — kein Stripe-Abo, kein Verbrauch. */
@@ -194,121 +156,49 @@ export async function getEffectiveBillingRow(userId: string): Promise<BillingRow
   return getBillingRow(userId);
 }
 
-export async function consumeTokens(userId: string, amount: number) {
-  if (await isOwnerUserId(userId)) {
+async function adjustTokens(userId: string, amount: number, operation: "consume" | "refund" | "add") {
+  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 2_147_483_647) {
+    return { ok: false as const, error: "Ungültige Token-Anzahl." };
+  }
+  if (operation !== "add" && await isOwnerUserId(userId)) {
     return { ok: true as const, state: buildOwnerBillingRow(userId) };
   }
-  const admin = createAdminClient();
-  const row = await getBillingRow(userId);
-  if (!row) {
-    return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
-  }
-  if (!row.plan || row.subscription_status === "canceled" || row.subscription_status === "none") {
-    return { ok: false as const, error: "Kein aktives Abo." };
-  }
-  const remaining = Math.max(row.monthly_tokens - row.used_tokens, 0);
-  if (remaining < amount) {
-    return { ok: false as const, error: `Nicht genug Tokens. Benötigt: ${amount}, verfügbar: ${remaining}.` };
-  }
-  const nextUsed = row.used_tokens + amount;
-  const { error } = await admin.from("billing_subscriptions").update({ used_tokens: nextUsed }).eq("user_id", userId);
-  if (error) {
-    return { ok: false as const, error: "Tokenverbrauch konnte nicht gespeichert werden." };
-  }
-  return {
-    ok: true as const,
-    state: { ...row, used_tokens: nextUsed },
-  };
+  const { data, error } = await createAdminClient().rpc("billing_adjust_tokens_atomic", {
+    p_user_id: userId, p_amount: amount, p_operation: operation,
+  });
+  if (error) return { ok: false as const, error: error.message as string };
+  const state = (Array.isArray(data) ? data[0] : null) as BillingRow | null;
+  if (!state) return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
+  return { ok: true as const, state };
+}
+
+export async function consumeTokens(userId: string, amount: number) {
+  return adjustTokens(userId, amount, "consume");
 }
 
 export async function refundTokens(userId: string, amount: number) {
-  const admin = createAdminClient();
-  const row = await getBillingRow(userId);
-  if (!row) {
-    return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
-  }
-  if (amount <= 0) {
-    return { ok: true as const, state: row };
-  }
-  const nextUsed = Math.max(row.used_tokens - amount, 0);
-  const { error } = await admin.from("billing_subscriptions").update({ used_tokens: nextUsed }).eq("user_id", userId);
-  if (error) {
-    return { ok: false as const, error: "Token-Rueckerstattung konnte nicht gespeichert werden." };
-  }
-  return {
-    ok: true as const,
-    state: { ...row, used_tokens: nextUsed },
-  };
+  return adjustTokens(userId, amount, "refund");
 }
 
 export async function addMonthlyTokens(userId: string, amount: number) {
-  if (amount <= 0) {
-    return { ok: false as const, error: "Ungueltige Token-Anzahl." };
-  }
-  const admin = createAdminClient();
-  // Atomare DB-Operation via RPC, falls vorhanden — verhindert Lost-Updates bei
-  // parallelen Buchungen (z. B. confirm-session + webhook).
-  const rpc = await admin.rpc("add_monthly_tokens_atomic", {
-    p_user_id: userId,
-    p_amount: amount,
-  });
-  if (!rpc.error) {
-    const next = Array.isArray(rpc.data) ? (rpc.data[0] as { monthly_tokens: number; used_tokens: number } | undefined) : undefined;
-    if (next) {
-      const row = await getBillingRow(userId);
-      if (!row) {
-        return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
-      }
-      return { ok: true as const, state: { ...row, monthly_tokens: next.monthly_tokens, used_tokens: next.used_tokens } };
-    }
-    return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
-  }
-  // Fallback fuer Umgebungen ohne RPC (z. B. lokal ohne Migration).
-  if (rpc.error.code !== "42883" && rpc.error.code !== "PGRST202") {
-    // 42883 = function does not exist; PGRST202 = supabase rpc not found
-    if (process.env.NODE_ENV === "production") {
-      return { ok: false as const, error: "Token-Kauf konnte nicht gespeichert werden (RPC)." };
-    }
-  }
-  const row = await getBillingRow(userId);
-  if (!row) {
-    return { ok: false as const, error: "Kein Billing-Profil vorhanden." };
-  }
-  const nextMonthly = Math.max(row.monthly_tokens + amount, 0);
-  const { error } = await admin
-    .from("billing_subscriptions")
-    .update({ monthly_tokens: nextMonthly })
-    .eq("user_id", userId);
-  if (error) {
-    return { ok: false as const, error: "Token-Kauf konnte nicht gespeichert werden." };
-  }
-  return { ok: true as const, state: { ...row, monthly_tokens: nextMonthly } };
+  return adjustTokens(userId, amount, "add");
 }
 
-/**
- * Versucht, einen Token-Pack-Kauf anhand der Stripe-Checkout-`session_id` zu
- * claimen. Gibt `true` zurueck, wenn dieser Aufrufer der erste ist und somit
- * gutschreiben darf. Bei `false` wurde der Kauf bereits anderweitig verbucht.
- */
-export async function claimTokenPackSession(args: {
+/** Checkout deduplication and credit are one DB transaction. Throws on failure. */
+export async function grantTokenPackSession(args: {
   sessionId: string;
   userId: string;
   packId: string;
   tokens: number;
   source: "confirm_session" | "webhook";
 }): Promise<boolean> {
-  const admin = createAdminClient();
-  const { error } = await admin.from("billing_token_pack_grants").insert({
-    session_id: args.sessionId,
-    user_id: args.userId,
-    pack_id: args.packId,
-    tokens: args.tokens,
-    source: args.source,
+  const { data, error } = await createAdminClient().rpc("billing_grant_token_pack_atomic", {
+    p_session_id: args.sessionId, p_user_id: args.userId, p_pack_id: args.packId,
+    p_tokens: args.tokens, p_source: args.source,
   });
-  if (!error) return true;
-  if (error.code === "23505") return false; // bereits geclaimt
-  if (error.code === "42P01" && isUndefinedTableTolerated()) return true;
-  throw new Error(`claimTokenPackSession fehlgeschlagen: ${error.message}`);
+  if (error) throw new Error(`Token-Gutschrift fehlgeschlagen: ${error.message}`);
+  if (typeof data !== "boolean") throw new Error("Ungültiges Ergebnis der Token-Gutschrift.");
+  return data;
 }
 
 export async function claimStripeWebhookEvent(eventId: string, eventType: string): Promise<boolean> {
@@ -347,4 +237,3 @@ export async function releaseStripeWebhookEvent(eventId: string) {
     throw new Error(`releaseStripeWebhookEvent fehlgeschlagen: ${error.message}`);
   }
 }
-

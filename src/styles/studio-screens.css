@@ -62,7 +62,7 @@
   }
 }
 
-/* ── Checklist dock ────────────────────────────────────── */
+/* ── Checklist dock (Erste Schritte redesign) ──────────── */
 .evg-studio.studio-onb-dock {
   position: fixed;
   right: 24px;
@@ -71,17 +71,56 @@
 }
 
 .evg-studio .studio-onb-widget {
-  width: 330px;
-  border: 1px solid var(--line-strong);
-  background: var(--field);
-  animation: evg-rise var(--dur-mid) var(--ease);
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--s1);
+  box-shadow: var(--sh-card);
+  overflow: hidden;
+}
+
+.evg-studio .studio-onb-widget--inline {
+  width: 100%;
+  max-width: none;
+  position: relative;
+  z-index: auto;
+  animation: none;
 }
 
 .evg-studio .studio-onb-widget-head {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 12px 10px 10px 14px;
+  gap: 10px;
+  padding: 16px 16px 14px;
+}
+
+.evg-studio .studio-onb-ring {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.evg-studio .studio-onb-ring svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+
+.evg-studio .studio-onb-ring-fill {
+  transition: stroke-dasharray 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.evg-studio .studio-onb-ring-count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t2);
 }
 
 .evg-studio .studio-onb-widget-toggle {
@@ -89,7 +128,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -100,137 +139,167 @@
 }
 
 .evg-studio .studio-onb-widget-toggle:focus-visible {
-  outline: 2px solid var(--acc);
+  outline: 2px solid var(--ac);
   outline-offset: 2px;
 }
 
 .evg-studio .studio-onb-widget-title {
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--fg);
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--t1);
 }
 
 .evg-studio .studio-onb-widget-count {
-  font-size: 10.5px;
-  color: var(--fg-4);
-  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--t3);
+  margin-left: 0;
 }
 
 .evg-studio .studio-onb-widget-chevron {
-  color: var(--fg-4);
-  transition: transform var(--dur) var(--ease);
+  color: var(--t3);
+  transition: transform 0.2s ease;
+  flex: none;
 }
 
-.evg-studio .studio-onb-widget[data-expanded="true"] .studio-onb-widget-chevron {
+.evg-studio .studio-onb-widget[data-expanded="false"] .studio-onb-widget-chevron {
   transform: rotate(180deg);
 }
 
 .evg-studio .studio-onb-widget-close {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
   border: 0;
+  border-radius: 6px;
   background: transparent;
-  color: var(--fg-5);
+  color: var(--t3);
   cursor: pointer;
+  transition:
+    color 0.16s,
+    background 0.16s;
 }
 
 .evg-studio .studio-onb-widget-close:hover {
-  color: var(--fg);
-  background: var(--raised);
+  color: var(--t1);
+  background: var(--s3);
 }
 
 .evg-studio .studio-onb-widget-close:focus-visible {
-  outline: 2px solid var(--acc);
+  outline: 2px solid var(--ac);
   outline-offset: 2px;
 }
 
-.evg-studio .studio-onb-progress {
-  height: 2px;
-  background: var(--line);
-}
-
+.evg-studio .studio-onb-progress,
 .evg-studio .studio-onb-progress-fill {
-  height: 100%;
-  background: var(--acc);
-  transition: width var(--dur-mid) var(--ease);
+  display: none;
 }
 
 .evg-studio .studio-onb-tasks {
   display: flex;
   flex-direction: column;
   margin: 0;
-  padding: 8px;
+  padding: 2px 8px 10px;
   list-style: none;
-  gap: 2px;
+  gap: 0;
 }
 
 .evg-studio .studio-onb-task {
   display: flex;
-  gap: 10px;
-  padding: 9px 10px;
+  gap: 11px;
+  padding: 10px 8px;
+  border-radius: 10px;
   color: inherit;
   text-decoration: none;
   border: 1px solid transparent;
+  transition: background 0.16s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .evg-studio .studio-onb-task:hover {
-  background: var(--raised);
+  background: var(--s2);
 }
 
 .evg-studio .studio-onb-task:focus-visible {
-  outline: 2px solid var(--acc);
+  outline: 2px solid var(--ac);
   outline-offset: -2px;
 }
 
 .evg-studio .studio-onb-task-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
 .evg-studio .studio-onb-task-label {
-  font-size: 13px;
-  color: var(--fg-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--t1);
   display: flex;
   gap: 8px;
-  align-items: baseline;
+  align-items: center;
 }
 
 .evg-studio .studio-onb-task[data-done="true"] .studio-onb-task-label {
-  color: var(--fg-5);
+  color: var(--t3);
   text-decoration: line-through;
 }
 
 .evg-studio .studio-onb-task-optional {
   font-family: var(--f-mono);
-  font-size: 10px;
-  color: var(--fg-5);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--t3);
   text-transform: uppercase;
+  text-decoration: none;
 }
 
 .evg-studio .studio-onb-task-desc {
   font-size: 12px;
-  color: var(--fg-4);
+  line-height: 1.45;
+  color: var(--t3);
 }
 
 .evg-studio .studio-onb-check {
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
   flex-shrink: 0;
   margin-top: 1px;
-  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  border: 1.5px solid var(--line2);
+  background: var(--s2);
   display: grid;
   place-items: center;
-  color: var(--acc-fg);
+  color: var(--ac-ink);
+  transition:
+    background 0.16s,
+    border-color 0.16s;
 }
 
 .evg-studio .studio-onb-check[data-done="true"] {
-  background: var(--acc);
-  border-color: var(--acc);
+  background: var(--ac);
+  border-color: var(--ac);
+  animation: studio-onb-check-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes studio-onb-check-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .evg-studio .studio-onb-done {
@@ -243,11 +312,11 @@
 .evg-studio .studio-onb-done-text {
   margin: 4px 0 0;
   font-size: 12.5px;
-  color: var(--fg-4);
+  color: var(--t3);
 }
 
 .evg-studio .studio-faint {
-  color: var(--fg-4);
+  color: var(--t3);
 }
 
 /* ── Tour hints ────────────────────────────────────────── */
@@ -314,7 +383,7 @@
 }
 
 .evg-studio .studio-onb-tour-count {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--fg-5);
 }
 
@@ -394,7 +463,7 @@
 
 .evg-studio .studio-onb-demo-chip {
   font-family: var(--f-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   padding: 3px 8px;
   border: 1px solid var(--line);
   color: var(--fg-4);
@@ -485,7 +554,7 @@
 }
 
 .evg-studio .studio-onb-demo-steplabel {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--fg-5);
 }
 
@@ -501,7 +570,7 @@
 .evg-studio .studio-onb-demo-badge {
   display: inline-block;
   font-family: var(--f-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 2px 7px;

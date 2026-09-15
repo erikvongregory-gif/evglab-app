@@ -7,19 +7,15 @@ import {
   providerErrorResponse,
 } from "@/lib/ai/providerRequest";
 import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
-import { buildHyperrealisticPrompt, buildProductPlacementPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
-import {
-  enforceHyperrealisticPromptConstraints,
-  shouldUseImageReferenceForGeneration,
-} from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/enforce-prompt-constraints";
+import { applyClientIntentOverrides, buildProductPlacementPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
+import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
 import { buildBrandProfilePromptContext, getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
 import { calculateGenerationTokenCost, calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
 import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
-import { generateBrauereiBildPrompt } from "@/lib/prompts/brauerei-bild/generate-prompt";
-import { buildHyperrealisticClaudeUserMessage } from "@/lib/prompts/brauerei-bild/map-hyperrealistic-brief";
+import { compileBrief } from "@/lib/prompts/prompt-compiler";
 import { applyContentPresetPrompt } from "@/lib/image-types/policy";
 import {
   generateOpenAiImage,
@@ -27,6 +23,7 @@ import {
   type OpenAiReferenceImage,
 } from "@/lib/openai/generateImage";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
+import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
 
 export const runtime = "nodejs";
@@ -35,6 +32,12 @@ export const maxDuration = 300;
 const MAX_PROMPT_CHARS = 12_000;
 const DEFAULT_VARIANT_COUNT = 3;
 const OUTPUT_FORMAT = "png" as const;
+const DEFAULT_IMAGE_MODEL = "gpt-image-2.5-sunburst";
+
+/** Leichtgewichtiger Warm-up — kompiliert die Route, ohne Bild zu erzeugen. */
+export async function GET() {
+  return NextResponse.json({ ok: true });
+}
 
 export async function POST(req: Request) {
   try {
@@ -47,9 +50,11 @@ export async function POST(req: Request) {
     await ensureBillingRow(guard.userId);
     const currentState = await getEffectiveBillingRow(guard.userId);
 
-    const openAiKey = process.env.OPENAI_API_KEY?.trim();
-    if (!openAiKey) {
-      return NextResponse.json({ error: "OPENAI_API_KEY fehlt." }, { status: 500 });
+    let openAiKey: string;
+    try {
+      openAiKey = requireOpenAiImageApiKey();
+    } catch {
+      return NextResponse.json({ error: "OPENAI_IMAGE_API_KEY fehlt." }, { status: 500 });
     }
 
     const parsed = hyperrealisticSchema.safeParse(await req.json());
@@ -58,16 +63,11 @@ export async function POST(req: Request) {
       const detail = issue ? `${issue.path.join(".")}: ${issue.message}` : "Payload validation failed.";
       return NextResponse.json({ error: `Ungueltige Anfrage. ${detail}` }, { status: 400 });
     }
-    const input = parsed.data;
+    const input = applyClientIntentOverrides(parsed.data);
 
     const brandProfile = getBrandProfileFromMetadata(guard.userMetadata);
     const brandProfileContext = buildBrandProfilePromptContext(brandProfile);
 
-    // Referenzbild (Etikett) aufloesen — wird sowohl fuer Claude-Vision (Prompt)
-    // als auch fuer OpenAI image-to-image (Etikett-Treue) genutzt.
-    // Fallback ist der gespeicherte Etikett-Traeger (bester Packshot der Analyse),
-    // NICHT brandReferenceImageUrls[0] — das sind seit der Szenen-zuerst-Auswahl
-    // Stimmungsbilder ohne verlaessliches Etikett.
     const wantsBrandLabel = input.etikettModus !== "generisch";
     const profileLabelUrl = brandProfile.brandLabelReferenceUrl.trim();
     let effectiveEtikettBild = input.etikettBild?.trim() ?? "";
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
       Boolean(effectiveEtikettBild) && !effectiveEtikettBild.includes("example.com/placeholder");
 
     let visionReference = null as Awaited<ReturnType<typeof resolveReferenceImageForVision>>;
-    if (wantsBrandLabel && hasEtikettInput) {
+    if (hasEtikettInput && input.behaelter !== "G") {
       try {
         visionReference = await resolveReferenceImageForVision(effectiveEtikettBild, guard.userMetadata);
       } catch (visionError) {
@@ -90,81 +90,104 @@ export async function POST(req: Request) {
       }
     }
 
-    const useProductPhoto =
-      wantsBrandLabel && input.behaelter !== "G" && Boolean(visionReference);
+    const extraRefs: OpenAiReferenceImage[] = [];
+    for (const raw of input.extraReferenceImages ?? []) {
+      if (extraRefs.length >= 3) break;
+      try {
+        const resolved = await resolveReferenceImageForVision(raw, guard.userMetadata);
+        if (resolved) extraRefs.push(resolved);
+      } catch {
+        /* ignore bad extra */
+      }
+    }
 
-    if (wantsBrandLabel && input.behaelter !== "G" && !visionReference) {
-      console.warn(
-        "[inhalte-erstellen/create-task] Etikett-Foto nicht aufloesbar:",
-        effectiveEtikettBild.slice(0, 120),
-      );
+    const hasProductPhoto = Boolean(visionReference) && input.behaelter !== "G";
+    const bottle = FLASCHEN_TYPEN[input.flaschenTyp];
+    const shapeReference =
+      input.behaelter === "G" || hasProductPhoto
+        ? null
+        : await loadBottleShapeReference(input.flaschenTyp);
+    const hasShapeReference = Boolean(shapeReference) || bottle.hasShapeReference;
+
+    const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+    const anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
+
+    // Mit Produktfoto: Compiler nur für Validierung + Brief-Normalisierung.
+    // Der Bild-Prompt bleibt kurz (i2i Placement) — lange Master-Prompts zerstören Etikett-Treue.
+    const compiled = await compileBrief({
+      anthropic: hasProductPhoto ? null : anthropic,
+      input,
+      breweryName: brandProfile.breweryName,
+      brandProfileContext,
+      hasProductPhoto,
+      hasShapeReference,
+      referenceImages: visionReference ? [visionReference] : undefined,
+    });
+
+    if (compiled.blocking_issues.length > 0) {
       return NextResponse.json(
         {
-          error:
-            "Das Etikett-Foto konnte nicht geladen werden. Bitte das Flaschenfoto der Sorte erneut hochladen — ohne dieses Bild kann das Etikett nicht 1:1 übernommen werden.",
+          error: compiled.blocking_issues[0],
+          blocking_issues: compiled.blocking_issues,
+          missing_information: compiled.missing_information,
+          compiled: {
+            normalized_brief: compiled.normalized_brief,
+            reference_roles: compiled.reference_roles,
+          },
         },
         { status: 422 },
       );
     }
 
-    // Mit Produktfoto: kurzen i2i-Prompt, kein Claude-Rewrite.
-    // Claude hat das Etikett aus dem Markennamen nachgebaut — die Bild-KI folgt dann dem Text, nicht dem Foto.
     let prompt: string;
-    if (useProductPhoto) {
-      prompt = buildProductPlacementPrompt(input);
-    } else {
-      prompt = buildHyperrealisticPrompt(input, { breweryName: brandProfile.breweryName });
-      const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
-      if (anthropicKey) {
-        try {
-          const anthropic = new Anthropic({ apiKey: anthropicKey });
-          prompt = await generateBrauereiBildPrompt({
-            anthropic,
-            userMessage: buildHyperrealisticClaudeUserMessage(input, {
-              breweryName: brandProfile.breweryName,
-              hasReferenceImage: Boolean(visionReference),
-            }),
-            brandProfileContext,
-            maxTokens: 1400,
-            temperature: 0.35,
-            referenceImages: visionReference ? [visionReference] : undefined,
-          });
-        } catch (skillError) {
-          console.warn("[inhalte-erstellen/create-task] brauerei-bild skill fallback:", skillError);
-        }
+    if (hasProductPhoto) {
+      const briefParts = [
+        compiled.normalized_brief.scene,
+        compiled.normalized_brief.action,
+        compiled.normalized_brief.people,
+        input.zusatzWunsch?.trim(),
+      ].filter((part, index, arr) => Boolean(part) && arr.indexOf(part) === index);
+      const placementInput = {
+        ...input,
+        zusatzWunsch: briefParts.join(". ").slice(0, 800) || input.zusatzWunsch,
+      };
+      prompt = buildProductPlacementPrompt(placementInput);
+      if (input.stiltreue === "hoch" && wantsBrandLabel) {
+        prompt = `${prompt} LABEL FIDELITY: Keep Image 1 label identical — every letter, logo, crest. Change only the environment.`;
       }
-      prompt = enforceHyperrealisticPromptConstraints(prompt, input, brandProfile.breweryName);
-      prompt = applyContentPresetPrompt(prompt, "hyperreal");
+    } else {
+      prompt = applyContentPresetPrompt(compiled.image_prompt, input.contentPreset ?? "hyperreal");
     }
     if (prompt.length > MAX_PROMPT_CHARS) prompt = prompt.slice(0, MAX_PROMPT_CHARS);
 
-    const useImageReference = shouldUseImageReferenceForGeneration(input) && hasEtikettInput;
-    const editReference = useProductPhoto ? visionReference : useImageReference ? visionReference : null;
-
-    const shapeReference =
-      input.behaelter === "G" || editReference
-        ? null
-        : await loadBottleShapeReference(input.flaschenTyp);
-    const referenceImages = [editReference, shapeReference].filter(
+    const referenceImages = [visionReference, ...extraRefs, shapeReference].filter(
       (ref): ref is OpenAiReferenceImage => Boolean(ref),
     );
-    if (editReference && !useProductPhoto) {
-      prompt = `${prompt}\n\nREFERENCE IMAGE (MANDATORY, 1:1): This photo is the exact product. Keep the printed label identical. Do not invent a different label.`;
-      if (prompt.length > MAX_PROMPT_CHARS) prompt = prompt.slice(0, MAX_PROMPT_CHARS);
-    } else if (shapeReference) {
-      prompt = `${prompt}\n\nREFERENCE IMAGE: This studio photo defines the bottle SHAPE only. Ignore its background. Do not copy any label from it.`;
-      if (prompt.length > MAX_PROMPT_CHARS) prompt = prompt.slice(0, MAX_PROMPT_CHARS);
-    }
 
-    // 3) Bild-Qualitaet + Billing vorbereiten.
-    // gpt-image-2 "high" ist sehr langsam (~120s/Bild). "medium" (~40s) ist der
-    // Standard-Kompromiss; per Env uebersteuerbar.
+    console.info("[inhalte-erstellen/create-task] compiled", {
+      szene: input.szene,
+      personenModus: input.personenModus,
+      zusatzWunsch: input.zusatzWunsch?.slice(0, 120) ?? null,
+      hasProductPhoto,
+      hasShapeReference,
+      promptMode: hasProductPhoto ? "placement-i2i" : "master-prompt",
+      blocking: compiled.blocking_issues.length,
+      promptStart: prompt.slice(0, 160),
+    });
+
     const qualityEnv = process.env.OPENAI_IMAGE_QUALITY?.trim().toLowerCase();
+    // Hyperreal-Finals mit Produktfoto: high, sofern nicht per Env anders gesetzt.
     const openAiQuality: "low" | "medium" | "high" =
-      qualityEnv === "low" || qualityEnv === "high" ? qualityEnv : "medium";
+      qualityEnv === "low" || qualityEnv === "medium" || qualityEnv === "high"
+        ? qualityEnv
+        : hasProductPhoto
+          ? "high"
+          : compiled.generation_settings.quality === "high"
+            ? "high"
+            : "medium";
     const billingResolution = (openAiQuality === "high" ? "2K" : "1K") as "1K" | "2K";
-    const hasReferenceForBilling = Boolean(editReference);
-    const strictLabelMode = input.etikettModus === "marke" && hasReferenceForBilling;
+    const hasReferenceForBilling = referenceImages.length > 0;
+    const strictLabelMode = wantsBrandLabel && hasProductPhoto;
     const perVariantCost = calculatePerVariantTokenCost({
       resolution: billingResolution,
       hasReferenceImage: hasReferenceForBilling,
@@ -186,9 +209,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // 4) N Varianten synchron via OpenAI rendern, Ergebnis in Supabase Storage ablegen.
-    const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2";
-    const size = mapAspectRatioToOpenAiSize(input.aspectRatio);
+    const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
+    const size = mapAspectRatioToOpenAiSize(
+      compiled.generation_settings.aspectRatio || input.aspectRatio,
+    );
 
     const renderOne = async (variantIndex: number): Promise<string> => {
       const buffer = await generateOpenAiImage({
@@ -213,28 +237,24 @@ export async function POST(req: Request) {
       }
     };
 
-    const settled = await Promise.allSettled(
-      Array.from({ length: variantsToCreate }, (_, i) => renderOne(i)),
-    );
     const images: string[] = [];
     const errors: string[] = [];
     const providerFailures: ProviderError[] = [];
-    for (const [index, result] of settled.entries()) {
-      if (result.status === "fulfilled") {
-        images.push(result.value);
-        continue;
+    for (let i = 0; i < variantsToCreate; i += 1) {
+      try {
+        images.push(await renderOne(i));
+      } catch (reason) {
+        if (isProviderError(reason)) {
+          providerFailures.push(reason);
+          errors.push(reason.classified.userMessage);
+          if (!reason.classified.retryable && reason.classified.providerFault) break;
+          continue;
+        }
+        errors.push(reason instanceof Error ? reason.message : `Variante ${i + 1}: Unbekannter Fehler.`);
       }
-      const reason = result.reason;
-      if (isProviderError(reason)) {
-        providerFailures.push(reason);
-        errors.push(reason.classified.userMessage);
-        continue;
-      }
-      errors.push(reason instanceof Error ? reason.message : `Variante ${index + 1}: Unbekannter Fehler.`);
     }
 
     if (images.length === 0) {
-      // Kein Token-Abzug: `consumeTokens` laeuft erst nach erfolgreichen Bildern.
       const [providerFailure] = providerFailures;
       if (providerFailure) {
         logProviderFailure(providerFailure.classified, {
@@ -249,7 +269,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 5) Tokens NUR fuer erfolgreich gelieferte Bilder verbuchen (eine atomare Buchung).
     const totalConsumed = perVariantCost * images.length;
     const consumeResult = await consumeTokens(guard.userId, totalConsumed);
     if (!consumeResult.ok) {
@@ -267,6 +286,11 @@ export async function POST(req: Request) {
       hasReference: hasReferenceForBilling,
       size,
       outputFormat: OUTPUT_FORMAT,
+      compiled: {
+        normalized_brief: compiled.normalized_brief,
+        missing_information: compiled.missing_information,
+        reference_roles: compiled.reference_roles,
+      },
       billing: {
         freeTrial: false,
         consumed: totalConsumed,

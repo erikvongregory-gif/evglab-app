@@ -116,7 +116,7 @@ export function ModeHyperrealistic() {
             ))}
           </select>
           <select className="h-9 rounded-lg border px-3 text-sm" value={input.aspectRatio} onChange={(e) => setInput({ ...input, aspectRatio: e.target.value as HyperrealisticInput["aspectRatio"] })}>
-            {["4:5", "1:1", "9:16", "16:9"].map((value) => <option key={value}>{value}</option>)}
+            {["1:1", "4:5", "3:4", "9:16", "4:3", "16:9"].map((value) => <option key={value}>{value}</option>)}
           </select>
           <select className="h-9 rounded-lg border px-3 text-sm" value={input.quality} onChange={(e) => setInput({ ...input, quality: e.target.value as HyperrealisticInput["quality"] })}>
             <option value="medium">Vorschau</option>

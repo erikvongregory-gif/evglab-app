@@ -16,6 +16,9 @@ export type BrandProfile = {
   brandReferenceImageUrls: string[];
   /** Bester Packshot/Etikett-Traeger aus der Analyse — Quelle fuer Etikett-Treue, NICHT fuer Bildsprache. */
   brandLabelReferenceUrl: string;
+  brandHeadlineFontName: string;
+  brandFontFileUrl: string;
+  brandFontWeight: string;
 };
 
 function asString(value: unknown): string {
@@ -61,6 +64,9 @@ export function getBrandProfileFromMetadata(userMetadata: unknown): BrandProfile
     brandDonts: asString(settings?.brandDonts),
     brandReferenceImageUrls: asStringArray(settings?.brandReferenceImageUrls),
     brandLabelReferenceUrl: asString(settings?.brandLabelReferenceUrl),
+    brandHeadlineFontName: asString(settings?.brandHeadlineFontName),
+    brandFontFileUrl: asString(settings?.brandFontFileUrl),
+    brandFontWeight: asString(settings?.brandFontWeight) || "700",
   };
 }
 
@@ -142,6 +148,9 @@ export function buildGenericBrandProfilePatch(): Partial<DashboardSettings> {
     brandDonts: "",
     brandReferenceImageUrls: [],
     brandLabelReferenceUrl: "",
+    brandHeadlineFontName: "",
+    brandFontFileUrl: "",
+    brandFontWeight: "700",
     brandLockLevel: "strict",
     brandAnalyzedAt: "",
   };

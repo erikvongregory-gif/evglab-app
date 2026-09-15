@@ -112,13 +112,45 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
       <div className="studio-hr" />
 
       <div className="studio-brand-review-body">
-        {refs.length > 0 ? (
+        <div>
+          <StudioFieldLabel className="studio-brand-review-label">Referenzbilder</StudioFieldLabel>
+          {refs.length > 0 ? (
+            <>
+              <div className="studio-brand-review-refs">
+                {refs.slice(0, 6).map((url, index) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={`${url.slice(0, 48)}-${index}`} src={url} alt="" className="studio-brand-review-ref" />
+                ))}
+              </div>
+              {refs.length < 2 ? (
+                <p className="studio-modal-sub" style={{ marginTop: 8 }}>
+                  Wenige passende Motive von der Website — optional manuell ergänzen oder mit einer Sortiment-/Über-uns-URL erneut scannen.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="studio-modal-sub" style={{ marginTop: 8 }}>
+              Keine brauchbaren Szenen gefunden — Logos und Gate-Bilder werden ignoriert. Du kannst Referenzbilder später im Markenprofil hochladen.
+            </p>
+          )}
+        </div>
+
+        {review.suggestedBeers && review.suggestedBeers.length > 0 ? (
           <div>
-            <StudioFieldLabel className="studio-brand-review-label">Referenzbilder</StudioFieldLabel>
+            <StudioFieldLabel className="studio-brand-review-label">Biersorten</StudioFieldLabel>
+            <p className="studio-modal-sub" style={{ marginTop: 8, marginBottom: 8 }}>
+              {review.suggestedBeers.length} Sorten von der Website erkannt — werden beim Aktivieren automatisch angelegt.
+            </p>
             <div className="studio-brand-review-refs">
-              {refs.slice(0, 6).map((url, index) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={`${url.slice(0, 48)}-${index}`} src={url} alt="" className="studio-brand-review-ref" />
+              {review.suggestedBeers.map((beer) => (
+                <div key={beer.name} className="studio-brand-review-ref-wrap" title={beer.name}>
+                  {beer.etikettUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={beer.etikettUrl} alt={beer.name} className="studio-brand-review-ref" />
+                  ) : (
+                    <div className="studio-brand-review-ref studio-brand-review-ref--empty">{beer.name.slice(0, 1)}</div>
+                  )}
+                </div>
               ))}
             </div>
           </div>

@@ -104,7 +104,10 @@ export function ModeCampaignText() {
           <select className="h-9 rounded-lg border px-3 text-sm" value={input.aspectRatio} onChange={(e) => setInput({ ...input, aspectRatio: e.target.value as CampaignTextInput["aspectRatio"] })}>
             <option value="4:5">4:5</option>
             <option value="1:1">1:1</option>
+            <option value="3:4">3:4</option>
             <option value="9:16">9:16</option>
+            <option value="4:3">4:3</option>
+            <option value="16:9">16:9</option>
           </select>
           <select className="h-9 rounded-lg border px-3 text-sm" value={input.quality} onChange={(e) => setInput({ ...input, quality: e.target.value as CampaignTextInput["quality"] })}>
             <option value="medium">Vorschau</option>

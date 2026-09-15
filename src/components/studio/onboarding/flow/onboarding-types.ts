@@ -15,6 +15,14 @@ export type OnboardingBrandDraft = {
   brandLabelReferenceUrl: string;
   referenceImageUrls: string[];
   referenceImagePayloads?: { base64: string; mime: string }[];
+  suggestedBeers?: Array<{
+    name: string;
+    bierstil: string;
+    flaschenTyp: string;
+    flaschenfarbe: "braun" | "gruen" | "klar";
+    glasTyp: string;
+    etikettUrl: string;
+  }>;
 };
 
 export type OnboardingBootstrap = {

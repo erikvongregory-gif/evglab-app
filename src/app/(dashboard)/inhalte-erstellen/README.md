@@ -4,10 +4,10 @@ Modulare Bild-Engine fuer Brauerei-Kunden. Jeder Modus besitzt ein eigenes Zod-S
 
 ## Modi
 
-- Hyperrealistisch: `POST /api/generate-hyperrealistic`, `gpt-image-2-2026-04-21`, Etikett als Referenzbild, `n: 2`.
+- Hyperrealistisch: `POST /api/generate-hyperrealistic`, `gpt-image-2.5-flare`, Etikett als Referenzbild, `n: 2`.
 - Produkt freistellen: `POST /api/generate-isolate`, Photoroom Segment API, Fallback `remove.bg`, kein GPT-Rendering.
-- Produkt Studio: `POST /api/generate-studio`, `gpt-image-2-2026-04-21`, Auto-Glas und Auto-Garnitur nach Bierstil.
-- Kampagnenbild mit Text: `POST /api/generate-campaign`, `gpt-image-2-2026-04-21`, 3-5 Feed-Referenzen, Thinking fuer Layout/Text aktiv.
+- Produkt Studio: `POST /api/generate-studio`, `gpt-image-2.5-flare`, Auto-Glas und Auto-Garnitur nach Bierstil.
+- Kampagnenbild mit Text: `POST /api/generate-campaign`, `gpt-image-2.5-flare`, 3-5 Feed-Referenzen, Thinking fuer Layout/Text aktiv.
 
 ## Single Source Of Truth
 

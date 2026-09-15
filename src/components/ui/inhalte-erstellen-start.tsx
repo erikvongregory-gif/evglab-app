@@ -116,6 +116,7 @@ export function InhalteErstellenStart({
         bierstil: draft.bierstil,
         flaschenTyp: draft.flaschenTyp,
         flaschenfarbe: draft.flaschenfarbe,
+        glasTyp: draft.glasTyp,
         etikettUrl: "",
         createdAt: new Date().toISOString(),
         ...(etikettPayload ? { etikettPayload } : {}),
@@ -194,7 +195,7 @@ export function InhalteErstellenStart({
     <div className="studio-create-start">
       <header className="studio-create-start-head">
         <span className="studio-eyebrow">Bilder erstellen</span>
-        <h1 style={{ fontFamily: STUDIO_TOKENS.serif ?? STUDIO_TOKENS.sans }}>{greeting}</h1>
+        <h1 style={{ fontFamily: STUDIO_TOKENS.sans, fontWeight: 600, letterSpacing: "-0.02em" }}>{greeting}</h1>
         <p>
           Bier wählen, Anlass antippen — Szene, Licht und Markenstil übernimmt die KI. Feinjustieren kannst du
           jederzeit vor dem Generieren.

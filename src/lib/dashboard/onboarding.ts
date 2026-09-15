@@ -126,6 +126,15 @@ export function needsFullOnboardingFlow(state: StudioOnboardingState): boolean {
   return true;
 }
 
+/** Nach Login / bei Studio-Entry: Einrichtung vor Dashboard, kein Shell-Flash. */
+export function resolveStudioEntryPath(
+  state: StudioOnboardingState,
+  preferredPath = "/dashboard",
+): string {
+  if (needsFullOnboardingFlow(state)) return "/onboarding";
+  return preferredPath;
+}
+
 /** Alte Tour-Overlays nicht mehr automatisch zeigen (v2 aktiv oder abgeschlossen). */
 export function shouldSuppressLegacyOnboardingUi(state: StudioOnboardingState): boolean {
   return state.flowVersion === 2 || isFlowV2Complete(state) || needsFullOnboardingFlow(state);

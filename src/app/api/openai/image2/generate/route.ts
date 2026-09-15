@@ -24,6 +24,7 @@ import {
   applyContentPresetPrompt,
   validateImageTypePolicy,
 } from "@/lib/image-types/policy";
+import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 
 type GenerateImageBody = {
   prompt: string;
@@ -156,9 +157,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: violation.message, code: violation.code }, { status: 400 });
     }
 
-    const openAiKey = process.env.OPENAI_API_KEY?.trim();
-    if (!openAiKey) {
-      return NextResponse.json({ error: "OPENAI_API_KEY fehlt." }, { status: 500 });
+    let openAiKey: string;
+    try {
+      openAiKey = requireOpenAiImageApiKey();
+    } catch {
+      return NextResponse.json({ error: "OPENAI_IMAGE_API_KEY fehlt." }, { status: 500 });
     }
     const kieKey = process.env.KIE_API_KEY?.trim();
     if (!kieKey) {
@@ -227,7 +230,7 @@ export async function POST(req: Request) {
     const model =
       process.env.KIE_CHATGPT_IMAGE2_TEXT_MODEL?.trim() ||
       process.env.OPENAI_IMAGE_MODEL?.trim() ||
-      "gpt-image-1";
+      "gpt-image-2.5-sunburst";
     const scenePrompt = body.prompt.trim();
     const subTrim = (body.subline ?? "").trim();
     const ctaTrim = (body.cta ?? "").trim();

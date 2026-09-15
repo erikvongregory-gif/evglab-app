@@ -21,6 +21,7 @@ const beerSchema = z.object({
   bierstil: z.string().min(1).max(60),
   flaschenTyp: z.string().min(1).max(60),
   flaschenfarbe: z.enum(["braun", "gruen", "klar"]),
+  glasTyp: z.string().min(1).max(40).optional(),
   etikettUrl: z.string().max(1200).optional().default(""),
   createdAt: z.string().max(40).optional().default(""),
   /** Optionaler Etikett-Upload — wird server-seitig als kurze HTTPS-URL persistiert. */
@@ -127,6 +128,7 @@ export async function PUT(req: Request) {
       bierstil: beer.bierstil,
       flaschenTyp: beer.flaschenTyp,
       flaschenfarbe: beer.flaschenfarbe,
+      glasTyp: beer.glasTyp,
       etikettUrl,
       createdAt: beer.createdAt || new Date().toISOString(),
     });

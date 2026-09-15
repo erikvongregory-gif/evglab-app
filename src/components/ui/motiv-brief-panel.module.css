@@ -31,9 +31,9 @@
 .kicker {
   margin: 0;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ac, #c9a24d);
 }
@@ -68,7 +68,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--ac, #c9a24d);
 }
@@ -221,9 +221,9 @@
 
 .rowLabel {
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3, #7e7263);
   padding-top: 6px;
@@ -330,7 +330,7 @@
 
 .extraCount {
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--t3, #7e7263);
   padding-top: 7px;
 }
@@ -373,8 +373,8 @@
   display: flex;
   justify-content: space-between;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3, #7e7263);
 }
@@ -406,7 +406,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--warn, #c98f4d);
 }
 
@@ -469,7 +469,7 @@
 
 .noteMeta {
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--t3, #7e7263);
   text-transform: uppercase;
 }
@@ -540,16 +540,97 @@
   left: 7px;
   top: 6px;
   font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
-  font-size: 9px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   color: rgba(243, 237, 228, 0.72);
 }
 
 .previewCaption {
   margin: 0;
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.45;
   color: var(--t2, #b3a694);
+}
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progressTrack {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line2, #3d3021);
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ac, #c9a24d);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.feedGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.feedCard {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  aspect-ratio: var(--preview-ratio, 4 / 5);
+  max-height: 220px;
+  border-radius: 10px;
+  border: 1px solid var(--line2, #3d3021);
+  background: linear-gradient(160deg, var(--s3, #271e16), var(--s2, #1e1710));
+  overflow: hidden;
+  cursor: pointer;
+  color: inherit;
+}
+
+.feedCardLoading {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  cursor: default;
+}
+
+.feedImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.feedBadge {
+  position: absolute;
+  left: 7px;
+  top: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1a120c;
+  background: var(--ac, #c9a24d);
+}
+
+.feedPct {
+  font-family: var(--f-mono, var(--font-ibm-plex-mono), ui-monospace, monospace);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ac, #c9a24d);
+}
+
+.feedLabel {
+  font-size: 11px;
+  color: var(--t3, #7e7263);
 }
 
 .formats,

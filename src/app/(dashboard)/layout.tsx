@@ -4,6 +4,7 @@ import { StudioLayoutFallback, StudioWorkspaceShell } from "@/components/studio/
 import { hasAdminAccess, isOwnerUser } from "@/lib/auth/owner";
 import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,6 +28,10 @@ export default async function StudioDashboardLayout({ children }: { children: Re
   }
 
   const dashboard = getDashboardMetadata(user.user_metadata);
+  // Vor der Shell umleiten — sonst kurz Dashboard, dann Redirect/Popup.
+  if (needsFullOnboardingFlow(sanitizeStudioOnboardingState(dashboard.onboarding))) {
+    redirect("/onboarding");
+  }
   const settings = dashboard.settings as Record<string, unknown> | undefined;
   const profileName =
     typeof settings?.profileName === "string"

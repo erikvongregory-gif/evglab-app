@@ -39,16 +39,10 @@ export async function POST(req: Request) {
   let bonusGranted = false;
   if (!alreadyClaimed && !hasActiveBilling(row)) {
     const admin = createAdminClient();
-    const nextMonthlyTokens = Math.max(row.monthly_tokens, ONBOARDING_BONUS_TOKENS);
-    const { error: updateError } = await admin
-      .from("billing_subscriptions")
-      .update({
-        plan: "start",
-        monthly_tokens: nextMonthlyTokens,
-        used_tokens: Math.min(row.used_tokens, nextMonthlyTokens),
-        subscription_status: "active",
-      })
-      .eq("user_id", user.id);
+    const { data: granted, error: updateError } = await admin.rpc("billing_onboarding_bonus_atomic", {
+      p_user_id: user.id,
+      p_amount: ONBOARDING_BONUS_TOKENS,
+    });
     if (updateError) {
       return NextResponse.json({ error: "Bonus konnte nicht gespeichert werden." }, { status: 500 });
     }
@@ -62,7 +56,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Bonus konnte nicht final gespeichert werden." }, { status: 500 });
     }
 
-    bonusGranted = true;
+    bonusGranted = granted === true;
 
     row = await getBillingRow(user.id);
     if (!row) {

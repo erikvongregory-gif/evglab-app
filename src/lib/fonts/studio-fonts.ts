@@ -1,21 +1,14 @@
-import { IBM_Plex_Mono, IBM_Plex_Sans, Work_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Inter_Tight, Newsreader } from "next/font/google";
 
-/** FINAL Handoff — nur Studio-UI (`.evg-studio` + `studioFontClassName`). */
-const workSans = Work_Sans({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-work-sans",
-  display: "swap",
-});
-
-/** Auth / Login / Passwort — unverändert IBM Plex (nicht Work Sans). */
-const ibmPlexSans = IBM_Plex_Sans({
+/** Produkt-UI — gesamte Studio-Oberfläche. Nur 400 / 500 / 600. */
+const interTight = Inter_Tight({
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600"],
-  variable: "--font-ibm-plex-sans",
+  variable: "--font-inter-tight",
   display: "swap",
 });
 
+/** Technische Metadaten, Zeitangaben, Statuslabels. */
 const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600"],
@@ -23,11 +16,19 @@ const ibmPlexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+/** Nur Logo / seltene Markenmomente — nicht für Dashboard-Überschriften oder KPIs. */
+const newsreader = Newsreader({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600"],
+  variable: "--font-newsreader",
+  display: "swap",
+});
+
 /**
- * Studio-Oberfläche: Work Sans + IBM Plex Mono.
+ * Studio-Oberfläche: Inter Tight + IBM Plex Mono + Newsreader (Logo).
  * Einmalig laden — mehrfache next/font-Instanzen verursachen removeChild-Fehler beim Navigieren.
  */
-export const studioFontClassName = `${workSans.variable} ${ibmPlexMono.variable}`;
+export const studioFontClassName = `${interTight.variable} ${ibmPlexMono.variable} ${newsreader.variable}`;
 
-/** Login / Passwort-Reset — außerhalb des FINAL-Studio-Scopes */
-export const loginFontClassName = `${ibmPlexSans.variable} ${ibmPlexMono.variable}`;
+/** Login / Passwort-Reset — gleiche Produkt-Typo. */
+export const loginFontClassName = studioFontClassName;

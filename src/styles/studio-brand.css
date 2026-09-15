@@ -19,9 +19,9 @@
 
 .evg-studio .studio-brand-title {
   margin: 0;
-  font-size: var(--t-19);
+  font-size: var(--t-page);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--t1);
   line-height: 1.2;
 }
@@ -31,7 +31,7 @@
   font-size: var(--t-13);
   color: var(--t3);
   max-width: 52ch;
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .evg-studio .studio-muted {
@@ -57,7 +57,7 @@
   font-family: var(--f-mono);
   font-size: var(--t-9);
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
 }
@@ -98,7 +98,7 @@
   height: auto;
   min-height: 72px;
   padding: 10px 11px;
-  line-height: 1.55;
+  line-height: 1.45;
   resize: vertical;
 }
 
@@ -199,7 +199,7 @@
   font-family: var(--f-mono);
   font-size: var(--t-9);
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
   margin-bottom: var(--sp-4);
@@ -274,6 +274,21 @@
   border: 1px solid var(--line2);
 }
 
+.evg-studio .studio-brand-font-name {
+  width: 100%;
+  border: 1px solid var(--line2);
+  border-radius: var(--r-md);
+  background: var(--s1);
+  color: var(--t1);
+  font: inherit;
+  font-size: var(--t-13);
+  padding: 10px 12px;
+}
+
+.evg-studio .studio-brand-font-upload {
+  display: inline-flex;
+}
+
 /* Tags */
 .evg-studio .studio-brand-tags {
   display: flex;
@@ -304,7 +319,7 @@
 .evg-studio .studio-brand-rules-sub {
   margin-top: 4px;
   font-size: var(--t-12);
-  line-height: 1.55;
+  line-height: 1.45;
   color: var(--t3);
 }
 
@@ -333,7 +348,7 @@
 
 .evg-studio .studio-brand-rule-val {
   font-size: var(--t-13);
-  line-height: 1.55;
+  line-height: 1.45;
   color: var(--t2);
 }
 
@@ -552,7 +567,7 @@
   font-family: var(--f-mono);
   font-size: var(--t-9);
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
 }
@@ -575,7 +590,7 @@
 .evg-studio .studio-modal-sub {
   margin: 8px 0 0;
   font-size: var(--t-13);
-  line-height: 1.55;
+  line-height: 1.45;
   color: var(--t3);
 }
 
@@ -950,7 +965,7 @@
   font-family: var(--f-mono);
   font-size: var(--t-10);
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   margin-bottom: 8px;
 }

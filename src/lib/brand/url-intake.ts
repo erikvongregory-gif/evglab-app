@@ -15,7 +15,11 @@ export const URL_MAX_BODY_BYTES = 2 * 1024 * 1024;
 export const URL_MAX_REDIRECTS = 3;
 
 export const BROWSER_USER_AGENT =
-  "Mozilla/5.0 (compatible; BrewAIBrandBot/1.0; +https://brewai.de) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+/** Häufige Consent-/Alters-Cookies — hilft bei Fetch-Fallback ohne JS. */
+export const BRAND_INTAKE_CONSENT_COOKIES =
+  "age_verified=1; ageGate=true; age_check=passed; ageConfirmed=yes; CookieConsent={stamp:'0',necessary:true,preferences:true,statistics:true,marketing:true};";
 
 export function normalizeWebsiteUrl(input: string): string | null {
   const trimmed = input.trim();
@@ -88,6 +92,7 @@ export async function safeFetchHtml(startUrl: string): Promise<SafeFetchResult> 
           "User-Agent": BROWSER_USER_AGENT,
           Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+          Cookie: BRAND_INTAKE_CONSENT_COOKIES,
         },
         cache: "no-store",
       });

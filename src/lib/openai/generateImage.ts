@@ -36,7 +36,7 @@ function referenceToFile(reference: OpenAiReferenceImage, index: number): File {
 }
 
 /**
- * Erzeugt EIN Bild direkt ueber die OpenAI Images API (gpt-image-2/1).
+ * Erzeugt EIN Bild direkt ueber die OpenAI Images API (gpt-image-2.5-sunburst).
  * - Mit Referenzbild(ern) → `images/edits` (multipart, bis zu 16 Bilder) fuer
  *   Form-/Etikett-Treue (i2i). Reihenfolge der `referenceImages` ist relevant
  *   (z. B. Bild 1 = Flaschenform, Bild 2 = Etikett) und muss im Prompt erklaert

@@ -27,7 +27,16 @@ function getAllowedHosts(): string[] {
   const fromEnv = process.env.KIE_DOWNLOAD_ALLOWED_HOSTS?.split(",")
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean);
-  return fromEnv?.length ? fromEnv : DEFAULT_ALLOWED_HOSTS;
+  const hosts = new Set(fromEnv?.length ? fromEnv : DEFAULT_ALLOWED_HOSTS);
+  // OpenAI-Pfade speichern in Supabase Storage (Custom Domain + Projekt-URL).
+  hosts.add("auth.brewai.de");
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+    if (supabaseUrl) hosts.add(new URL(supabaseUrl).hostname.toLowerCase());
+  } catch {
+    // ignore invalid env URL
+  }
+  return [...hosts];
 }
 
 function isPrivateOrLocalIp(ip: string): boolean {

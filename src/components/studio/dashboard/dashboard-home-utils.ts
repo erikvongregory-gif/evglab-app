@@ -56,6 +56,26 @@ export function formatDeNumber(n: number) {
   return n.toLocaleString("de-DE");
 }
 
+/** Kompakte Anzeige für große KPI-/Tokenwerte (de-DE), z. B. 12,4k · 1,2 Mio. */
+export function formatCompactNumber(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  if (abs < 1000) return formatDeNumber(Math.round(n));
+  if (abs < 1_000_000) {
+    const value = n / 1000;
+    const digits = abs < 10_000 ? 1 : 0;
+    return `${value.toLocaleString("de-DE", {
+      maximumFractionDigits: digits,
+      minimumFractionDigits: 0,
+    })}k`;
+  }
+  const value = n / 1_000_000;
+  return `${value.toLocaleString("de-DE", {
+    maximumFractionDigits: abs < 10_000_000 ? 1 : 0,
+    minimumFractionDigits: 0,
+  })} Mio.`;
+}
+
 export function formatDashboardDate(d = new Date()) {
   return d.toLocaleDateString("de-DE", {
     weekday: "long",
@@ -310,6 +330,9 @@ export function brandProfileActiveFromSettings(settings: DashboardHomeSettings |
     brandDonts: settings.brandDonts,
     brandReferenceImageUrls: [],
     brandLabelReferenceUrl: "",
+    brandHeadlineFontName: "",
+    brandFontFileUrl: "",
+    brandFontWeight: "700",
   });
 }
 

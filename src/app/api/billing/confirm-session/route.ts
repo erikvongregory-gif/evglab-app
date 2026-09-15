@@ -5,8 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import {
   activatePlanForUser,
-  addMonthlyTokens,
-  claimTokenPackSession,
+  grantTokenPackSession,
   getBillingRow,
 } from "@/lib/billing/store";
 import { getStripeClient, mapPriceIdToPlan, syncBillingFromStripe } from "@/lib/billing/stripeSync";
@@ -55,24 +54,21 @@ export async function POST(req: Request) {
 
     if (session.mode === "payment" && session.metadata?.kind === "token_pack") {
       try {
-        const tokens = Number.parseInt(session.metadata?.tokens ?? "0", 10);
-        if (!Number.isFinite(tokens) || tokens <= 0) {
+        if (session.payment_status !== "paid") {
+          return NextResponse.json({ error: "Zahlung noch nicht bestätigt." }, { status: 400 });
+        }
+        const tokens = Number(session.metadata?.tokens ?? "0");
+        if (!Number.isSafeInteger(tokens) || tokens <= 0) {
           return NextResponse.json({ error: "Token-Metadaten ungueltig." }, { status: 400 });
         }
         const packId = (session.metadata?.pack_id ?? session.metadata?.pack ?? "tokens").toString();
-        const claimed = await claimTokenPackSession({
+        const claimed = await grantTokenPackSession({
           sessionId: session.id,
           userId: user.id,
           packId,
           tokens,
           source: "confirm_session",
         });
-        if (claimed) {
-          const addResult = await addMonthlyTokens(user.id, tokens);
-          if (!addResult.ok) {
-            return NextResponse.json({ error: addResult.error }, { status: 500 });
-          }
-        }
         const row = await getBillingRow(user.id);
         return NextResponse.json({
           ok: true,
@@ -114,7 +110,7 @@ export async function POST(req: Request) {
         : session.subscription;
     const planFromMeta = (session.metadata?.plan as SubscriptionPlanKey | undefined) ?? null;
     const planFromPrice = mapPriceIdToPlan(subscription?.items.data[0]?.price?.id ?? null);
-    const plan = planFromMeta ?? planFromPrice;
+    const plan = planFromPrice ?? planFromMeta;
     if (!plan || !customerId || !subscription?.id) {
       return NextResponse.json({ error: "Session-Metadaten unvollstaendig." }, { status: 400 });
     }
@@ -123,7 +119,7 @@ export async function POST(req: Request) {
     const currentPeriodEndUnix =
       typeof subscriptionWithPeriod.current_period_end === "number"
         ? subscriptionWithPeriod.current_period_end
-        : null;
+        : subscription.items.data[0]?.current_period_end ?? null;
 
     await activatePlanForUser({
       userId: user.id,
@@ -133,7 +129,6 @@ export async function POST(req: Request) {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscription.id,
       currentPeriodEnd: currentPeriodEndUnix ? new Date(currentPeriodEndUnix * 1000).toISOString() : null,
-      preserveTokenBalance: true,
     });
 
     await syncBillingFromStripe({ userId: user.id, userEmail: user.email });
@@ -178,4 +173,3 @@ function formatStripeAmount(amountTotal: number | null, currency: string | null)
     return `${(amountTotal / 100).toFixed(2)} ${cur}`;
   }
 }
-

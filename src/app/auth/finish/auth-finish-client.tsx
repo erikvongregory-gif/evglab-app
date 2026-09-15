@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  needsFullOnboardingFlow,
+  sanitizeStudioOnboardingState,
+} from "@/lib/dashboard/onboarding";
 
 async function serverAuthReady(): Promise<{ ok: boolean; admin2faRequired?: boolean }> {
   try {
@@ -14,6 +18,24 @@ async function serverAuthReady(): Promise<{ ok: boolean; admin2faRequired?: bool
   }
 }
 
+async function resolveEntry(preferred: string): Promise<string> {
+  if (preferred !== "/dashboard") return preferred;
+  try {
+    const res = await fetch("/api/dashboard/onboarding", {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!res.ok) return preferred;
+    const json = (await res.json()) as { state?: unknown };
+    if (needsFullOnboardingFlow(sanitizeStudioOnboardingState(json.state))) {
+      return "/onboarding";
+    }
+  } catch {
+    /* Fallback: preferred — Middleware fängt Dashboard ggf. ab */
+  }
+  return preferred;
+}
+
 function delayMs(attempt: number) {
   return attempt < 12 ? 120 : attempt < 28 ? 250 : 400;
 }
@@ -22,7 +44,7 @@ export function AuthFinishClient({ initialNext = "/dashboard" }: { initialNext?:
   const [message, setMessage] = useState("Anmeldung wird abgeschlossen …");
 
   useEffect(() => {
-    const next = initialNext;
+    const preferred = initialNext;
     let cancelled = false;
 
     void (async () => {
@@ -31,7 +53,11 @@ export function AuthFinishClient({ initialNext = "/dashboard" }: { initialNext?:
 
         const server = await serverAuthReady();
         if (server.ok) {
-          window.location.replace(server.admin2faRequired ? "/dashboard/2fa-email" : next);
+          const next = server.admin2faRequired
+            ? "/dashboard/2fa-email"
+            : await resolveEntry(preferred);
+          if (cancelled) return;
+          window.location.replace(next);
           return;
         }
 
@@ -52,7 +78,11 @@ export function AuthFinishClient({ initialNext = "/dashboard" }: { initialNext?:
           } = await supabase.auth.getSession();
           if (session) {
             const recheck = await serverAuthReady();
-            window.location.replace(recheck.admin2faRequired ? "/dashboard/2fa-email" : next);
+            const next = recheck.admin2faRequired
+              ? "/dashboard/2fa-email"
+              : await resolveEntry(preferred);
+            if (cancelled) return;
+            window.location.replace(next);
             return;
           }
         } catch {

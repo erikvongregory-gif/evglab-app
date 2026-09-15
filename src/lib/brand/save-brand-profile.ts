@@ -4,7 +4,17 @@ import {
   clampBrandSettingsFields,
   sanitizeDashboardSettings,
 } from "@/lib/dashboard/settingsPayload";
-import { getDashboardMetadata, mergeDashboardMetadata, type DashboardSettings } from "@/lib/dashboard/metadata";
+import {
+  mergeSuggestedBeers,
+  persistSuggestedBeerLabels,
+  type SuggestedBeerVariety,
+} from "@/lib/brand/beer-catalog-intake";
+import {
+  getDashboardMetadata,
+  mergeDashboardMetadata,
+  type DashboardBeer,
+  type DashboardSettings,
+} from "@/lib/dashboard/metadata";
 import { storeBrandReferenceImagesAsUrls } from "@/lib/brand/persist-reference-urls";
 import { parseBrandReferenceIdFromUrl, repairBrandReferenceImageUrls } from "@/lib/brand/reference-image-store";
 import { normalizeWebsiteUrl } from "@/lib/brand/url-intake";
@@ -27,6 +37,7 @@ export type SaveBrandProfileInput = {
   /** Bester Packshot (Etikett-Traeger) aus der Analyse — Quelle fuer Etikett-Treue. */
   brandLabelReferenceUrl?: string;
   referenceImagePayloads?: BrandReferencePayload[];
+  suggestedBeers?: SuggestedBeerVariety[];
 };
 
 function filterHttpUrls(urls: string[] | undefined): string[] {
@@ -135,8 +146,12 @@ export function buildActivatedBrandSettings(params: {
 export function buildUserMetadataForBrandSave(params: {
   latestMetadata: unknown;
   settings: DashboardSettings;
+  myBeers?: DashboardBeer[];
 }): Record<string, unknown> {
-  const merged = mergeDashboardMetadata(params.latestMetadata, { settings: params.settings });
+  const merged = mergeDashboardMetadata(params.latestMetadata, {
+    settings: params.settings,
+    ...(params.myBeers ? { myBeers: params.myBeers } : {}),
+  });
   const dashboard = (merged as { dashboard?: Record<string, unknown> }).dashboard;
   const keepsInternalReferenceStore = params.settings.brandReferenceImageUrls.some(
     (url) => parseBrandReferenceIdFromUrl(url) !== null,
@@ -166,10 +181,18 @@ export async function persistBrandProfileForUser(params: {
     referenceImageUrls: params.referenceImageUrls,
   });
 
+  const existingBeers = getDashboardMetadata(params.latestMetadata).myBeers ?? [];
+  let myBeers: DashboardBeer[] | undefined;
+  if (params.input.suggestedBeers && params.input.suggestedBeers.length > 0) {
+    const withLabels = await persistSuggestedBeerLabels(params.userId, params.input.suggestedBeers);
+    myBeers = mergeSuggestedBeers(existingBeers, withLabels);
+  }
+
   const admin = createAdminClient();
   let userMetadata = buildUserMetadataForBrandSave({
     latestMetadata: params.latestMetadata,
     settings,
+    myBeers,
   });
 
   let { error } = await admin.auth.admin.updateUserById(params.userId, {
@@ -182,6 +205,7 @@ export async function persistBrandProfileForUser(params: {
       userMetadata = buildUserMetadataForBrandSave({
         latestMetadata: prunedBase,
         settings,
+        myBeers,
       });
       ({ error } = await admin.auth.admin.updateUserById(params.userId, {
         user_metadata: userMetadata,
@@ -196,5 +220,6 @@ export async function persistBrandProfileForUser(params: {
   return {
     settings,
     referenceImageUrls: settings.brandReferenceImageUrls,
+    myBeers,
   };
 }

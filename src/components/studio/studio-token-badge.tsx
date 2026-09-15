@@ -25,6 +25,18 @@ function formatTokens(n: number) {
   return n.toLocaleString("de-DE");
 }
 
+function formatTokensCompact(n: number) {
+  if (!Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  if (abs < 1000) return formatTokens(Math.round(n));
+  if (abs < 1_000_000) {
+    const value = n / 1000;
+    const digits = abs < 10_000 ? 1 : 0;
+    return `${value.toLocaleString("de-DE", { maximumFractionDigits: digits, minimumFractionDigits: 0 })}k`;
+  }
+  return `${(n / 1_000_000).toLocaleString("de-DE", { maximumFractionDigits: 1, minimumFractionDigits: 0 })} Mio.`;
+}
+
 function formatPeriodEnd(iso: string | null | undefined) {
   if (!iso) return null;
   const d = new Date(iso);
@@ -110,6 +122,7 @@ export function StudioTokenBadge({
           aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
         >
+          <span className="evg-tokens__label">Tokens</span>
           <span className="evg-tokens__val">Unbegrenzt</span>
         </button>
         {open ? (
@@ -136,6 +149,7 @@ export function StudioTokenBadge({
   if (!known) return null;
 
   const resetLabel = formatPeriodEnd(periodEnd);
+  const remainingPct = Math.round(ratio * 100);
 
   return (
     <div ref={rootRef} style={{ position: "relative" }} data-tour="tokens">
@@ -148,13 +162,19 @@ export function StudioTokenBadge({
         )}
         aria-expanded={open}
         aria-controls={panelId}
+        aria-label={`Tokens: ${formatTokens(remaining)} von ${formatTokens(monthly)} übrig`}
+        title={`${formatTokens(remaining)} / ${formatTokens(monthly)} übrig`}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="evg-tokens__val">{formatTokens(remaining)}</span>
+        <span className="evg-tokens__label">Tokens</span>
+        <span className="evg-tokens__val">{formatTokensCompact(remaining)}</span>
         <span className="evg-tokens__bar" aria-hidden="true">
-          <span className="evg-tokens__fill" style={{ width: `${Math.max(2, Math.min(100, ratio * 100))}%`, display: "block" }} />
+          <span
+            className="evg-tokens__fill"
+            style={{ width: `${Math.max(2, Math.min(100, remainingPct))}%`, display: "block" }}
+          />
         </span>
-        <span className="evg-tokens__max">{formatTokens(monthly)}</span>
+        <span className="evg-tokens__meta">übrig</span>
       </button>
 
       {open ? (
@@ -168,6 +188,12 @@ export function StudioTokenBadge({
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
             <span style={{ color: "var(--fg-5)" }}>Plan</span>
             <span>{planLabel(plan)}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, marginTop: 8 }}>
+            <span style={{ color: "var(--fg-5)" }}>Übrig</span>
+            <span className="evg-mono">
+              {formatTokens(remaining)} / {formatTokens(monthly)}
+            </span>
           </div>
           {resetLabel ? (
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13, marginTop: 8 }}>
@@ -189,7 +215,7 @@ export function StudioTokenBadge({
                       {c.title}
                     </span>
                     <span className="evg-mono" style={{ fontSize: 11, color: "var(--fg-4)" }}>
-                      ÔêÆ{formatTokens(c.tokens)}
+                      −{formatTokens(c.tokens)}
                     </span>
                   </li>
                 ))}
@@ -198,7 +224,7 @@ export function StudioTokenBadge({
           </div>
 
           <p style={{ margin: "12px 0 0", fontSize: 12, color: "var(--fg-5)" }}>
-            Nachgekaufte Tokens bleiben bei der Verl├ñngerung erhalten.
+            Nachgekaufte Tokens bleiben bei der Verlängerung erhalten.
           </p>
 
           {buyError ? (
@@ -208,11 +234,11 @@ export function StudioTokenBadge({
           ) : null}
 
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button type="button" className="evg-btn" disabled={buying !== null} onClick={() => void onBuy("tokens_500")}>
-              {buying === "tokens_500" ? "ÔÇª" : "+500 Tokens"}
+            <button type="button" className="evg-btn evg-btn--ghost" disabled={buying !== null} onClick={() => void onBuy("tokens_500")}>
+              {buying === "tokens_500" ? "…" : "+500 Tokens"}
             </button>
-            <button type="button" className="evg-btn" disabled={buying !== null} onClick={() => void onBuy("tokens_2000")}>
-              {buying === "tokens_2000" ? "ÔÇª" : "+2.000 Tokens"}
+            <button type="button" className="evg-btn evg-btn--primary" disabled={buying !== null} onClick={() => void onBuy("tokens_2000")}>
+              {buying === "tokens_2000" ? "…" : "+2.000 Tokens"}
             </button>
           </div>
         </div>

@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import {
-  addMonthlyTokens,
   activatePlanForUser,
-  claimTokenPackSession,
+  grantTokenPackSession,
   getByStripeCustomerId,
   claimStripeWebhookEvent,
   markStripeWebhookEventProcessed,
   releaseStripeWebhookEvent,
   renewBillingPeriodTokens,
-  updateByStripeSubscription,
+  cancelBillingSubscription,
 } from "@/lib/billing/store";
-import { SUBSCRIPTION_PLAN_TOKENS, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { mapPriceIdToPlan } from "@/lib/billing/stripePrices";
 import { getStripeClient } from "@/lib/billing/stripeServer";
 
@@ -22,7 +21,7 @@ function toIsoFromUnix(seconds?: number | null) {
 
 function getCurrentPeriodEndUnix(subscription: Stripe.Subscription) {
   const value = (subscription as Stripe.Subscription & { current_period_end?: number }).current_period_end;
-  return typeof value === "number" ? value : null;
+  return typeof value === "number" ? value : subscription.items.data[0]?.current_period_end ?? null;
 }
 
 function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
@@ -56,33 +55,33 @@ export async function POST(req: Request) {
     }
 
     const event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    // Token purchases have their own transactional deduplication. Do not put a
+    // separate event claim in front of it: a process crash could strand a payment.
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.metadata?.kind === "token_pack") {
+        if (session.payment_status !== "paid") return NextResponse.json({ received: true, awaitingPayment: true });
+        const userId = session.metadata.user_id;
+        const tokens = Number(session.metadata.tokens);
+        if (!userId || !Number.isSafeInteger(tokens) || tokens <= 0) {
+          throw new Error("Token-Kauf-Metadaten ungültig.");
+        }
+        await grantTokenPackSession({
+          sessionId: session.id, userId, tokens,
+          packId: session.metadata.pack_id ?? session.metadata.pack ?? "tokens",
+          source: "webhook",
+        });
+        return NextResponse.json({ received: true });
+      }
+    }
     const claimed = await claimStripeWebhookEvent(event.id, event.type);
     if (!claimed) {
       return NextResponse.json({ received: true, duplicate: true });
     }
 
     try {
-      if (event.type === "checkout.session.completed") {
+      if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
         const session = event.data.object as Stripe.Checkout.Session;
-        const kind = session.metadata?.kind;
-        if (kind === "token_pack") {
-          const userId = session.metadata?.user_id;
-          const tokens = Number.parseInt(session.metadata?.tokens ?? "0", 10);
-          if (userId && Number.isFinite(tokens) && tokens > 0) {
-            const packId = (session.metadata?.pack_id ?? session.metadata?.pack ?? "tokens").toString();
-            const claimed = await claimTokenPackSession({
-              sessionId: session.id,
-              userId,
-              packId,
-              tokens,
-              source: "webhook",
-            });
-            if (claimed) {
-              await addMonthlyTokens(userId, tokens);
-            }
-          }
-        }
-
         const userId = session.metadata?.user_id;
         const plan = (session.metadata?.plan as SubscriptionPlanKey | undefined) ?? null;
         const subscriptionId =
@@ -92,13 +91,12 @@ export async function POST(req: Request) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId);
           await activatePlanForUser({
             userId,
-            plan,
+            plan: mapPriceIdToPlan(subscription.items.data[0]?.price.id) ?? plan,
             subscriptionStatus:
               (subscription.status as "active" | "trialing" | "past_due" | "canceled" | "incomplete" | "unpaid") ?? "active",
             stripeCustomerId: customerId,
             stripeSubscriptionId: subscriptionId,
             currentPeriodEnd: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
-            preserveTokenBalance: true,
           });
         }
       }
@@ -111,20 +109,14 @@ export async function POST(req: Request) {
         if (customerId) {
           const row = await getByStripeCustomerId(customerId);
           if (row) {
-            const oldBaseTokens = row.plan ? SUBSCRIPTION_PLAN_TOKENS[row.plan] : 0;
-            const extraTokens = Math.max(row.monthly_tokens - oldBaseTokens, 0);
-            const baseTokens = mappedPlan ? SUBSCRIPTION_PLAN_TOKENS[mappedPlan] : null;
-            await updateByStripeSubscription(subscription.id, {
-              plan: mappedPlan ?? row.plan,
-              monthly_tokens: baseTokens ? baseTokens + extraTokens : row.monthly_tokens,
-              subscription_status: subscription.status as
-                | "active"
-                | "trialing"
-                | "past_due"
-                | "canceled"
-                | "incomplete"
-                | "unpaid",
-              current_period_end: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
+            const plan = mappedPlan ?? row.plan;
+            if (!plan) throw new Error("Unbekannter Subscription-Plan.");
+            await activatePlanForUser({
+              userId: row.user_id, plan,
+              subscriptionStatus: subscription.status === "paused" || subscription.status === "incomplete_expired"
+                ? "incomplete" : subscription.status,
+              stripeCustomerId: customerId, stripeSubscriptionId: subscription.id,
+              currentPeriodEnd: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
             });
           }
         }
@@ -132,25 +124,24 @@ export async function POST(req: Request) {
 
       if (event.type === "customer.subscription.deleted") {
         const subscription = event.data.object as Stripe.Subscription;
-        await updateByStripeSubscription(subscription.id, {
-          plan: null,
-          monthly_tokens: 0,
-          used_tokens: 0,
-          subscription_status: "canceled",
-          current_period_end: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
-        });
+        await cancelBillingSubscription(subscription.id, toIsoFromUnix(getCurrentPeriodEndUnix(subscription)));
       }
 
       if (event.type === "invoice.paid") {
         const invoice = event.data.object as Stripe.Invoice;
         const billingReason = invoice.billing_reason;
-        if (billingReason === "subscription_cycle" || billingReason === "subscription_update") {
+        if (billingReason === "subscription_cycle") {
           const subscriptionId = getInvoiceSubscriptionId(invoice);
           if (subscriptionId) {
-            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const periodEnd = invoice.lines.data.find((line) => {
+              const details = line.parent?.subscription_item_details;
+              const lineSubscription = details?.subscription ??
+                (typeof line.subscription === "string" ? line.subscription : line.subscription?.id);
+              return lineSubscription === subscriptionId && !details?.proration;
+            })?.period.end;
             await renewBillingPeriodTokens({
               stripeSubscriptionId: subscriptionId,
-              currentPeriodEnd: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
+              currentPeriodEnd: toIsoFromUnix(periodEnd),
             });
           }
         }
@@ -167,4 +158,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
-

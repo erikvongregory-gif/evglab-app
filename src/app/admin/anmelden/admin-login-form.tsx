@@ -28,9 +28,11 @@ function messageForError(code: string | undefined, detail?: string | null): stri
 }
 
 export function AdminLoginForm({
+  nextPath = "/admin",
   urlError,
   urlNotice,
 }: {
+  nextPath?: string;
   urlError?: string;
   urlNotice?: string;
 }) {
@@ -50,7 +52,7 @@ export function AdminLoginForm({
   return (
     <SignInPage
       authPostAction="/auth/admin-signin"
-      nextPath="/admin"
+      nextPath={nextPath}
       showGoogle={false}
       waitlistMode={false}
       signInOnly

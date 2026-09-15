@@ -32,6 +32,7 @@ export async function middleware(request: NextRequest) {
       "/auth/google",
       "/auth/callback",
       "/auth/finish",
+      "/auth/operator-access",
     ]);
     const isBlockedAuthPath =
       !passwordResetAllowed &&

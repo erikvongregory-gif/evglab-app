@@ -20,6 +20,7 @@ import { brandLockLabel, formatDomain } from "@/lib/brand/brand-profile-display"
 import { BrandProfileView } from "@/components/dashboard/BrandProfileView";
 import { BrandProfileSetupModal, type BrandScanSuggestion } from "@/components/dashboard/BrandProfileSetupModal";
 import { DashboardHomeView } from "@/components/studio/dashboard/dashboard-home-view";
+import { BrewAiAssistantView } from "@/components/studio/hopfen-hugo-assistant";
 import { StudioMediaLibrary, type MediaItem } from "@/components/studio/media/studio-media-library";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
 import {
@@ -32,7 +33,7 @@ import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboa
 import { fetchWithRetry } from "@/lib/http/fetchWithRetry";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
 
-type DashboardTab = "dashboard" | "media" | "team" | "brand" | "settings" | "pricing";
+type DashboardTab = "dashboard" | "assistant" | "media" | "team" | "brand" | "settings" | "pricing";
 
 type DashboardSummary = {
   unlimited?: boolean;
@@ -75,6 +76,9 @@ type SettingsPayload = {
   brandDonts: string;
   brandReferenceImageUrls: string[];
   brandLabelReferenceUrl: string;
+  brandHeadlineFontName: string;
+  brandFontFileUrl: string;
+  brandFontWeight: string;
   brandAnalyzedAt?: string;
 };
 
@@ -249,7 +253,12 @@ export function DashboardRedesignShell(props: {
 
   const tabParam = (searchParams.get("tab") ?? "dashboard").toLowerCase();
   const initialTab: DashboardTab =
-    tabParam === "media" || tabParam === "team" || tabParam === "brand" || tabParam === "settings" || tabParam === "pricing"
+    tabParam === "media" ||
+    tabParam === "team" ||
+    tabParam === "brand" ||
+    tabParam === "settings" ||
+    tabParam === "pricing" ||
+    tabParam === "assistant"
       ? (tabParam as DashboardTab)
       : "dashboard";
   const [tab, setTab] = useState<DashboardTab>(initialTab);
@@ -295,7 +304,12 @@ export function DashboardRedesignShell(props: {
   useEffect(() => {
     const next = (searchParams.get("tab") ?? "dashboard").toLowerCase();
     const resolved: DashboardTab =
-      next === "media" || next === "team" || next === "brand" || next === "settings" || next === "pricing"
+      next === "media" ||
+      next === "team" ||
+      next === "brand" ||
+      next === "settings" ||
+      next === "pricing" ||
+      next === "assistant"
         ? (next as DashboardTab)
         : "dashboard";
     if (resolved !== tab) {
@@ -586,6 +600,7 @@ export function DashboardRedesignShell(props: {
           }}
         />
       ) : null}
+      {tab === "assistant" ? <BrewAiAssistantView /> : null}
       {tab === "media" ? (
         <StudioMediaLibrary
           P={P}
@@ -659,41 +674,104 @@ export function DashboardRedesignShell(props: {
 
     {showBrandProfileChoice ? (
       <div
-        className="fixed inset-0 z-[126] flex items-center justify-center px-4"
-        style={{ background: "rgba(19,18,17,0.72)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}
+        className="studio-brand-choice"
+        role="presentation"
         onClick={() => setShowBrandProfileChoice(false)}
       >
         <div
-          className="evg-dialog relative w-full max-w-lg p-7"
-          style={{ background: "var(--field)", color: "var(--fg)" }}
+          className="studio-brand-choice__modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="studio-brand-choice-title"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            aria-label="Schliessen"
-            onClick={() => setShowBrandProfileChoice(false)}
-            className="evg-btn absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center"
-            style={{ color: "var(--fg-5)", padding: 0 }}
-          >
-            ×
-          </button>
-          <h3 className="evg-h1" style={{ fontSize: 18 }}>Willst du deinen Markenstil fixieren?</h3>
-          <p className="mt-2 text-sm" style={{ color: "var(--fg-3)" }}>
-            Gib einfach die Website deiner Marke ein — die KI erkennt Tonality, Farben und Bildsprache und erstellt
-            dein Markenprofil. Du kannst das später unter Einstellungen jederzeit ändern.
-          </p>
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button type="button" onClick={handleChooseBrandProfileGuided} className="evg-btn evg-btn--primary">
-              Ja, Markenprofil anlegen
+          <div className="studio-brand-choice__glow" aria-hidden />
+          <div className="studio-brand-choice__accent" aria-hidden />
+          <div className="studio-brand-choice__dots" aria-hidden />
+
+          <div className="studio-brand-choice__body">
+            <button
+              type="button"
+              className="studio-brand-choice__close"
+              aria-label="Schließen"
+              title="Schließen"
+              onClick={() => setShowBrandProfileChoice(false)}
+            >
+              <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden>
+                <path
+                  d="M1.5 1.5l11 11M12.5 1.5l-11 11"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
-            <button type="button" onClick={() => void handleSkipBrandProfile()} className="evg-btn">
-              Ohne Profil starten (dauerhaft)
-            </button>
+
+            <div className="studio-brand-choice__icon" aria-hidden>
+              <svg width="24" height="24" viewBox="0 0 22 22">
+                <path
+                  d="M11 2l2.4 5.6 6.1.6-4.6 4 1.4 6-5.3-3.2-5.3 3.2 1.4-6-4.6-4 6.1-.6L11 2z"
+                  fill="var(--ac-tint)"
+                  stroke="var(--ac)"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+
+            <div className="studio-brand-choice__eyebrow">Markenprofil</div>
+            <h3 id="studio-brand-choice-title" className="studio-brand-choice__title">
+              Willst du deinen Markenstil fixieren?
+            </h3>
+            <p className="studio-brand-choice__lead">
+              Gib einfach die Website deiner Marke ein — die KI erkennt Tonality, Farben und Bildsprache und
+              erstellt dein Markenprofil. Du kannst das später unter Einstellungen jederzeit ändern.
+            </p>
+
+            <div className="studio-brand-choice__actions">
+              <button
+                type="button"
+                className="studio-brand-choice__btn studio-brand-choice__btn--primary"
+                onClick={handleChooseBrandProfileGuided}
+              >
+                Ja, Markenprofil anlegen
+                <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden>
+                  <path
+                    d="M3 7h8M7.5 3.5L11 7l-3.5 3.5"
+                    fill="none"
+                    stroke="var(--ac-ink)"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="studio-brand-choice__btn studio-brand-choice__btn--ghost"
+                onClick={() => void handleSkipBrandProfile()}
+              >
+                Ohne Profil starten
+              </button>
+            </div>
+
+            <div className="studio-brand-choice__note">
+              <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
+                <path
+                  d="M8 1.5l6 2.7v3.6c0 4-2.6 6.6-6 7.7-3.4-1.1-6-3.7-6-7.7V4.2L8 1.5z"
+                  fill="none"
+                  stroke="var(--t3)"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>
+                Beim ×-Schließen wirst du in dieser Sitzung nicht erneut gefragt — beim nächsten Login erscheint
+                die Auswahl wieder. „Ohne Profil starten“ speichert deine Wahl dauerhaft.
+              </span>
+            </div>
           </div>
-          <p className="mt-4 text-xs" style={{ color: TOKENS.ink3 }}>
-            Beim X-Schließen wirst du in dieser Sitzung nicht erneut gefragt — beim nächsten Login erscheint die
-            Auswahl wieder. „Ohne Profil starten" speichert deine Wahl dauerhaft.
-          </p>
         </div>
       </div>
     ) : null}

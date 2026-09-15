@@ -7,7 +7,6 @@ import {
   StudioUiBadge,
   StudioUiButton,
   StudioUiCard,
-  StudioUiProgress,
   StudioUiSkeleton,
 } from "@/components/studio/ui";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
@@ -21,6 +20,7 @@ import {
   deriveChargesTotal,
   describeChargesTotalKpi,
   formatChartTextAlternative,
+  formatCompactNumber,
   formatDashboardDate,
   formatDeNumber,
   formatPeriodEnd,
@@ -40,6 +40,8 @@ import {
   type TokenRangeKey,
 } from "./dashboard-home-utils";
 import { StudioIcon } from "@/components/studio/icons";
+import { StudioOnboardingChecklist } from "@/components/studio/onboarding/onboarding-checklist";
+import { BrewAiAssistantView } from "@/components/studio/hopfen-hugo-assistant";
 
 type DashboardTab = "dashboard" | "media" | "team" | "brand" | "settings" | "pricing";
 
@@ -62,10 +64,9 @@ export type DashboardHomeViewProps = {
 
 function KpiSkeleton() {
   return (
-    <StudioUiCard padding="md" className="stu-dash-home__enter">
+    <StudioUiCard padding="sm" className="stu-dash-home__enter stu-dash-home__kpi">
       <StudioUiSkeleton style={{ width: "56%", height: 9 }} />
-      <StudioUiSkeleton style={{ width: "44%", height: 22, marginTop: 14 }} />
-      <StudioUiSkeleton style={{ width: "100%", height: 4, marginTop: 16 }} />
+      <StudioUiSkeleton style={{ width: "44%", height: 18, marginTop: 10 }} />
     </StudioUiCard>
   );
 }
@@ -120,7 +121,20 @@ export function DashboardHomeView({
   const createHref = hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing";
   const planLabel = planLabelFromKey(summary?.plan ?? null, unlimited);
   const periodEndLabel = formatPeriodEnd(summary?.periodEnd);
-  const showBrandCallout = settingsLoaded && !brandProfileComplete && brandProfileMode !== "skip";
+  const showBrandCallout =
+    hasActivePlan && settingsLoaded && !brandProfileComplete && brandProfileMode !== "skip";
+
+  /* One dominant primary CTA for the view */
+  const primaryHref = !hasActivePlan
+    ? "/dashboard?tab=pricing"
+    : !brandProfileComplete && brandProfileMode !== "skip"
+      ? null
+      : "/inhalte-erstellen";
+  const primaryLabel = !hasActivePlan
+    ? "Tarif wählen"
+    : !brandProfileComplete && brandProfileMode !== "skip"
+      ? null
+      : "Motiv generieren";
 
   const motifsThisMonth = summary?.postsThisMonth;
   const chargesTotal = summaryLoaded ? deriveChargesTotal(summary, media) : null;
@@ -170,23 +184,26 @@ export function DashboardHomeView({
           <StudioUiButton variant="secondary" size="sm" onClick={() => onOpenTab("media")} className="stu-dash-home__actions-secondary">
             Mediathek
           </StudioUiButton>
-          <Link href={createHref} className="stu-btn stu-btn--primary stu-btn--sm" style={{ textDecoration: "none" }}>
-            {hasActivePlan ? "Motiv generieren" : "Tarif wählen"}
-          </Link>
+          {primaryHref && primaryLabel ? (
+            <Link href={primaryHref} className="stu-btn stu-btn--primary stu-btn--sm" style={{ textDecoration: "none" }}>
+              {primaryLabel}
+            </Link>
+          ) : showBrandCallout ? (
+            <StudioUiButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
+              Markenprofil starten
+            </StudioUiButton>
+          ) : null}
         </div>
       </header>
 
       {showBrandCallout ? (
         <div className="stu-dash-home__callout stu-dash-home__enter" role="status">
           <div style={{ minWidth: 0 }}>
-            <div className="stu-dash-home__callout-title">Markenprofil vervollständigen</div>
+            <div className="stu-dash-home__callout-title">Nächster Schritt: Markenprofil</div>
             <p className="stu-dash-home__callout-sub">
-              Website, Tonalität und Farben steuern alle Generierungen — ein Link genügt zum Start.
+              Website, Tonalität und Farben steuern alle Generierungen.
             </p>
           </div>
-          <StudioUiButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
-            Jetzt starten
-          </StudioUiButton>
         </div>
       ) : null}
 
@@ -211,78 +228,100 @@ export function DashboardHomeView({
           </>
         ) : (
           <>
-            <StudioUiCard padding="md" className="stu-dash-home__enter">
+            <StudioUiCard padding="sm" className="stu-dash-home__enter stu-dash-home__kpi">
               <div className="stu-dash-home__kpi-head">
                 <span className="stu-dash-home__kpi-label">Tokens übrig</span>
                 <span className="stu-dash-home__kpi-icon stu-dash-home__kpi-icon--accent" aria-hidden="true">
-                  <StudioIcon name="bolt" size={14} />
+                  <StudioIcon name="bolt" size={13} />
                 </span>
               </div>
               {unlimited ? (
                 <>
                   <div className="stu-dash-home__kpi-value">∞</div>
-                  <p className="stu-dash-home__kpi-meta">Unbegrenzt</p>
+                  <p className="stu-dash-home__kpi-meta">{planLabel}</p>
                 </>
               ) : remaining != null && monthly > 0 ? (
                 <>
-                  <div className="stu-dash-home__kpi-value">
-                    {formatDeNumber(remaining)}
-                    <span style={{ fontSize: 12, color: "var(--t3)", fontWeight: 500 }}> / {formatDeNumber(monthly)}</span>
+                  <div className="stu-dash-home__kpi-value" title={`${formatDeNumber(remaining)} / ${formatDeNumber(monthly)}`}>
+                    {formatCompactNumber(remaining)}
+                    <span className="stu-dash-home__kpi-unit"> / {formatCompactNumber(monthly)}</span>
                   </div>
-                  <StudioUiProgress value={availPct ?? 0} label="Verfügbare Tokens" style={{ marginTop: 12 }} />
+                  {availPct != null ? (
+                    <span
+                      className={`stu-dash-home__kpi-trend ${
+                        availPct >= 40
+                          ? "stu-dash-home__kpi-trend--up"
+                          : availPct >= 15
+                            ? "stu-dash-home__kpi-trend--neutral"
+                            : "stu-dash-home__kpi-trend--down"
+                      }`}
+                    >
+                      {availPct} % verfügbar
+                    </span>
+                  ) : null}
                   <p className="stu-dash-home__kpi-meta">
-                    {availPct != null ? `${availPct} % verfügbar` : "Keine Angabe"}
-                    {periodEndLabel ? ` · Reset ${periodEndLabel}` : ""}
+                    {periodEndLabel ? `Reset ${periodEndLabel}` : planLabel}
                   </p>
                 </>
               ) : remaining != null ? (
                 <>
-                  <div className="stu-dash-home__kpi-value">{formatDeNumber(remaining)}</div>
+                  <div className="stu-dash-home__kpi-value" title={formatDeNumber(remaining)}>
+                    {formatCompactNumber(remaining)}
+                  </div>
                   <p className="stu-dash-home__kpi-meta">{planLabel}</p>
                 </>
               ) : (
                 <>
                   <div className="stu-dash-home__kpi-value">—</div>
-                  <p className="stu-dash-home__kpi-meta">Keine Daten verfügbar</p>
+                  <p className="stu-dash-home__kpi-meta">Keine Daten</p>
                 </>
               )}
             </StudioUiCard>
 
-            <StudioUiCard padding="md" className="stu-dash-home__enter">
+            <StudioUiCard padding="sm" className="stu-dash-home__enter stu-dash-home__kpi">
               <div className="stu-dash-home__kpi-head">
                 <span className="stu-dash-home__kpi-label">Generierungen</span>
                 <span className="stu-dash-home__kpi-icon" aria-hidden="true">
-                  <StudioIcon name="sparkles" size={14} />
+                  <StudioIcon name="sparkles" size={13} />
                 </span>
               </div>
-              <div className="stu-dash-home__kpi-value">
-                {motifsThisMonth != null ? formatDeNumber(motifsThisMonth) : "—"}
+              <div
+                className="stu-dash-home__kpi-value"
+                title={motifsThisMonth != null ? formatDeNumber(motifsThisMonth) : undefined}
+              >
+                {motifsThisMonth != null ? formatCompactNumber(motifsThisMonth) : "—"}
               </div>
               <p className="stu-dash-home__kpi-meta">Dieser Monat</p>
             </StudioUiCard>
 
-            <StudioUiCard padding="md" className="stu-dash-home__enter">
+            <StudioUiCard padding="sm" className="stu-dash-home__enter stu-dash-home__kpi">
               <div className="stu-dash-home__kpi-head">
                 <span className="stu-dash-home__kpi-label">{chargesKpi.label}</span>
                 <span className="stu-dash-home__kpi-icon" aria-hidden="true">
-                  <StudioIcon name="grid" size={14} />
+                  <StudioIcon name="grid" size={13} />
                 </span>
               </div>
-              <div className="stu-dash-home__kpi-value">
-                {chargesTotal != null ? formatDeNumber(chargesTotal) : "—"}
+              <div
+                className="stu-dash-home__kpi-value"
+                title={chargesTotal != null ? formatDeNumber(chargesTotal) : undefined}
+              >
+                {chargesTotal != null ? formatCompactNumber(chargesTotal) : "—"}
               </div>
               <p className="stu-dash-home__kpi-meta">{chargesKpi.subtitle}</p>
             </StudioUiCard>
 
-            <StudioUiCard padding="md" className="stu-dash-home__enter">
+            <StudioUiCard padding="sm" className="stu-dash-home__enter stu-dash-home__kpi">
               <div className="stu-dash-home__kpi-head">
                 <span className="stu-dash-home__kpi-label">Teammitglieder</span>
                 <span className="stu-dash-home__kpi-icon" aria-hidden="true">
-                  <StudioIcon name="users" size={14} />
+                  <StudioIcon name="users" size={13} />
                 </span>
               </div>
-              <div className="stu-dash-home__kpi-value">
-                {teamMembers != null ? formatDeNumber(teamMembers) : "—"}
+              <div
+                className="stu-dash-home__kpi-value"
+                title={teamMembers != null ? formatDeNumber(teamMembers) : undefined}
+              >
+                {teamMembers != null ? formatCompactNumber(teamMembers) : "—"}
               </div>
               <p className="stu-dash-home__kpi-meta">
                 {openInvites > 0 ? `${openInvites} Einladung${openInvites === 1 ? "" : "en"} offen` : "Aktives Team"}
@@ -294,7 +333,7 @@ export function DashboardHomeView({
 
       <div className="stu-dash-home__main-grid">
         <div className="stu-dash-home__stack">
-          <StudioUiCard padding="md" className="stu-dash-home__enter">
+          <StudioUiCard padding="md" className="stu-dash-home__enter stu-dash-home__chart-card">
             <div className="stu-dash-home__card-head">
               <div>
                 <h2 className="stu-dash-home__card-title">Tokens pro Tag</h2>
@@ -329,18 +368,17 @@ export function DashboardHomeView({
 
             {loadingChart ? (
               <div className="stu-dash-home__chart-empty">
-                <StudioUiSkeleton style={{ width: "100%", height: 196, borderRadius: 8 }} />
+                <StudioUiSkeleton style={{ width: "100%", height: 160, borderRadius: 8 }} />
               </div>
             ) : !showChart ? (
               <div className="stu-dash-home__chart-empty" role="status">
                 <div>
-                  <strong style={{ color: "var(--t1)", display: "block", marginBottom: 6 }}>Noch kein Verlauf</strong>
-                  Sobald du Motive generierst, erscheint hier der tägliche Token-Verbrauch.
-                  <div style={{ marginTop: 12 }}>
-                    <Link href={createHref} className="stu-btn stu-btn--primary stu-btn--sm" style={{ textDecoration: "none" }}>
-                      {hasActivePlan ? "Erstes Motiv erstellen" : "Tarif wählen"}
-                    </Link>
-                  </div>
+                  <strong style={{ color: "var(--t1)", display: "block", marginBottom: 4, fontSize: 13 }}>Noch kein Verlauf</strong>
+                  <p style={{ margin: 0, color: "var(--t2)", fontSize: 12.5, lineHeight: 1.45 }}>
+                    {hasActivePlan
+                      ? "Nach der ersten Generierung erscheint hier der tägliche Token-Verbrauch."
+                      : "Mit einem Tarif kannst du Motive erzeugen — danach siehst du hier den Verbrauch."}
+                  </p>
                 </div>
               </div>
             ) : (
@@ -353,7 +391,7 @@ export function DashboardHomeView({
                 >
                   <defs>
                     <linearGradient id="stu-dash-area" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--ac)" stopOpacity="0.26" />
+                      <stop offset="0%" stopColor="var(--ac)" stopOpacity="0.18" />
                       <stop offset="100%" stopColor="var(--ac)" stopOpacity="0" />
                     </linearGradient>
                   </defs>
@@ -425,7 +463,7 @@ export function DashboardHomeView({
                 <StudioUiSkeleton style={{ width: "100%", height: 48 }} />
               </div>
             ) : recentGenerations.length === 0 ? (
-              <div className="stu-dash-home__chart-empty" style={{ minHeight: 120, margin: 16 }}>
+              <div className="stu-dash-home__chart-empty" style={{ margin: 12 }}>
                 Noch keine Generierungen.{" "}
                 <Link href={createHref} style={{ color: "var(--ac)" }}>
                   Erstes Motiv erstellen
@@ -520,11 +558,19 @@ export function DashboardHomeView({
               </>
             )}
             <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
-              <StudioUiButton variant="secondary" size="sm" onClick={() => onOpenTab("pricing")}>
-                {hasActivePlan ? "Tarif verwalten" : "Tarif wählen"}
-              </StudioUiButton>
+              {hasActivePlan ? (
+                <StudioUiButton variant="secondary" size="sm" onClick={() => onOpenTab("pricing")}>
+                  Tarif verwalten
+                </StudioUiButton>
+              ) : (
+                <p className="stu-dash-home__kpi-meta" style={{ margin: 0, textAlign: "center" }}>
+                  Tarif oben wählen, um Tokens freizuschalten.
+                </p>
+              )}
             </div>
           </StudioUiCard>
+
+          <StudioOnboardingChecklist placement="inline" />
 
           <StudioUiCard padding="md" className="stu-dash-home__enter">
             <div className="stu-dash-home__card-head">
@@ -572,11 +618,17 @@ export function DashboardHomeView({
                   : "Profil noch nicht vollständig"}
               </p>
             )}
-            <div style={{ marginTop: 16 }}>
-              <StudioUiButton variant="secondary" size="sm" onClick={() => onOpenTab("brand")}>
-                Markenprofil öffnen
-              </StudioUiButton>
-            </div>
+            {showBrandCallout ? null : (
+              <div style={{ marginTop: 16 }}>
+                <StudioUiButton
+                  variant={brandProfileComplete ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => onOpenTab("brand")}
+                >
+                  Markenprofil öffnen
+                </StudioUiButton>
+              </div>
+            )}
           </StudioUiCard>
 
           {teamMembers != null && teamMembers > 0 ? (
@@ -597,9 +649,11 @@ export function DashboardHomeView({
           <StudioUiCard padding="md" className="stu-dash-home__enter">
             <h2 className="stu-dash-home__card-title">Schnellaktionen</h2>
             <div className="stu-dash-home__quick-list" style={{ marginTop: 10 }}>
-              <Link href={createHref} className="stu-dash-home__quick-item">
-                Motiv generieren
-              </Link>
+              {hasActivePlan ? (
+                <Link href="/inhalte-erstellen" className="stu-dash-home__quick-item">
+                  Motiv generieren
+                </Link>
+              ) : null}
               <button type="button" className="stu-dash-home__quick-item" onClick={() => onOpenTab("media")}>
                 Mediathek öffnen
               </button>
@@ -614,6 +668,10 @@ export function DashboardHomeView({
             </div>
           </StudioUiCard>
         </div>
+
+        <aside className="stu-dash-home__assistant stu-dash-home__enter" aria-label="BrewAI Assistent">
+          <BrewAiAssistantView variant="column" />
+        </aside>
       </div>
     </div>
   );

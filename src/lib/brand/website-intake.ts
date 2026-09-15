@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 import {
   assertSafePublicUrl,
@@ -11,11 +12,76 @@ const MAX_TEXT_CHARS = 6_000;
 const MERGED_MAX_TEXT_BLOCKS = 48;
 const MERGED_MAX_TEXT_CHARS = 9_000;
 const MAX_IMAGE_CANDIDATES = 60;
-const MAX_IMAGES_TO_DOWNLOAD = 10;
+const MAX_IMAGES_TO_DOWNLOAD = 14;
 const IMAGE_DOWNLOAD_CONCURRENCY = 5;
 const MAX_REFERENCE_IMAGES = 5;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MIN_REFERENCE_IMAGE_PX = 180;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** Pflicht-Badges, Cookie-/Gate-Grafiken — nie als Marken-Referenz. */
+const REFERENCE_NOISE_SIGNALS = [
+  "bier-bewusst",
+  "bewusst-geniessen",
+  "bewusstgeniessen",
+  "bbg-logo",
+  "bbg_logo",
+  "deutsche-braurer",
+  "deutschen-braurer",
+  "deutschebrauer",
+  "die-deutschen-brauer",
+  "drinkaware",
+  "responsibility",
+  "verantwortungsbewusst",
+  "jugendschutz",
+  "age-gate",
+  "agegate",
+  "age-check",
+  "agecheck",
+  "cookie",
+  "consent",
+  "datenschutz",
+  "privacy",
+  "placeholder",
+  "spacer.gif",
+  "pixel.gif",
+  "tracking",
+  "1x1",
+  "blank.gif",
+  "loader",
+  "spinner",
+  "ajax",
+  "historie",
+  "historisch",
+  "jahrhundert",
+  "archiv",
+  "etikett",
+  "portraet",
+  "portrait",
+  "georg-boettger",
+  "anton-wagner",
+  "therese-wagner",
+  "um-1860",
+  "um-1840",
+  "gebaeude",
+  "gebäude",
+  "brauerei-gebaeude",
+  "fassade",
+  "holzfas",
+  "stiftung",
+  "missionswerk",
+];
+
+/** Sortiment-/Produktseiten liefern brauchbare Flaschen-Motive statt Archiv-Fotos. */
+const PRODUCT_CATALOG_PATH_SIGNALS = [
+  "unser-bier",
+  "unsere-biere",
+  "sortiment",
+  "biersortiment",
+  "produkte",
+  "shop",
+  "getraenke",
+];
 
 const BEER_PRODUCT_SIGNALS = [
   "bier",
@@ -152,12 +218,14 @@ const SUBPAGE_LINK_SIGNALS: Array<{ signal: string; weight: number }> = [
   { signal: "ueber-uns", weight: 30 },
   { signal: "ueberuns", weight: 30 },
   { signal: "unsere-biere", weight: 30 },
-  { signal: "geschichte", weight: 28 },
-  { signal: "sortiment", weight: 28 },
+  { signal: "unser-bier", weight: 34 },
+  { signal: "unsere-biere", weight: 34 },
+  { signal: "sortiment", weight: 32 },
+  { signal: "geschichte", weight: 10 },
   { signal: "braukunst", weight: 26 },
   { signal: "philosophie", weight: 26 },
   { signal: "familienbrauerei", weight: 26 },
-  { signal: "historie", weight: 26 },
+  { signal: "historie", weight: 6 },
   { signal: "about", weight: 26 },
   { signal: "brauerei", weight: 24 },
   { signal: "tradition", weight: 24 },
@@ -307,6 +375,66 @@ function combinedText(url: string, alt: string): string {
   return `${url} ${alt}`.toLowerCase();
 }
 
+/** Pfad + Alt ohne Hostname — „brauerei“ in der Domain zählt nicht als Bildkontext. */
+function imagePathAndAltText(url: string, alt: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search} ${alt}`.toLowerCase();
+  } catch {
+    return combinedText(url, alt);
+  }
+}
+
+const LOGO_REFERENCE_SIGNALS = [
+  "logo",
+  "logotype",
+  "wordmark",
+  "wappen",
+  "crest",
+  "emblem",
+  "siegel",
+  "seal",
+  "wappenschild",
+  "markenzeichen",
+  "firmenzeichen",
+  "brandmark",
+  "brand-mark",
+  "corporate-logo",
+  "header-logo",
+  "nav-logo",
+  "site-logo",
+  "unternehmenslogo",
+  "coat-of-arms",
+  "coatofarms",
+  "heraldik",
+];
+
+const WEAK_REFERENCE_BEER_SIGNALS = new Set(["brauerei", "brewery", "bier", "beer", "marke", "brand", "keller"]);
+
+/** Logo/Wappen — taugen nicht als Bildsprache-Referenz. */
+export function isBrandLogoReferenceCandidate(url: string, alt: string): boolean {
+  const text = normalizeForSignals(imagePathAndAltText(url, alt));
+  if (LOGO_REFERENCE_SIGNALS.some((signal) => text.includes(normalizeForSignals(signal)))) return true;
+  try {
+    const filename = normalizeForSignals(new URL(url).pathname.split("/").pop() ?? "");
+    if (LOGO_REFERENCE_SIGNALS.some((signal) => filename.includes(normalizeForSignals(signal)))) return true;
+  } catch {
+    /* URL nicht parsebar */
+  }
+  return false;
+}
+
+/** Brauerei-Alt allein reicht nicht — es braucht echte Produkt- oder Lifestyle-Hinweise. */
+export function hasStrongReferenceSignal(url: string, alt: string): boolean {
+  const text = imagePathAndAltText(url, alt);
+  if (BRAND_LIFESTYLE_SIGNALS.some((signal) => text.includes(signal))) return true;
+  if (BEER_PRODUCT_SIGNALS.some((signal) => !WEAK_REFERENCE_BEER_SIGNALS.has(signal) && text.includes(signal))) {
+    return true;
+  }
+  const weakHits = [...WEAK_REFERENCE_BEER_SIGNALS].filter((signal) => text.includes(signal));
+  return weakHits.length >= 2;
+}
+
 function isMustIncludeCandidate(url: string, alt: string): boolean {
   const text = combinedText(url, alt);
   return MUST_INCLUDE_SIGNALS.some((signal) => text.includes(signal));
@@ -315,6 +443,42 @@ function isMustIncludeCandidate(url: string, alt: string): boolean {
 function isHardCampaignCandidate(url: string, alt: string): boolean {
   const text = combinedText(url, alt);
   return countSignals(text, CAMPAIGN_NOISE_SIGNALS) >= 2 || (text.includes("teaser") && !text.includes("social"));
+}
+
+function normalizeImageUrlKey(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.search = "";
+    parsed.hash = "";
+    const typoMatch = parsed.pathname.match(/\/csm_([^/]+?)_[a-f0-9]{6,}\.(jpg|jpeg|png|webp)$/i);
+    if (typoMatch?.[1]) {
+      parsed.pathname = parsed.pathname.replace(
+        /\/csm_[^/]+_[a-f0-9]{6,}\.(jpg|jpeg|png|webp)$/i,
+        `/csm_${typoMatch[1]}.$2`,
+      );
+    }
+    return parsed.toString();
+  } catch {
+    return url.trim();
+  }
+}
+
+export function isProductCatalogImage(url: string): boolean {
+  const text = normalizeForSignals(imagePathAndAltText(url, ""));
+  return PRODUCT_CATALOG_PATH_SIGNALS.some((signal) => text.includes(normalizeForSignals(signal)));
+}
+
+/** Branchen-Badge, Cookie-Grafik, Gate-Asset, Logo — kein Markenlook. */
+export function isHardReferenceNoiseCandidate(url: string, alt: string): boolean {
+  const text = normalizeForSignals(imagePathAndAltText(url, alt));
+  if (REFERENCE_NOISE_SIGNALS.some((signal) => text.includes(normalizeForSignals(signal)))) return true;
+  if (/bbg[^a-z]|\/bbg[./_-]/i.test(url)) return true;
+  if (isBrandLogoReferenceCandidate(url, alt)) return true;
+  return false;
+}
+
+function imageContentHash(base64: string): string {
+  return createHash("md5").update(base64).digest("hex");
 }
 
 /** Bewertet Bild-URLs und Alt-Texte: Produkt + Lifestyle hoch, Kampagnen/Events runter. */
@@ -326,8 +490,22 @@ export function scoreImageCandidate(url: string, alt: string, source: "img" | "o
   productScore += countSignals(combined, BEER_PRODUCT_SIGNALS) * 16;
   lifestyleScore += countSignals(combined, BRAND_LIFESTYLE_SIGNALS) * 20;
 
+  const pathText = normalizeForSignals(imagePathAndAltText(url, alt));
+  if (PRODUCT_CATALOG_PATH_SIGNALS.some((signal) => pathText.includes(normalizeForSignals(signal)))) {
+    productScore += 36;
+    lifestyleScore += 18;
+  }
+  if (/historie|jahrhundert|etikett|portraet|portrait|archiv|18[0-9]{2}|19[0-9]{2}-etikett/.test(pathText)) {
+    productScore -= 48;
+    lifestyleScore -= 48;
+  }
+
   if (isMustIncludeCandidate(url, alt)) lifestyleScore += 80;
-  if (combined.includes("logo")) productScore += 10;
+  if (combined.includes("logo") && countSignals(combined, BEER_PRODUCT_SIGNALS) > 0) productScore += 6;
+  if (isHardReferenceNoiseCandidate(url, alt) || isBrandLogoReferenceCandidate(url, alt)) {
+    productScore -= 200;
+    lifestyleScore -= 200;
+  }
   // Freigestellte Packshots taugen fuers Etikett, aber nicht fuer die Bildsprache.
   if (countSignals(combined, PACKSHOT_URL_SIGNALS) > 0) lifestyleScore -= 30;
 
@@ -391,16 +569,23 @@ function extractBackgroundImageUrls(html: string): string[] {
 
 /** Mischt Produkt- und Lifestyle-Kandidaten — Social Wall etc. wird erzwungen. */
 export function selectCandidatesForDownload(candidates: ImageCandidate[]): ImageCandidate[] {
-  const eligible = candidates.filter((c) => !isHardCampaignCandidate(c.url, c.alt));
+  const eligible = candidates.filter(
+    (c) => !isHardCampaignCandidate(c.url, c.alt) && !isHardReferenceNoiseCandidate(c.url, c.alt),
+  );
   const forced = eligible.filter((c) => isMustIncludeCandidate(c.url, c.alt));
+  const catalogTop = [...eligible]
+    .filter((c) => isProductCatalogImage(c.url))
+    .sort((a, b) => b.productScore - a.productScore || b.score - a.score)
+    .slice(0, 10);
   const productTop = [...eligible].sort((a, b) => b.productScore - a.productScore).slice(0, 8);
   const lifestyleTop = [...eligible].sort((a, b) => b.lifestyleScore - a.lifestyleScore).slice(0, 10);
   const overallTop = [...eligible].sort((a, b) => b.score - a.score).slice(0, 8);
 
   const byUrl = new Map<string, ImageCandidate>();
-  for (const candidate of [...forced, ...lifestyleTop, ...productTop, ...overallTop]) {
-    const existing = byUrl.get(candidate.url);
-    if (!existing || candidate.score > existing.score) byUrl.set(candidate.url, candidate);
+  for (const candidate of [...forced, ...catalogTop, ...lifestyleTop, ...productTop, ...overallTop]) {
+    const key = normalizeImageUrlKey(candidate.url);
+    const existing = byUrl.get(key);
+    if (!existing || candidate.score > existing.score) byUrl.set(key, candidate);
   }
 
   return [...byUrl.values()]
@@ -414,10 +599,12 @@ function extractImageCandidates(html: string, pageUrl: string): ImageCandidate[]
   const addCandidate = (url: string, alt: string, source: "img" | "og") => {
     const abs = resolveAbsoluteUrl(pageUrl, url);
     if (!abs) return;
+    if (isHardReferenceNoiseCandidate(abs, alt)) return;
     const scored = scoreImageCandidate(abs, alt, source);
-    const existing = byUrl.get(abs);
+    const key = normalizeImageUrlKey(abs);
+    const existing = byUrl.get(key);
     if (!existing || scored.score > existing.score) {
-      byUrl.set(abs, scored);
+      byUrl.set(key, scored);
     }
   };
 
@@ -457,6 +644,61 @@ function extractImageCandidates(html: string, pageUrl: string): ImageCandidate[]
  * Erkennt freigestellte Produktfotos (Packshots): Der Bildrand ist fast komplett
  * weiss oder transparent. Szenische Fotos haben praktisch nie einen uniformen Rand.
  */
+/** Gate-/Archiv-Fotos sind oft nahezu grau — ohne Farbe kein Bildsprache-Motiv. */
+/** Wappen/Logo: wenige Farben, kein Foto — nicht als Bildsprache. */
+export async function detectGraphicLogoFromBuffer(raw: Buffer): Promise<boolean> {
+  try {
+    const size = 48;
+    const { data, info } = await sharp(raw)
+      .resize(size, size, { fit: "fill" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const buckets = new Set<string>();
+    let opaquePixels = 0;
+    for (let i = 0; i < data.length; i += info.channels) {
+      const r = data[i] ?? 0;
+      const g = data[i + 1] ?? 0;
+      const b = data[i + 2] ?? 0;
+      const a = info.channels >= 4 ? (data[i + 3] ?? 255) : 255;
+      if (a < 32) continue;
+      opaquePixels += 1;
+      buckets.add(`${Math.round(r / 24)},${Math.round(g / 24)},${Math.round(b / 24)}`);
+    }
+    if (opaquePixels < size * size * 0.25) return false;
+    return buckets.size <= 14;
+  } catch {
+    return false;
+  }
+}
+
+export async function detectMostlyGrayscaleFromBuffer(raw: Buffer): Promise<boolean> {
+  try {
+    const size = 32;
+    const { data, info } = await sharp(raw)
+      .resize(size, size, { fit: "fill" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    let grayishPixels = 0;
+    let totalPixels = 0;
+    for (let y = 0; y < info.height; y += 1) {
+      for (let x = 0; x < info.width; x += 1) {
+        const offset = (y * info.width + x) * info.channels;
+        const r = data[offset] ?? 0;
+        const g = data[offset + 1] ?? 0;
+        const b = data[offset + 2] ?? 0;
+        const maxDiff = Math.max(Math.abs(r - g), Math.abs(g - b), Math.abs(r - b));
+        if (maxDiff < 18) grayishPixels += 1;
+        totalPixels += 1;
+      }
+    }
+    return totalPixels > 0 && grayishPixels / totalPixels >= 0.9;
+  } catch {
+    return false;
+  }
+}
+
 export async function detectPackshotFromBuffer(raw: Buffer): Promise<boolean> {
   try {
     const size = 24;
@@ -514,6 +756,18 @@ async function downloadImage(candidate: ImageCandidate): Promise<DownloadedImage
 
     const raw = Buffer.from(await response.arrayBuffer());
     if (raw.byteLength === 0 || raw.byteLength > MAX_IMAGE_BYTES) return null;
+
+    const meta = await sharp(raw).metadata();
+    const width = meta.width ?? 0;
+    const height = meta.height ?? 0;
+    if (width < MIN_REFERENCE_IMAGE_PX || height < MIN_REFERENCE_IMAGE_PX) return null;
+    if (isHardReferenceNoiseCandidate(candidate.url, candidate.alt)) return null;
+    if (isBrandLogoReferenceCandidate(candidate.url, candidate.alt)) return null;
+
+    const mostlyGrayscale = await detectMostlyGrayscaleFromBuffer(raw);
+    if (mostlyGrayscale && !isProductCatalogImage(candidate.url)) return null;
+
+    if (await detectGraphicLogoFromBuffer(raw)) return null;
 
     const isPackshot = await detectPackshotFromBuffer(raw);
 
@@ -695,8 +949,9 @@ export function mergeParsedWebsitePages(pages: ParsedWebsitePage[]): ParsedWebsi
   const byUrl = new Map<string, ImageCandidate>();
   for (const page of pages) {
     for (const candidate of page.imageCandidates) {
-      const existing = byUrl.get(candidate.url);
-      if (!existing || candidate.score > existing.score) byUrl.set(candidate.url, candidate);
+      const key = normalizeImageUrlKey(candidate.url);
+      const existing = byUrl.get(key);
+      if (!existing || candidate.score > existing.score) byUrl.set(key, candidate);
     }
   }
 
@@ -737,18 +992,40 @@ export function pickBrandReferenceImages(
   opts?: { minScore?: number },
 ): DownloadedImage[] {
   const minScore = opts?.minScore ?? 20;
-  const eligible = images.filter((image) => image.score >= minScore);
+  const seenKeys = new Set<string>();
+  const eligible = images.filter((image) => {
+    if (image.score < minScore) return false;
+    if (isHardReferenceNoiseCandidate(image.url, image.alt)) return false;
+    const dedupeKey = normalizeImageUrlKey(image.url);
+    if (seenKeys.has(dedupeKey)) return false;
+    seenKeys.add(dedupeKey);
+    return true;
+  });
+
   const scenes = eligible
     .filter((image) => !image.isPackshot)
-    .sort((a, b) => b.lifestyleScore - a.lifestyleScore || b.score - a.score);
+    .sort((a, b) => {
+      const aSignal = hasStrongReferenceSignal(a.url, a.alt) ? 1 : 0;
+      const bSignal = hasStrongReferenceSignal(b.url, b.alt) ? 1 : 0;
+      if (bSignal !== aSignal) return bSignal - aSignal;
+      return b.lifestyleScore - a.lifestyleScore || b.score - a.score;
+    });
   const packshots = eligible
     .filter((image) => image.isPackshot)
     .sort((a, b) => b.productScore - a.productScore || b.score - a.score);
 
-  const picked = scenes.slice(0, MAX_REFERENCE_IMAGES);
-  if (picked.length < MAX_REFERENCE_IMAGES && packshots.length > 0) {
-    const packshotBudget = picked.length >= 2 ? 1 : 2;
-    picked.push(...packshots.slice(0, Math.min(MAX_REFERENCE_IMAGES - picked.length, packshotBudget)));
+  const signaledScenes = scenes.filter((image) => hasStrongReferenceSignal(image.url, image.alt));
+  const scenePool = signaledScenes.length > 0 ? signaledScenes : [];
+  const picked = scenePool.slice(0, MAX_REFERENCE_IMAGES);
+
+  const catalogPackshots = packshots
+    .filter((image) => isProductCatalogImage(image.url))
+    .sort((a, b) => b.productScore - a.productScore || b.score - a.score);
+  const packshotPool = catalogPackshots.length > 0 ? catalogPackshots : packshots;
+
+  if (picked.length < MAX_REFERENCE_IMAGES && packshotPool.length > 0) {
+    const packshotBudget = picked.length >= 2 ? 1 : scenePool.length === 0 ? 3 : 2;
+    picked.push(...packshotPool.slice(0, Math.min(MAX_REFERENCE_IMAGES - picked.length, packshotBudget)));
   }
   return picked;
 }

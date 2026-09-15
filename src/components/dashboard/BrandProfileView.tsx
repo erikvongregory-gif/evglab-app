@@ -46,6 +46,12 @@ type BrandSettings = {
 
   brandReferenceImageUrls: string[];
 
+  brandHeadlineFontName?: string;
+
+  brandFontFileUrl?: string;
+
+  brandFontWeight?: string;
+
   brandAnalyzedAt?: string;
 
 };
@@ -231,6 +237,10 @@ export function BrandProfileView({
   const [resetting, setResetting] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+
+  const [fontUploading, setFontUploading] = useState(false);
+
+  const [fontUploadError, setFontUploadError] = useState<string | null>(null);
 
 
 
@@ -440,6 +450,79 @@ export function BrandProfileView({
             </div>
 
 
+
+            <div className="studio-brand-section-label">Marken-Schrift</div>
+            <p className="studio-brand-meta" style={{ marginBottom: 10 }}>
+              Für Social-Posts und Kampagnen — Headline wird in dieser Schrift über das Motiv gelegt.
+            </p>
+            <div style={{ display: "grid", gap: 10 }}>
+              <input
+                type="text"
+                className="studio-brand-font-name"
+                placeholder="Schriftname, z. B. Augustina Display"
+                value={value.brandHeadlineFontName ?? ""}
+                onChange={(e) => onChange({ brandHeadlineFontName: e.target.value })}
+                onBlur={() => void onSave({ brandHeadlineFontName: value.brandHeadlineFontName })}
+              />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                <label className="studio-brand-font-upload">
+                  <input
+                    type="file"
+                    accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
+                    hidden
+                    disabled={fontUploading}
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (!file) return;
+                      setFontUploading(true);
+                      setFontUploadError(null);
+                      try {
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        fd.append("fontName", value.brandHeadlineFontName?.trim() || file.name.replace(/\.[^.]+$/, ""));
+                        const res = await fetch("/api/dashboard/brand-font", {
+                          method: "POST",
+                          credentials: "include",
+                          body: fd,
+                        });
+                        const json = (await res.json()) as { error?: string; url?: string; fontName?: string };
+                        if (!res.ok) throw new Error(json.error ?? "Schrift-Upload fehlgeschlagen.");
+                        onChange({
+                          brandFontFileUrl: json.url ?? "",
+                          brandHeadlineFontName: json.fontName ?? value.brandHeadlineFontName,
+                        });
+                        await onSave({
+                          brandFontFileUrl: json.url ?? "",
+                          brandHeadlineFontName: json.fontName ?? value.brandHeadlineFontName,
+                        });
+                      } catch (uploadErr) {
+                        setFontUploadError(
+                          uploadErr instanceof Error ? uploadErr.message : "Schrift-Upload fehlgeschlagen.",
+                        );
+                      } finally {
+                        setFontUploading(false);
+                      }
+                    }}
+                  />
+                  <StudioButton type="button" variant="soft" size="sm" disabled={fontUploading}>
+                    {fontUploading ? "Lädt …" : value.brandFontFileUrl ? "Schrift ersetzen" : "Schrift hochladen"}
+                  </StudioButton>
+                </label>
+                {value.brandFontFileUrl ? (
+                  <StudioBadge tone="ok">
+                    {value.brandHeadlineFontName?.trim() || "Schrift"} aktiv
+                  </StudioBadge>
+                ) : (
+                  <span className="studio-faint" style={{ fontSize: 12 }}>
+                    .woff2 empfohlen · max. 2 MB
+                  </span>
+                )}
+              </div>
+              {fontUploadError ? (
+                <p style={{ margin: 0, fontSize: 12, color: "var(--warn)" }}>{fontUploadError}</p>
+              ) : null}
+            </div>
 
             <div className="studio-brand-section-label studio-brand-tones-label">Tonalität</div>
 

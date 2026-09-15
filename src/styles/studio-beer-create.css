@@ -37,7 +37,7 @@
 
 .studio-beer-create-title {
   margin: 0;
-  font-family: var(--f-sans, "Work Sans", system-ui, sans-serif);
+  font-family: var(--f-sans, "Inter Tight", system-ui, sans-serif);
   font-size: 16.5px;
   font-weight: 650;
   letter-spacing: -0.015em;
@@ -47,7 +47,7 @@
 .studio-beer-create-lead {
   margin: 6px 0 0;
   font-size: 12.5px;
-  line-height: 1.55;
+  line-height: 1.45;
   color: var(--t2);
   max-width: 46ch;
 }
@@ -61,9 +61,9 @@
   background: transparent;
   color: var(--t3);
   font-family: var(--f-mono, "IBM Plex Mono", monospace);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   transition:
@@ -115,10 +115,10 @@
   max-height: 380px;
   min-height: 240px;
   border-radius: 14px;
-  border: 1px dashed rgba(201, 162, 77, 0.35);
+  border: 1.5px dashed var(--ac-line, rgba(199, 105, 30, 0.35));
   background:
-    linear-gradient(165deg, rgba(201, 162, 77, 0.06), transparent 55%),
-    rgba(48, 34, 20, 0.55);
+    linear-gradient(165deg, var(--ac-tint, rgba(199, 105, 30, 0.08)), transparent 58%),
+    var(--s2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -132,8 +132,8 @@
 .studio-beer-create-drop.is-drag {
   border-color: var(--ac);
   background:
-    linear-gradient(165deg, rgba(201, 162, 77, 0.14), transparent 50%),
-    rgba(56, 38, 20, 0.7);
+    linear-gradient(165deg, var(--ac-tint2, rgba(199, 105, 30, 0.14)), transparent 50%),
+    var(--s3);
   transform: scale(1.004);
 }
 
@@ -179,8 +179,8 @@
   height: 32px;
   padding: 0 13px;
   border-radius: 8px;
-  border: 1px solid rgba(201, 162, 77, 0.45);
-  background: rgba(201, 162, 77, 0.14);
+  border: 1px solid var(--ac-line, rgba(199, 105, 30, 0.4));
+  background: var(--ac-tint, rgba(199, 105, 30, 0.12));
   color: var(--ac);
   font-size: 12.5px;
   font-weight: 560;
@@ -194,7 +194,7 @@
 }
 
 .studio-beer-create-file-btn:hover {
-  background: rgba(201, 162, 77, 0.22);
+  background: var(--ac-tint2, rgba(199, 105, 30, 0.18));
   border-color: var(--ac);
 }
 
@@ -219,7 +219,7 @@
   justify-content: center;
   gap: 10px;
   padding: 14px;
-  background: rgba(18, 12, 8, 0.35);
+  background: color-mix(in srgb, var(--s1) 72%, transparent);
 }
 
 .studio-beer-create-drop-preview img {
@@ -264,9 +264,9 @@
 
 .studio-beer-create-label {
   font-family: var(--f-mono, "IBM Plex Mono", monospace);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
 }
@@ -414,16 +414,16 @@
 }
 
 .studio-beer-create-save.is-success {
-  background: rgba(90, 140, 100, 0.85);
-  color: #e8f2ea;
+  background: var(--ok, #2f7a4a);
+  color: #fff;
 }
 
 .studio-beer-create-spinner {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 1.5px solid rgba(26, 18, 7, 0.25);
-  border-top-color: var(--ac-ink, #1a1207);
+  border: 1.5px solid color-mix(in srgb, var(--ac-ink, #fff) 28%, transparent);
+  border-top-color: var(--ac-ink, #fff);
   animation: studio-beer-create-spin 0.7s linear infinite;
 }
 
@@ -457,14 +457,14 @@
   grid-template-columns: minmax(110px, 160px) 1fr;
   gap: 12px;
   align-items: center;
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--s2);
 }
 
 .studio-beer-create-preview-label {
   font-family: var(--f-mono, "IBM Plex Mono", monospace);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
   line-height: 1.4;
@@ -516,8 +516,8 @@
   height: 34px;
   padding: 0 14px;
   border-radius: 8px;
-  border: 1px solid rgba(201, 162, 77, 0.4);
-  background: rgba(201, 162, 77, 0.1);
+  border: 1px solid var(--ac-line, rgba(199, 105, 30, 0.4));
+  background: var(--ac-tint, rgba(199, 105, 30, 0.1));
   color: var(--ac);
   font-size: 12.5px;
   font-weight: 560;
@@ -529,7 +529,7 @@
 }
 
 .studio-beer-create-add:hover:not(:disabled) {
-  background: rgba(201, 162, 77, 0.18);
+  background: var(--ac-tint2, rgba(199, 105, 30, 0.18));
 }
 
 .studio-beer-create-add:active:not(:disabled) {
@@ -563,7 +563,7 @@
 
 @keyframes studio-beer-create-fresh {
   0% {
-    background: rgba(201, 162, 77, 0.16);
+    background: var(--ac-tint, rgba(199, 105, 30, 0.16));
   }
   100% {
     background: transparent;

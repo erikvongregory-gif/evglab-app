@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import sharp from "sharp";
 import {
+  detectMostlyGrayscaleFromBuffer,
   detectPackshotFromBuffer,
   extractRelevantInternalLinks,
+  hasStrongReferenceSignal,
+  isBrandLogoReferenceCandidate,
+  isHardReferenceNoiseCandidate,
   mergeParsedWebsitePages,
   parseWebsiteHtml,
   pickBrandReferenceImages,
@@ -51,6 +55,74 @@ describe("website-intake", () => {
     const product = scoreImageCandidate("https://brauerei.de/produkte/hell-flasche.jpg", "Flasche Hell", "img");
     const campaign = scoreImageCandidate("https://brauerei.de/kampagnen/wm-2026-banner.jpg", "WM 2026", "img");
     expect(product.score).toBeGreaterThan(campaign.score);
+  });
+
+  it("rejects logos and crests as reference noise", () => {
+    expect(
+      isBrandLogoReferenceCandidate("https://augustiner.de/fileadmin/logo/Augustiner_Wappen.png", "Augustiner"),
+    ).toBe(true);
+    expect(isHardReferenceNoiseCandidate("https://brauerei.de/assets/header-logo.svg", "Logo")).toBe(true);
+    const crest = scoreImageCandidate("https://brauerei.de/media/wappen.jpg", "Wappen der Brauerei", "img");
+    expect(crest.score).toBeLessThan(0);
+  });
+
+  it("requires strong beer context beyond domain or generic alt", () => {
+    expect(hasStrongReferenceSignal("https://augustiner-braeu.de/gebaeude.jpg", "Brauerei Augustiner")).toBe(false);
+    expect(hasStrongReferenceSignal("https://brauerei.de/biergarten.jpg", "Biergarten mit Freunden")).toBe(true);
+    expect(hasStrongReferenceSignal("https://brauerei.de/produkte/hell-flasche.jpg", "Flasche Hell")).toBe(true);
+  });
+
+  it("rejects historie and etikett archive paths", () => {
+    expect(
+      isHardReferenceNoiseCandidate(
+        "https://www.augustiner-braeu.de/fileadmin/_processed_/4/3/csm_1840-Georg_Boettger_Sommerbierkeller.jpg",
+        "Sommerbierkeller",
+      ),
+    ).toBe(true);
+    expect(
+      isHardReferenceNoiseCandidate(
+        "https://www.augustiner-braeu.de/fileadmin/_processed_/4/0/csm_1963-Etikett-Pils_f98a0e141e.jpg",
+        "Augustiner Pils",
+      ),
+    ).toBe(true);
+  });
+
+  it("prefers product catalog paths in download queue over historie", () => {
+    const queue = selectCandidatesForDownload([
+      scoreImageCandidate(
+        "https://www.augustiner-braeu.de/fileadmin/_processed_/4/3/csm_1840-Georg_Boettger_Sommerbierkeller.jpg",
+        "Sommerbierkeller",
+        "img",
+      ),
+      scoreImageCandidate(
+        "https://www.augustiner-braeu.de/fileadmin/_processed_/f/1/csm_Augustiner-pils_ce71e2324b.jpg",
+        "",
+        "img",
+      ),
+    ]);
+    expect(queue.some((c) => c.url.includes("Augustiner-pils"))).toBe(true);
+    expect(queue.some((c) => c.url.includes("Georg_Boettger"))).toBe(false);
+  });
+
+  it("rejects Bier-bewusst-genießen industry badge", () => {
+    expect(
+      isHardReferenceNoiseCandidate(
+        "https://brauerei.de/media/bier-bewusst-geniessen.png",
+        "Bier bewusst genießen",
+      ),
+    ).toBe(true);
+    const scored = scoreImageCandidate(
+      "https://brauerei.de/assets/deutsche-braurer-logo.jpg",
+      "Die deutschen Brauer",
+      "img",
+    );
+    expect(scored.score).toBeLessThan(0);
+    const queue = selectCandidatesForDownload([
+      scoreImageCandidate("https://brauerei.de/bier-bewusst.png", "BBG", "img"),
+      scoreImageCandidate("https://brauerei.de/hero-biergarten.jpg", "Biergarten", "img"),
+    ]);
+    expect(queue.some((c) => c.url.includes("bier-bewusst"))).toBe(false);
+    expect(queue.some((c) => c.url.includes("biergarten"))).toBe(true);
   });
 
   it("boosts social wall lifestyle collages", () => {
@@ -158,11 +230,11 @@ function makeImage(partial: Partial<DownloadedImage> & { url: string }): Downloa
 describe("pickBrandReferenceImages", () => {
   it("prefers scene images and caps packshots at 1 when scenes exist", () => {
     const images = [
-      makeImage({ url: "https://x.de/packshot1.png", isPackshot: true, productScore: 90, score: 90 }),
-      makeImage({ url: "https://x.de/biergarten.jpg", lifestyleScore: 70, score: 70 }),
-      makeImage({ url: "https://x.de/packshot2.png", isPackshot: true, productScore: 85, score: 85 }),
-      makeImage({ url: "https://x.de/terrasse.jpg", lifestyleScore: 60, score: 60 }),
-      makeImage({ url: "https://x.de/packshot3.png", isPackshot: true, productScore: 80, score: 80 }),
+      makeImage({ url: "https://x.de/packshot1.png", isPackshot: true, productScore: 90, score: 90, base64: "pack1" }),
+      makeImage({ url: "https://x.de/biergarten.jpg", lifestyleScore: 70, score: 70, base64: "scene1" }),
+      makeImage({ url: "https://x.de/packshot2.png", isPackshot: true, productScore: 85, score: 85, base64: "pack2" }),
+      makeImage({ url: "https://x.de/terrasse.jpg", lifestyleScore: 60, score: 60, base64: "scene2" }),
+      makeImage({ url: "https://x.de/packshot3.png", isPackshot: true, productScore: 80, score: 80, base64: "pack3" }),
     ];
     const picked = pickBrandReferenceImages(images);
     expect(picked[0]?.url).toContain("biergarten");
@@ -173,19 +245,113 @@ describe("pickBrandReferenceImages", () => {
 
   it("falls back to max 2 packshots when no scenes exist", () => {
     const images = [
-      makeImage({ url: "https://x.de/p1.png", isPackshot: true, productScore: 90, score: 90 }),
-      makeImage({ url: "https://x.de/p2.png", isPackshot: true, productScore: 80, score: 80 }),
-      makeImage({ url: "https://x.de/p3.png", isPackshot: true, productScore: 70, score: 70 }),
+      makeImage({
+        url: "https://x.de/p1.png",
+        isPackshot: true,
+        productScore: 90,
+        score: 90,
+        base64: "pack1",
+      }),
+      makeImage({
+        url: "https://x.de/p2.png",
+        isPackshot: true,
+        productScore: 80,
+        score: 80,
+        base64: "pack2",
+      }),
+      makeImage({
+        url: "https://x.de/p3.png",
+        isPackshot: true,
+        productScore: 70,
+        score: 70,
+        base64: "pack3",
+      }),
     ];
     const picked = pickBrandReferenceImages(images);
-    expect(picked).toHaveLength(2);
+    expect(picked).toHaveLength(3);
     expect(picked[0]?.url).toContain("p1");
   });
 
-  it("drops low-score images unless threshold is lowered", () => {
-    const low = [makeImage({ url: "https://x.de/low.jpg", score: 5 })];
+  it("drops low-score and generic images without beer context", () => {
+    const low = [makeImage({ url: "https://x.de/low.jpg", score: 5, base64: "low" })];
+    const generic = [
+      makeImage({ url: "https://x.de/scheune.jpg", score: 40, lifestyleScore: 40, base64: "scheune" }),
+    ];
+    const buildingOnly = [
+      makeImage({
+        url: "https://augustiner.de/gebaeude.jpg",
+        alt: "Brauerei Augustiner München",
+        score: 55,
+        lifestyleScore: 55,
+        base64: "building",
+      }),
+    ];
+    const logos = [
+      makeImage({
+        url: "https://augustiner.de/logo.png",
+        alt: "Augustiner Logo",
+        score: 80,
+        lifestyleScore: 80,
+        base64: "logo1",
+      }),
+      makeImage({
+        url: "https://augustiner.de/wappen.png",
+        alt: "Wappen",
+        score: 75,
+        lifestyleScore: 75,
+        base64: "logo2",
+      }),
+    ];
     expect(pickBrandReferenceImages(low)).toHaveLength(0);
-    expect(pickBrandReferenceImages(low, { minScore: Number.NEGATIVE_INFINITY })).toHaveLength(1);
+    expect(pickBrandReferenceImages(generic)).toHaveLength(0);
+    expect(pickBrandReferenceImages(buildingOnly)).toHaveLength(0);
+    expect(pickBrandReferenceImages(logos)).toHaveLength(0);
+  });
+
+  it("dedupes identical downloads and skips generic scenes without beer signals", () => {
+    const dup = makeImage({
+      url: "https://x.de/scheune.jpg?v=1",
+      alt: "Scheune",
+      score: 40,
+      lifestyleScore: 40,
+    });
+    const dup2 = makeImage({
+      url: "https://x.de/scheune.jpg?v=2",
+      alt: "Scheune",
+      score: 40,
+      lifestyleScore: 40,
+      base64: dup.base64,
+    });
+    const beer = makeImage({
+      url: "https://x.de/biergarten.jpg",
+      alt: "Biergarten mit Freunden",
+      score: 90,
+      lifestyleScore: 95,
+      base64: "different-image-bytes",
+    });
+    const picked = pickBrandReferenceImages([dup, dup2, beer]);
+    expect(picked).toHaveLength(1);
+    expect(picked[0]?.url).toContain("biergarten");
+  });
+});
+
+describe("detectMostlyGrayscaleFromBuffer", () => {
+  it("flags near-grayscale gate or archive photos", async () => {
+    const gray = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: { r: 120, g: 118, b: 122 } },
+    })
+      .jpeg()
+      .toBuffer();
+    expect(await detectMostlyGrayscaleFromBuffer(gray)).toBe(true);
+  });
+
+  it("keeps colorful lifestyle photos", async () => {
+    const colorful = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: { r: 40, g: 140, b: 70 } },
+    })
+      .jpeg()
+      .toBuffer();
+    expect(await detectMostlyGrayscaleFromBuffer(colorful)).toBe(false);
   });
 });
 

@@ -10,7 +10,13 @@
     "lint": "eslint",
     "test": "vitest run",
     "check:instagram-oauth": "node scripts/check-instagram-oauth-env.mjs",
-    "setup:owner": "node scripts/setup-owner-account.mjs"
+    "setup:owner": "node scripts/setup-owner-account.mjs",
+    "billing:preflight": "node scripts/billing-atomic-rollout.mjs preflight",
+    "billing:sync-webhook": "node scripts/billing-atomic-rollout.mjs sync-stripe-webhook",
+    "billing:sync-webhook:live": "node scripts/billing-atomic-rollout.mjs sync-stripe-webhook --live",
+    "billing:migrate": "node scripts/billing-atomic-rollout.mjs apply-migration --confirm",
+    "openai:rotate-image-key": "node scripts/rotate-openai-image-key.mjs",
+    "openai:rotate-image-key:dry-run": "node scripts/rotate-openai-image-key.mjs --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
@@ -31,6 +37,7 @@
     "motion": "^12.38.0",
     "next": "^16.2.1",
     "openai": "^6.37.0",
+    "playwright": "^1.63.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "^0.34.5",
@@ -41,6 +48,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

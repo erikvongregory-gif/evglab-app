@@ -1,6 +1,11 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { hasPassedTwoFactor, twoFactorRedirectPath } from "@/lib/auth/twoFactorSession";
+import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import {
+  resolveStudioEntryPath,
+  sanitizeStudioOnboardingState,
+} from "@/lib/dashboard/onboarding";
 import { normalizeNextPath } from "@/lib/security/authResponses";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -12,6 +17,18 @@ function resolveNext(raw: string | undefined) {
   return normalizeNextPath(raw ?? null);
 }
 
+function entryPathForUser(
+  userMetadata: Record<string, unknown> | undefined,
+  preferred: string,
+) {
+  const onboarding = sanitizeStudioOnboardingState(
+    getDashboardMetadata(userMetadata).onboarding,
+  );
+  // Deep-Links (Checkout, Tabs) nicht überschreiben — nur Default-Studio-Entry.
+  if (preferred !== "/dashboard") return preferred;
+  return resolveStudioEntryPath(onboarding, preferred);
+}
+
 export default async function AuthFinishPage({
   searchParams,
 }: {
@@ -19,7 +36,7 @@ export default async function AuthFinishPage({
 }) {
   const params = (await searchParams) ?? {};
   const nextRaw = params.next;
-  const next = resolveNext(Array.isArray(nextRaw) ? nextRaw[0] : nextRaw);
+  const preferred = resolveNext(Array.isArray(nextRaw) ? nextRaw[0] : nextRaw);
 
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
@@ -28,6 +45,7 @@ export default async function AuthFinishPage({
     } = await supabase.auth.getUser();
 
     if (user) {
+      const next = entryPathForUser(user.user_metadata as Record<string, unknown> | undefined, preferred);
       if (!(await hasPassedTwoFactor(user.id))) {
         redirect(twoFactorRedirectPath(next));
       }
@@ -43,7 +61,7 @@ export default async function AuthFinishPage({
         </main>
       }
     >
-      <AuthFinishClient initialNext={next} />
+      <AuthFinishClient initialNext={preferred} />
     </Suspense>
   );
 }

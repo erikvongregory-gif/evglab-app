@@ -1,6 +1,38 @@
+export type BottleClosure = "kronkorken" | "buegel" | "ring_pull";
+
+export const BOTTLE_PRESERVE = [
+  "Silhouette",
+  "Flaschenproportionen",
+  "Verschluss",
+  "Glasfarbe",
+  "Etikettgeometrie",
+] as const;
+
+type BottleBase = {
+  label: string;
+  pillLabel: string;
+  promptDescription: string;
+  forbidden: string;
+  typicalColors: readonly string[];
+  geometry_profile: string;
+  closure: BottleClosure;
+  /** Kanonisches Form-Referenzfoto vorhanden (siehe bottleShapeReference). */
+  hasShapeReference?: boolean;
+};
+
+function bottle(base: BottleBase) {
+  return {
+    ...base,
+    display_name: base.label,
+    glass_color_defaults: base.typicalColors,
+    preserve: BOTTLE_PRESERVE,
+    hasShapeReference: base.hasShapeReference ?? false,
+  };
+}
+
 export const FLASCHEN_TYPEN = {
   // ---------------------------------------------------------------- 0,33 l
-  euro_longneck_330: {
+  euro_longneck_330: bottle({
     label: "Longneck 0,33 l",
     pillLabel: "Longneck 0,33 l",
     promptDescription:
@@ -8,8 +40,10 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a tall 0.5 L bottle, NOT a short squat Steinie/Stubbi, NOT a short-necked Euroflasche, NOT a swing-top bottle, NOT an aluminium can",
     typicalColors: ["braun", "grün"],
-  },
-  euro_steinie_330: {
+    geometry_profile: "schlanker Körper, langer dünner Hals, sanfte Schulter, Kronkorken",
+    closure: "kronkorken",
+  }),
+  euro_steinie_330: bottle({
     label: "Steinie / Stubbi 0,33 l",
     pillLabel: "Steinie 0,33 l",
     promptDescription:
@@ -17,8 +51,10 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a tall long-neck bottle, NOT a 0.5 L bottle, NOT a slim elegant bottle, NOT a swing-top bottle, NOT an aluminium can",
     typicalColors: ["braun"],
-  },
-  vichy_330: {
+    geometry_profile: "kurz und gedrungen, sehr kurzer Hals, breite Schultern, Kronkorken",
+    closure: "kronkorken",
+  }),
+  vichy_330: bottle({
     label: "Vichy 0,33 l",
     pillLabel: "Vichy 0,33 l",
     promptDescription:
@@ -26,8 +62,10 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a 0.5 L bottle, NOT a stocky short-necked bottle, NOT an abrupt or stepped shoulder, NOT a short stubby Steinie/Stubbi, NOT a swing-top bottle, NOT an aluminium can — it MUST be the slim 0.33 L German NRW/Vichy returnable with a long neck and a smooth gradual sloping shoulder",
     typicalColors: ["braun", "grün"],
-  },
-  buegel_330: {
+    geometry_profile: "schlank, langer Hals, glatte allmähliche Schulter, Kronkorken",
+    closure: "kronkorken",
+  }),
+  buegel_330: bottle({
     label: "Bügelflasche 0,33 l",
     pillLabel: "Bügel 0,33 l",
     promptDescription:
@@ -35,9 +73,11 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a crown-cap bottle, NOT a tall 0.5 L bottle, NOT an aluminium can — the porcelain stopper and metal wire bail closure MUST be clearly visible",
     typicalColors: ["braun"],
-  },
+    geometry_profile: "stabiler Körper, dicker Hals, Porzellanstöpsel mit Bügelverschluss",
+    closure: "buegel",
+  }),
   // ----------------------------------------------------------------- 0,5 l
-  longneck_500: {
+  longneck_500: bottle({
     label: "Longneck 0,5 l",
     pillLabel: "Longneck 0,5 l",
     promptDescription:
@@ -45,8 +85,10 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a German NRW returnable (the NRW is taller, slimmer and has a SMOOTH gradual sloping shoulder with a long slender nearly-straight body), NOT a short stocky Euroflasche, NOT a short stubby Steinie/Stubbi, NOT a small 0.33 L bottle, NOT a swing-top bottle, NOT an aluminium can — it MUST be the Ale long-neck with a more pronounced rounded shoulder",
     typicalColors: ["braun", "grün"],
-  },
-  nrw_500: {
+    geometry_profile: "voller Körper, langer Hals, ausgeprägte runde Schulter, Kronkorken",
+    closure: "kronkorken",
+  }),
+  nrw_500: bottle({
     label: "NRW-Flasche 0,5 l",
     pillLabel: "NRW 0,5 l",
     promptDescription:
@@ -54,8 +96,11 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT an American/English ale longneck (those have a longer thinner neck and a fuller rounded shoulder), NOT a short-necked stocky Euroflasche, NOT a Steinie/Stubbi, NOT a 0.33 L bottle, NOT a swing-top/Bügel bottle, NOT an aluminium can",
     typicalColors: ["braun"],
-  },
-  vichy_500: {
+    geometry_profile: "breiter Körper, kurze ausgeprägte Schulter, vergleichsweise kurzer Hals, Kronkorken",
+    closure: "kronkorken",
+    hasShapeReference: true,
+  }),
+  vichy_500: bottle({
     label: "Euroflasche 0,5 l",
     pillLabel: "Euroflasche 0,5 l",
     promptDescription:
@@ -63,8 +108,10 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a slim NRW returnable, NOT an Ale long-neck, NOT a short stubby Steinie/Stubbi, NOT a small 0.33 L bottle, NOT a swing-top bottle, NOT an aluminium can — it MUST be the stocky, very short-necked 0.5 L Euroflasche",
     typicalColors: ["braun", "grün"],
-  },
-  weizen_500: {
+    geometry_profile: "stockig, sehr kurzer Hals, starke runde Schulter, Kronkorken",
+    closure: "kronkorken",
+  }),
+  weizen_500: bottle({
     label: "Weizenflasche 0,5 l",
     pillLabel: "Weizen 0,5 l",
     promptDescription:
@@ -72,8 +119,10 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a short stubby Steinie/Stubbi, NOT a 0.33 L bottle, NOT a short-necked Euroflasche, NOT a swing-top bottle, NOT an aluminium can",
     typicalColors: ["braun"],
-  },
-  buegel_500: {
+    geometry_profile: "hoch und schlank, langer Hals, leicht geschwungenes Profil, Kronkorken",
+    closure: "kronkorken",
+  }),
+  buegel_500: bottle({
     label: "Bügelflasche 0,5 l",
     pillLabel: "Bügel 0,5 l",
     promptDescription:
@@ -81,9 +130,11 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a crown-cap bottle, NOT a short stubby Steinie/Stubbi, NOT a small 0.33 L bottle, NOT an aluminium can — the porcelain stopper and metal wire bail closure MUST be clearly visible",
     typicalColors: ["braun"],
-  },
+    geometry_profile: "hoch, schwer, dicker Hals, Porzellanstöpsel mit Bügelverschluss",
+    closure: "buegel",
+  }),
   // ---------------------------------------------------------------- 0,75 l
-  buegel_750: {
+  buegel_750: bottle({
     label: "Bügelflasche 0,75 l",
     pillLabel: "Bügel 0,75 l",
     promptDescription:
@@ -91,8 +142,10 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a crown-cap bottle, NOT a small 0.33 or 0.5 L bottle, NOT an aluminium can — the porcelain stopper and metal wire bail closure MUST be clearly visible",
     typicalColors: ["braun", "grün"],
-  },
-  belgien_750: {
+    geometry_profile: "große Sharing-Flasche, dicker Hals, Bügelverschluss",
+    closure: "buegel",
+  }),
+  belgien_750: bottle({
     label: "Belgische Flasche 0,75 l",
     pillLabel: "Belgisch 0,75 l",
     promptDescription:
@@ -100,9 +153,11 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a small 0.33 or 0.5 L bottle, NOT a short stubby Steinie/Stubbi, NOT a stocky Euroflasche — it MUST be a large 0.75 L sharing bottle",
     typicalColors: ["braun", "grün"],
-  },
+    geometry_profile: "hohe Sharing-Flasche, langer Hals, hohe Schulter, Kronkorken oder Kork",
+    closure: "kronkorken",
+  }),
   // ----------------------------------------------------------------- Dosen
-  dose_330: {
+  dose_330: bottle({
     label: "Dose 0,33 l",
     pillLabel: "Dose 0,33 l",
     promptDescription:
@@ -110,8 +165,10 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a glass bottle, NOT a long-neck or swing-top bottle, NOT a 0.5 L can, NOT a tall sleek energy-drink can — it MUST be a standard 0.33 L beer can",
     typicalColors: ["silber"],
-  },
-  dose_500: {
+    geometry_profile: "schlanke Aluminiumdose, Stay-Tab, Vollflächen-Artwork",
+    closure: "ring_pull",
+  }),
+  dose_500: bottle({
     label: "Dose 0,5 l",
     pillLabel: "Dose 0,5 l",
     promptDescription:
@@ -119,12 +176,18 @@ export const FLASCHEN_TYPEN = {
     forbidden:
       "NOT a glass bottle, NOT a long-neck or swing-top bottle, NOT a small 0.33 L can — it MUST be a standard tall 0.5 L beer can",
     typicalColors: ["silber"],
-  },
+    geometry_profile: "höhere Aluminiumdose, Stay-Tab, Vollflächen-Artwork",
+    closure: "ring_pull",
+  }),
 } as const;
 
 /** Aluminium-Dose statt Glasflasche — beeinflusst Material/Wording/Farbe im Prompt. */
 export function isDoseTyp(flaschenTyp: keyof typeof FLASCHEN_TYPEN): boolean {
   return flaschenTyp === "dose_330" || flaschenTyp === "dose_500";
+}
+
+export function getBottleCatalogEntry(flaschenTyp: keyof typeof FLASCHEN_TYPEN) {
+  return FLASCHEN_TYPEN[flaschenTyp];
 }
 
 export const GLAS_TYPEN = {

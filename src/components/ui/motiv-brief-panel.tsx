@@ -1,9 +1,17 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
 import React from "react";
 import styles from "./motiv-brief-panel.module.css";
 
 export type BriefStepId = "produkt" | "szene" | "stimmung" | "extras" | "brief";
+
+export type MotivVariantCard = {
+  index: number;
+  src?: string;
+  progress?: number;
+  loading?: boolean;
+};
 
 export type MotivBriefPanelProps = {
   brandName: string;
@@ -38,6 +46,8 @@ export type MotivBriefPanelProps = {
   generationStep?: string;
   error?: string | null;
   durationHint?: string;
+  variants?: MotivVariantCard[];
+  onSelectVariant?: (index: number) => void;
 };
 
 const STEP_LABELS: Array<{ id: BriefStepId; label: string }> = [
@@ -95,9 +105,16 @@ export function MotivBriefPanel({
   generationStep,
   error,
   durationHint,
+  variants = [],
+  onSelectVariant,
 }: MotivBriefPanelProps) {
   const balanceAfter =
     tokensRemaining === null ? null : Math.max(0, tokensRemaining - tokenCost);
+  const avgProgress =
+    variants.length > 0
+      ? Math.round(variants.reduce((sum, v) => sum + (v.progress ?? 0), 0) / variants.length)
+      : 0;
+  const hasVariantFeed = variants.length > 0;
   const productChips = [productLabel, ...splitMeta(productMeta)].filter(Boolean);
   const sceneChips = splitMeta(sceneLabel).length ? splitMeta(sceneLabel) : sceneLabel ? [sceneLabel] : [];
   const moodChips = moodLabel ? [moodLabel] : [];
@@ -305,16 +322,59 @@ export function MotivBriefPanel({
 
         <aside className={styles.rail} aria-label="Ausgabe und Generieren">
           <div className={styles.railBlock}>
-            <p className={styles.kicker}>So kommt es raus</p>
-            <div
-              className={styles.preview}
-              style={{ ["--preview-ratio" as string]: aspectCssRatio(aspectValue) }}
-              aria-hidden
-            >
-              <span className={styles.previewTag}>{aspectValue}</span>
-            </div>
+            <p className={styles.kicker}>
+              {loading ? "Wird erzeugt" : hasVariantFeed && variants.some((v) => v.src) ? "Ergebnisse" : "So kommt es raus"}
+            </p>
+            {hasVariantFeed ? (
+              <div className={styles.feed} aria-live="polite">
+                {loading ? (
+                  <div className={styles.progressTrack} aria-hidden>
+                    <span className={styles.progressFill} style={{ width: `${Math.min(100, avgProgress)}%` }} />
+                  </div>
+                ) : null}
+                <div className={styles.feedGrid}>
+                  {variants.map((variant) => {
+                    const ratio = aspectCssRatio(aspectValue);
+                    if (variant.src) {
+                      return (
+                        <button
+                          key={variant.index}
+                          type="button"
+                          className={styles.feedCard}
+                          style={{ ["--preview-ratio" as string]: ratio }}
+                          onClick={() => onSelectVariant?.(variant.index)}
+                        >
+                          <img src={variant.src} alt={`Variante ${variant.index + 1}`} className={styles.feedImg} />
+                          <span className={styles.feedBadge}>Fertig</span>
+                        </button>
+                      );
+                    }
+                    return (
+                      <div
+                        key={variant.index}
+                        className={`${styles.feedCard} ${styles.feedCardLoading}`}
+                        style={{ ["--preview-ratio" as string]: ratio }}
+                      >
+                        <span className={styles.feedPct}>{Math.round(variant.progress ?? 0)}%</span>
+                        <span className={styles.feedLabel}>Variante {variant.index + 1}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div
+                className={styles.preview}
+                style={{ ["--preview-ratio" as string]: aspectCssRatio(aspectValue) }}
+                aria-hidden
+              >
+                <span className={styles.previewTag}>{aspectValue}</span>
+              </div>
+            )}
             <p className={styles.previewCaption}>
-              {brandName || "Dein Motiv"} · {variantCount} Variante(n)
+              {loading && generationStep
+                ? generationStep
+                : `${brandName || "Dein Motiv"} · ${variantCount} Variante(n)`}
             </p>
           </div>
 

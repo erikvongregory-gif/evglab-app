@@ -39,7 +39,9 @@ export const bierstilSchema = z.enum([
 ]);
 
 export const imageQualitySchema = z.enum(["medium", "high"]).default("high");
-export const aspectRatioSchema = z.enum(["1:1", "4:5", "9:16", "16:9"]).default("4:5");
+export const aspectRatioSchema = z
+  .enum(["1:1", "4:5", "3:4", "9:16", "4:3", "16:9"])
+  .default("4:5");
 export const studioAspectRatioSchema = z.enum(["1:1", "2:3"]).default("1:1");
 
 /** Aus Skill SCHRITT 1, Frage 8 — Personen-Modus A–E + Sub-Slots. */
@@ -138,9 +140,18 @@ export const hyperrealisticSchema = z.object({
   kiPlattform: kiPlattformSchema.optional(),
   /** Zielgruppe — optional, kommt sonst aus Markenprofil. */
   zielgruppe: zielgruppeSchema.optional(),
-  zusatzWunsch: z.string().trim().max(300).optional(),
+  zusatzWunsch: z.string().trim().max(800).optional(),
   /** Sortenname aus „Meine Biere“ — fuer den 1:1-Etikett-Lock. */
   beerName: z.string().trim().max(80).optional(),
+  /**
+   * Zusaetzliche Kontext-Referenzen (Kiste, Location, Stimmung) — nicht das Sorten-Etikett.
+   * data:-URLs oder https. Max. 3.
+   */
+  extraReferenceImages: z.array(z.string().min(8).max(12_000_000)).max(3).optional(),
+  /** Client-Stiltreue: frei=generisches Etikett, normal/hoch=Marken-Lock (hoch strenger). */
+  stiltreue: z.enum(["frei", "normal", "hoch"]).optional(),
+  /** Content-Tab Framing fuer applyContentPresetPrompt. */
+  contentPreset: z.enum(["hyperreal", "campaign_social"]).optional(),
   aspectRatio: aspectRatioSchema,
   quality: imageQualitySchema,
   variantCount: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
@@ -173,6 +184,24 @@ export const productStudioSchema = z.object({
   quality: imageQualitySchema,
 });
 
+export const socialPostZielSchema = z.enum([
+  "produkt_launch",
+  "event_ankuendigung",
+  "saisonal",
+  "behind_the_scenes",
+  "rezept_pairing",
+  "community_engagement",
+  "edukativ_bierwissen",
+  "sale_aktion",
+]);
+
+export const socialPostSchema = hyperrealisticSchema.extend({
+  headline: z.string().trim().min(1).max(60),
+  subline: z.string().trim().max(120).optional(),
+  ctaText: z.string().trim().max(30).optional(),
+  postZiel: socialPostZielSchema.default("community_engagement"),
+});
+
 export const campaignTextSchema = z.object({
   referenzBilder: z.array(z.string().url()).min(3).max(5),
   postZiel: z.enum([
@@ -191,11 +220,12 @@ export const campaignTextSchema = z.object({
   brauereiName: z.string().trim().min(1).max(80),
   bierstilOderProdukt: z.string().trim().max(80).optional(),
   zusatzKontext: z.string().trim().max(400).optional(),
-  aspectRatio: z.enum(["1:1", "4:5", "9:16"]).default("4:5"),
+  aspectRatio: z.enum(["1:1", "4:5", "3:4", "9:16", "4:3", "16:9"]).default("4:5"),
   quality: imageQualitySchema,
 });
 
 export type HyperrealisticInput = z.infer<typeof hyperrealisticSchema>;
+export type SocialPostInput = z.infer<typeof socialPostSchema>;
 export type ProductIsolateInput = z.infer<typeof productIsolateSchema>;
 export type ProductStudioInput = z.infer<typeof productStudioSchema>;
 export type CampaignTextInput = z.infer<typeof campaignTextSchema>;

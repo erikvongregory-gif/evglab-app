@@ -5,7 +5,10 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { analyzeWebsiteBrand, computeAnalysisConfidence, selectBeerProductImageIndices } from "@/lib/brand/brand-analysis";
 import { storeBrandReferenceImagesAsUrls } from "@/lib/brand/persist-reference-urls";
-import { isInstagramUrl, normalizeWebsiteUrl, safeFetchHtml } from "@/lib/brand/url-intake";
+import { fetchWebsiteHtmlForBrandIntake, fetchWebsiteHtmlWithBrowser } from "@/lib/brand/browser-intake";
+import { looksLikeBlockedGatePage } from "@/lib/brand/consent-gate-dismiss";
+import { isInstagramUrl, normalizeWebsiteUrl } from "@/lib/brand/url-intake";
+import { extractBeerVarietiesFromIntake } from "@/lib/brand/beer-catalog-intake";
 import {
   downloadCandidateImages,
   extractRelevantInternalLinks,
@@ -71,21 +74,45 @@ export async function POST(req: Request) {
 
     let fetched;
     try {
-      fetched = await safeFetchHtml(normalizedUrl);
+      fetched = await fetchWebsiteHtmlForBrandIntake(normalizedUrl);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Website konnte nicht geladen werden.";
       return NextResponse.json({ error: msg }, { status: 502 });
     }
 
-    // Startseite + bis zu 2 marken-relevante Unterseiten (Ueber uns, Sortiment …) analysieren.
-    const homepage = parseWebsiteHtml(fetched.html, fetched.finalUrl);
-    const subpageLinks = extractRelevantInternalLinks(fetched.html, fetched.finalUrl, 2);
+    // Startseite + bis zu 4 marken-relevante Unterseiten (Ueber uns, Sortiment …) analysieren.
+    let homepage = parseWebsiteHtml(fetched.html, fetched.finalUrl);
+    if (looksLikeBlockedGatePage(fetched.html, homepage.textExcerpt)) {
+      try {
+        fetched = await fetchWebsiteHtmlWithBrowser(normalizedUrl);
+        homepage = parseWebsiteHtml(fetched.html, fetched.finalUrl);
+      } catch (retryError) {
+        const msg = retryError instanceof Error ? retryError.message : "Alters-/Cookie-Gate konnte nicht umgangen werden.";
+        return NextResponse.json({ error: msg, code: "brand_intake_gate_blocked" }, { status: 422 });
+      }
+      if (looksLikeBlockedGatePage(fetched.html, homepage.textExcerpt)) {
+        return NextResponse.json(
+          {
+            error:
+              "Die Website zeigt weiterhin nur Cookie- oder Altersbestätigung — Markeninhalt nicht erreichbar. Bitte Support melden mit der URL.",
+            code: "brand_intake_gate_blocked",
+          },
+          { status: 422 },
+        );
+      }
+    }
+
+    const rawHtmlByUrl: Record<string, string> = { [fetched.finalUrl]: fetched.html };
+    const subpageLinks = extractRelevantInternalLinks(fetched.html, fetched.finalUrl, 4);
     const subpages = (
       await Promise.all(
         subpageLinks.map(async (link) => {
           try {
-            const sub = await safeFetchHtml(link.url);
-            return parseWebsiteHtml(sub.html, sub.finalUrl);
+            const sub = await fetchWebsiteHtmlForBrandIntake(link.url);
+            const parsed = parseWebsiteHtml(sub.html, sub.finalUrl);
+            if (looksLikeBlockedGatePage(sub.html, parsed.textExcerpt)) return null;
+            rawHtmlByUrl[sub.finalUrl] = sub.html;
+            return parsed;
           } catch {
             return null;
           }
@@ -113,17 +140,12 @@ export async function POST(req: Request) {
       : [];
     const visionReferences =
       visionIndices.length > 0
-        ? pickBrandReferenceImages(pickImagesByIndices(downloadedImages, visionIndices), {
-            minScore: Number.NEGATIVE_INFINITY,
-          })
+        ? pickBrandReferenceImages(pickImagesByIndices(downloadedImages, visionIndices))
         : [];
 
+    // Heuristik zuerst — Vision nur wenn gar nichts Brauchbares gefunden wurde.
     const referenceImages =
-      visionReferences.length > 0
-        ? visionReferences
-        : heuristicReferences.length > 0
-          ? heuristicReferences
-          : pickBrandReferenceImages(downloadedImages, { minScore: Number.NEGATIVE_INFINITY });
+      heuristicReferences.length > 0 ? heuristicReferences : visionReferences;
 
     // Die KI-Analyse sieht Szenen (Bildsprache) + bis zu 2 Packshots (nur Farbpalette/Etikett).
     const analysisScenes = referenceImages.filter((image) => !image.isPackshot);
@@ -175,10 +197,19 @@ export async function POST(req: Request) {
       imageCount: analysisImages.length,
     });
 
+    const suggestedBeers = extractBeerVarietiesFromIntake({
+      pages: [homepage, ...subpages],
+      downloadedImages,
+      imageCandidates: intake.imageCandidates,
+      breweryName: scan.breweryName,
+      rawHtmlByUrl,
+    });
+
     return NextResponse.json({
       ok: true,
       suggestion: {
         ...scan,
+        suggestedBeers,
         referenceImageUrls,
         ...(referenceImageUrls.length === 0
           ? {
@@ -203,6 +234,7 @@ export async function POST(req: Request) {
         confidence,
         pageTitle: intake.title,
         imageSelection: visionReferences.length > 0 ? "vision" : referenceImages.length > 0 ? "heuristic" : "text_only",
+        beersDetected: suggestedBeers.length,
       },
     });
   } catch (e) {

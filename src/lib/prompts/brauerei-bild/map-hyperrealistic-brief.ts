@@ -205,7 +205,7 @@ export function hyperrealisticInputToBrauereiBrief(
     personenDetail: personen.detail,
     shotType: fallbackShotType(input),
     shotTypeCode: input.shotType ?? "A",
-    kiPlattform: "GPT Image 2 (OpenAI gpt-image-2)",
+    kiPlattform: "GPT Image 2.5 Sunburst (OpenAI gpt-image-2.5-sunburst)",
     etikettModus:
       etikettModus === "marke"
         ? "Ja, Marken-Etikett 1:1 (Referenzbild wird mitgesendet)"
@@ -226,10 +226,10 @@ export function buildHyperrealisticClaudeUserMessage(
   options?: { breweryName?: string; hasReferenceImage?: boolean },
 ): string {
   const brief = hyperrealisticInputToBrauereiBrief(input, options);
-  // Das Bild wird IMMER mit OpenAI gpt-image-2 gerendert. Wir zwingen den
+  // Das Bild wird IMMER mit OpenAI gpt-image-2.5-sunburst gerendert. Wir zwingen den
   // Prompt-Stil hart auf dieses Modell — unabhängig von etwaigen Alt-Werten in
   // `kiPlattform` (UI bietet keine Plattform-Auswahl mehr).
-  const targetModel = "GPT Image 2 (OpenAI gpt-image-2)";
+  const targetModel = "GPT Image 2.5 Sunburst (OpenAI gpt-image-2.5-sunburst)";
 
   const lines: string[] = [
     "Erstelle einen kopierfertigen englischen Bildgenerierungs-Prompt fuer den BrewAI Dashboard-Modus „Hyperrealistisch“.",

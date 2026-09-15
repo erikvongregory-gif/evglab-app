@@ -6,10 +6,13 @@ import { useId, useRef, useState } from "react";
 import {
   BEER_STYLE_OPTIONS,
   beerStyleLabel,
+  findBeerStyle,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
 import {
   FLASCHEN_TYPEN,
+  GLAS_TYPEN,
   isDoseTyp,
+  type GlasTyp,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { readAndCompressImage } from "@/lib/images/compress-image";
 
@@ -19,6 +22,13 @@ const FLASCHEN_CHOICES = Object.entries(FLASCHEN_TYPEN).map(([code, item]) => ({
   code,
   label: item.pillLabel,
 }));
+
+const GLAS_CHOICES = (Object.entries(GLAS_TYPEN) as [GlasTyp, (typeof GLAS_TYPEN)[GlasTyp]][]).map(
+  ([code, item]) => ({
+    code,
+    label: item.label,
+  }),
+);
 
 const FARBE_CHOICES = [
   { code: "braun" as const, label: "Braun", swatch: "#6b4423" },
@@ -37,6 +47,7 @@ export type BeerCreateDraft = {
   bierstil: string;
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
+  glasTyp: string;
   etikettDataUrl: string;
 };
 
@@ -61,6 +72,7 @@ function buildPromptPreview(parts: {
   bierstil: string;
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
+  glasTyp: string;
   brandTone: string;
 }): string {
   const segments: string[] = [];
@@ -71,6 +83,8 @@ function buildPromptPreview(parts: {
   if (!isDoseTyp(parts.flaschenTyp as keyof typeof FLASCHEN_TYPEN)) {
     segments.push(FARBE_LABEL[parts.flaschenfarbe]);
   }
+  const glass = GLAS_CHOICES.find((g) => g.code === parts.glasTyp)?.label;
+  if (glass) segments.push(glass);
   const tone = parts.brandTone.trim();
   if (tone) segments.push(`Markenstil „${tone}“`);
   if (parts.name.trim()) segments.unshift(parts.name.trim());
@@ -100,6 +114,7 @@ export function BeerCreatePanel({
   const [bierstil, setBierstil] = useState("helles");
   const [flaschenTyp, setFlaschenTyp] = useState("nrw_500");
   const [flaschenfarbe, setFlaschenfarbe] = useState<"braun" | "gruen" | "klar">("braun");
+  const [glasTyp, setGlasTyp] = useState<GlasTyp>(findBeerStyle("helles")?.glasTyp ?? "willibecher");
   const [etikettDataUrl, setEtikettDataUrl] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -108,7 +123,7 @@ export function BeerCreatePanel({
   const [previewKey, setPreviewKey] = useState(0);
 
   const showDose = isDoseTyp(flaschenTyp as keyof typeof FLASCHEN_TYPEN);
-  const preview = buildPromptPreview({ name, bierstil, flaschenTyp, flaschenfarbe, brandTone });
+  const preview = buildPromptPreview({ name, bierstil, flaschenTyp, flaschenfarbe, glasTyp, brandTone });
   const displayError = localError || error || uploadError;
   const busy = phase === "saving" || phase === "success";
 
@@ -144,6 +159,7 @@ export function BeerCreatePanel({
         bierstil,
         flaschenTyp,
         flaschenfarbe,
+        glasTyp,
         etikettDataUrl,
       });
       setPhase("success");
@@ -311,6 +327,7 @@ export function BeerCreatePanel({
                     disabled={busy}
                     onClick={() => {
                       setBierstil(opt.bierstil);
+                      if (opt.glasTyp) setGlasTyp(opt.glasTyp);
                       setPreviewKey((k) => k + 1);
                     }}
                   >
@@ -368,6 +385,30 @@ export function BeerCreatePanel({
                       disabled={busy}
                       onClick={() => {
                         setFlaschenTyp(opt.code);
+                        setPreviewKey((k) => k + 1);
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="studio-beer-create-field">
+              <span className="studio-beer-create-label">Glastyp</span>
+              <div className="studio-beer-create-chips" role="group" aria-label="Glastyp">
+                {GLAS_CHOICES.map((opt) => {
+                  const on = glasTyp === opt.code;
+                  return (
+                    <button
+                      key={opt.code}
+                      type="button"
+                      className={`studio-beer-create-chip${on ? " is-on" : ""}`}
+                      aria-pressed={on}
+                      disabled={busy}
+                      onClick={() => {
+                        setGlasTyp(opt.code);
                         setPreviewKey((k) => k + 1);
                       }}
                     >

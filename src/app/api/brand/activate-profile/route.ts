@@ -11,7 +11,7 @@ import {
 } from "@/lib/brand/save-brand-profile";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const bodySchema = z.object({
   breweryName: z.string().min(1).max(120),
@@ -32,6 +32,19 @@ const bodySchema = z.object({
       }),
     )
     .max(5)
+    .optional(),
+  suggestedBeers: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(80),
+        bierstil: z.string().min(1).max(60),
+        flaschenTyp: z.string().min(1).max(60),
+        flaschenfarbe: z.enum(["braun", "gruen", "klar"]),
+        glasTyp: z.string().min(1).max(40),
+        etikettUrl: z.string().max(1200).optional().default(""),
+      }),
+    )
+    .max(8)
     .optional(),
 });
 
@@ -106,6 +119,7 @@ export async function POST(req: Request) {
       ok: true,
       settings: saved.settings,
       referenceImageUrls: saved.referenceImageUrls,
+      beersCreated: saved.myBeers?.length ?? 0,
     });
   } catch (error) {
     console.error("[brand/activate-profile]", error);

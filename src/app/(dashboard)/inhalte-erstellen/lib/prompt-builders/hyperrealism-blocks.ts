@@ -198,7 +198,7 @@ export function buildBeerPhysicsFragment(bierstil: string, behaelter: NonNullabl
  */
 function aspectRatioFormatLabel(aspectRatio: HyperrealisticInput["aspectRatio"]): string {
   if (aspectRatio === "1:1") return "a square 1:1";
-  if (aspectRatio === "16:9") return "a horizontal landscape (3:2)";
+  if (aspectRatio === "16:9" || aspectRatio === "4:3") return "a horizontal landscape (3:2)";
   return "a vertical portrait (2:3)";
 }
 
@@ -396,7 +396,9 @@ export function buildAuthenticityFragment(input: HyperrealisticInput): string {
     "Aesthetic: handheld editorial snapshot; slightly imperfect, lived-in, ordinary.",
     "Color science of Kodak Portra 400. Fine analog grain. Neutral white balance, slightly muted real-world color — never a warm amber glow over the whole frame, never teal-orange grading, never HDR, never beauty-retouch.",
     "Lighting is a large soft source from the actual scene (sun, overcast sky, window, practical lamps) with true falloff. Some areas stay in shadow. Highlights may clip softly. No beauty dish, no rim-light hero glow.",
-    "The product rests on a real surface with a natural contact shadow. Glass reflects this room, not a white studio cove.",
+    modus === "A"
+      ? "The product rests on a real surface with a natural contact shadow. Glass reflects this room, not a white studio cove."
+      : "If the product is held or mid-toast: believable grip, scale, and contact shadows on hands/glasses — not a cutout packshot floating in the frame.",
     "Composition is slightly off: not centered, natural overlaps, things cropped at the frame edge. Not everything is razor-sharp.",
   ];
   if (modus === "B" || modus === "C") {
