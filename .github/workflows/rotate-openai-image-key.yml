@@ -1,0 +1,31 @@
+name: Rotate OpenAI Image Key
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 1. des Monats, 04:00 UTC — nach manuellem Ersttest aktiv
+    - cron: "0 4 1 * *"
+
+concurrency:
+  group: rotate-openai-image-key
+  cancel-in-progress: false
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rotate key
+        env:
+          OPENAI_ADMIN_KEY: ${{ secrets.OPENAI_ADMIN_KEY }}
+          OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL }}
+          ROTATION_GRACE_MINUTES: ${{ vars.ROTATION_GRACE_MINUTES }}
+        run: node scripts/rotate-openai-image-key.mjs

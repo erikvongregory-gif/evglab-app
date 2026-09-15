@@ -10,7 +10,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "check:instagram-oauth": "node scripts/check-instagram-oauth-env.mjs",
-    "setup:owner": "node scripts/setup-owner-account.mjs"
+    "setup:owner": "node scripts/setup-owner-account.mjs",
+    "openai:rotate-image-key": "node scripts/rotate-openai-image-key.mjs",
+    "openai:rotate-image-key:dry-run": "node scripts/rotate-openai-image-key.mjs --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
