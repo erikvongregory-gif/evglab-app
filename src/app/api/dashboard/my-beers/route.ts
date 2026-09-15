@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient, createRouteHandlerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
+import { getFreshUserDashboardMetadata, getFreshUserMetadata } from "@/lib/dashboard/freshMetadata";
 import {
   MAX_MY_BEERS,
   getDashboardMetadata,
@@ -58,7 +60,8 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
-  return NextResponse.json({ beers: getDashboardMetadata(user.user_metadata).myBeers ?? [] });
+  const dashboard = await getFreshUserDashboardMetadata(user.id, user.user_metadata);
+  return NextResponse.json({ beers: dashboard.myBeers ?? [] });
 }
 
 export async function PUT(req: Request) {
@@ -135,12 +138,32 @@ export async function PUT(req: Request) {
   }
 
   const sanitized = sanitizeDashboardBeers(beers);
-  const { error } = await supabase.auth.updateUser({
-    data: mergeDashboardMetadata(user.user_metadata, { myBeers: sanitized }),
-  });
-  if (error) {
+  const freshMetadata = await getFreshUserMetadata(user.id, user.user_metadata);
+  const userMetadata = mergeDashboardMetadata(freshMetadata, { myBeers: sanitized });
+
+  try {
+    const admin = createAdminClient();
+    const { error: adminError } = await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: userMetadata,
+    });
+    if (adminError) {
+      return NextResponse.json({ error: "Sortiment konnte nicht gespeichert werden." }, { status: 500 });
+    }
+  } catch {
     return NextResponse.json({ error: "Sortiment konnte nicht gespeichert werden." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, beers: sanitized });
+  const response = NextResponse.json({ ok: true, beers: sanitized });
+  try {
+    const routeClient = createRouteHandlerClient(req, response);
+    await Promise.race([
+      routeClient.auth.refreshSession(),
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 8_000);
+      }),
+    ]);
+  } catch {
+    /* Session-Refresh ist best-effort */
+  }
+  return response;
 }
