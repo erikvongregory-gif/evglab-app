@@ -21,7 +21,7 @@ create or replace function public.enforce_rate_limit_atomic(
 language plpgsql security definer set search_path = public as $$
 declare
   current_row public.request_rate_limits;
-  current_time timestamptz := clock_timestamp();
+  v_now timestamptz := clock_timestamp();
 begin
   if p_key is null or length(p_key) < 10 or length(p_key) > 200
     or p_limit < 1 or p_window_ms < 1000 then
@@ -29,22 +29,22 @@ begin
   end if;
 
   insert into public.request_rate_limits(rate_key, request_count, reset_at)
-  values(p_key, 1, current_time + make_interval(secs => p_window_ms / 1000.0))
+  values(p_key, 1, v_now + make_interval(secs => p_window_ms / 1000.0))
   on conflict(rate_key) do update set
     request_count = case
-      when request_rate_limits.reset_at <= current_time then 1
+      when request_rate_limits.reset_at <= v_now then 1
       else request_rate_limits.request_count + 1
     end,
     reset_at = case
-      when request_rate_limits.reset_at <= current_time
-        then current_time + make_interval(secs => p_window_ms / 1000.0)
+      when request_rate_limits.reset_at <= v_now
+        then v_now + make_interval(secs => p_window_ms / 1000.0)
       else request_rate_limits.reset_at
     end
   returning * into current_row;
 
   return query select
     current_row.request_count <= p_limit,
-    greatest(1, ceil(extract(epoch from (current_row.reset_at - current_time)))::integer);
+    greatest(1, ceil(extract(epoch from (current_row.reset_at - v_now)))::integer);
 end;
 $$;
 
