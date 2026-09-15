@@ -75,6 +75,16 @@ const GoogleG = () => (
   </svg>
 );
 
+function clearLegacySupabaseSessionCookies() {
+  if (typeof document === "undefined") return;
+  const names = document.cookie.split(";").map((part) => part.slice(0, part.indexOf("=")).trim())
+    .filter((name) => /^sb-[A-Za-z0-9_-]+-auth-token(?:\.\d+)?$/.test(name));
+  for (const name of new Set(names)) {
+    document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+    document.cookie = `${name}=; Path=/; Domain=.brewai.de; Max-Age=0; SameSite=Lax; Secure`;
+  }
+}
+
 export function AuthCard({
   defaultMode = "login",
   mode: controlledMode,
@@ -150,6 +160,7 @@ export function AuthCard({
     setLocalError(null);
 
     if (formAction) {
+      clearLegacySupabaseSessionCookies();
       // Native POST to existing auth routes — do not preventDefault.
       onSubmit({
         mode,
@@ -384,6 +395,7 @@ export function AuthCard({
                   googleHref ? (
                     <a
                       href={googleHref}
+                      onClick={clearLegacySupabaseSessionCookies}
                       className={`${styles.oauthBtn} ${styles.oauthIcon}`}
                       rel="noopener"
                       aria-label="Mit Google"

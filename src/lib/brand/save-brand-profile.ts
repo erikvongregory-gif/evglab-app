@@ -10,6 +10,7 @@ import {
   type SuggestedBeerVariety,
 } from "@/lib/brand/beer-catalog-intake";
 import { getFreshUserMetadata } from "@/lib/dashboard/freshMetadata";
+import { readDashboardBeers, replaceDashboardBeers } from "@/lib/dashboard/beer-store";
 import {
   getDashboardMetadata,
   mergeDashboardMetadata,
@@ -151,7 +152,6 @@ export function buildUserMetadataForBrandSave(params: {
 }): Record<string, unknown> {
   const merged = mergeDashboardMetadata(params.latestMetadata, {
     settings: params.settings,
-    ...(params.myBeers ? { myBeers: params.myBeers } : {}),
   });
   const dashboard = (merged as { dashboard?: Record<string, unknown> }).dashboard;
   const keepsInternalReferenceStore = params.settings.brandReferenceImageUrls.some(
@@ -189,7 +189,12 @@ export async function persistBrandProfileForUser(params: {
   });
 
   const freshMetadata = await getFreshUserMetadata(params.userId, params.latestMetadata);
-  const existingBeers = getDashboardMetadata(freshMetadata).myBeers ?? [];
+  let existingBeers: DashboardBeer[] = [];
+  try {
+    existingBeers = await readDashboardBeers(params.userId);
+  } catch {
+    existingBeers = getDashboardMetadata(freshMetadata).myBeers ?? [];
+  }
   let myBeers: DashboardBeer[] | undefined;
   if (params.input.suggestedBeers && params.input.suggestedBeers.length > 0) {
     const withLabels = await persistSuggestedBeerLabels(params.userId, params.input.suggestedBeers);
@@ -224,6 +229,8 @@ export async function persistBrandProfileForUser(params: {
   if (error) {
     throw new Error(error.message || "Markenprofil konnte nicht gespeichert werden.");
   }
+
+  if (myBeers) await replaceDashboardBeers(params.userId, myBeers);
 
   return {
     settings,

@@ -2,6 +2,7 @@ import { hydratePrivateAssets } from "@/lib/supabase/privateAssets";
 import { getWorkspace } from "@/lib/dashboard/workspace";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDashboardMetadata, type DashboardMetadata } from "@/lib/dashboard/metadata";
+import { readDashboardBeers } from "@/lib/dashboard/beer-store";
 
 /** Liest user_metadata frisch aus Supabase Auth — nicht aus dem oft veralteten JWT. */
 export async function getFreshUserMetadata(userId: string, fallbackMetadata: unknown): Promise<unknown> {
@@ -22,5 +23,11 @@ export async function getFreshUserDashboardMetadata(
   userId: string,
   fallbackMetadata: unknown,
 ): Promise<DashboardMetadata> {
-  return getDashboardMetadata(await getFreshUserMetadata(userId, fallbackMetadata));
+  const workspace = await getWorkspace(userId);
+  const metadata = getDashboardMetadata(await getFreshUserMetadata(userId, fallbackMetadata));
+  try {
+    return { ...metadata, myBeers: await readDashboardBeers(workspace.ownerId) };
+  } catch {
+    return metadata;
+  }
 }

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { authMetadataLikelyOversized, buildPrunedAuthUserData } from "@/lib/auth/pruneAuthMetadata";
+import { buildPrunedAuthUserData, shouldPruneAuthMetadata } from "@/lib/auth/pruneAuthMetadata";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const REFRESH_TIMEOUT_MS = 8_000;
@@ -22,7 +22,7 @@ export async function repairOversizedMetadataForUser(
   userId: string,
   userMetadata: unknown,
 ): Promise<boolean> {
-  if (!authMetadataLikelyOversized(userMetadata)) return false;
+  if (!shouldPruneAuthMetadata(userMetadata)) return false;
   const pruned = buildPrunedAuthUserData(userMetadata);
   if (!pruned) return false;
 

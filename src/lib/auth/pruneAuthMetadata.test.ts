@@ -47,4 +47,9 @@ describe("buildPrunedAuthUserData", () => {
   it("lässt schlanke Metadata unangetastet", () => {
     expect(buildPrunedAuthUserData({ dashboard: { settings: {}, onboarding } })).toBeNull();
   });
+
+  it("entfernt Sortiment auch aus ansonsten schlanker Auth-Metadata", () => {
+    const pruned = buildPrunedAuthUserData({ dashboard: { settings: {}, myBeers: [{ id: "b1", name: "Pils" }] } });
+    expect((pruned?.dashboard as Record<string, unknown>).myBeers).toBeUndefined();
+  });
 });

@@ -18,6 +18,11 @@ export function pruneBloatedAuthMetadata(userMetadata: unknown): Record<string, 
   let changed = false;
   const nextDashboard = { ...dashboard };
 
+  if ("myBeers" in nextDashboard) {
+    delete nextDashboard.myBeers;
+    changed = true;
+  }
+
   if ("brandReferenceImages" in nextDashboard) {
     delete nextDashboard.brandReferenceImages;
     changed = true;
@@ -36,7 +41,7 @@ export function pruneBloatedAuthMetadata(userMetadata: unknown): Record<string, 
 /** Grobe Schätzung, ob Metadata die Session-Cookies sprengen könnte. */
 export function authMetadataLikelyOversized(userMetadata: unknown): boolean {
   try {
-    return JSON.stringify(userMetadata ?? {}).length > 12_000;
+    return JSON.stringify(userMetadata ?? {}).length > 8_000;
   } catch {
     return false;
   }
@@ -61,8 +66,6 @@ export function buildPrunedAuthUserData(userMetadata: unknown): Record<string, u
       // Winzig (vier Flags plus gedeckelte ID-Liste) und muss erhalten bleiben,
       // sonst startet das Onboarding nach dem Verkleinern von vorn.
       onboarding: slim.onboarding,
-      // Sortiment (max 8 kompakte Eintraege) — darf beim Verkleinern nicht verloren gehen.
-      myBeers: slim.myBeers,
     },
   };
 }
