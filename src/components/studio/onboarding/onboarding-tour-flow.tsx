@@ -56,6 +56,21 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
   }, []);
 
   useEffect(() => {
+    if (!tour.open) return;
+    const selector =
+      tour.index === 1
+        ? "#onboarding-brewery input"
+        : tour.index === 2
+          ? "#onboarding-website input"
+          : null;
+    if (!selector) return;
+    const t = window.setTimeout(() => {
+      (document.querySelector(selector) as HTMLInputElement | null)?.focus();
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [tour.index, tour.open]);
+
+  useEffect(() => {
     if (!scanning) return;
     const timers = SCAN_STEPS.map((_, i) =>
       window.setTimeout(() => setScanIndex(i + 1), 700 + i * 900),
@@ -235,15 +250,17 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
       {
         target: "#onboarding-brewery",
         title: "Deine Brauerei",
-        content: "Wie heißt deine Brauerei? Der Name erscheint in Motiven und im Markenprofil.",
+        content: "Trage den Namen im markierten Feld ein — er erscheint in Motiven und im Markenprofil.",
         placement: "bottom",
+        interactWithTarget: true,
       },
       {
         target: "#onboarding-website",
         title: "Website verbinden",
         content:
-          "Wir lesen deine Website aus — Farben, Tonalität und Biersorten werden automatisch erkannt.",
+          "Trage die URL im markierten Feld ein — Farben, Tonalität und Biersorten werden automatisch erkannt.",
         placement: "bottom",
+        interactWithTarget: true,
       },
       {
         target: "#onboarding-scan",
@@ -292,10 +309,12 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
 
     if (idx === 1 && !breweryName.trim()) {
       setError("Bitte Brauereinamen eingeben.");
+      (document.querySelector("#onboarding-brewery input") as HTMLInputElement | null)?.focus();
       return;
     }
     if (idx === 2 && !websiteUrl.trim()) {
       setError("Bitte Website-URL eingeben.");
+      (document.querySelector("#onboarding-website input") as HTMLInputElement | null)?.focus();
       return;
     }
 
