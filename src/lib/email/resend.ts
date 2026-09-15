@@ -120,6 +120,19 @@ export async function sendResendEmail(input: SendResendEmailInput, options?: { f
     if (options?.fromOverride) throw error;
 
     if (isResendDomainNotVerifiedError(message)) {
+      const fallbackFrom = process.env.RESEND_FALLBACK_FROM_EMAIL?.trim();
+      if (fallbackFrom && !isPlaceholderValue(fallbackFrom)) {
+        const formattedFallback = fallbackFrom.includes("<") ? fallbackFrom : `BrewAI <${fallbackFrom}>`;
+        if (formattedFallback !== from) {
+          try {
+            await postResendEmail({ apiKey: config.apiKey, from: formattedFallback }, input);
+            return;
+          } catch {
+            // Weiter mit Dev-Sandbox-Fallback unten.
+          }
+        }
+      }
+
       try {
         await postResendEmail({ apiKey: config.apiKey, from: RESEND_SANDBOX_FROM }, input);
         return;
