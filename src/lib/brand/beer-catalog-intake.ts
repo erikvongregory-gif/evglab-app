@@ -108,7 +108,7 @@ export function humanizeBeerSlug(slug: string, breweryName: string): string {
   return cleaned;
 }
 
-function extractSlugFromImageUrl(url: string): string | null {
+function extractContaoSlugFromImageUrl(url: string): string | null {
   const filename = url.split("/").pop()?.split("?")[0] ?? "";
   const decoded = decodeURIComponent(filename);
   const csmMatch = decoded.match(/csm_(?:[A-Za-z][A-Za-z0-9]*-)?([A-Za-z0-9-]+?)_[a-f0-9]{6,}\./i);
@@ -118,6 +118,72 @@ function extractSlugFromImageUrl(url: string): string | null {
   if (FILENAME_SKIP_SLUGS.has(token.split("-")[0] ?? "")) return null;
   if (/festhalle|historie|gebaeude|portrait|portraet|\d{4}-\d{2}-\d{2}/.test(token)) return null;
   return token;
+}
+
+const PRODUCT_IMAGE_NOISE =
+  /logo|banner|hero|slider|thumb|icon|favicon|social|partner|sponsor|historie|gebaeude|portrait|portraet|team|event|news|cookie|gate|wm-|euro|lkw|festhalle|placeholder|spacer|loader|tracking|pixel|1x1|svg/i;
+
+const BEERISH_FILENAME =
+  /\b(bier|pils|hell|weizen|weiss|bock|dunkel|lager|radler|ipa|stout|keller|koelsch|maerzen|alkoholfrei|edelstoff|doppelbock|hefe|kristall|fest|ur|original|premium|classic|craft|export|spezial|dose|flasche|etikett|label)\b/;
+
+/** Contao csm_* plus gaengige Datei-/Pfad-Muster (WordPress, Typo3, Custom CMS). */
+export function extractProductSlugFromImageUrl(url: string): string | null {
+  const contao = extractContaoSlugFromImageUrl(url);
+  if (contao) return contao;
+
+  const filename = decodeURIComponent(url.split("/").pop()?.split("?")[0] ?? "");
+  let base = filename.replace(/\.(jpe?g|png|webp|avif)$/i, "");
+  base = base.replace(/[-_][a-f0-9]{6,}$/i, "").replace(/^csm[-_]?/i, "");
+  const slug = normalizeToken(base);
+  if (slug.length < 3 || FILENAME_SKIP_SLUGS.has(slug)) return null;
+  if (PRODUCT_IMAGE_NOISE.test(slug) || PRODUCT_IMAGE_NOISE.test(url)) return null;
+
+  const pathSlug = normalizeToken(
+    url
+      .split("?")[0]
+      .split("/")
+      .slice(-3)
+      .join("-"),
+  );
+  const beerish = BEERISH_FILENAME.test(slug) || BEERISH_FILENAME.test(pathSlug) || NAME_STYLE_HINTS.some((hint) => hint.pattern.test(slug));
+  if (!beerish && slug.split("-").filter((part) => part.length >= 4).length === 0) return null;
+  return slug;
+}
+
+type CatalogImageRef = { url: string; alt: string };
+
+function scoreImageForBeerName(name: string, image: CatalogImageRef, breweryName: string): number {
+  const combined = `${image.url} ${image.alt}`.toLowerCase();
+  const nameNorm = name.toLowerCase();
+  const nameSlug = normalizeToken(name.replace(new RegExp(`^${breweryShortName(breweryName)}`, "i"), "").trim() || name);
+  const nameTokens = nameSlug.split("-").filter((part) => part.length >= 3);
+  let score = 0;
+
+  for (const token of nameTokens) {
+    if (combined.includes(token)) score += 14;
+  }
+  if (nameNorm.length >= 4 && combined.includes(nameNorm.replace(/\s+/g, ""))) score += 10;
+  if (NAME_STYLE_HINTS.some((hint) => hint.pattern.test(name) && hint.pattern.test(combined))) score += 8;
+
+  const imageSlug = extractProductSlugFromImageUrl(image.url);
+  if (imageSlug && findBestMatchingImageSlug(nameSlug, [imageSlug])) score += 20;
+  if (image.alt.trim().length >= 3) score += 4;
+  if (/\.(jpe?g|png|webp|avif)(\?|$)/i.test(image.url)) score += 2;
+  if (PRODUCT_IMAGE_NOISE.test(combined)) score -= 80;
+  return score;
+}
+
+function findBestEtikettUrlForBeerName(name: string, images: CatalogImageRef[], breweryName: string): string {
+  let bestUrl = "";
+  let bestScore = 0;
+  for (const image of images) {
+    const score = scoreImageForBeerName(name, image, breweryName);
+    if (score > bestScore) {
+      bestScore = score;
+      bestUrl = image.url;
+    }
+  }
+  return bestScore >= 12 ? bestUrl : "";
 }
 
 function stripTags(html: string): string {
@@ -134,7 +200,7 @@ function decodeHtmlEntities(input: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-function extractBeerNamesFromHtml(html: string): string[] {
+function extractBeerNamesFromHtml(html: string, options?: { catalogPage?: boolean }): string[] {
   const names: string[] = [];
   const patterns = [
     /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi,
@@ -147,7 +213,15 @@ function extractBeerNamesFromHtml(html: string): string[] {
       if (text.length < 3 || text.length > 80) continue;
       if (/impressum|datenschutz|newsletter|kontakt|cookie|menü|menu/i.test(text)) continue;
       if (HTML_NAME_SKIP.test(text)) continue;
-      if (HTML_NAME_BEER_SIGNAL.test(text) || /\b(bier|sorte|sortiment)\b/i.test(text)) {
+      const beerish =
+        HTML_NAME_BEER_SIGNAL.test(text) ||
+        /\b(bier|sorte|sortiment)\b/i.test(text) ||
+        NAME_STYLE_HINTS.some((hint) => hint.pattern.test(text));
+      const catalogTitle =
+        options?.catalogPage &&
+        text.length <= 48 &&
+        !/^(home|start|news|mehr|weiter|lesen|zurück|zurueck)$/i.test(text);
+      if (beerish || catalogTitle) {
         names.push(text);
       }
     }
@@ -155,32 +229,46 @@ function extractBeerNamesFromHtml(html: string): string[] {
   return names;
 }
 
-function isCatalogPage(page: ParsedWebsitePage): boolean {
+function isCatalogPage(page: ParsedWebsitePage, rawHtml?: string): boolean {
   try {
-    return isProductCatalogImage(page.pageUrl);
+    if (isProductCatalogImage(page.pageUrl)) return true;
+    if (rawHtml && extractBeerNamesFromHtml(rawHtml, { catalogPage: true }).length >= 2) return true;
+    return false;
   } catch {
     return false;
   }
 }
 
-function collectProductImageUrls(
+function collectProductImages(
   downloadedImages: DownloadedImage[],
   imageCandidates: ImageCandidate[],
-  htmlImageUrls: string[],
-): string[] {
+  htmlImages: CatalogImageRef[],
+): CatalogImageRef[] {
   const seen = new Set<string>();
-  const urls: string[] = [];
-  const add = (url: string) => {
+  const out: CatalogImageRef[] = [];
+  const add = (url: string, alt: string, force = false) => {
     const trimmed = url.trim();
     if (!trimmed || seen.has(trimmed)) return;
-    if (!extractSlugFromImageUrl(trimmed)) return;
+    if (PRODUCT_IMAGE_NOISE.test(trimmed)) return;
+    const slug = extractProductSlugFromImageUrl(trimmed);
+    const altBeerish = BEERISH_FILENAME.test(`${trimmed} ${alt}`.toLowerCase());
+    if (!force && !slug && !altBeerish) return;
     seen.add(trimmed);
-    urls.push(trimmed);
+    out.push({ url: trimmed, alt: alt.trim() });
   };
-  for (const image of downloadedImages) add(image.url);
-  for (const candidate of imageCandidates) add(candidate.url);
-  for (const url of htmlImageUrls) add(url);
-  return urls;
+
+  for (const image of downloadedImages) {
+    if (image.productScore >= 28 || image.isPackshot || extractProductSlugFromImageUrl(image.url)) {
+      add(image.url, image.alt, true);
+    }
+  }
+  for (const candidate of imageCandidates) {
+    if (candidate.productScore >= 28 || extractProductSlugFromImageUrl(candidate.url)) {
+      add(candidate.url, candidate.alt, true);
+    }
+  }
+  for (const image of htmlImages) add(image.url, image.alt);
+  return out;
 }
 
 function styleTokenScore(token: string): number {
@@ -226,13 +314,13 @@ function findBestMatchingImageSlug(nameSlug: string, imageSlugs: string[]): stri
   return null;
 }
 
-function pickEtikettUrl(slug: string, productImageUrls: string[]): string {
-  const imageSlugs = productImageUrls
-    .map((url) => extractSlugFromImageUrl(url))
+function pickEtikettUrl(slug: string, productImages: CatalogImageRef[]): string {
+  const imageSlugs = productImages
+    .map((image) => extractProductSlugFromImageUrl(image.url))
     .filter((value): value is string => Boolean(value));
   const matched = findBestMatchingImageSlug(slug, imageSlugs);
   if (!matched) return "";
-  return productImageUrls.find((url) => extractSlugFromImageUrl(url) === matched) ?? "";
+  return productImages.find((image) => extractProductSlugFromImageUrl(image.url) === matched)?.url ?? "";
 }
 
 function extractAttr(tag: string, name: string): string {
@@ -240,16 +328,22 @@ function extractAttr(tag: string, name: string): string {
   return tag.match(re)?.[1]?.trim() ?? "";
 }
 
-function extractCatalogImageUrlsFromHtml(html: string, pageUrl: string): string[] {
-  const urls: string[] = [];
+function extractCatalogImagesFromHtml(html: string, pageUrl: string): CatalogImageRef[] {
+  const images: CatalogImageRef[] = [];
   for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
     const tag = match[0] ?? "";
-    const src = extractAttr(tag, "src") || extractAttr(tag, "data-src");
+    const src =
+      extractAttr(tag, "src") ||
+      extractAttr(tag, "data-src") ||
+      extractAttr(tag, "data-lazy-src") ||
+      extractAttr(tag, "data-original");
     if (!src || src.startsWith("data:")) continue;
     const abs = resolveAbsoluteUrl(pageUrl, src);
-    if (abs && extractSlugFromImageUrl(abs)) urls.push(abs);
+    if (!abs) continue;
+    const alt = decodeHtmlEntities(extractAttr(tag, "alt"));
+    images.push({ url: abs, alt });
   }
-  return urls;
+  return images;
 }
 
 export function extractBeerVarietiesFromIntake(params: {
@@ -261,34 +355,34 @@ export function extractBeerVarietiesFromIntake(params: {
 }): SuggestedBeerVariety[] {
   const bySlug = new Map<string, { name: string; etikettUrl: string }>();
   const brewery = params.breweryName.trim() || "Brauerei";
-  const htmlImageUrls = params.pages.flatMap((page) => {
-    if (!isCatalogPage(page)) return [];
+  const htmlImages = params.pages.flatMap((page) => {
     const html = params.rawHtmlByUrl?.[page.pageUrl] ?? "";
-    return html ? extractCatalogImageUrlsFromHtml(html, page.pageUrl) : [];
+    if (!html || !isCatalogPage(page, html)) return [];
+    return extractCatalogImagesFromHtml(html, page.pageUrl);
   });
-  const productImageUrls = collectProductImageUrls(
+  const productImages = collectProductImages(
     params.downloadedImages,
     params.imageCandidates ?? params.pages.flatMap((page) => page.imageCandidates),
-    htmlImageUrls,
+    htmlImages,
   );
 
   const htmlNames: string[] = [];
   for (const page of params.pages) {
-    if (!isCatalogPage(page)) continue;
     const html = params.rawHtmlByUrl?.[page.pageUrl] ?? "";
-    if (html) htmlNames.push(...extractBeerNamesFromHtml(html));
+    if (!html || !isCatalogPage(page, html)) continue;
+    htmlNames.push(...extractBeerNamesFromHtml(html, { catalogPage: true }));
   }
 
-  const imageSlugs = productImageUrls
-    .map((url) => extractSlugFromImageUrl(url))
+  const imageSlugs = productImages
+    .map((image) => extractProductSlugFromImageUrl(image.url))
     .filter((value): value is string => Boolean(value));
 
-  for (const url of productImageUrls) {
-    const slug = extractSlugFromImageUrl(url);
+  for (const image of productImages) {
+    const slug = extractProductSlugFromImageUrl(image.url);
     if (!slug) continue;
     bySlug.set(slug, {
       name: humanizeBeerSlug(slug, brewery),
-      etikettUrl: url,
+      etikettUrl: image.url,
     });
   }
 
@@ -300,13 +394,15 @@ export function extractBeerVarietiesFromIntake(params: {
     if (imageSlug && bySlug.has(imageSlug)) {
       const entry = bySlug.get(imageSlug)!;
       entry.name = rawName.trim();
-      if (!entry.etikettUrl) entry.etikettUrl = pickEtikettUrl(nameSlug, productImageUrls);
+      if (!entry.etikettUrl) entry.etikettUrl = pickEtikettUrl(nameSlug, productImages);
       continue;
     }
     if (!bySlug.has(nameSlug)) {
       bySlug.set(nameSlug, {
         name: rawName.trim(),
-        etikettUrl: pickEtikettUrl(nameSlug, productImageUrls),
+        etikettUrl:
+          pickEtikettUrl(nameSlug, productImages) ||
+          findBestEtikettUrlForBeerName(rawName.trim(), productImages, brewery),
       });
     }
   }
@@ -315,13 +411,16 @@ export function extractBeerVarietiesFromIntake(params: {
   for (const [slug, entry] of bySlug) {
     const bierstil = inferBierstilFromName(`${slug} ${entry.name}`);
     const style = findBeerStyle(bierstil);
+    const etikettUrl =
+      entry.etikettUrl ||
+      findBestEtikettUrlForBeerName(entry.name, productImages, brewery);
     varieties.push({
       name: entry.name.slice(0, 80),
       bierstil,
       flaschenTyp: "nrw_500",
       flaschenfarbe: slug.includes("pils") ? "braun" : "braun",
       glasTyp: style?.glasTyp ?? "willibecher",
-      etikettUrl: entry.etikettUrl.slice(0, 1200),
+      etikettUrl: etikettUrl.slice(0, 1200),
     });
     if (varieties.length >= MAX_MY_BEERS) break;
   }

@@ -44,7 +44,8 @@ export type DashboardBeer = {
   createdAt: string;
 };
 
-export const MAX_MY_BEERS = 8;
+/** Obergrenze pro Brauerei (Supabase user_metadata). Darueber hinaus manuell nicht speicherbar. */
+export const MAX_MY_BEERS = 64;
 
 /** KIE-Temp-URLs sind oft tot oder vom Server nicht ladbar — Etikett dann neu hochladen. */
 export function hasUsableBeerEtikett(url: string): boolean {

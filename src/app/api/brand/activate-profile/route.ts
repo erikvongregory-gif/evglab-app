@@ -1,3 +1,5 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient, createRouteHandlerClient } from "@/lib/supabase/server";
@@ -10,6 +12,7 @@ import {
   resolveBrandReferenceImageUrls,
   type PersistBrandProfileResult,
 } from "@/lib/brand/save-brand-profile";
+import { MAX_MY_BEERS } from "@/lib/dashboard/metadata";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -45,7 +48,7 @@ const bodySchema = z.object({
         etikettUrl: z.string().max(1200).optional().default(""),
       }),
     )
-    .max(8)
+    .max(MAX_MY_BEERS)
     .optional(),
 });
 
@@ -65,9 +68,12 @@ export async function POST(req: Request) {
     }
 
     const supabase = await createClient();
-    const {
+    let {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
     if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
     let rawBody: unknown;

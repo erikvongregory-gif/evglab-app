@@ -42,7 +42,7 @@ describe("sanitizeDashboardBeers", () => {
   });
 
   it("deckelt auf MAX_MY_BEERS Eintraege", () => {
-    const many = Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, name: `Bier ${i}` }));
+    const many = Array.from({ length: 80 }, (_, i) => ({ id: `b${i}`, name: `Bier ${i}` }));
     expect(sanitizeDashboardBeers(many)).toHaveLength(MAX_MY_BEERS);
   });
 });

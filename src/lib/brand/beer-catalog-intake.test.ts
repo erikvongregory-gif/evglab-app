@@ -171,6 +171,33 @@ describe("beer-catalog-intake", () => {
     expect(merged[0]?.etikettUrl).toBe("https://example.com/pils.jpg");
   });
 
+  it("matches generic WordPress product filenames and alt text to beer names", () => {
+    const html = `
+      <h2>Da Helles</h2>
+      <img src="/wp-content/uploads/da-helles-flasche.jpg" alt="Da Helles Flasche" />
+      <h2>Da Pils</h2>
+      <img src="/wp-content/uploads/da-pils.jpg" alt="Da Pils" />
+    `;
+    const varieties = extractBeerVarietiesFromIntake({
+      pages: [
+        {
+          pageUrl: "https://brauerei-beispiel.de/biere/",
+          title: "Biere",
+          textBlocks: [],
+          textExcerpt: "",
+          imageCandidates: [],
+        },
+      ],
+      downloadedImages: [],
+      breweryName: "Brauerei Beispiel",
+      rawHtmlByUrl: { "https://brauerei-beispiel.de/biere/": html },
+    });
+
+    const byName = Object.fromEntries(varieties.map((beer) => [beer.name, beer.etikettUrl]));
+    expect(byName["Da Helles"]).toContain("da-helles-flasche");
+    expect(byName["Da Pils"]).toContain("da-pils");
+  });
+
   it("merges suggested beers without duplicating existing names", () => {
     const merged = mergeSuggestedBeers(
       [{ id: "beer-1", name: "Augustiner Pils", bierstil: "pils", flaschenTyp: "nrw_500", flaschenfarbe: "braun", etikettUrl: "", createdAt: "" }],
