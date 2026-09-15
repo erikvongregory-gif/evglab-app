@@ -17,8 +17,15 @@ create table if not exists workspace_invites (
   created_at timestamptz not null default now(),
   unique(owner_id,email)
 );
+create index if not exists workspace_members_owner_id_idx on public.workspace_members(owner_id);
 alter table workspace_members enable row level security;
 alter table workspace_invites enable row level security;
+drop policy if exists "No client access to workspace members" on public.workspace_members;
+create policy "No client access to workspace members"
+  on public.workspace_members for all to public using (false) with check (false);
+drop policy if exists "No client access to workspace invites" on public.workspace_invites;
+create policy "No client access to workspace invites"
+  on public.workspace_invites for all to public using (false) with check (false);
 revoke all on workspace_members,workspace_invites from public,anon,authenticated;
 grant all on workspace_members,workspace_invites to service_role;
 

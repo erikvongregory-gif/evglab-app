@@ -14,6 +14,12 @@ create table if not exists public.integration_secrets (
 );
 alter table public.dashboard_media enable row level security;
 alter table public.integration_secrets enable row level security;
+drop policy if exists "No client access to dashboard media" on public.dashboard_media;
+create policy "No client access to dashboard media"
+  on public.dashboard_media for all to public using (false) with check (false);
+drop policy if exists "No client access to integration secrets" on public.integration_secrets;
+create policy "No client access to integration secrets"
+  on public.integration_secrets for all to public using (false) with check (false);
 revoke all on public.dashboard_media, public.integration_secrets from public, anon, authenticated;
 grant all on public.dashboard_media, public.integration_secrets to service_role;
 commit;

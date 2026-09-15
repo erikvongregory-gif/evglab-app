@@ -15,6 +15,9 @@ create table if not exists public.token_lots (
   unique(user_id,grant_key)
 );
 alter table token_lots enable row level security;
+drop policy if exists "No client access to token lots" on public.token_lots;
+create policy "No client access to token lots"
+  on public.token_lots for all to public using (false) with check (false);
 revoke all on token_lots from public,anon,authenticated;
 grant all on token_lots to service_role;
 alter table generation_jobs add column if not exists allocations jsonb not null default '[]';

@@ -18,6 +18,9 @@ create table if not exists public.generation_jobs (
   unique(user_id, request_key)
 );
 alter table public.generation_jobs enable row level security;
+drop policy if exists "No client access to generation jobs" on public.generation_jobs;
+create policy "No client access to generation jobs"
+  on public.generation_jobs for all to public using (false) with check (false);
 revoke all on public.generation_jobs from public, anon, authenticated;
 grant all on public.generation_jobs to service_role;
 

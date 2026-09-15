@@ -5,6 +5,9 @@ create table if not exists billing_checkout_locks (
  expires_at timestamptz not null default now()+interval '24 hours'
 );
 alter table billing_checkout_locks enable row level security;
+drop policy if exists "No client access to checkout locks" on public.billing_checkout_locks;
+create policy "No client access to checkout locks"
+  on public.billing_checkout_locks for all to public using (false) with check (false);
 revoke all on billing_checkout_locks from public,anon,authenticated;
 grant all on billing_checkout_locks to service_role;
 create or replace function billing_claim_checkout(p_user uuid,p_plan text,p_interval text) returns uuid

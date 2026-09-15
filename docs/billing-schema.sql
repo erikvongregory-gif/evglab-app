@@ -57,6 +57,7 @@ create table if not exists public.invites (
 
 create index if not exists invites_email_idx on public.invites (email);
 create index if not exists invites_expires_idx on public.invites (expires_at desc);
+create index if not exists invites_created_by_idx on public.invites (created_by);
 
 alter table public.invites enable row level security;
 
