@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createRouteHandlerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { clampBrandSettingsFields } from "@/lib/dashboard/settingsPayload";
@@ -8,6 +8,7 @@ import {
   persistBrandProfileForUser,
   prepareMetadataForSave,
   resolveBrandReferenceImageUrls,
+  type PersistBrandProfileResult,
 } from "@/lib/brand/save-brand-profile";
 
 export const runtime = "nodejs";
@@ -101,7 +102,7 @@ export async function POST(req: Request) {
     const origin = new URL(req.url).origin;
     const latestMetadata = prepareMetadataForSave(user.user_metadata);
 
-    let saved;
+    let saved: PersistBrandProfileResult;
     try {
       saved = await persistBrandProfileForUser({
         userId: user.id,
@@ -115,12 +116,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg }, { status: 500 });
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ok: true,
       settings: saved.settings,
       referenceImageUrls: saved.referenceImageUrls,
       beersCreated: saved.myBeers?.length ?? 0,
+      myBeers: saved.myBeers ?? [],
     });
+
+    try {
+      const routeClient = createRouteHandlerClient(req, response);
+      await Promise.race([
+        routeClient.auth.refreshSession(),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, 8_000);
+        }),
+      ]);
+    } catch (refreshError) {
+      console.warn("[brand/activate-profile] refreshSession failed:", refreshError);
+    }
+
+    return response;
   } catch (error) {
     console.error("[brand/activate-profile]", error);
     const msg = error instanceof Error ? error.message : "Markenprofil konnte nicht gespeichert werden.";

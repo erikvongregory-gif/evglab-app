@@ -9,6 +9,7 @@ import {
   persistSuggestedBeerLabels,
   type SuggestedBeerVariety,
 } from "@/lib/brand/beer-catalog-intake";
+import { getFreshUserMetadata } from "@/lib/dashboard/freshMetadata";
 import {
   getDashboardMetadata,
   mergeDashboardMetadata,
@@ -167,13 +168,19 @@ export function buildUserMetadataForBrandSave(params: {
   };
 }
 
+export type PersistBrandProfileResult = {
+  settings: DashboardSettings;
+  referenceImageUrls: string[];
+  myBeers?: DashboardBeer[];
+};
+
 export async function persistBrandProfileForUser(params: {
   userId: string;
   latestMetadata: unknown;
   origin: string;
   input: SaveBrandProfileInput;
   referenceImageUrls: string[];
-}): Promise<{ settings: DashboardSettings; referenceImageUrls: string[] }> {
+}): Promise<PersistBrandProfileResult> {
   const settings = buildActivatedBrandSettings({
     latestMetadata: params.latestMetadata,
     origin: params.origin,
@@ -181,7 +188,8 @@ export async function persistBrandProfileForUser(params: {
     referenceImageUrls: params.referenceImageUrls,
   });
 
-  const existingBeers = getDashboardMetadata(params.latestMetadata).myBeers ?? [];
+  const freshMetadata = await getFreshUserMetadata(params.userId, params.latestMetadata);
+  const existingBeers = getDashboardMetadata(freshMetadata).myBeers ?? [];
   let myBeers: DashboardBeer[] | undefined;
   if (params.input.suggestedBeers && params.input.suggestedBeers.length > 0) {
     const withLabels = await persistSuggestedBeerLabels(params.userId, params.input.suggestedBeers);
@@ -190,7 +198,7 @@ export async function persistBrandProfileForUser(params: {
 
   const admin = createAdminClient();
   let userMetadata = buildUserMetadataForBrandSave({
-    latestMetadata: params.latestMetadata,
+    latestMetadata: freshMetadata,
     settings,
     myBeers,
   });
@@ -203,7 +211,7 @@ export async function persistBrandProfileForUser(params: {
     const prunedBase = buildPrunedAuthUserData(params.latestMetadata);
     if (prunedBase) {
       userMetadata = buildUserMetadataForBrandSave({
-        latestMetadata: prunedBase,
+        latestMetadata: freshMetadata,
         settings,
         myBeers,
       });
