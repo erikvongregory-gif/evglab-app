@@ -1,6 +1,7 @@
 import type { EmailOtpType, User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { redirectWithEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
+import { repairOversizedMetadataForUser } from "@/lib/auth/repairOversizedMetadata";
 import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import {
   acquireOAuthCode,
@@ -175,6 +176,9 @@ export async function handleAuthCallbackGet(request: Request) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      if (user) {
+        await repairOversizedMetadataForUser(supabase, user.id, user.user_metadata);
+      }
       return redirectAfterOAuthSuccess(request, {
         requestId,
         appOrigin,
@@ -248,6 +252,9 @@ export async function handleAuthCallbackGet(request: Request) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      if (user) {
+        await repairOversizedMetadataForUser(supabase, user.id, user.user_metadata);
+      }
       return redirectAfterOAuthSuccess(request, {
         requestId,
         appOrigin,
