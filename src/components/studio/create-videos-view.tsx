@@ -231,7 +231,7 @@ export function CreateVideosView({ breweryName }: CreateVideosViewProps) {
     try {
       const res = await fetch("/api/kie/seedance/create-task", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({
           prompt: composed.englishPrompt,
           aspectRatio: brief.aspectRatioId,

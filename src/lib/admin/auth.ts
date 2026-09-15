@@ -23,7 +23,7 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   if (!user) return null;
   if (!hasAdminAccess(user)) return null;
   if (!(await hasPassedTwoFactor(user.id))) return null;
-  return { userId: user.id, email: user.email ?? null, role: readRole(user.user_metadata?.role) };
+  return { userId: user.id, email: user.email ?? null, role: readRole(user.app_metadata?.role) };
 }
 
 export async function requireAdminPageAccess(options?: { allowWithout2FA?: boolean }) {
@@ -40,6 +40,6 @@ export async function requireAdminPageAccess(options?: { allowWithout2FA?: boole
   return {
     userId: user.id,
     email: user.email ?? null,
-    role: readRole(user.user_metadata?.role),
+    role: readRole(user.app_metadata?.role),
   };
 }

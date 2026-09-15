@@ -97,12 +97,13 @@ export async function POST(req: Request) {
             stripeCustomerId: customerId,
             stripeSubscriptionId: subscriptionId,
             currentPeriodEnd: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
+    currentPeriodStart: toIsoFromUnix(subscription.items.data[0]?.current_period_start ?? subscription.start_date),
           });
         }
       }
 
       if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.created") {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = await stripe.subscriptions.retrieve((event.data.object as Stripe.Subscription).id);
         const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
         const priceId = subscription.items.data[0]?.price?.id ?? null;
         const mappedPlan = mapPriceIdToPlan(priceId);
@@ -117,6 +118,7 @@ export async function POST(req: Request) {
                 ? "incomplete" : subscription.status,
               stripeCustomerId: customerId, stripeSubscriptionId: subscription.id,
               currentPeriodEnd: toIsoFromUnix(getCurrentPeriodEndUnix(subscription)),
+    currentPeriodStart: toIsoFromUnix(subscription.items.data[0]?.current_period_start ?? subscription.start_date),
             });
           }
         }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
+import { finishGeneration, type GenerationJob } from "./generationJobs";
+import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 
 /**
  * Vorprüfung des Guthabens vor einem teuren Provider-Call. Verhindert, dass
@@ -25,14 +26,8 @@ export async function requireTokenBudget(userId: string, cost: number): Promise<
  * Buchung nach erfolgreicher Generierung. Erst hier abrechnen — bei
  * Provider-Ausfällen soll der Nutzer nichts verlieren.
  */
-export async function chargeGeneratedTokens(userId: string, cost: number) {
-  const result = await consumeTokens(userId, cost);
-  if (!result.ok) {
-    return {
-      ok: false as const,
-      response: NextResponse.json({ error: result.error, code: "insufficient_tokens" }, { status: 402 }),
-    };
-  }
+export async function chargeGeneratedTokens(job: GenerationJob, cost: number, payload: Record<string, unknown>) {
+  const result = await finishGeneration(job, cost, payload);
   const { monthly_tokens: monthlyTokens, used_tokens: usedTokens, plan } = result.state;
   return {
     ok: true as const,

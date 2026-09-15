@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { repairOversizedMetadataForUser } from "@/lib/auth/repairOversizedMetadata";
 import { authMetadataLikelyOversized } from "@/lib/auth/pruneAuthMetadata";
 import { createClient } from "@/lib/supabase/server";

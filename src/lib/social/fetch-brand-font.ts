@@ -19,15 +19,18 @@ export async function fetchBrandFontBuffer(
   const trimmed = url.trim();
   if (!trimmed) return null;
   try {
-    const res = await fetch(trimmed, { cache: "no-store" });
-    if (!res.ok) return null;
-    const arrayBuffer = await res.arrayBuffer();
-    if (!arrayBuffer.byteLength) return null;
+    const res = await publicFetch(trimmed, {
+      maxBytes: 8 * 1024 * 1024,
+      timeoutMs: 8_000,
+      headers: { Accept: "font/woff2,font/woff,font/ttf,font/otf,application/octet-stream" },
+    });
+    if (res.status < 200 || res.status >= 300 || !res.body.byteLength) return null;
     return {
-      buffer: Buffer.from(arrayBuffer),
-      mime: res.headers.get("content-type")?.split(";")[0]?.trim() || mimeFromUrl(trimmed),
+      buffer: res.body,
+      mime: res.headers["content-type"]?.split(";")[0]?.trim() || mimeFromUrl(res.finalUrl),
     };
   } catch {
     return null;
   }
 }
+import { publicFetch } from "@/lib/security/public-fetch";

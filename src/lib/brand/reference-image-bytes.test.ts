@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/lib/security/public-fetch",()=>({publicFetch:vi.fn(async()=>({status:200,body:PNG_1X1,headers:{"content-type":"image/png"}}))}));
 import { resolveReferenceImageForVision } from "./reference-image-bytes";
 
 const PNG_1X1 = Buffer.from(

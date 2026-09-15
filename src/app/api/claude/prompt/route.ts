@@ -4,9 +4,7 @@ import { z } from "zod";
 import { classifyThrownProviderError } from "@/lib/ai/providerErrors";
 import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
 import { generateBrauereiBildPrompt } from "@/lib/prompts/brauerei-bild/generate-prompt";
-import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { createClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import {
   buildBrandProfilePromptContext,
   getBrandProfileFromMetadata,
@@ -154,25 +152,9 @@ function buildClaudeInput(body: PromptRequestBody): string {
 
 export async function POST(req: Request) {
   try {
-    const rateError = await enforceRateLimitPersistent(req, {
-      keyPrefix: "claude-prompt",
-      limit: 20,
-      windowMs: 60_000,
-    });
-    if (rateError) return rateError;
-    const originError = enforceSameOrigin(req);
-    if (originError) return originError;
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: "Supabase-Konfiguration fehlt." }, { status: 500 });
-    }
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
-    }
-    const brandProfile = getBrandProfileFromMetadata(user.user_metadata);
+    const guard = await requireBillableImageGenerationUser(req, "claude-prompt");
+    if (!guard.ok) return guard.response;
+    const brandProfile = getBrandProfileFromMetadata(guard.userMetadata);
     if (!isBrandProfileComplete(brandProfile)) {
       return NextResponse.json(
         {

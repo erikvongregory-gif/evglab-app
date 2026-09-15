@@ -81,7 +81,9 @@ export async function enforceRateLimitPersistent(
   const identifier =
     options.identifier || buildCompositeIdentifier(req, options.identifierParts ?? []);
   if (!upstashUrl || !upstashToken) {
-    return enforceRateLimit(req, { ...rule, keyPrefix: `${rule.keyPrefix}:fallback` });
+    return process.env.NODE_ENV === "production"
+      ? NextResponse.json({ error: "Anfrageschutz vorübergehend nicht verfügbar." }, { status: 503 })
+      : enforceRateLimit(req, { ...rule, keyPrefix: `${rule.keyPrefix}:fallback` });
   }
 
   const key = buildRateLimitKey(rule, identifier);
@@ -106,7 +108,7 @@ export async function enforceRateLimitPersistent(
         globalThis.clearTimeout(timeout);
       });
     if (!response.ok) {
-      return enforceRateLimit(req, { ...rule, keyPrefix: `${rule.keyPrefix}:fallback` });
+      return process.env.NODE_ENV === "production" ? NextResponse.json({error:"Anfrageschutz vorübergehend nicht verfügbar."},{status:503}) : enforceRateLimit(req, { ...rule, keyPrefix: `${rule.keyPrefix}:fallback` });
     }
 
     const payload = (await response.json()) as Array<{ result?: unknown }>;
@@ -124,7 +126,7 @@ export async function enforceRateLimitPersistent(
     }
     return null;
   } catch {
-    return enforceRateLimit(req, { ...rule, keyPrefix: `${rule.keyPrefix}:fallback` });
+    return process.env.NODE_ENV === "production" ? NextResponse.json({error:"Anfrageschutz vorübergehend nicht verfügbar."},{status:503}) : enforceRateLimit(req, { ...rule, keyPrefix: `${rule.keyPrefix}:fallback` });
   }
 }
 

@@ -29,7 +29,7 @@ describe("brauerei-bild skill", () => {
   it("maps hyperrealistic dashboard input to brauerei brief", () => {
     const brief = hyperrealisticInputToBrauereiBrief(
       {
-        etikettBild: "https://example.com/label.png",
+        aiWatermark: false, etikettBild: "https://example.com/label.png",
         flaschenTyp: "nrw_500",
         flaschenfarbe: "braun",
         bierstil: "helles",

@@ -9,7 +9,7 @@ describe("inhalte-erstellen prompt builders", () => {
   it("builds a hyperrealistic prompt snapshot", () => {
     expect(
       buildHyperrealisticPrompt({
-        etikettBild: "https://example.com/etikett.png",
+        aiWatermark: false, etikettBild: "https://example.com/etikett.png",
         flaschenTyp: "nrw_500",
         flaschenfarbe: "braun",
         bierstil: "pils",
@@ -28,7 +28,7 @@ describe("inhalte-erstellen prompt builders", () => {
 
   it("places the product photo without describing a brand name for the label", () => {
     const prompt = buildProductPlacementPrompt({
-      etikettBild: "https://example.com/etikett.png",
+      aiWatermark: false, stimmung: "entspannt", etikettBild: "https://example.com/etikett.png",
       flaschenTyp: "nrw_500",
       flaschenfarbe: "braun",
       bierstil: "helles",
@@ -59,7 +59,7 @@ describe("inhalte-erstellen prompt builders", () => {
 
   it("lets free-text intent override biergarten defaults for mountain toasting", () => {
     const next = applyClientIntentOverrides({
-      etikettBild: "https://example.com/etikett.png",
+      aiWatermark: false, etikettBild: "https://example.com/etikett.png",
       flaschenTyp: "nrw_500",
       flaschenfarbe: "braun",
       bierstil: "helles",
@@ -91,7 +91,7 @@ describe("inhalte-erstellen prompt builders", () => {
 
   it("maps brewery toasting freitext to brauereihof with people", () => {
     const next = applyClientIntentOverrides({
-      etikettBild: "https://example.com/etikett.png",
+      aiWatermark: false, etikettBild: "https://example.com/etikett.png",
       flaschenTyp: "nrw_500",
       flaschenfarbe: "braun",
       bierstil: "helles",
@@ -116,7 +116,7 @@ describe("inhalte-erstellen prompt builders", () => {
 
   it("maps laughing brewer freitext to person hero + brewery scene", () => {
     const next = applyClientIntentOverrides({
-      etikettBild: "https://example.com/etikett.png",
+      aiWatermark: false, etikettBild: "https://example.com/etikett.png",
       flaschenTyp: "nrw_500",
       flaschenfarbe: "braun",
       bierstil: "helles",
@@ -144,7 +144,7 @@ describe("inhalte-erstellen prompt builders", () => {
 
   it("forces two older Bavarians into the prompt instead of No-people packshot", () => {
     const next = applyClientIntentOverrides({
-      etikettBild: "https://example.com/etikett.png",
+      aiWatermark: false, etikettBild: "https://example.com/etikett.png",
       flaschenTyp: "nrw_500",
       flaschenfarbe: "braun",
       bierstil: "helles",
@@ -174,7 +174,7 @@ describe("inhalte-erstellen prompt builders", () => {
 
   it("never emits hard No-people when freitext exists even for unknown synonyms", () => {
     const prompt = buildProductPlacementPrompt({
-      etikettBild: "https://example.com/etikett.png",
+      aiWatermark: false, etikettBild: "https://example.com/etikett.png",
       flaschenTyp: "nrw_500",
       flaschenfarbe: "braun",
       bierstil: "helles",
@@ -197,7 +197,7 @@ describe("inhalte-erstellen prompt builders", () => {
 
   it("haelt das Glas auf Flaschenvolumen (kein 0,5-l-Krug neben 0,33 l)", () => {
     const prompt = buildProductPlacementPrompt({
-      etikettBild: "https://example.com/etikett.png",
+      aiWatermark: false, stimmung: "entspannt", etikettBild: "https://example.com/etikett.png",
       flaschenTyp: "euro_longneck_330",
       flaschenfarbe: "braun",
       bierstil: "bock",

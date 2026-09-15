@@ -1,3 +1,5 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
@@ -32,6 +34,8 @@ export async function requireImageGenerationUser(req: Request, keyPrefix: string
     return { ok: false, response: NextResponse.json({ error: "Nicht angemeldet.", code: "auth_required" }, { status: 401 }) };
   }
 
+  if (!(await hasPassedTwoFactor(user.id))) return { ok: false, response: NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 }) };
+
   const hourly = await enforceRateLimitPersistent(
     req,
     { keyPrefix: `${keyPrefix}:hour`, limit: 30, windowMs: 60 * 60 * 1000 },
@@ -46,7 +50,10 @@ export async function requireImageGenerationUser(req: Request, keyPrefix: string
   );
   if (daily) return { ok: false, response: daily };
 
-  return { ok: true, userId: user.id, userMetadata: user.user_metadata };
+  try {
+    const resource = await workspaceResourceUser(user, !["GET", "HEAD"].includes(req.method));
+    return { ok: true, userId: resource.id, userMetadata: resource.user_metadata };
+  } catch { return { ok: false, response: NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}) }; }
 }
 
 export async function requireAuthenticatedUser(req: Request, keyPrefix: string): Promise<ApiGuardResult> {
@@ -66,6 +73,8 @@ export async function requireAuthenticatedUser(req: Request, keyPrefix: string):
     return { ok: false, response: NextResponse.json({ error: "Nicht angemeldet.", code: "auth_required" }, { status: 401 }) };
   }
 
+  if (!(await hasPassedTwoFactor(user.id))) return { ok: false, response: NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 }) };
+
   const rateError = await enforceRateLimitPersistent(
     req,
     { keyPrefix, limit: 60, windowMs: 60_000 },
@@ -73,7 +82,10 @@ export async function requireAuthenticatedUser(req: Request, keyPrefix: string):
   );
   if (rateError) return { ok: false, response: rateError };
 
-  return { ok: true, userId: user.id, userMetadata: user.user_metadata };
+  try {
+    const resource = await workspaceResourceUser(user, !["GET", "HEAD"].includes(req.method));
+    return { ok: true, userId: resource.id, userMetadata: resource.user_metadata };
+  } catch { return { ok: false, response: NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}) }; }
 }
 
 /** Bildgenerierung: Auth + Rate-Limit + aktives Abo. */

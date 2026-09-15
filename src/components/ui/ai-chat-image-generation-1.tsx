@@ -5,33 +5,74 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 export interface ImageGenerationProps {
-  children: React.ReactNode;
   isLoading: boolean;
+  /** Bild-URL — sobald gesetzt, startet der langsame Blur-Reveal. */
+  imageSrc?: string | null;
   progress?: number;
   className?: string;
-  /** Statuszeile ausblenden (nur Reveal-Effekt). */
+  aspectRatio?: string;
   hideStatus?: boolean;
+  alt?: string;
+  onPreviewClick?: (src: string) => void;
 }
 
 const STATUS = {
   starting: "Wird gestartet …",
   generating: "BrewAI generiert dein Bild …",
+  revealing: "Bild wird sichtbar …",
   completed: "Bild erstellt.",
 } as const;
 
 export const ImageGeneration = ({
-  children,
   isLoading,
+  imageSrc,
   progress,
   className,
+  aspectRatio = "4:5",
   hideStatus = false,
+  alt = "Motivvorschau",
+  onPreviewClick,
 }: ImageGenerationProps) => {
   const clampedProgress = Math.max(0, Math.min(100, progress ?? 0));
-  const loadingState: "starting" | "generating" | "completed" = !isLoading
+  const [decoded, setDecoded] = React.useState(false);
+  const [sharp, setSharp] = React.useState(false);
+  const imgRef = React.useRef<HTMLImageElement | null>(null);
+  const revealStarted = React.useRef(false);
+
+  const beginReveal = React.useCallback(() => {
+    if (revealStarted.current) return;
+    revealStarted.current = true;
+    setDecoded(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setSharp(true));
+    });
+  }, []);
+
+  React.useEffect(() => {
+    setDecoded(false);
+    setSharp(false);
+    revealStarted.current = false;
+  }, [imageSrc]);
+
+  React.useEffect(() => {
+    const img = imgRef.current;
+    if (img?.complete && img.naturalWidth > 0) beginReveal();
+  }, [imageSrc, beginReveal]);
+
+  const loadingState: keyof typeof STATUS = !isLoading && sharp
     ? "completed"
-    : clampedProgress < 10
-      ? "starting"
-      : "generating";
+    : imageSrc && decoded && !sharp
+      ? "revealing"
+      : clampedProgress < 10
+        ? "starting"
+        : "generating";
+
+  const showAurora = isLoading || (Boolean(imageSrc) && !sharp);
+  const showImage = Boolean(imageSrc);
+
+  const handleImageLoad = () => {
+    beginReveal();
+  };
 
   return (
     <div className={cn("studio-image-gen flex flex-col gap-2", className)}>
@@ -57,30 +98,37 @@ export const ImageGeneration = ({
         </motion.span>
       )}
 
-      <div className="studio-image-gen__frame relative overflow-hidden rounded-[var(--r-md,8px)] border border-[color:var(--line,#E5E3DE)] bg-[var(--s1,#FFFFFF)]">
-        {children}
-        <motion.div
-          className="pointer-events-none absolute -top-[25%] h-[125%] w-full backdrop-blur-3xl"
-          style={{
-            background:
-              "color-mix(in srgb, var(--ac-tint, #FBEFE0) 55%, var(--s1, #FFFFFF))",
-            clipPath: `polygon(0 ${clampedProgress}%, 100% ${clampedProgress}%, 100% 100%, 0 100%)`,
-            maskImage:
-              clampedProgress === 0
-                ? "linear-gradient(to bottom, black -5%, black 100%)"
-                : `linear-gradient(to bottom, transparent ${Math.max(clampedProgress - 5, 0)}%, transparent ${clampedProgress}%, black ${Math.min(clampedProgress + 5, 100)}%)`,
-            WebkitMaskImage:
-              clampedProgress === 0
-                ? "linear-gradient(to bottom, black -5%, black 100%)"
-                : `linear-gradient(to bottom, transparent ${Math.max(clampedProgress - 5, 0)}%, transparent ${clampedProgress}%, black ${Math.min(clampedProgress + 5, 100)}%)`,
-          }}
-          initial={false}
-          animate={{
-            clipPath: `polygon(0 ${clampedProgress}%, 100% ${clampedProgress}%, 100% 100%, 0 100%)`,
-            opacity: isLoading ? 1 : 0,
-          }}
-          transition={{ opacity: { duration: 0.45 } }}
-        />
+      <div
+        className={cn(
+          "studio-image-gen__frame studio-create-preview-stage relative overflow-hidden",
+          isLoading && !imageSrc ? "is-generating" : "",
+        )}
+        data-aspect={aspectRatio}
+      >
+        {showAurora ? (
+          <div className="studio-image-gen__aurora" aria-hidden="true">
+            <div className="studio-image-gen__aurora-spin" />
+          </div>
+        ) : null}
+
+        {showImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={imageSrc ?? "empty"}
+            ref={imgRef}
+            src={imageSrc ?? undefined}
+            alt={alt}
+            className={cn(
+              "studio-create-preview-stage__img studio-image-gen__img",
+              !sharp && "is-blurred",
+              sharp && "is-sharp",
+            )}
+            onLoad={handleImageLoad}
+            onClick={() => {
+              if (imageSrc && onPreviewClick) onPreviewClick(imageSrc);
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

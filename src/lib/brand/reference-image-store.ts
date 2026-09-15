@@ -64,7 +64,7 @@ async function compressImage(
   options: { maxWidth: number; maxHeight: number; jpegQuality: number; maxBytes: number },
 ): Promise<{ base64: string; mime: string }> {
   const input = Buffer.from(base64, "base64");
-  let pipeline = sharp(input)
+  const pipeline = sharp(input)
     .rotate()
     .resize({ width: options.maxWidth, height: options.maxHeight, fit: "inside", withoutEnlargement: true });
 
@@ -147,7 +147,7 @@ export async function persistBrandReferenceImages(params: {
 
   const base = asObj(params.userMetadata);
   const dashboard = asObj(base.dashboard);
-  let trimmedStore = store;
+  const trimmedStore = store;
   let trimmedUrls = urls;
 
   while (Object.keys(trimmedStore).length > 0) {

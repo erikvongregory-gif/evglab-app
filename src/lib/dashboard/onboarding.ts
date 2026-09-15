@@ -2,12 +2,15 @@ export type StudioOnboardingTaskId = "brand" | "motif" | "plan" | "team";
 
 export type OnboardingFlowStep = 1 | 2 | 3 | 4 | 5;
 
+/** Aktuelle Product-Tour-Version — alte `completedAt` ohne diese Version zählen nicht. */
+export const ONBOARDING_TOUR_VERSION = 1;
+
 /**
  * Nur kompakte Flags — landet in `user_metadata.dashboard.onboarding` und darf
  * das Auth-JWT nicht aufblähen.
  *
  * v1: Welcome / Checklist / Hints
- * v2: Fullscreen-Flow (`flowVersion`, `currentStep`, `completedAt`)
+ * v2: Geführte Einrichtung per Product-Tour (`flowVersion`, `completedAt`, `tourVersion`)
  */
 export type StudioOnboardingState = {
   v: 1;
@@ -19,12 +22,14 @@ export type StudioOnboardingState = {
   celebrated: boolean;
   /** IDs weggeklickter Kontext-Hinweise. */
   hints: string[];
-  /** 2 = neuer Fullscreen-Flow. Fehlt → Legacy. */
+  /** 2 = Product-Tour-Einrichtung. */
   flowVersion?: 2;
-  /** Letzter erreichter / aktiver Schritt (1–5). */
+  /** Letzter erreichter / aktiver Schritt (Legacy). */
   currentStep?: OnboardingFlowStep;
   /** ISO — Flow abgeschlossen. */
   completedAt?: string;
+  /** Abgeschlossene Tour-Version — fehlt bei Legacy-Abschlüssen. */
+  tourVersion?: number;
 };
 
 export type StudioOnboardingProgress = Record<StudioOnboardingTaskId, boolean>;
@@ -71,6 +76,10 @@ export function sanitizeStudioOnboardingState(raw: unknown): StudioOnboardingSta
       ? base.completedAt.trim().slice(0, 40)
       : undefined;
   const currentStep = sanitizeStep(base.currentStep);
+  const tourVersion =
+    typeof base.tourVersion === "number" && Number.isFinite(base.tourVersion)
+      ? Math.max(0, Math.min(99, Math.floor(base.tourVersion)))
+      : undefined;
   return {
     v: 1,
     welcome: base.welcome === true,
@@ -80,17 +89,24 @@ export function sanitizeStudioOnboardingState(raw: unknown): StudioOnboardingSta
     ...(base.flowVersion === 2 ? { flowVersion: 2 as const } : {}),
     ...(currentStep ? { currentStep } : {}),
     ...(completedAt ? { completedAt } : {}),
+    ...(tourVersion !== undefined ? { tourVersion } : {}),
   };
 }
 
 export function mergeStudioOnboardingState(
   current: StudioOnboardingState,
-  patch: Partial<StudioOnboardingState> & { completedAt?: string | null },
+  patch: Partial<StudioOnboardingState> & {
+    completedAt?: string | null;
+    tourVersion?: number | null;
+  },
 ): StudioOnboardingState {
   const merged: Record<string, unknown> = { ...current, ...patch };
   // Restart: completedAt explizit löschen (spread behält sonst den alten Wert).
   if (patch.completedAt === null || patch.completedAt === "") {
     delete merged.completedAt;
+  }
+  if (patch.tourVersion === null || patch.tourVersion === 0) {
+    delete merged.tourVersion;
   }
   if (patch.currentStep === undefined && "currentStep" in patch) {
     delete merged.currentStep;
@@ -106,24 +122,27 @@ export function isStudioOnboardingComplete(progress: StudioOnboardingProgress): 
   return requiredTasksDone(progress) === STUDIO_ONBOARDING_REQUIRED_TASKS.length;
 }
 
-/** Legacy-Nutzer: Welcome/Checklist/Celebrate schon bedient → kein Zwangs-v2-Flow. */
+/** Legacy-Nutzer: Welcome/Checklist/Celebrate schon bedient (nur noch Checkliste/Hinweise). */
 export function isLegacyOnboardingSettled(state: StudioOnboardingState): boolean {
   return state.welcome || state.checklistDismissed || state.celebrated;
 }
 
+/** Product-Tour abgeschlossen — alte Abschlüsse ohne `tourVersion` zählen nicht. */
+export function isOnboardingTourComplete(state: StudioOnboardingState): boolean {
+  return Boolean(state.completedAt) && (state.tourVersion ?? 0) >= ONBOARDING_TOUR_VERSION;
+}
+
+/** @deprecated Nutze isOnboardingTourComplete */
 export function isFlowV2Complete(state: StudioOnboardingState): boolean {
-  return Boolean(state.completedAt);
+  return isOnboardingTourComplete(state);
 }
 
 /**
- * Neue Nutzer ohne Legacy-Flags und ohne completedAt müssen den Fullscreen-Flow
- * durchlaufen. Restart setzt Flags zurück und setzt flowVersion=2.
+ * Einrichtung solange nötig, bis die aktuelle Product-Tour abgeschlossen ist.
+ * Legacy-Flags (welcome/checklist) blockieren den Flow nicht mehr.
  */
 export function needsFullOnboardingFlow(state: StudioOnboardingState): boolean {
-  if (isFlowV2Complete(state)) return false;
-  if (state.flowVersion === 2) return true;
-  if (isLegacyOnboardingSettled(state)) return false;
-  return true;
+  return !isOnboardingTourComplete(state);
 }
 
 /** Nach Login / bei Studio-Entry: Einrichtung vor Dashboard, kein Shell-Flash. */
@@ -135,9 +154,9 @@ export function resolveStudioEntryPath(
   return preferredPath;
 }
 
-/** Alte Tour-Overlays nicht mehr automatisch zeigen (v2 aktiv oder abgeschlossen). */
+/** Alte Tour-Overlays nicht mehr automatisch zeigen (Product-Tour aktiv oder abgeschlossen). */
 export function shouldSuppressLegacyOnboardingUi(state: StudioOnboardingState): boolean {
-  return state.flowVersion === 2 || isFlowV2Complete(state) || needsFullOnboardingFlow(state);
+  return needsFullOnboardingFlow(state) || isOnboardingTourComplete(state);
 }
 
 export function resolveOnboardingStep(state: StudioOnboardingState): OnboardingFlowStep {

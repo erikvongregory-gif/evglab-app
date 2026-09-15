@@ -18,8 +18,8 @@ async function isAccountMarkedForDeletion(admin: ReturnType<typeof createAdminCl
   const deletion = await admin.from("account_deletion_jobs").select("user_id").eq("user_id", userId).maybeSingle();
   if (deletion.data) return true;
   if (deletion.error) {
-    if (isMissingRelationError(deletion.error)) return false;
-    console.warn("[getWorkspace] account_deletion_jobs check failed:", deletion.error.message);
+    if (process.env.NODE_ENV !== "production" && isMissingRelationError(deletion.error)) return false;
+    throw new Error("Löschstatus konnte nicht geprüft werden.");
   }
   return false;
 }
@@ -31,16 +31,18 @@ export async function getWorkspace(userId: string): Promise<{ ownerId: string; r
   }
   const { data, error } = await admin.from("workspace_members").select("owner_id,role").eq("user_id", userId).maybeSingle();
   if (error) {
-    if (isMissingRelationError(error)) return { ownerId: userId, role: "owner" };
+    if (process.env.NODE_ENV !== "production" && isMissingRelationError(error)) return { ownerId: userId, role: "owner" };
     throw new Error("Teamzuordnung konnte nicht geprüft werden.");
   }
   if (!data) return { ownerId: userId, role: "owner" };
+  if (await isAccountMarkedForDeletion(admin, data.owner_id)) throw new Error("Teamkonto ist zur Löschung vorgemerkt.");
   const billing = await admin.from("billing_subscriptions").select("plan,subscription_status").eq("user_id", data.owner_id).single();
   if (billing.error || !["active", "trialing"].includes(billing.data.subscription_status)) throw new Error("Teamabo nicht aktiv.");
   const members = await admin.from("workspace_members").select("user_id").eq("owner_id", data.owner_id).order("created_at").order("user_id");
   if (members.error) throw new Error("Teamplätze konnten nicht geprüft werden.");
   const limit = billing.data.plan === "pro" ? 10 : billing.data.plan === "growth" ? 3 : 1;
-  if ((members.data ?? []).findIndex(m => m.user_id === userId) >= limit - 1) throw new Error("Teamplatz im aktuellen Tarif nicht verfügbar.");
+  const position = (members.data ?? []).findIndex(m => m.user_id === userId);
+  if (position < 0 || position >= limit - 1) throw new Error("Teamplatz im aktuellen Tarif nicht verfügbar.");
   return { ownerId: data.owner_id, role: data.role as DashboardTeamRole };
 }
 

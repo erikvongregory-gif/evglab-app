@@ -38,7 +38,7 @@ export async function resolveStripeCustomerId(args: {
   const customer = await stripe.customers.create({
     email: email ?? undefined,
     metadata: { user_id: userId },
-  });
+  }, { idempotencyKey: `customer:${userId}` });
   await setStripeCustomerId(userId, customer.id);
   return customer.id;
 }

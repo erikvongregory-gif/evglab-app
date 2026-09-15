@@ -1,3 +1,6 @@
+import { createAdminClient } from "@/lib/supabase/admin";
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -12,9 +15,12 @@ export async function GET() {
     return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
   }
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, false); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
   let billing = null as Awaited<ReturnType<typeof getBillingRow>>;
@@ -47,7 +53,11 @@ export async function GET() {
   }
   const dashboard = getDashboardMetadata(user.user_metadata);
   const media = await readDashboardMedia(user.id).catch(() => dashboard.mediaLibrary ?? []);
-  const team = dashboard.teamMembers ?? [];
+  const client = createAdminClient();
+  const activeMembers = await client.from("workspace_members").select("user_id").eq("owner_id",user.id);
+  const pendingInvites = await client.from("workspace_invites").select("id").eq("owner_id",user.id).gt("expires_at",new Date().toISOString());
+  if(activeMembers.error || pendingInvites.error)return NextResponse.json({error:"Teamdaten konnten nicht geladen werden."},{status:503});
+  const team = [{status:"active"}, ...(activeMembers.data??[]).map(()=>({status:"active"})), ...(pendingInvites.data??[]).map(()=>({status:"invited"}))];
   const activeCampaigns = media.length === 0 ? 0 : Math.min(6, Math.ceil(media.length / 5));
 
   const sortedMedia = media.slice().sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));

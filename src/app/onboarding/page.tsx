@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { OnboardingFlow } from "@/components/studio/onboarding/flow/onboarding-flow";
-import type { OnboardingBootstrap } from "@/components/studio/onboarding/flow/onboarding-types";
+import { OnboardingTourFlow } from "@/components/studio/onboarding/onboarding-tour-flow";
+import type { OnboardingBootstrap } from "@/components/studio/onboarding/onboarding-tour-types";
 import { hasActiveSubscription } from "@/lib/billing/access";
 import { getEffectiveBillingRow } from "@/lib/billing/store";
-import {
-  needsFullOnboardingFlow,
-  resolveOnboardingStep,
-  sanitizeStudioOnboardingState,
-} from "@/lib/dashboard/onboarding";
-import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
+import { getFreshUserDashboardMetadata } from "@/lib/dashboard/freshMetadata";
 import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -40,7 +36,7 @@ export default async function OnboardingPage() {
     redirect(TWO_FACTOR_PAGE);
   }
 
-  const dashboard = getDashboardMetadata(user.user_metadata);
+  const dashboard = await getFreshUserDashboardMetadata(user.id, user.user_metadata);
   const onboarding = sanitizeStudioOnboardingState(dashboard.onboarding);
 
   if (!needsFullOnboardingFlow(onboarding)) {
@@ -69,9 +65,7 @@ export default async function OnboardingPage() {
     profileName,
     settings: settings ?? null,
     beers: dashboard.myBeers ?? [],
-    team: dashboard.teamMembers ?? [],
     userEmail: user.email ?? "",
-    initialStep: resolveOnboardingStep(onboarding),
     hasActivePlan,
     tokensRemaining,
   };
@@ -79,14 +73,12 @@ export default async function OnboardingPage() {
   return (
     <Suspense
       fallback={
-        <div className="evg-studio evg-onb" style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>
-          <p style={{ color: "var(--t3)", fontSize: 13 }}>Einrichtung wird geladen …</p>
+        <div className="grid min-h-dvh place-items-center bg-zinc-950 text-zinc-400">
+          <p className="text-[13px]">Einrichtung wird geladen …</p>
         </div>
       }
     >
-      <div className="evg-studio">
-        <OnboardingFlow bootstrap={bootstrap} />
-      </div>
+      <OnboardingTourFlow bootstrap={bootstrap} />
     </Suspense>
   );
 }

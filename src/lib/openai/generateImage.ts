@@ -1,20 +1,31 @@
+import sharp from "sharp";
 import { classifyProviderResponse } from "@/lib/ai/providerErrors";
 import { ProviderError, withProviderRetry } from "@/lib/ai/providerRequest";
+import {
+  aspectRatioToCropRect,
+  mapAspectRatioToOpenAiSize,
+  type OpenAiImageSize,
+} from "@/lib/openai/imageAspectRatio";
 
-export type OpenAiImageSize = "1024x1024" | "1024x1536" | "1536x1024";
+export type { OpenAiImageSize } from "@/lib/openai/imageAspectRatio";
+export { aspectRatioToOutputDimensions, mapAspectRatioToOpenAiSize } from "@/lib/openai/imageAspectRatio";
 export type OpenAiImageQuality = "low" | "medium" | "high" | "auto";
 
 export type OpenAiReferenceImage = { base64: string; mime: string };
 
-/**
- * Mappt unsere UI-Seitenverhaeltnisse auf die von den GPT-Image-Modellen
- * garantiert unterstuetzten Standardgroessen (quadratisch / hoch / quer).
- */
-export function mapAspectRatioToOpenAiSize(aspectRatio: string | undefined): OpenAiImageSize {
-  if (!aspectRatio) return "1024x1024";
-  if (["9:16", "4:5", "3:4", "2:3"].includes(aspectRatio)) return "1024x1536";
-  if (["16:9", "21:9", "3:2", "4:3", "5:4"].includes(aspectRatio)) return "1536x1024";
-  return "1024x1024";
+/** Center-Crop auf das gewählte UI-Format (OpenAI liefert nur 1:1 / 2:3 / 3:2). */
+export async function cropImageBufferToAspectRatio(
+  buffer: Buffer,
+  aspectRatio: string,
+  outputFormat: "png" | "jpg" = "png",
+): Promise<Buffer> {
+  const crop = aspectRatioToCropRect(aspectRatio);
+  const source = mapAspectRatioToOpenAiSize(aspectRatio);
+  const [nativeW, nativeH] = source.split("x").map(Number);
+  if (crop.width === nativeW && crop.height === nativeH) return buffer;
+
+  const pipeline = sharp(buffer).extract(crop);
+  return outputFormat === "jpg" ? pipeline.jpeg({ quality: 92 }).toBuffer() : pipeline.png().toBuffer();
 }
 
 function parseOpenAiBase64(payload: unknown): string | null {

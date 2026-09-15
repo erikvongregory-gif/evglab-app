@@ -1,3 +1,4 @@
+import { publicFetch } from "@/lib/security/public-fetch";
 import type { Frame, Page } from "playwright";
 import {
   assertSafePublicUrl,
@@ -54,11 +55,12 @@ export async function fetchWebsiteHtmlWithBrowser(startUrl: string): Promise<Saf
   const { chromium } = await import("playwright");
   const browser = await chromium.launch({
     headless: true,
-    args: ["--disable-blink-features=AutomationControlled"],
+    args: ["--disable-blink-features=AutomationControlled", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"],
   });
 
   try {
     const context = await browser.newContext({
+      serviceWorkers: "block",
       userAgent: REAL_BROWSER_USER_AGENT,
       locale: "de-DE",
       timezoneId: "Europe/Berlin",
@@ -68,6 +70,18 @@ export async function fetchWebsiteHtmlWithBrowser(startUrl: string): Promise<Saf
       },
     });
 
+    let requestCount = 0;
+    let totalBytes = 0;
+    await context.routeWebSocket("**/*", socket => socket.close());
+    await context.route("**/*", async route => {
+      if (++requestCount > 80 || totalBytes > 30 * 1024 * 1024 || !["GET", "HEAD"].includes(route.request().method())) return route.abort();
+      try {
+        const response = await publicFetch(route.request().url(), { followRedirects: false, maxBytes: 2 * 1024 * 1024, headers: { "User-Agent": REAL_BROWSER_USER_AGENT } });
+        totalBytes += response.body.length;
+        await route.fulfill({ status: response.status, body: response.body, contentType: response.headers["content-type"] ?? "application/octet-stream",
+          headers: response.headers.location ? { location: response.headers.location } : undefined });
+      } catch { await route.abort(); }
+    });
     const page = await context.newPage();
     await page.goto(startUrl, {
       waitUntil: "domcontentloaded",
@@ -113,9 +127,7 @@ export async function fetchWebsiteHtmlForBrandIntake(startUrl: string): Promise<
       /executable doesn't exist|browserType.launch|Failed to launch/i.test(reason) ||
       reason.includes("npx playwright install");
     if (missingBrowser) {
-      throw new Error(
-        "Chromium für die Marken-Analyse fehlt. Auf dem Server ausführen: npx playwright install chromium",
-      );
+      return safeFetchHtml(startUrl);
     }
     console.warn("[brand-intake] browser fetch failed, fallback to fetch:", reason);
     return safeFetchHtml(startUrl);

@@ -1,3 +1,5 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -7,7 +9,6 @@ import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/re
 import { getFreshUserDashboardMetadata, getFreshUserMetadata } from "@/lib/dashboard/freshMetadata";
 import {
   MAX_MY_BEERS,
-  getDashboardMetadata,
   mergeDashboardMetadata,
   sanitizeDashboardBeers,
   type DashboardBeer,
@@ -55,9 +56,12 @@ export async function GET() {
     return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
   }
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, false); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
   const dashboard = await getFreshUserDashboardMetadata(user.id, user.user_metadata);
@@ -93,9 +97,12 @@ export async function PUT(req: Request) {
   }
 
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
   // Etikett-Uploads in kurze HTTPS-URLs umwandeln (nie Base64 in user_metadata).

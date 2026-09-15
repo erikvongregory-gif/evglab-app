@@ -1,3 +1,6 @@
+import { getWorkspace } from "@/lib/dashboard/workspace";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -48,6 +51,9 @@ export async function POST(req: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user && (await getWorkspace(user.id)).role !== "owner") return NextResponse.json({error:"Abrechnung kann nur der Teaminhaber verwalten."},{status:403});
     if (!user) {
       return NextResponse.json(
         { error: "Konto erforderlich. Bitte zuerst registrieren.", code: "ACCOUNT_REQUIRED" },
@@ -73,6 +79,10 @@ export async function POST(req: Request) {
       existingCustomerId: billing?.stripe_customer_id ?? null,
     });
 
+    const subscriptions = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
+    if (subscriptions.data.some(sub => !["canceled", "incomplete_expired"].includes(sub.status))) return NextResponse.json({ error: "Es besteht bereits ein Abo. Bitte über die Aboverwaltung ändern." }, { status: 409 });
+    const claim = await createAdminClient().rpc("billing_claim_checkout", { p_user: user.id, p_plan: plan, p_interval: interval });
+    if (claim.error) return NextResponse.json({ error: claim.error.message }, { status: 409 });
     const priceId = getPriceIdForPlan(plan, interval);
     const origin = getAppBaseUrlOrigin(new URL(req.url).origin);
     const kleinunternehmerMode = isKleinunternehmerModeEnabled();
@@ -111,7 +121,7 @@ export async function POST(req: Request) {
           interval,
         },
       },
-    });
+    }, { idempotencyKey: `checkout:${claim.data}` });
 
     return NextResponse.json({ url: session.url });
   } catch (error) {

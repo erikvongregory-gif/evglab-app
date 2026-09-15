@@ -1,3 +1,4 @@
+import { reserveGeneration } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
@@ -40,6 +41,8 @@ export async function POST(req: Request) {
     });
     const budgetError = await requireTokenBudget(guard.userId, perImageCost);
     if (budgetError) return budgetError;
+    const job = await reserveGeneration(req,guard.userId,perImageCost * 2,input);
+    if(job instanceof NextResponse)return job;
 
     const origin = new URL(req.url).origin;
     assertResolvableReferenceUrls(guard.userMetadata, origin, [input.etikettBild]);
@@ -90,8 +93,7 @@ export async function POST(req: Request) {
       resolveReferenceUrl: createReferenceResolverFromMetadata(guard.userMetadata),
     });
 
-    const charge = await chargeGeneratedTokens(guard.userId, perImageCost * Math.max(images.length, 1));
-    if (!charge.ok) return charge.response;
+    const charge = await chargeGeneratedTokens(job, perImageCost * images.length, {images,prompt});
 
     return NextResponse.json({
       mode: "hyperrealistic",

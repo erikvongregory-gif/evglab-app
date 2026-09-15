@@ -1,14 +1,15 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { reserveGeneration, finishGeneration, linkProviderTask } from "@/lib/billing/generationJobs";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { classifyProviderError, classifyProviderResponse } from "@/lib/ai/providerErrors";
 import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
+import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
-import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { withPendingTask } from "@/lib/kie/taskBillingMetadata";
+import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import {
   buildBrandProfilePromptContext,
   canUseCampaignWithTextProfile,
@@ -138,7 +139,7 @@ async function uploadReferenceImagesToKie(apiKey: string, referenceImageUrls?: s
 
 export async function POST(req: Request) {
   try {
-    const rateError = enforceRateLimit(req, {
+    const rateError = await enforceRateLimitPersistent(req, {
       keyPrefix: "kie-create-task",
       limit: 12,
       windowMs: 60_000,
@@ -148,19 +149,20 @@ export async function POST(req: Request) {
     if (originError) return originError;
 
     let userId: string | null = null;
-    let currentUserMetadata: Record<string, unknown> = {};
     let bodyBrandProfileContext = "";
     let resolvedBrandProfile: ReturnType<typeof getBrandProfileFromMetadata> | null = null;
     if (isSupabaseConfigured()) {
       const supabase = await createClient();
-      const {
+      let {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
       if (!user) {
         return NextResponse.json({ error: "Nicht angemeldet.", code: "auth_required" }, { status: 401 });
       }
       userId = user.id;
-      currentUserMetadata = (user.user_metadata as Record<string, unknown> | null) ?? {};
       resolvedBrandProfile = getBrandProfileFromMetadata(user.user_metadata);
       if (!isBrandProfileComplete(resolvedBrandProfile)) {
         return NextResponse.json(
@@ -308,6 +310,8 @@ export async function POST(req: Request) {
           ...nsfwFalse,
         };
 
+    const job = await reserveGeneration(req, userId, tokenCost, body);
+    if (job instanceof NextResponse) return job;
     const upstream = await fetch(`${baseUrl}/api/v1/jobs/createTask`, {
       method: "POST",
       headers: {
@@ -325,6 +329,7 @@ export async function POST(req: Request) {
       // Kein Token-Abzug: die Buchung erfolgt erst nach erfolgreicher Task-Anlage.
       const classified = classifyProviderResponse("kie", upstream, data);
       logProviderFailure(classified, { label: "kie-nano-banana-create-task", userId });
+      await finishGeneration(job, 0, { error: classified.userMessage });
       return providerErrorResponse(classified);
     }
 
@@ -338,6 +343,7 @@ export async function POST(req: Request) {
         ((data.data as Record<string, unknown> | undefined)?.msg as string | undefined);
       const classified = classifyProviderError({ provider: "kie", status: code, message: upstreamMessage });
       logProviderFailure(classified, { label: "kie-nano-banana-create-task", userId });
+      await finishGeneration(job, 0, { error: classified.userMessage });
       return providerErrorResponse(classified);
     }
 
@@ -351,24 +357,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const consumeResult = await consumeTokens(userId, tokenCost);
-    if (!consumeResult.ok) {
-      return NextResponse.json({ error: consumeResult.error }, { status: 402 });
-    }
-    const admin = createAdminClient();
-    const { error: pendingBillingError } = await admin.auth.admin.updateUserById(userId, {
-      user_metadata: withPendingTask(currentUserMetadata, taskId, {
-        consumed: tokenCost,
-        createdAt: new Date().toISOString(),
-        freeTrial: false,
-      }),
-    });
-    if (pendingBillingError) {
-      return NextResponse.json(
-        { error: "Tokenverbrauch wurde verbucht, aber Task-Buchung konnte nicht gespeichert werden." },
-        { status: 500 },
-      );
-    }
+    await linkProviderTask(job, taskId);
+    const consumeResult = { state: (await getEffectiveBillingRow(userId))! };
     const response = NextResponse.json({
       taskId,
       usedModel: kieModel,

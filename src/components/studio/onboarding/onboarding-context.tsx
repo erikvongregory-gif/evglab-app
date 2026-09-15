@@ -197,7 +197,6 @@ export function StudioOnboardingProvider({ children }: { children: ReactNode }) 
           celebrated: false,
           hints: [],
           flowVersion: 2,
-          currentStep: 1,
         });
         setState(reset);
         void fetch("/api/dashboard/onboarding", {
@@ -210,8 +209,8 @@ export function StudioOnboardingProvider({ children }: { children: ReactNode }) 
             celebrated: false,
             hints: [],
             flowVersion: 2,
-            currentStep: 1,
             completedAt: null,
+            tourVersion: null,
           }),
         }).finally(() => {
           window.location.assign("/onboarding");

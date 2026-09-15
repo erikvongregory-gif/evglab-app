@@ -1,3 +1,4 @@
+import { publicFetch } from "@/lib/security/public-fetch";
 import { createHash } from "node:crypto";
 import sharp from "sharp";
 import {
@@ -740,11 +741,8 @@ async function downloadImage(candidate: ImageCandidate): Promise<DownloadedImage
     const timeout = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
     let response: Response;
     try {
-      response = await fetch(candidate.url, {
-        signal: controller.signal,
-        headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "image/*" },
-        cache: "no-store",
-      });
+      const fetched = await publicFetch(candidate.url, { maxBytes: MAX_IMAGE_BYTES, headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "image/*" } });
+      response = new Response(new Uint8Array(fetched.body), { status: fetched.status, headers: fetched.headers });
     } finally {
       clearTimeout(timeout);
     }

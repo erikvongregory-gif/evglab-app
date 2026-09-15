@@ -1,10 +1,12 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { type DashboardMediaItem } from "@/lib/dashboard/metadata";
-import { readDashboardMedia, writeDashboardMedia } from "@/lib/dashboard/media-store";
+import { readDashboardMedia, writeDashboardMedia, deleteDashboardMedia } from "@/lib/dashboard/media-store";
 
 const mediaSchema = z.object({
   id: z.string().min(1).max(120),
@@ -22,14 +24,17 @@ const mediaPatchSchema = z.object({
   title: z.string().min(1).max(120),
 });
 
-async function requireUserId(): Promise<string | NextResponse> {
+async function requireUserId(write = false): Promise<string | NextResponse> {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
   }
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, write); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   return user.id;
 }
@@ -63,7 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Ungültiges Mediathek-Element." }, { status: 400 });
   }
 
-  const userId = await requireUserId();
+  const userId = await requireUserId(true);
   if (typeof userId !== "string") return userId;
 
   const payload = parsed.data;
@@ -74,11 +79,7 @@ export async function POST(req: Request) {
   };
 
   try {
-    const current = await readDashboardMedia(userId);
-    const next = await writeDashboardMedia(userId, [
-      item,
-      ...current.filter((entry) => entry.id !== item.id),
-    ]);
+    const next = await writeDashboardMedia(userId, [item]);
     return NextResponse.json({ ok: true, items: next });
   } catch (error) {
     console.warn("[dashboard/media] POST failed:", error);
@@ -101,7 +102,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Ungültiger Motiv-Titel." }, { status: 400 });
   }
 
-  const userId = await requireUserId();
+  const userId = await requireUserId(true);
   if (typeof userId !== "string") return userId;
 
   const { id, title } = parsed.data;
@@ -112,7 +113,7 @@ export async function PATCH(req: Request) {
     }
     const next = await writeDashboardMedia(
       userId,
-      current.map((entry) => (entry.id === id ? { ...entry, title: title.trim() } : entry)),
+      current.filter(entry => entry.id === id).map(entry => ({ ...entry, title: title.trim() })),
     );
     return NextResponse.json({ ok: true, items: next });
   } catch (error) {
@@ -135,15 +136,11 @@ export async function DELETE(req: Request) {
   const id = url.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id fehlt." }, { status: 400 });
 
-  const userId = await requireUserId();
+  const userId = await requireUserId(true);
   if (typeof userId !== "string") return userId;
 
   try {
-    const current = await readDashboardMedia(userId);
-    const next = await writeDashboardMedia(
-      userId,
-      current.filter((entry) => entry.id !== id),
-    );
+    const next = await deleteDashboardMedia(userId, id);
     return NextResponse.json({ ok: true, items: next });
   } catch (error) {
     console.warn("[dashboard/media] DELETE failed:", error);

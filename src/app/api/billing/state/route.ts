@@ -1,3 +1,5 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { isOwnerUser } from "@/lib/auth/owner";
 import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
@@ -16,13 +18,16 @@ export async function GET() {
     return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
   }
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
   if (!user) {
     return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
 
+  user = await workspaceResourceUser(user);
   const freeTrialImageUsed = Boolean(user.user_metadata?.free_trial_image_used_at);
   const onboardingBonusClaimed = Boolean(user.user_metadata?.onboarding_bonus_claimed_at);
 

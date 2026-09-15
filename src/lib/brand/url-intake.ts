@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+import { publicFetch, isPublicAddress } from "@/lib/security/public-fetch";
 const BLOCKED_HOSTS = new Set([
   "localhost",
   "127.0.0.1",
@@ -42,7 +44,7 @@ export function isBlockedHost(hostname: string): boolean {
   if (BLOCKED_HOSTS.has(host)) return true;
   if (host.endsWith(".local") || host.endsWith(".internal")) return true;
   if (PRIVATE_IPV4_RE.test(host)) return true;
-  if (host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) return true;
+  if (isIP(host) && !isPublicAddress(host)) return true;
   return false;
 }
 
@@ -50,7 +52,7 @@ export function assertSafePublicUrl(url: URL): void {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("Nur http- und https-URLs sind erlaubt.");
   }
-  if (isBlockedHost(url.hostname)) {
+  if (url.username || url.password || isBlockedHost(url.hostname)) {
     throw new Error("Diese URL ist nicht erlaubt.");
   }
 }
@@ -72,67 +74,11 @@ export type SafeFetchResult = {
 };
 
 export async function safeFetchHtml(startUrl: string): Promise<SafeFetchResult> {
-  let currentUrl = startUrl;
-  let redirectCount = 0;
-
-  while (true) {
-    const parsed = new URL(currentUrl);
-    assertSafePublicUrl(parsed);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
-
-    let response: Response;
-    try {
-      response = await fetch(currentUrl, {
-        method: "GET",
-        redirect: "manual",
-        signal: controller.signal,
-        headers: {
-          "User-Agent": BROWSER_USER_AGENT,
-          Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
-          Cookie: BRAND_INTAKE_CONSENT_COOKIES,
-        },
-        cache: "no-store",
-      });
-    } catch (e) {
-      clearTimeout(timeout);
-      if (e instanceof Error && e.name === "AbortError") {
-        throw new Error("Die Website hat zu lange geantwortet.");
-      }
-      throw new Error("Die Website konnte nicht geladen werden.");
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location) throw new Error("Ungueltige Weiterleitung der Website.");
-      redirectCount += 1;
-      if (redirectCount > URL_MAX_REDIRECTS) {
-        throw new Error("Zu viele Weiterleitungen.");
-      }
-      currentUrl = new URL(location, currentUrl).toString();
-      continue;
-    }
-
-    if (!response.ok) {
-      throw new Error(`Website antwortete mit Status ${response.status}.`);
-    }
-
-    const contentType = response.headers.get("content-type") ?? "text/html";
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.byteLength > URL_MAX_BODY_BYTES) {
-      throw new Error("Die Website ist zu gross zum Analysieren.");
-    }
-
-    return {
-      finalUrl: currentUrl,
-      html: buffer.toString("utf-8"),
-      contentType,
-    };
-  }
+  assertSafePublicUrl(new URL(startUrl));
+  const response = await publicFetch(startUrl, { maxBytes: URL_MAX_BODY_BYTES, timeoutMs: URL_FETCH_TIMEOUT_MS,
+    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "text/html,application/xhtml+xml", Cookie: BRAND_INTAKE_CONSENT_COOKIES } });
+  if (response.status < 200 || response.status >= 300) throw new Error(`Website antwortete mit Status ${response.status}.`);
+  return { finalUrl: response.finalUrl, html: response.body.toString("utf8"), contentType: response.headers["content-type"] ?? "text/html" };
 }
 
 export function resolveAbsoluteUrl(baseUrl: string, href: string): string | null {

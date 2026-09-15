@@ -4,7 +4,7 @@ import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuard
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminSession } from "@/lib/admin/auth";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
-import { readDashboardMedia, writeDashboardMedia } from "@/lib/dashboard/media-store";
+import { readDashboardMedia, deleteDashboardMedia } from "@/lib/dashboard/media-store";
 
 const deleteSchema = z.object({
   ownerUserId: z.string().min(1),
@@ -74,7 +74,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Motiv nicht gefunden." }, { status: 404 });
   }
   try {
-    await writeDashboardMedia(parsed.data.ownerUserId, nextMedia);
+    await deleteDashboardMedia(parsed.data.ownerUserId, parsed.data.mediaId);
   } catch (updateError) {
     return NextResponse.json(
       { error: updateError instanceof Error ? updateError.message : "Löschen fehlgeschlagen." },

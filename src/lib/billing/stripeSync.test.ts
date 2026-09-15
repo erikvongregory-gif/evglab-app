@@ -19,6 +19,6 @@ beforeEach(() => {
 it("syncs entitlement using the current price without replaying historical purchases", async () => {
   expect(await syncBillingFromStripe({ userId: "user_one" })).toEqual({ synced: true, plan: "growth" });
   expect(mocks.activate).toHaveBeenCalledWith({ userId: "user_one", plan: "growth", subscriptionStatus: "active",
-    stripeCustomerId: "cus_one", stripeSubscriptionId: "sub_one", currentPeriodEnd: new Date(1790812800 * 1000).toISOString(),
+    stripeCustomerId: "cus_one", stripeSubscriptionId: "sub_one", currentPeriodStart: null, currentPeriodEnd: new Date(1790812800 * 1000).toISOString(),
   });
 });

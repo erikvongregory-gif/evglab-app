@@ -3,9 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { classifyThrownProviderError } from "@/lib/ai/providerErrors";
 import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
-import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { createClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 
 export const runtime = "nodejs";
 
@@ -16,24 +14,8 @@ const bodySchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const originError = enforceSameOrigin(req);
-    if (originError) return originError;
-
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ error: "Supabase nicht konfiguriert." }, { status: 503 });
-    }
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
-
-    const rate = await enforceRateLimitPersistent(req, {
-      keyPrefix: "claude-improve-scene",
-      limit: 30,
-      windowMs: 60_000,
-    });
-    if (rate) return rate;
+    const guard = await requireBillableImageGenerationUser(req, "claude-improve-scene");
+    if (!guard.ok) return guard.response;
 
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
     if (!apiKey) return NextResponse.json({ error: "ANTHROPIC_API_KEY fehlt." }, { status: 500 });

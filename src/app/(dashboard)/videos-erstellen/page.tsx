@@ -13,6 +13,7 @@ import { isVideosCreateEnabled } from "@/lib/featureFlags";
 import { CreateContentLockedView } from "@/components/studio/create-content-locked-view";
 import { CreateVideosComingSoonView } from "@/components/studio/create-videos-coming-soon-view";
 import { CreateVideosView } from "@/components/studio/create-videos-view";
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -48,9 +49,11 @@ export default async function VideosErstellenPage() {
     redirect("/anmelden");
   }
 
+  const resourceUser = await workspaceResourceUser(user);
+
   if (
     needsFullOnboardingFlow(
-      sanitizeStudioOnboardingState(getDashboardMetadata(user.user_metadata).onboarding),
+      sanitizeStudioOnboardingState(getDashboardMetadata(resourceUser.user_metadata).onboarding),
     )
   ) {
     redirect("/onboarding");
@@ -61,17 +64,17 @@ export default async function VideosErstellenPage() {
   }
 
   if (!isOwnerUser(user)) {
-    await ensureBillingRow(user.id);
-    let billing = await getBillingRow(user.id);
+    await ensureBillingRow(resourceUser.id);
+    let billing = await getBillingRow(resourceUser.id);
     if (!hasActiveSubscription(billing)) {
       try {
         const syncResult = await syncBillingFromStripe({
-          userId: user.id,
-          userEmail: user.email,
+          userId: resourceUser.id,
+          userEmail: resourceUser.email,
           currentRow: billing,
         });
         if (syncResult.synced) {
-          billing = await getBillingRow(user.id);
+          billing = await getBillingRow(resourceUser.id);
         }
       } catch {
         /* Stripe optional */
@@ -83,13 +86,13 @@ export default async function VideosErstellenPage() {
     }
   }
 
-  const dashboard = (user.user_metadata?.dashboard ?? {}) as Record<string, unknown>;
+  const dashboard = (resourceUser.user_metadata?.dashboard ?? {}) as Record<string, unknown>;
   const settings = dashboard.settings as Record<string, unknown> | undefined;
   const breweryName =
     typeof settings?.breweryName === "string"
       ? settings.breweryName
-      : typeof user.user_metadata?.brewery === "string"
-        ? user.user_metadata.brewery
+      : typeof resourceUser.user_metadata?.brewery === "string"
+        ? resourceUser.user_metadata.brewery
         : undefined;
 
   return <CreateVideosView breweryName={breweryName} />;

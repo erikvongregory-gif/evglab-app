@@ -1,3 +1,4 @@
+import { reserveGeneration } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
     const input = parsed.data;
     const budgetError = await requireTokenBudget(guard.userId, ISOLATE_TOKEN_COST);
     if (budgetError) return budgetError;
+    const job = await reserveGeneration(req,guard.userId,ISOLATE_TOKEN_COST,input);
+    if(job instanceof NextResponse)return job;
 
     const prompt = buildProductIsolatePrompt(input);
     const cutout = await removeBackground({
@@ -44,8 +47,7 @@ export async function POST(req: Request) {
       input.outputFormat === "webp" ? await sharp(cutout).webp({ quality: 95 }).toBuffer() : await sharp(cutout).png().toBuffer();
     const mime = input.outputFormat === "webp" ? "image/webp" : "image/png";
 
-    const charge = await chargeGeneratedTokens(guard.userId, ISOLATE_TOKEN_COST);
-    if (!charge.ok) return charge.response;
+    const charge = await chargeGeneratedTokens(job, ISOLATE_TOKEN_COST, {image:`data:${mime};base64,${output.toString("base64")}`,prompt});
 
     return NextResponse.json({
       mode: "product_isolate",

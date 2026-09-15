@@ -1,3 +1,5 @@
+import { getWorkspace } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isOwnerUser } from "@/lib/auth/owner";
@@ -60,6 +62,9 @@ export async function POST(req: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user && (await getWorkspace(user.id)).role !== "owner") return NextResponse.json({error:"Abrechnung kann nur der Teaminhaber verwalten."},{status:403});
   if (!user) {
     return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   }

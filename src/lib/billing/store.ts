@@ -15,13 +15,6 @@ export type BillingRow = {
   current_period_end: string | null;
 };
 
-type StripeEventClaimRow = {
-  event_id: string;
-  event_type: string;
-  status: "processing" | "processed";
-  processed_at?: string | null;
-};
-
 /**
  * Wenn die Dedupe-Tabelle in Prod fehlt, wollen wir das laut hoeren statt still
  * weiterzumachen. In Dev/Local ist Toleranz gegenueber `42P01` (table missing)
@@ -58,11 +51,14 @@ export async function ensureBillingRow(userId: string) {
 
 export async function getBillingRow(userId: string): Promise<BillingRow | null> {
   const admin = createAdminClient();
-  const { data } = await admin
+  const refresh = await admin.rpc("billing_refresh_monthly", { p_user_id: userId });
+  if (refresh.error) throw new Error(refresh.error.message);
+  const { data, error } = await admin
     .from("billing_subscriptions")
     .select("user_id,plan,monthly_tokens,used_tokens,stripe_customer_id,stripe_subscription_id,subscription_status,current_period_end")
     .eq("user_id", userId)
     .maybeSingle();
+  if (error) throw new Error(error.message);
   return (data as BillingRow | null) ?? null;
 }
 
@@ -81,6 +77,7 @@ export async function activatePlanForUser(args: {
   stripeCustomerId: string;
   stripeSubscriptionId: string;
   currentPeriodEnd: string | null;
+  currentPeriodStart?: string | null;
 }) {
   const { error } = await createAdminClient().rpc("billing_activate_plan_atomic", {
     p_user_id: args.userId,
@@ -92,6 +89,10 @@ export async function activatePlanForUser(args: {
     p_period_end: args.currentPeriodEnd,
   });
   if (error) throw new Error(`activatePlanForUser fehlgeschlagen: ${error.message}`);
+  if (args.currentPeriodStart) {
+    const schedule = await createAdminClient().rpc("billing_set_token_schedule", { p_user_id: args.userId, p_subscription_id: args.stripeSubscriptionId, p_start: args.currentPeriodStart });
+    if (schedule.error) throw new Error(schedule.error.message);
+  }
 }
 
 export async function cancelBillingSubscription(subscriptionId: string, periodEnd: string | null) {
@@ -103,21 +104,23 @@ export async function cancelBillingSubscription(subscriptionId: string, periodEn
 
 export async function getByStripeCustomerId(customerId: string): Promise<BillingRow | null> {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("billing_subscriptions")
     .select("user_id,plan,monthly_tokens,used_tokens,stripe_customer_id,stripe_subscription_id,subscription_status,current_period_end")
     .eq("stripe_customer_id", customerId)
     .maybeSingle();
+  if (error) throw new Error(error.message);
   return (data as BillingRow | null) ?? null;
 }
 
 export async function getByStripeSubscriptionId(subscriptionId: string): Promise<BillingRow | null> {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("billing_subscriptions")
     .select("user_id,plan,monthly_tokens,used_tokens,stripe_customer_id,stripe_subscription_id,subscription_status,current_period_end")
     .eq("stripe_subscription_id", subscriptionId)
     .maybeSingle();
+  if (error) throw new Error(error.message);
   return (data as BillingRow | null) ?? null;
 }
 
@@ -202,17 +205,9 @@ export async function grantTokenPackSession(args: {
 }
 
 export async function claimStripeWebhookEvent(eventId: string, eventType: string): Promise<boolean> {
-  const admin = createAdminClient();
-  const { error } = await admin.from("stripe_webhook_events").insert({
-    event_id: eventId,
-    event_type: eventType,
-    status: "processing",
-  } satisfies StripeEventClaimRow);
-  if (!error) return true;
-  // Fallback fuer Umgebungen ohne Migration der Dedupe-Tabelle - nur in Dev tolerieren.
-  if (error.code === "42P01" && isUndefinedTableTolerated()) return true;
-  if (error.code === "23505") return false;
-  throw new Error(`claimStripeWebhookEvent fehlgeschlagen: ${error.message}`);
+  const {data,error}=await createAdminClient().rpc("stripe_claim_event",{p_id:eventId,p_type:eventType});
+  if(error)throw new Error(error.message);
+  return data===true;
 }
 
 export async function markStripeWebhookEventProcessed(eventId: string) {

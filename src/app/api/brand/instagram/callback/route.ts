@@ -1,3 +1,5 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient, createRouteHandlerClient } from "@/lib/supabase/server";
@@ -29,9 +31,12 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) {
     return NextResponse.redirect(`${appOrigin}/anmelden?next=${encodeURIComponent("/dashboard?tab=brand&openBrand=1")}`);
   }

@@ -1,4 +1,4 @@
-import { getDashboardMetadata, mergeDashboardMetadata } from "@/lib/dashboard/metadata";
+import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 
 export type StoredInstagramConnection = {
   igUserId: string;

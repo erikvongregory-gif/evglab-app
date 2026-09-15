@@ -87,6 +87,7 @@ export async function syncBillingFromStripe(args: SyncArgs) {
     stripeCustomerId: customerId,
     stripeSubscriptionId: preferred.id,
     currentPeriodEnd: toIsoFromUnix(getCurrentPeriodEndUnix(preferred)),
+    currentPeriodStart: toIsoFromUnix(preferred.items.data[0]?.current_period_start ?? preferred.start_date),
   });
   return { synced: true as const, plan };
 }

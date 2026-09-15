@@ -8,7 +8,7 @@ import {
 } from "@/lib/assistant/hopfenHugoPolicy";
 import { createAnthropicMessageWithModelFallback } from "@/lib/anthropic/modelCandidates";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { requireAuthenticatedUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
+import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -64,7 +64,7 @@ function resolveConversationMessages(input: z.infer<typeof requestSchema>): Arra
 export async function POST(req: Request) {
   let questionForFallback = "";
   try {
-    const authGuard = await requireAuthenticatedUser(req, "brauerei-assistant-auth");
+    const authGuard = await requireBillableImageGenerationUser(req, "brauerei-assistant-auth");
     if (!authGuard.ok) return authGuard.response;
 
     const rateError = await enforceRateLimitPersistent(req, {

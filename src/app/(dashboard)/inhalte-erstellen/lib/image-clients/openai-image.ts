@@ -1,3 +1,4 @@
+import { publicFetch } from "@/lib/security/public-fetch";
 import OpenAI from "openai";
 import { toFile } from "openai/uploads";
 import sharp from "sharp";
@@ -47,13 +48,13 @@ async function fetchReferenceBuffer(
   const resolved = resolveReferenceUrl ? await resolveReferenceUrl(url, index) : null;
   if (resolved && resolved.byteLength > 0) return resolved;
 
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
+  const res = await publicFetch(url,{maxBytes:20*1024*1024});
+  if (res.status !== 200) {
     throw new Error(
       `Reference image fetch failed: ${url}. Bitte Markenprofil neu scannen, falls das Bild aelter ist.`,
     );
   }
-  return Buffer.from(await res.arrayBuffer());
+  return res.body;
 }
 
 async function urlsToFiles(urls: string[], resolveReferenceUrl?: ReferenceUrlResolver) {

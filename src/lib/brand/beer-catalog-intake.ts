@@ -7,6 +7,7 @@ import {
 } from "@/lib/dashboard/metadata";
 import { uploadUserImageToStorage } from "@/lib/supabase/storage";
 import { assertSafePublicUrl, BROWSER_USER_AGENT, resolveAbsoluteUrl, URL_FETCH_TIMEOUT_MS } from "@/lib/brand/url-intake";
+import { publicFetch } from "@/lib/security/public-fetch";
 import {
   isProductCatalogImage,
   type DownloadedImage,
@@ -487,20 +488,18 @@ export async function persistBeerLabelFromUrl(userId: string, sourceUrl: string)
     return "";
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), URL_FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(parsed.toString(), {
-      signal: controller.signal,
+    const response = await publicFetch(parsed.toString(), {
+      maxBytes: MAX_LABEL_BYTES,
+      timeoutMs: URL_FETCH_TIMEOUT_MS,
       headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "image/*" },
-      cache: "no-store",
     });
-    if (!response.ok) return trimmed;
+    if (response.status < 200 || response.status >= 300) return trimmed;
 
-    const contentType = (response.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+    const contentType = (response.headers["content-type"] ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
     if (!ALLOWED_LABEL_MIME.has(contentType)) return trimmed;
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const buffer = response.body;
     if (buffer.byteLength < 32 || buffer.byteLength > MAX_LABEL_BYTES) return trimmed;
 
     return await uploadUserImageToStorage({
@@ -511,8 +510,6 @@ export async function persistBeerLabelFromUrl(userId: string, sourceUrl: string)
     });
   } catch {
     return trimmed;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

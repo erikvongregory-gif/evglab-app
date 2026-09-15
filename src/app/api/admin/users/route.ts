@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
   const users = (data.users ?? [])
     .map((u) => {
-      const role = typeof u.user_metadata?.role === "string" ? String(u.user_metadata.role) : "user";
+      const role = typeof u.app_metadata?.role === "string" ? String(u.app_metadata.role) : "user";
       return {
         id: u.id,
         email: u.email ?? "",
@@ -65,7 +65,7 @@ export async function PATCH(req: Request) {
 
   const client = createAdminClient();
   const { error } = await client.auth.admin.updateUserById(parsed.data.userId, {
-    user_metadata: { role: parsed.data.role },
+    app_metadata: { role: parsed.data.role },
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

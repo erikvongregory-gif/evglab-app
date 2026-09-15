@@ -1,10 +1,11 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { finishGeneration, type GenerationJob } from "@/lib/billing/generationJobs";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { refundTokens } from "@/lib/billing/store";
 import { parseUpstreamProgress } from "@/lib/kie/generationProgress";
 import { extractTaskMedia } from "@/lib/kie/taskResponse";
-import { getPendingTaskBillingMap, withoutPendingTask } from "@/lib/kie/taskBillingMetadata";
-import { enforceRateLimit, sanitizeTaskId } from "@/lib/security/requestGuards";
+import { enforceRateLimitPersistent, sanitizeTaskId } from "@/lib/security/requestGuards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
     // Polling-Endpoint: pro User max 4 parallele Varianten × ein Poll alle ~2.5s
     // = bis zu ~96 Requests/Minute im Worst-Case. Großzügig dimensionieren, damit
     // länger laufende Kie-Tasks nicht ins Rate-Limit laufen.
-    const rateError = enforceRateLimit(req, {
+    const rateError = await enforceRateLimitPersistent(req, {
       keyPrefix: "kie-task-status",
       limit: 300,
       windowMs: 60_000,
@@ -42,17 +43,18 @@ export async function GET(req: Request) {
     if (rateError) return rateError;
 
     let userId: string | null = null;
-    let currentUserMetadata: Record<string, unknown> = {};
     if (isSupabaseConfigured()) {
       const supabase = await createClient();
-      const {
+      let {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, false); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
       if (!user) {
         return NextResponse.json({ error: "Nicht angemeldet.", code: "auth_required" }, { status: 401 });
       }
       userId = user.id;
-      currentUserMetadata = (user.user_metadata as Record<string, unknown> | null) ?? {};
     }
 
     const apiKey = process.env.KIE_API_KEY;
@@ -74,6 +76,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "taskId ist ungültig." }, { status: 400 });
     }
 
+    if (!userId) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+    const lookup = await createAdminClient().from("generation_jobs").select("*").eq("user_id", userId).eq("provider_task_id", taskId).maybeSingle();
+    if (lookup.error) throw new Error(lookup.error.message);
+    if (!lookup.data) return NextResponse.json({ error: "Auftrag nicht gefunden." }, { status: 404 });
+    const job = lookup.data as GenerationJob;
     const baseUrl = process.env.KIE_API_BASE_URL || "https://api.kie.ai";
     const timeoutController = new AbortController();
     const timeoutId = globalThis.setTimeout(() => timeoutController.abort(), KIE_STATUS_TIMEOUT_MS);
@@ -120,20 +127,9 @@ export async function GET(req: Request) {
     const videoUrl = media.videoUrl;
     const mediaUrl = media.mediaUrl ?? imageUrl ?? videoUrl;
 
-    if (userId) {
-      const pending = getPendingTaskBillingMap(currentUserMetadata)[taskId];
-      const finishedSuccess = ["success", "succeeded", "completed", "done"].includes(state) && Boolean(mediaUrl);
-      const finishedError = ["failed", "error", "cancelled", "canceled"].includes(state);
-      if (pending && (finishedSuccess || finishedError)) {
-        if (finishedError && pending.consumed > 0) {
-          await refundTokens(userId, pending.consumed);
-        }
-        const admin = createAdminClient();
-        await admin.auth.admin.updateUserById(userId, {
-          user_metadata: withoutPendingTask(currentUserMetadata, taskId),
-        });
-      }
-    }
+    const result = { state, imageUrl, videoUrl, mediaUrl, mediaKind: media.mediaKind, progress: upstreamProgress ?? (mediaUrl ? 100 : null) };
+    if (["failed", "error", "cancelled", "canceled"].includes(state)) await finishGeneration(job, 0, result);
+    else if (["success", "succeeded", "completed", "done"].includes(state) && mediaUrl) await finishGeneration(job, job.amount, result);
 
     return NextResponse.json({
       state,

@@ -10,12 +10,12 @@ export function hasActiveSubscription(
   row: Pick<BillingRow, "plan" | "subscription_status"> | null | undefined,
 ): boolean {
   if (!row?.plan) return false;
-  return row.subscription_status !== "none" && row.subscription_status !== "canceled";
+  return ["active", "trialing"].includes(row.subscription_status);
 }
 
 export function hasActiveSubscriptionFromState(plan: string | null | undefined, status: string | undefined): boolean {
   if (!plan) return false;
-  return status !== "none" && status !== "canceled";
+  return status === "active" || status === "trialing";
 }
 
 /** Server/API: 402 wenn kein aktives Abo. Owner-Konten sind ausgenommen. */

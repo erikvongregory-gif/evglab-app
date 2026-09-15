@@ -1,3 +1,5 @@
+import { reserveGeneration } from "@/lib/billing/generationJobs";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { aspectRatioToImageSize, generateCampaignImage } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
@@ -23,8 +25,10 @@ export async function POST(req: Request) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
       if (user) {
-        const profile = getBrandProfileFromMetadata(user.user_metadata);
+        const profile = getBrandProfileFromMetadata(guard.userMetadata);
         if (!canUseCampaignWithTextProfile(profile)) {
           return NextResponse.json(
             {
@@ -52,6 +56,8 @@ export async function POST(req: Request) {
     });
     const budgetError = await requireTokenBudget(guard.userId, perImageCost);
     if (budgetError) return budgetError;
+    const job = await reserveGeneration(req,guard.userId,perImageCost * 2,input);
+    if(job instanceof NextResponse)return job;
 
     const prompt = buildCampaignTextPrompt(input);
     const origin = new URL(req.url).origin;
@@ -65,8 +71,7 @@ export async function POST(req: Request) {
       resolveReferenceUrl: createReferenceResolverFromMetadata(guard.userMetadata),
     });
 
-    const charge = await chargeGeneratedTokens(guard.userId, perImageCost * Math.max(images.length, 1));
-    if (!charge.ok) return charge.response;
+    const charge = await chargeGeneratedTokens(job, perImageCost * images.length, {images,prompt});
 
     return NextResponse.json({
       mode: "campaign_text",

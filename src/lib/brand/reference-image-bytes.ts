@@ -1,3 +1,4 @@
+import { publicFetch } from "@/lib/security/public-fetch";
 import {
   parseBrandReferenceIdFromUrl,
   readBrandReferenceImageBuffer,
@@ -86,12 +87,12 @@ export async function resolveReferenceImageForVision(
 
   if (/^https?:\/\//i.test(rawUrl)) {
     try {
-      const res = await fetch(rawUrl, { cache: "no-store" });
-      if (!res.ok) return null;
-      const buf = Buffer.from(await res.arrayBuffer());
+      const res = await publicFetch(rawUrl, { maxBytes: 20 * 1024 * 1024 });
+      if (res.status !== 200) return null;
+      const buf = res.body;
       const detected = fromBuffer(buf);
       if (!detected) return null;
-      const headerMime = (res.headers.get("content-type") ?? "")
+      const headerMime = (res.headers["content-type"] ?? "")
         .split(";")[0]
         ?.trim()
         .toLowerCase();

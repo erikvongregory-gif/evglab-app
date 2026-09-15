@@ -1,9 +1,13 @@
+import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { reserveGeneration, finishGeneration } from "@/lib/billing/generationJobs";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { classifyProviderResponse } from "@/lib/ai/providerErrors";
 import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
-import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
+import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import {
   buildBrandProfilePromptContext,
@@ -92,40 +96,6 @@ function base64DataUrlToFile(dataUrl: string, fileName: string): File {
   return new File([buffer], fileName, { type: mimeType });
 }
 
-async function uploadBase64ToKie(apiKey: string, base64Data: string, format: "png" | "jpg"): Promise<string> {
-  const uploadRes = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      base64Data: `data:image/${format === "jpg" ? "jpeg" : "png"};base64,${base64Data}`,
-      uploadPath: "evglab/generated-images",
-      fileName: `chatgpt-image2-${Date.now()}.${format === "jpg" ? "jpg" : "png"}`,
-    }),
-  });
-  const uploadPayload = (await uploadRes.json()) as Record<string, unknown>;
-  if (!uploadRes.ok) {
-    throw new Error(
-      (uploadPayload.msg as string | undefined) ||
-        (uploadPayload.error as string | undefined) ||
-        "Upload der Bilddatei fehlgeschlagen.",
-    );
-  }
-  const candidates = [
-    uploadPayload.fileUrl,
-    uploadPayload.url,
-    uploadPayload.downloadUrl,
-    (uploadPayload.data as Record<string, unknown> | undefined)?.fileUrl,
-    (uploadPayload.data as Record<string, unknown> | undefined)?.url,
-  ];
-  const url = candidates.find((item) => typeof item === "string" && /^https?:\/\//i.test(item as string));
-  if (typeof url !== "string") {
-    throw new Error("Upload lieferte keine gueltige Datei-URL.");
-  }
-  return url;
-}
 
 export async function POST(req: Request) {
   try {
@@ -163,24 +133,21 @@ export async function POST(req: Request) {
     } catch {
       return NextResponse.json({ error: "OPENAI_IMAGE_API_KEY fehlt." }, { status: 500 });
     }
-    const kieKey = process.env.KIE_API_KEY?.trim();
-    if (!kieKey) {
-      return NextResponse.json({ error: "KIE_API_KEY fehlt fuers Speichern der Bilddatei." }, { status: 500 });
-    }
 
     let userId: string | null = null;
-    let currentUserMetadata: Record<string, unknown> = {};
     let brandContext = "";
     if (isSupabaseConfigured()) {
       const supabase = await createClient();
-      const {
+      let {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
       if (!user) {
         return NextResponse.json({ error: "Nicht angemeldet.", code: "auth_required" }, { status: 401 });
       }
       userId = user.id;
-      currentUserMetadata = (user.user_metadata as Record<string, unknown> | null) ?? {};
       const profile = getBrandProfileFromMetadata(user.user_metadata);
       if (!isBrandProfileComplete(profile)) {
         return NextResponse.json(
@@ -249,6 +216,8 @@ export async function POST(req: Request) {
     const policyPrompt = applyContentPresetPrompt(creativeCore, body.imageType ?? "hyperreal");
     const promptRaw = [policyPrompt, "", brandContext].filter(Boolean).join("\n");
     const prompt = promptRaw.length > MAX_OPENAI_PROMPT_CHARS ? promptRaw.slice(0, MAX_OPENAI_PROMPT_CHARS) : promptRaw;
+    const job = await reserveGeneration(req, userId, tokenCost, body);
+    if (job instanceof NextResponse) return job;
     const openAiRes = hasReferenceImage
       ? await (async () => {
           const firstReference = body.referenceImageUrls?.[0];
@@ -287,22 +256,20 @@ export async function POST(req: Request) {
         });
     const openAiPayload = (await openAiRes.json()) as Record<string, unknown>;
     if (!openAiRes.ok) {
-      // Kein Token-Abzug: `consumeTokens` laeuft erst nach erfolgreichem Bild.
       const classified = classifyProviderResponse("openai", openAiRes, openAiPayload);
       logProviderFailure(classified, { label: "openai-image2-generate", userId });
+      await finishGeneration(job, 0, { error: classified.userMessage });
       return providerErrorResponse(classified);
     }
     const base64Image = parseOpenAiBase64(openAiPayload);
     if (!base64Image) {
+      await finishGeneration(job, 0, { error: "OpenAI lieferte kein Bild." });
       return NextResponse.json({ error: "OpenAI lieferte kein Bild." }, { status: 502 });
     }
 
-    const imageUrl = await uploadBase64ToKie(kieKey, base64Image, body.outputFormat ?? "png");
+    const imageUrl = await uploadGeneratedImageToStorage({userId,buffer:Buffer.from(base64Image,"base64"),outputFormat:body.outputFormat??"png"});
 
-    const consumeResult = await consumeTokens(userId, tokenCost);
-    if (!consumeResult.ok) {
-      return NextResponse.json({ error: consumeResult.error }, { status: 402 });
-    }
+    const consumeResult = await finishGeneration(job, tokenCost, { imageUrl, usedModel: usedModelLabel });
 
     return NextResponse.json({
       generationId: `openai-${randomUUID()}`,

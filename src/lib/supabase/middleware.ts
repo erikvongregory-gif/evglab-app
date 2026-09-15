@@ -2,7 +2,6 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 import {
-  needsFullOnboardingFlow,
   resolveStudioEntryPath,
   sanitizeStudioOnboardingState,
 } from "@/lib/dashboard/onboarding";
@@ -81,7 +80,8 @@ export async function updateSession(request: NextRequest) {
     const checkout = request.nextUrl.searchParams.get("checkout");
     const source = request.nextUrl.searchParams.get("source");
     const onboarding = onboardingStateFromUser(user);
-    const entry = resolveStudioEntryPath(onboarding, "/dashboard");
+    const requestedNext = request.nextUrl.searchParams.get("next");
+    const entry = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : resolveStudioEntryPath(onboarding, "/dashboard");
     const targetUrl = new URL(entry, request.url);
     if (
       entry === "/dashboard" &&
@@ -97,18 +97,6 @@ export async function updateSession(request: NextRequest) {
     return redirectWithRequestId(targetUrl, requestId);
   }
 
-  // 2FA-Route nicht abfangen — sonst Endlosschleife vor der Einrichtung.
-  if (
-    user &&
-    pathname !== "/dashboard/2fa-email" &&
-    needsFullOnboardingFlow(onboardingStateFromUser(user)) &&
-    (pathname === "/dashboard" ||
-      pathname.startsWith("/dashboard/") ||
-      pathname === "/inhalte-erstellen" ||
-      pathname === "/videos-erstellen")
-  ) {
-    return redirectWithRequestId(new URL("/onboarding", request.url), requestId);
-  }
 
   if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/admin") || pathname.startsWith("/onboarding"))) {
     const loginUrl = new URL("/anmelden", request.url);

@@ -1,3 +1,5 @@
+import { getWorkspace } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { z } from "zod";
@@ -30,6 +32,9 @@ export async function POST(req: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user && (await getWorkspace(user.id)).role !== "owner") return NextResponse.json({error:"Abrechnung kann nur der Teaminhaber verwalten."},{status:403});
     if (!user) {
       return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
     }
@@ -128,6 +133,7 @@ export async function POST(req: Request) {
         (subscription.status as "active" | "trialing" | "past_due" | "canceled" | "incomplete" | "unpaid") ?? "active",
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscription.id,
+      currentPeriodStart: new Date((subscription.items.data[0]?.current_period_start ?? subscription.start_date) * 1000).toISOString(),
       currentPeriodEnd: currentPeriodEndUnix ? new Date(currentPeriodEndUnix * 1000).toISOString() : null,
     });
 

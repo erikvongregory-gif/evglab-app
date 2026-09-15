@@ -7,7 +7,7 @@ import {
 import { buildHyperrealisticPrompt } from "./hyperrealistic";
 
 const baseInput: HyperrealisticInput = {
-  etikettBild: "https://example.com/label.png",
+  aiWatermark: false, etikettBild: "https://example.com/label.png",
   flaschenTyp: "nrw_500",
   flaschenfarbe: "braun",
   bierstil: "hefeweizen",

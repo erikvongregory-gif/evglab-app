@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { classifyThrownProviderError } from "@/lib/ai/providerErrors";
 import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
-import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
+import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { socialPostZielSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { buildBrandProfilePromptContext, getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
 
@@ -53,7 +53,7 @@ function parseCopyJson(raw: string): { headline: string; subline?: string; ctaTe
 
 export async function POST(req: Request) {
   try {
-    const guard = await requireImageGenerationUser(req, "inhalte-erstellen-suggest-copy");
+    const guard = await requireBillableImageGenerationUser(req, "inhalte-erstellen-suggest-copy");
     if (!guard.ok) return guard.response;
 
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim();

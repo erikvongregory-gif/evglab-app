@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import { z } from "zod";
 import { requireAuthenticatedUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { enforceRateLimit, sanitizeTaskId } from "@/lib/security/requestGuards";
+import { publicFetch } from "@/lib/security/public-fetch";
 
 type DownloadFormat = "png" | "jpg" | "webp" | "svg";
 
@@ -39,41 +38,12 @@ function getAllowedHosts(): string[] {
   return [...hosts];
 }
 
-function isPrivateOrLocalIp(ip: string): boolean {
-  const ipVersion = isIP(ip);
-  if (ipVersion === 0) return true;
-
-  // IPv6 local, loopback, link-local, unique local
-  if (ipVersion === 6) {
-    const normalized = ip.toLowerCase();
-    return (
-      normalized === "::1" ||
-      normalized.startsWith("fe80:") ||
-      normalized.startsWith("fc") ||
-      normalized.startsWith("fd")
-    );
-  }
-
-  // IPv4 private/link-local/loopback/unspecified
-  const parts = ip.split(".").map((p) => Number(p));
-  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p))) return true;
-  const [a, b] = parts;
-  return (
-    a === 10 ||
-    a === 127 ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 169 && b === 254) ||
-    a === 0
-  );
-}
-
 function hostnameAllowed(hostname: string, allowlist: string[]): boolean {
   const normalized = hostname.toLowerCase();
   return allowlist.some((allowed) => normalized === allowed || normalized.endsWith(`.${allowed}`));
 }
 
-async function assertSafeSourceUrl(sourceUrl: string): Promise<URL> {
+function assertSafeSourceUrl(sourceUrl: string): URL {
   let parsed: URL;
   try {
     parsed = new URL(sourceUrl);
@@ -90,38 +60,7 @@ async function assertSafeSourceUrl(sourceUrl: string): Promise<URL> {
     throw new Error("Bildquelle ist nicht freigegeben.");
   }
 
-  if (isIP(parsed.hostname) && isPrivateOrLocalIp(parsed.hostname)) {
-    throw new Error("Private Netzwerkziele sind nicht erlaubt.");
-  }
-
-  const dnsRecords = await lookup(parsed.hostname, { all: true });
-  if (dnsRecords.some((entry) => isPrivateOrLocalIp(entry.address))) {
-    throw new Error("Unsichere Bildquelle erkannt.");
-  }
-
   return parsed;
-}
-
-async function readWithLimit(response: Response, maxBytes: number): Promise<Buffer> {
-  const body = response.body;
-  if (!body) {
-    throw new Error("Bildquelle konnte nicht gelesen werden.");
-  }
-
-  const reader = body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      throw new Error("Bildquelle ist zu gross.");
-    }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
 }
 
 export async function GET(req: Request) {
@@ -145,30 +84,28 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Ungueltiges Download-Format." }, { status: 400 });
     }
 
-    const safeUrl = await assertSafeSourceUrl(sourceUrl);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
-    const upstream = await fetch(safeUrl.toString(), {
-      signal: controller.signal,
-      redirect: "error",
-      cache: "no-store",
+    const safeUrl = assertSafeSourceUrl(sourceUrl);
+    const upstream = await publicFetch(safeUrl.toString(), {
+      maxBytes: MAX_IMAGE_BYTES,
+      timeoutMs: DOWNLOAD_TIMEOUT_MS,
+      followRedirects: false,
+      headers: { Accept: "image/*" },
     });
-    clearTimeout(timeout);
-    if (!upstream.ok) {
+    if (upstream.status < 200 || upstream.status >= 300) {
       return NextResponse.json({ error: "Bildquelle konnte nicht geladen werden." }, { status: 502 });
     }
 
-    const sourceContentType = upstream.headers.get("content-type") || "";
+    const sourceContentType = upstream.headers["content-type"] || "";
     if (!sourceContentType.toLowerCase().startsWith("image/")) {
       return NextResponse.json({ error: "Bildquelle ist kein Bild." }, { status: 415 });
     }
 
-    const contentLength = Number(upstream.headers.get("content-length") || "0");
+    const contentLength = Number(upstream.headers["content-length"] || "0");
     if (contentLength > MAX_IMAGE_BYTES) {
       return NextResponse.json({ error: "Bildquelle ist zu gross." }, { status: 413 });
     }
 
-    const inputBuffer = await readWithLimit(upstream, MAX_IMAGE_BYTES);
+    const inputBuffer = upstream.body;
     const fileBase = `brewai-${taskId}`;
 
     if (formatParam === "svg") {
@@ -217,7 +154,7 @@ export async function GET(req: Request) {
       if (message.includes("https")) {
         return NextResponse.json({ error: "Nur HTTPS-Bildquellen sind erlaubt." }, { status: 400 });
       }
-      if (message.includes("gross")) {
+      if (message.includes("gross") || message.includes("groß")) {
         return NextResponse.json({ error: "Bildquelle ist zu gross." }, { status: 413 });
       }
     }

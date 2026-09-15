@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { StudioLayoutFallback, StudioWorkspaceShell } from "@/components/studio/studio-workspace-shell";
 import { hasAdminAccess, isOwnerUser } from "@/lib/auth/owner";
 import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
-import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { getFreshUserDashboardMetadata } from "@/lib/dashboard/freshMetadata";
 import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -27,7 +27,7 @@ export default async function StudioDashboardLayout({ children }: { children: Re
     redirect(TWO_FACTOR_PAGE);
   }
 
-  const dashboard = getDashboardMetadata(user.user_metadata);
+  const dashboard = await getFreshUserDashboardMetadata(user.id, user.user_metadata);
   // Vor der Shell umleiten — sonst kurz Dashboard, dann Redirect/Popup.
   if (needsFullOnboardingFlow(sanitizeStudioOnboardingState(dashboard.onboarding))) {
     redirect("/onboarding");

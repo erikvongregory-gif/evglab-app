@@ -1,3 +1,4 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
@@ -59,30 +60,31 @@ export default async function DashboardPage({
     redirect(qs ? `/anmelden?${qs}` : "/anmelden");
   }
 
+  const resourceUser = await workspaceResourceUser(user);
   const onboardingState = sanitizeStudioOnboardingState(
-    getDashboardMetadata(user.user_metadata).onboarding,
+    getDashboardMetadata(resourceUser.user_metadata).onboarding,
   );
   if (needsFullOnboardingFlow(onboardingState)) {
     redirect("/onboarding");
   }
 
-  const dashboard = getDashboardMetadata(user.user_metadata);
+  const dashboard = getDashboardMetadata(resourceUser.user_metadata);
   const settings = dashboard.settings as Record<string, unknown> | undefined;
   const profileName =
     typeof settings?.profileName === "string"
       ? settings.profileName
-      : typeof user.user_metadata?.full_name === "string"
-        ? user.user_metadata.full_name
+      : typeof resourceUser.user_metadata?.full_name === "string"
+        ? resourceUser.user_metadata.full_name
         : undefined;
   const breweryName =
     typeof settings?.breweryName === "string"
       ? settings.breweryName
-      : typeof user.user_metadata?.brewery === "string"
-        ? user.user_metadata.brewery
+      : typeof resourceUser.user_metadata?.brewery === "string"
+        ? resourceUser.user_metadata.brewery
         : undefined;
   const userRole =
-    typeof user.user_metadata?.role === "string"
-      ? String(user.user_metadata.role).toLowerCase()
+    typeof user.app_metadata?.role === "string"
+      ? String(user.app_metadata.role).toLowerCase()
       : "user";
   const isAdmin = userRole === "admin";
 

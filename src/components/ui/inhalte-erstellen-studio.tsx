@@ -26,7 +26,9 @@ import { hyperrealisticSchema, socialPostSchema } from "@/app/(dashboard)/inhalt
 import type { SocialPostInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { hasUsableBeerEtikett, MAX_MY_BEERS, type DashboardBeer } from "@/lib/dashboard/metadata";
 import { readAndCompressImage, splitDataUrl } from "@/lib/images/compress-image";
+import { StudioUiSwitch } from "@/components/studio/ui/switch";
 import { ImageGeneration } from "@/components/ui/ai-chat-image-generation-1";
+import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 
 type ImageResponse = { b64_json?: string; url?: string };
 type ContentTab = "produktfoto" | "kampagne" | "social";
@@ -81,9 +83,8 @@ function imageSrc(img: ImageResponse): string {
 }
 
 function pixelLabel(aspect: Aspect): string {
-  if (aspect === "1:1") return "1024 × 1024 px";
-  if (aspect === "16:9" || aspect === "4:3") return "1536 × 1024 px";
-  return "1024 × 1536 px";
+  const { width, height } = aspectRatioToOutputDimensions(aspect);
+  return `${width} × ${height} px`;
 }
 
 function contentPresetForTab(tab: ContentTab): "hyperreal" | "campaign_social" {
@@ -126,6 +127,7 @@ export function InhalteErstellenStudio({
   const [stiltreue, setStiltreue] = useState<Stiltreue>("hoch");
   const [aspectRatio, setAspectRatio] = useState<Aspect>("4:5");
   const [variantCount, setVariantCount] = useState<VariantCount>(1);
+  const [aiWatermark, setAiWatermark] = useState(false);
 
   const [was, setWas] = useState(BEER_STYLE_OPTIONS[0]);
   const [wo, setWo] = useState(WO_OPTIONS[0]);
@@ -205,6 +207,29 @@ export function InhalteErstellenStudio({
     loadingRef.current = loading;
   }, [loading]);
 
+  const applyBeer = useCallback(
+    (beer: DashboardBeer | null) => {
+      setSelectedBeer(beer);
+      if (!beer) return;
+      const style = findBeerStyle(beer.bierstil);
+      const glassFromBeer =
+        beer.glasTyp && beer.glasTyp in GLAS_TYPEN
+          ? (beer.glasTyp as NonNullable<HyperrealisticInput["glasTyp"]>)
+          : style?.glasTyp ?? "willibecher";
+      setWas(
+        style
+          ? { ...style, glasTyp: glassFromBeer }
+          : { label: beerStyleLabel(beer.bierstil), bierstil: beer.bierstil, glasTyp: glassFromBeer },
+      );
+      if (beer.flaschenTyp in FLASCHEN_TYPEN) {
+        setFlaschenTyp(beer.flaschenTyp as HyperrealisticInput["flaschenTyp"]);
+      }
+      setFlaschenfarbe(beer.flaschenfarbe);
+      if (beer.etikettUrl && profileMode !== "skip") setStiltreue("hoch");
+    },
+    [profileMode],
+  );
+
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -275,29 +300,6 @@ export function InhalteErstellenStudio({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount bootstrap only
   }, []);
-
-  const applyBeer = useCallback(
-    (beer: DashboardBeer | null) => {
-      setSelectedBeer(beer);
-      if (!beer) return;
-      const style = findBeerStyle(beer.bierstil);
-      const glassFromBeer =
-        beer.glasTyp && beer.glasTyp in GLAS_TYPEN
-          ? (beer.glasTyp as NonNullable<HyperrealisticInput["glasTyp"]>)
-          : style?.glasTyp ?? "willibecher";
-      setWas(
-        style
-          ? { ...style, glasTyp: glassFromBeer }
-          : { label: beerStyleLabel(beer.bierstil), bierstil: beer.bierstil, glasTyp: glassFromBeer },
-      );
-      if (beer.flaschenTyp in FLASCHEN_TYPEN) {
-        setFlaschenTyp(beer.flaschenTyp as HyperrealisticInput["flaschenTyp"]);
-      }
-      setFlaschenfarbe(beer.flaschenfarbe);
-      if (beer.etikettUrl && profileMode !== "skip") setStiltreue("hoch");
-    },
-    [profileMode],
-  );
 
   const persistBeers = useCallback(
     async (next: Array<DashboardBeer & { etikettPayload?: { base64: string; mime: string } }>) => {
@@ -571,6 +573,7 @@ export function InhalteErstellenStudio({
         aspectRatio,
         quality: "medium" as const,
         variantCount,
+        aiWatermark,
         headline: headline.trim(),
         subline: subline.trim() || undefined,
         ctaText: ctaText.trim() || undefined,
@@ -594,7 +597,7 @@ export function InhalteErstellenStudio({
       const res = await fetch("/api/inhalte-erstellen/social-post", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify(parsedResult.data),
       });
       const data = (await res.json()) as {
@@ -713,6 +716,7 @@ export function InhalteErstellenStudio({
         aspectRatio,
         quality: "medium" as const,
         variantCount,
+        aiWatermark,
       };
       const parsedResult = hyperrealisticSchema.safeParse(payload);
       if (!parsedResult.success) {
@@ -756,11 +760,12 @@ export function InhalteErstellenStudio({
         billing?: { remainingTokens?: number };
       };
 
+      const requestKey = crypto.randomUUID();
       const postCreateTask = async (): Promise<{ res: Response; data: CreateTaskResponse }> => {
         const res = await fetch("/api/inhalte-erstellen/create-task", {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Idempotency-Key": requestKey },
           body: JSON.stringify(parsed),
         });
         const raw = await res.text();
@@ -1302,29 +1307,16 @@ export function InhalteErstellenStudio({
               <ImageGeneration
                 className="studio-create-image-gen"
                 isLoading={loading}
+                imageSrc={previewSrc}
+                aspectRatio={aspectRatio}
+                hideStatus
                 progress={
                   loading
                     ? Math.max(8, variantProgress[previewIndex] ?? variantProgress[0] ?? 8)
                     : 100
                 }
-              >
-                <div
-                  className={`studio-create-preview-stage${loading && !previewSrc ? " is-generating" : ""}`}
-                  data-aspect={aspectRatio}
-                >
-                  {previewSrc ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={previewSrc}
-                      alt="Motivvorschau"
-                      className="studio-create-preview-stage__img"
-                      onClick={() => window.open(previewSrc, "_blank", "noopener,noreferrer")}
-                    />
-                  ) : (
-                    <div className="studio-create-image-gen__underlay" aria-hidden="true" />
-                  )}
-                </div>
-              </ImageGeneration>
+                onPreviewClick={(src) => window.open(src, "_blank", "noopener,noreferrer")}
+              />
             ) : (
               <div className="studio-create-preview-stage" data-aspect={aspectRatio}>
                 <div className="studio-create-preview-placeholder">
@@ -1425,12 +1417,24 @@ export function InhalteErstellenStudio({
             </div>
           </div>
 
+          <div className="studio-create-field studio-create-field--switch">
+            <StudioUiSwitch
+              checked={aiWatermark}
+              onCheckedChange={setAiWatermark}
+              label="AI-Kennzeichnung"
+            />
+            <span className="studio-create-field__hint">
+              Dezentes „AI“-Label unten rechts — erkennbar für veröffentlichte Inhalte (EU AI Act, Art. 50).
+            </span>
+          </div>
+
           <div className="studio-create-summary">
             <div>
               {variantCount} Variante{variantCount === 1 ? "" : "n"}
             </div>
             <div>
               Format {aspectRatio} · Markenprofil {etikettModus === "marke" ? "aktiv" : "frei"}
+              {aiWatermark ? " · AI-Label" : ""}
             </div>
             <div className="studio-create-summary__cost">
               Geschätzter Verbrauch: <strong>{formatDeNumber(generationTokenCost)} Tokens</strong>

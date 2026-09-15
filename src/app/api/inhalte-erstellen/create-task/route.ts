@@ -1,3 +1,4 @@
+import { reserveGeneration, finishGeneration, saveGenerationProgress } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import {
@@ -13,15 +14,18 @@ import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
 import { buildBrandProfilePromptContext, getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
 import { calculateGenerationTokenCost, calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
-import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
+import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { compileBrief } from "@/lib/prompts/prompt-compiler";
 import { applyContentPresetPrompt } from "@/lib/image-types/policy";
+import { applyAiWatermark } from "@/lib/openai/aiWatermark";
 import {
+  cropImageBufferToAspectRatio,
   generateOpenAiImage,
   mapAspectRatioToOpenAiSize,
   type OpenAiReferenceImage,
 } from "@/lib/openai/generateImage";
+import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
 import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
@@ -210,12 +214,12 @@ export async function POST(req: Request) {
     }
 
     const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
-    const size = mapAspectRatioToOpenAiSize(
-      compiled.generation_settings.aspectRatio || input.aspectRatio,
-    );
+    const aspectRatio = compiled.generation_settings.aspectRatio || input.aspectRatio;
+    const size = mapAspectRatioToOpenAiSize(aspectRatio);
+    const outputDimensions = aspectRatioToOutputDimensions(aspectRatio);
 
     const renderOne = async (variantIndex: number): Promise<string> => {
-      const buffer = await generateOpenAiImage({
+      const rawBuffer = await generateOpenAiImage({
         apiKey: openAiKey,
         model,
         prompt,
@@ -224,6 +228,10 @@ export async function POST(req: Request) {
         quality: openAiQuality,
         referenceImages,
       });
+      let buffer = await cropImageBufferToAspectRatio(rawBuffer, aspectRatio, OUTPUT_FORMAT);
+      if (input.aiWatermark) {
+        buffer = await applyAiWatermark(buffer, OUTPUT_FORMAT);
+      }
       try {
         return await uploadGeneratedImageToStorage({
           userId: guard.userId,
@@ -237,12 +245,15 @@ export async function POST(req: Request) {
       }
     };
 
+    const job = await reserveGeneration(req, guard.userId, perVariantCost * variantsToCreate, input);
+    if (job instanceof NextResponse) return job;
     const images: string[] = [];
     const errors: string[] = [];
     const providerFailures: ProviderError[] = [];
     for (let i = 0; i < variantsToCreate; i += 1) {
       try {
         images.push(await renderOne(i));
+        await saveGenerationProgress(job, images, perVariantCost);
       } catch (reason) {
         if (isProviderError(reason)) {
           providerFailures.push(reason);
@@ -255,6 +266,7 @@ export async function POST(req: Request) {
     }
 
     if (images.length === 0) {
+      await finishGeneration(job, 0, { error: errors[0] ?? "Generierung fehlgeschlagen.", images: [] });
       const [providerFailure] = providerFailures;
       if (providerFailure) {
         logProviderFailure(providerFailure.classified, {
@@ -270,10 +282,7 @@ export async function POST(req: Request) {
     }
 
     const totalConsumed = perVariantCost * images.length;
-    const consumeResult = await consumeTokens(guard.userId, totalConsumed);
-    if (!consumeResult.ok) {
-      return NextResponse.json({ error: consumeResult.error }, { status: 402 });
-    }
+    const consumeResult = await finishGeneration(job, totalConsumed, { images: images.map(imageUrl => ({ imageUrl })), jobId: job.id });
 
     return NextResponse.json({
       images: images.map((imageUrl) => ({ imageUrl })),
@@ -285,6 +294,8 @@ export async function POST(req: Request) {
       prompt,
       hasReference: hasReferenceForBilling,
       size,
+      aspectRatio,
+      outputDimensions,
       outputFormat: OUTPUT_FORMAT,
       compiled: {
         normalized_brief: compiled.normalized_brief,

@@ -42,7 +42,7 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     features: buildPlanFeatures(
       "start",
       "Tokens 30 Tage übertragbar",
-      "1 Teammitglied",
+      "1 Teamplatz (Inhaber inklusive)",
       "E-Mail-Support",
     ),
   },
@@ -58,7 +58,7 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     features: buildPlanFeatures(
       "growth",
       "Tokens 60 Tage übertragbar",
-      "3 Teammitglieder",
+      "3 Teamplätze (Inhaber inklusive)",
       "Priorisierter Support",
     ),
   },
@@ -73,7 +73,7 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     features: buildPlanFeatures(
       "pro",
       "Tokens 90 Tage übertragbar",
-      "10 Teammitglieder",
+      "10 Teamplätze (Inhaber inklusive)",
       "Fast-Lane Rendering + Premium-Support",
     ),
   },

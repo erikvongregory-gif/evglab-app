@@ -1,3 +1,4 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
@@ -47,44 +48,45 @@ export default async function InhalteErstellenPage() {
     redirect("/anmelden");
   }
 
+  const resourceUser = await workspaceResourceUser(user);
   if (
     needsFullOnboardingFlow(
-      sanitizeStudioOnboardingState(getDashboardMetadata(user.user_metadata).onboarding),
+      sanitizeStudioOnboardingState(getDashboardMetadata(resourceUser.user_metadata).onboarding),
     )
   ) {
     redirect("/onboarding");
   }
 
-  const dashboard = getDashboardMetadata(user.user_metadata);
+  const dashboard = getDashboardMetadata(resourceUser.user_metadata);
   const settings = dashboard.settings as Record<string, unknown> | undefined;
   const profileName =
     typeof settings?.profileName === "string"
       ? settings.profileName
-      : typeof user.user_metadata?.full_name === "string"
-        ? user.user_metadata.full_name
+      : typeof resourceUser.user_metadata?.full_name === "string"
+        ? resourceUser.user_metadata.full_name
         : undefined;
   const breweryName =
     typeof settings?.breweryName === "string"
       ? settings.breweryName
-      : typeof user.user_metadata?.brewery === "string"
-        ? user.user_metadata.brewery
+      : typeof resourceUser.user_metadata?.brewery === "string"
+        ? resourceUser.user_metadata.brewery
         : undefined;
 
-  const brandProfile = getBrandProfileFromMetadata(user.user_metadata);
+  const brandProfile = getBrandProfileFromMetadata(resourceUser.user_metadata);
 
   // Owner brauchen kein Stripe-Abo — Tokens und API-Guards sind separat freigeschaltet.
   if (!isOwnerUser(user)) {
-    await ensureBillingRow(user.id);
-    let billing = await getBillingRow(user.id);
+    await ensureBillingRow(resourceUser.id);
+    let billing = await getBillingRow(resourceUser.id);
     if (!hasActiveSubscription(billing)) {
       try {
         const syncResult = await syncBillingFromStripe({
-          userId: user.id,
-          userEmail: user.email,
+          userId: resourceUser.id,
+          userEmail: resourceUser.email,
           currentRow: billing,
         });
         if (syncResult.synced) {
-          billing = await getBillingRow(user.id);
+          billing = await getBillingRow(resourceUser.id);
         }
       } catch {
         /* Stripe optional */

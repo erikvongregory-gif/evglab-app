@@ -1,8 +1,12 @@
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient, createRouteHandlerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
+import { getFreshUserMetadata } from "@/lib/dashboard/freshMetadata";
 import { getDashboardMetadata, mergeDashboardMetadata } from "@/lib/dashboard/metadata";
 import { readDashboardMedia } from "@/lib/dashboard/media-store";
 import {
@@ -23,6 +27,7 @@ const patchSchema = z.object({
   currentStep: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]).optional(),
   /** ISO string oder null zum Zurücksetzen (Restart). */
   completedAt: z.union([z.string().max(40), z.null()]).optional(),
+  tourVersion: z.union([z.literal(1), z.null()]).optional(),
 });
 
 async function deriveProgress(
@@ -54,14 +59,18 @@ export async function GET() {
     return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
   }
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, false); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
+  const freshMetadata = await getFreshUserMetadata(user.id, user.user_metadata);
   return NextResponse.json({
-    state: getDashboardMetadata(user.user_metadata).onboarding ?? EMPTY_STUDIO_ONBOARDING_STATE,
-    progress: await deriveProgress(user.id, user.user_metadata),
+    state: getDashboardMetadata(freshMetadata).onboarding ?? EMPTY_STUDIO_ONBOARDING_STATE,
+    progress: await deriveProgress(user.id, freshMetadata),
   });
 }
 
@@ -92,27 +101,51 @@ export async function PATCH(req: Request) {
   }
 
   const supabase = await createClient();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user) { try { user = await workspaceResourceUser(user, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
-  const current = sanitizeStudioOnboardingState(
-    getDashboardMetadata(user.user_metadata).onboarding,
-  );
+  const freshMetadata = await getFreshUserMetadata(user.id, user.user_metadata);
+  const current = sanitizeStudioOnboardingState(getDashboardMetadata(freshMetadata).onboarding);
   const next = mergeStudioOnboardingState(current, parsed.data as Parameters<typeof mergeStudioOnboardingState>[1]);
-  const { error } = await supabase.auth.updateUser({
-    data: mergeDashboardMetadata(user.user_metadata, { onboarding: next }),
-  });
-  if (error) {
+  const userMetadata = mergeDashboardMetadata(freshMetadata, { onboarding: next });
+
+  try {
+    const admin = createAdminClient();
+    const { error: adminError } = await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: userMetadata,
+    });
+    if (adminError) {
+      return NextResponse.json(
+        { error: "Onboarding-Status konnte nicht gespeichert werden." },
+        { status: 500 },
+      );
+    }
+  } catch {
     return NextResponse.json(
       { error: "Onboarding-Status konnte nicht gespeichert werden." },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     state: next,
-    progress: await deriveProgress(user.id, user.user_metadata),
+    progress: await deriveProgress(user.id, userMetadata),
   });
+  try {
+    const routeClient = createRouteHandlerClient(req, response);
+    await Promise.race([
+      routeClient.auth.refreshSession(),
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 8_000);
+      }),
+    ]);
+  } catch {
+    /* Session-Refresh ist best-effort */
+  }
+  return response;
 }

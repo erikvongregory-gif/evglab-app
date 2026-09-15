@@ -1,3 +1,4 @@
+import { reserveGeneration, finishGeneration, saveGenerationProgress } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import {
@@ -17,17 +18,20 @@ import {
   getBrandProfileFromMetadata,
 } from "@/lib/dashboard/brandProfile";
 import { calculateGenerationTokenCost, calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
-import { consumeTokens, ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
+import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { compileBrief } from "@/lib/prompts/prompt-compiler";
 import { appendCopySpaceDirective } from "@/lib/social/copy-space-prompt";
 import { composeSocialTextOverlay, parsePrimaryBrandColor } from "@/lib/social/text-overlay";
 import { fetchBrandFontBuffer } from "@/lib/social/fetch-brand-font";
+import { applyAiWatermark } from "@/lib/openai/aiWatermark";
 import {
+  cropImageBufferToAspectRatio,
   generateOpenAiImage,
   mapAspectRatioToOpenAiSize,
   type OpenAiReferenceImage,
 } from "@/lib/openai/generateImage";
+import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
 import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
@@ -207,9 +211,9 @@ export async function POST(req: Request) {
     }
 
     const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL;
-    const size = mapAspectRatioToOpenAiSize(
-      compiled.generation_settings.aspectRatio || input.aspectRatio,
-    );
+    const aspectRatio = compiled.generation_settings.aspectRatio || input.aspectRatio;
+    const size = mapAspectRatioToOpenAiSize(aspectRatio);
+    const outputDimensions = aspectRatioToOutputDimensions(aspectRatio);
 
     const fontName = brandProfile.brandHeadlineFontName.trim() || brandProfile.breweryName.trim() || "Brand Sans";
     const fontData = brandProfile.brandFontFileUrl.trim()
@@ -228,11 +232,13 @@ export async function POST(req: Request) {
         referenceImages,
       });
 
+      const cropped = await cropImageBufferToAspectRatio(rawBuffer, aspectRatio, OUTPUT_FORMAT);
+
       const composited = await composeSocialTextOverlay({
-        imageBuffer: rawBuffer,
+        imageBuffer: cropped,
         overlay: {
-          width: 1024,
-          height: 1024,
+          width: outputDimensions.width,
+          height: outputDimensions.height,
           headline,
           subline,
           ctaText,
@@ -245,10 +251,14 @@ export async function POST(req: Request) {
         },
       });
 
+      const finalBuffer = input.aiWatermark
+        ? await applyAiWatermark(composited, OUTPUT_FORMAT)
+        : composited;
+
       try {
         return await uploadGeneratedImageToStorage({
           userId: guard.userId,
-          buffer: composited,
+          buffer: finalBuffer,
           outputFormat: OUTPUT_FORMAT,
         });
       } catch (uploadError) {
@@ -258,12 +268,15 @@ export async function POST(req: Request) {
       }
     };
 
+    const job = await reserveGeneration(req, guard.userId, perVariantCost * variantsToCreate, input);
+    if (job instanceof NextResponse) return job;
     const images: string[] = [];
     const errors: string[] = [];
     const providerFailures: ProviderError[] = [];
     for (let i = 0; i < variantsToCreate; i += 1) {
       try {
         images.push(await renderOne(i));
+        await saveGenerationProgress(job, images, perVariantCost);
       } catch (reason) {
         if (isProviderError(reason)) {
           providerFailures.push(reason);
@@ -276,6 +289,7 @@ export async function POST(req: Request) {
     }
 
     if (images.length === 0) {
+      await finishGeneration(job, 0, { error: errors[0] ?? "Generierung fehlgeschlagen.", images: [] });
       if (providerFailures.length > 0) {
         logProviderFailure(providerFailures[0].classified, { label: "inhalte-erstellen-social-post" });
         return providerErrorResponse(providerFailures[0].classified);
@@ -286,10 +300,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const consumeResult = await consumeTokens(guard.userId, perVariantCost * images.length);
-    if (!consumeResult.ok) {
-      return NextResponse.json({ error: consumeResult.error }, { status: 402 });
-    }
+    const consumeResult = await finishGeneration(job, perVariantCost * images.length, { images: images.map(imageUrl => ({ imageUrl })), jobId: job.id });
 
     return NextResponse.json({
       mode: "social_post_overlay",

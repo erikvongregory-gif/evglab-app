@@ -15,6 +15,7 @@
  *   node scripts/rotate-openai-image-key.mjs --dry-run
  *   node scripts/rotate-openai-image-key.mjs --skip-wait --skip-delete
  *
+ * Env: .env.rotation.local (empfohlen), sonst .env.local / GitHub Secrets
  * GitHub Secrets: OPENAI_ADMIN_KEY, OPENAI_PROJECT_ID, VERCEL_TOKEN, VERCEL_PROJECT_ID
  * Optional: VERCEL_ORG_ID, VERCEL_DEPLOY_HOOK_URL, ROTATION_GRACE_MINUTES (Default 20)
  */
@@ -31,7 +32,7 @@ const SERVICE_ACCOUNT_ENV = "OPENAI_IMAGE_SERVICE_ACCOUNT_ID";
 const DEFAULT_MODEL = "gpt-image-2.5-sunburst";
 const DEFAULT_GRACE_MINUTES = 20;
 
-function loadEnvFile(path) {
+function loadEnvFile(path, { override = false } = {}) {
   if (!existsSync(path)) return;
   for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -39,7 +40,7 @@ function loadEnvFile(path) {
     const separator = trimmed.indexOf("=");
     if (separator < 0) continue;
     const key = trimmed.slice(0, separator).trim();
-    if (process.env[key] !== undefined) continue;
+    if (!override && process.env[key] !== undefined) continue;
     let value = trimmed.slice(separator + 1).trim();
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
@@ -264,6 +265,7 @@ async function triggerProductionDeploy(deployHookUrl, dryRun) {
 async function main() {
   loadEnvFile(join(ROOT, ".env.local"));
   loadEnvFile(join(ROOT, ".env"));
+  loadEnvFile(join(ROOT, ".env.rotation.local"), { override: true });
 
   const { dryRun, skipWait, skipDelete } = parseArgs(process.argv);
   const projectId = requireEnv("OPENAI_PROJECT_ID");

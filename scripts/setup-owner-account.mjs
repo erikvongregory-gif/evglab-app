@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Legt die in OWNER_EMAILS gelisteten Betreiber-Konten an bzw. hebt sie auf
- * `user_metadata.role = "owner"`. Owner haben unbegrenzte Tokens und brauchen
+ * `app_metadata.role = "owner"`. Owner haben unbegrenzte Tokens und brauchen
  * kein Stripe-Abo.
  *
  * Usage:
@@ -83,7 +83,7 @@ for (const email of ownerEmails) {
 
     if (existing) {
       const { error } = await admin.auth.admin.updateUserById(existing.id, {
-        user_metadata: { ...existing.user_metadata, role: "owner" },
+        app_metadata: { ...existing.app_metadata, role: "owner" },
       });
       if (error) throw new Error(error.message);
       console.log(`✓ ${email}: vorhanden, Rolle auf "owner" gesetzt (id ${existing.id}).`);
@@ -102,7 +102,7 @@ for (const email of ownerEmails) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { role: "owner" },
+      app_metadata: { role: "owner" },
     });
     if (error) throw new Error(error.message);
     console.log(`✓ ${email}: neu erstellt (id ${data.user?.id}).`);
