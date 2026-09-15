@@ -272,7 +272,8 @@ async function main() {
   const vercelTeamId = process.env.VERCEL_ORG_ID?.trim() || "";
   const deployHookUrl = process.env.VERCEL_DEPLOY_HOOK_URL?.trim() || "";
   const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_MODEL;
-  const graceMinutes = Number(process.env.ROTATION_GRACE_MINUTES ?? DEFAULT_GRACE_MINUTES);
+  const graceRaw = process.env.ROTATION_GRACE_MINUTES?.trim();
+  const graceMinutes = graceRaw ? Number(graceRaw) : DEFAULT_GRACE_MINUTES;
 
   if (!Number.isFinite(graceMinutes) || graceMinutes < 1) {
     fail("ROTATION_GRACE_MINUTES muss >= 1 sein.");
