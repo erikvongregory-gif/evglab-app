@@ -15,6 +15,8 @@ type RateLimitBucket = {
 const rateBuckets = new Map<string, RateLimitBucket>();
 const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
 const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || process.env.SUPABASE_URL?.trim();
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 function getClientIdentifier(req: Request): string {
   const forwardedFor = req.headers.get("x-forwarded-for");
@@ -59,6 +61,47 @@ type PersistentRateLimitOptions = {
 
 const RATE_LIMIT_TIMEOUT_MS = 1_500;
 
+async function opaqueRateLimitKey(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function enforceSupabaseRateLimit(
+  key: string,
+  rule: RateLimitRule,
+): Promise<NextResponse | null | undefined> {
+  if (!supabaseUrl || !supabaseServiceKey) return undefined;
+  try {
+    const controller = new AbortController();
+    const timeout = globalThis.setTimeout(() => controller.abort(), RATE_LIMIT_TIMEOUT_MS);
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/enforce_rate_limit_atomic`, {
+      method: "POST",
+      headers: {
+        apikey: supabaseServiceKey,
+        Authorization: `Bearer ${supabaseServiceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_key: key, p_limit: rule.limit, p_window_ms: rule.windowMs }),
+      cache: "no-store",
+      signal: controller.signal,
+    }).finally(() => globalThis.clearTimeout(timeout));
+    if (!response.ok) return undefined;
+    const payload = (await response.json()) as Array<{ allowed?: unknown; retry_after?: unknown }>;
+    const result = payload[0];
+    if (typeof result?.allowed !== "boolean") return undefined;
+    if (result.allowed) return null;
+    return NextResponse.json(
+      { error: "Zu viele Anfragen. Bitte kurz warten." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.max(1, Number(result.retry_after) || 1)) },
+      },
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 function compactIdentifierPart(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9._:@-]/g, "").slice(0, 120);
 }
@@ -80,13 +123,16 @@ export async function enforceRateLimitPersistent(
 ): Promise<NextResponse | null> {
   const identifier =
     options.identifier || buildCompositeIdentifier(req, options.identifierParts ?? []);
+  const key = `${rule.keyPrefix}:${await opaqueRateLimitKey(identifier)}`;
+  const supabaseResult = await enforceSupabaseRateLimit(key, rule);
+  if (supabaseResult !== undefined) return supabaseResult;
+
   if (!upstashUrl || !upstashToken) {
     return process.env.NODE_ENV === "production"
       ? NextResponse.json({ error: "Anfrageschutz vorübergehend nicht verfügbar." }, { status: 503 })
       : enforceRateLimit(req, { ...rule, keyPrefix: `${rule.keyPrefix}:fallback` });
   }
 
-  const key = buildRateLimitKey(rule, identifier);
   try {
     // Avoid blocking auth/API flows if Upstash is slow/unreachable.
     const controller = new AbortController();
