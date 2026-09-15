@@ -19,13 +19,24 @@ export async function signStoragePath(path:string):Promise<string> {
   if(error||!data?.signedUrl)throw new Error("Medienzugriff konnte nicht erstellt werden.");
   return data.signedUrl;
 }
+async function trySignStoragePath(path: string, fallback: string): Promise<string> {
+  try {
+    return await signStoragePath(path);
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[privateAssets] sign failed", path, error);
+    }
+    return fallback;
+  }
+}
+
 /** Refresh expiring asset URLs only within this user's storage prefix. */
 export async function hydratePrivateAssets<T>(input:T,userId:string):Promise<T> {
   const cache=new Map<string,Promise<string>>();
   async function visit(value:unknown):Promise<unknown> {
     if(typeof value==="string"){
       const path=ownedStoragePath(value,userId);if(!path)return value;
-      if(!cache.has(path))cache.set(path,signStoragePath(path));
+      if(!cache.has(path))cache.set(path,trySignStoragePath(path,value));
       return cache.get(path)!;
     }
     if(Array.isArray(value))return Promise.all(value.map(visit));

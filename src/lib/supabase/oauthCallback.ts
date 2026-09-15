@@ -12,12 +12,12 @@ import {
   bridgeOAuthSession,
   peekBridgedOAuthSession,
 } from "@/lib/supabase/oauthSessionBridge";
-import { createAuthRouteHandlerClient } from "@/lib/supabase/server";
+import { clearIncomingSupabaseAuthCookies } from "@/lib/supabase/clearAuthCookies";
+import { createAuthRouteHandlerClient, createOAuthExchangeClient } from "@/lib/supabase/server";
 import {
   createNoStoreRedirect,
   createOAuthSessionPollerHtml,
   createRecoveryHashForwardHtml,
-  createRedirectWithCookies,
   normalizeNextPath,
 } from "@/lib/security/authResponses";
 import { getOrCreateRequestId, logAuthEvent } from "@/lib/security/authObservability";
@@ -106,7 +106,14 @@ async function redirectAfterOAuthSuccess(
     durationMs: Date.now() - startedAt,
   });
 
-  return createRedirectWithCookies(`${appOrigin}${postAuthNext}`, requestId, redirectResponse);
+  return createOAuthSessionPollerHtml(
+    {
+      successUrl: `${appOrigin}${postAuthNext}`,
+      fallbackUrl: finishUrl(appOrigin, postAuthNext),
+      requestId,
+    },
+    redirectResponse,
+  );
 }
 
 async function finishFromBridge(
@@ -125,6 +132,7 @@ async function finishFromBridge(
   if (!bridged) return null;
 
   const redirectResponse = createNoStoreRedirect(`${opts.appOrigin}${opts.postAuthNext}`, opts.requestId);
+  clearIncomingSupabaseAuthCookies(request, redirectResponse, { preserveCodeVerifier: true });
   applyBridgedCookies(redirectResponse, bridged);
   return redirectAfterOAuthSuccess(request, {
     requestId: opts.requestId,
@@ -227,7 +235,8 @@ export async function handleAuthCallbackGet(request: Request) {
   }
 
   const redirectResponse = createNoStoreRedirect(`${appOrigin}${postAuthNext}`, requestId);
-  const supabase = await createAuthRouteHandlerClient(redirectResponse);
+  clearIncomingSupabaseAuthCookies(request, redirectResponse, { preserveCodeVerifier: true });
+  const supabase = createOAuthExchangeClient(request, redirectResponse);
 
   try {
     // Always exchange the OAuth code. Never short-circuit on an existing session —

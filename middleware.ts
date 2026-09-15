@@ -32,6 +32,7 @@ export async function middleware(request: NextRequest) {
       "/auth/google",
       "/auth/callback",
       "/auth/finish",
+      "/auth/clear-session",
       "/auth/operator-access",
     ]);
     const isBlockedAuthPath =
@@ -59,7 +60,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/invite") ||
     pathname.startsWith("/inhalte-erstellen") ||
     pathname.startsWith("/videos-erstellen") ||
-    pathname.startsWith("/auth/finish") ||
+    pathname.startsWith("/auth/") ||
     pathname === "/anmelden" ||
     pathname === "/registrieren" ||
     pathname === "/passwort-vergessen" ||

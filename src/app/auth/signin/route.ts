@@ -2,6 +2,7 @@ import { redirectWithEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
 import { getAppBaseUrlOrigin, isSupabaseConfigured } from "@/lib/supabase/env";
 import { mapSignInErrorCode, signInErrorDetail } from "@/lib/auth/signInErrors";
 import { repairOversizedMetadataForUser } from "@/lib/auth/repairOversizedMetadata";
+import { purgeStaleAuthSession } from "@/lib/supabase/clearAuthCookies";
 import { createAuthRouteHandlerClient } from "@/lib/supabase/server";
 import { logAuthEvent, getOrCreateRequestId } from "@/lib/security/authObservability";
 import {
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
   const redirectResponse = createNoStoreRedirect(finishTarget, requestId);
 
   const supabase = await createAuthRouteHandlerClient(redirectResponse);
+  await purgeStaleAuthSession(request, redirectResponse, supabase);
   const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     const errorCode = mapSignInErrorCode(error);

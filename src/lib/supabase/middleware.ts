@@ -7,7 +7,19 @@ import {
 } from "@/lib/dashboard/onboarding";
 import { getSupabaseAnonKey, getSupabaseUrl, isInviteOnlyEnabled } from "@/lib/supabase/env";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
+import { clearIncomingSupabaseAuthCookies } from "@/lib/supabase/clearAuthCookies";
 import { getSharedCookieDomain } from "@/lib/siteConfig";
+
+const AUTH_COOKIE_SWEEP_PATHS = new Set([
+  "/anmelden",
+  "/registrieren",
+  "/auth/google",
+  "/auth/signin",
+  "/auth/signup",
+  "/auth/callback",
+  "/auth/signout",
+  "/auth/clear-session",
+]);
 
 function withSharedCookieDomain<T extends { domain?: string }>(options: T): T {
   const domain = getSharedCookieDomain();
@@ -28,8 +40,25 @@ function redirectWithRequestId(url: URL, requestId: string) {
 
 export async function updateSession(request: NextRequest) {
   const requestId = getOrCreateRequestId(request);
+  const pathname = request.nextUrl.pathname;
   const supabaseResponse = NextResponse.next({ request });
   supabaseResponse.headers.set("x-request-id", requestId);
+
+  if (AUTH_COOKIE_SWEEP_PATHS.has(pathname)) {
+    clearIncomingSupabaseAuthCookies(request, supabaseResponse, {
+      preserveCodeVerifier: pathname === "/auth/callback",
+      allSupabase: pathname === "/auth/google" || pathname === "/auth/clear-session",
+    });
+  }
+
+  // Auth-Handler lesen/schreiben Session selbst — kein getUser() mit riesigen Cookie-Jars.
+  if (
+    pathname === "/auth/callback" ||
+    pathname === "/auth/google" ||
+    pathname === "/auth/clear-session"
+  ) {
+    return supabaseResponse;
+  }
 
   const url = getSupabaseUrl();
   const key = getSupabaseAnonKey();
@@ -72,8 +101,6 @@ export async function updateSession(request: NextRequest) {
   } catch {
     return supabaseResponse;
   }
-
-  const pathname = request.nextUrl.pathname;
 
   if (user && (pathname === "/anmelden" || pathname === "/registrieren")) {
     const plan = request.nextUrl.searchParams.get("plan");

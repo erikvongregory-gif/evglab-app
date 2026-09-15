@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPendingCookieName, getVerifiedCookieName } from "@/lib/admin/emailTwoFactor";
 import { getAppBaseUrlOrigin, isSupabaseConfigured } from "@/lib/supabase/env";
+import { clearIncomingSupabaseAuthCookies } from "@/lib/supabase/clearAuthCookies";
 import { createClient } from "@/lib/supabase/server";
 import { enforceSameOrigin } from "@/lib/security/requestGuards";
 import { createNoStoreRedirect, secureCookieOptions, withRequestIdJson } from "@/lib/security/authResponses";
@@ -27,9 +28,10 @@ async function handleSignOut(request: Request) {
     const response = createNoStoreRedirect(`${origin}/anmelden?notice=signed_out`, requestId);
     return clearAdmin2FACookies(response);
   }
-  const supabase = await createClient();
-  await supabase.auth.signOut();
   const response = createNoStoreRedirect(`${origin}/anmelden?notice=signed_out`, requestId);
+  const supabase = await createClient();
+  await supabase.auth.signOut().catch(() => undefined);
+  clearIncomingSupabaseAuthCookies(request, response);
   return clearAdmin2FACookies(response);
 }
 

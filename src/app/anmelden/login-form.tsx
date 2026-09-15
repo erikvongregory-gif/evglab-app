@@ -49,9 +49,9 @@ function messageForError(
     case "google":
       return "Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.";
     case "oauth_state":
-      return "Google-Anmeldung abgelaufen oder doppelt aufgerufen. Cookies für localhost löschen, dann erneut „Mit Google anmelden“ (nicht Zurück im Browser).";
+      return "Google-Anmeldung abgelaufen oder doppelt aufgerufen. Cookies für brewai.de löschen oder /auth/clear-session aufrufen, dann erneut „Mit Google anmelden“ (nicht Zurück im Browser).";
     case "session_pending":
-      return "Anmeldung fast fertig — bitte erneut auf „Mit Google anmelden“ klicken. Wenn es wieder hängt: Cookies für localhost löschen.";
+      return "Anmeldung fast fertig — bitte erneut auf „Mit Google anmelden“ klicken. Wenn es wieder hängt: Cookies für brewai.de löschen oder /auth/clear-session aufrufen.";
     case "missing":
       return mode === "register"
         ? "Bitte alle Felder ausfüllen."
