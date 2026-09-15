@@ -1,0 +1,56 @@
+import { hydratePrivateAssets } from "@/lib/supabase/privateAssets";
+import type { User } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { DashboardTeamRole } from "./metadata";
+
+function isMissingRelationError(error: { code?: string; message?: string } | null | undefined) {
+  if (!error) return false;
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    message.includes("does not exist") ||
+    message.includes("could not find the table")
+  );
+}
+
+async function isAccountMarkedForDeletion(admin: ReturnType<typeof createAdminClient>, userId: string) {
+  const deletion = await admin.from("account_deletion_jobs").select("user_id").eq("user_id", userId).maybeSingle();
+  if (deletion.data) return true;
+  if (deletion.error) {
+    if (isMissingRelationError(deletion.error)) return false;
+    console.warn("[getWorkspace] account_deletion_jobs check failed:", deletion.error.message);
+  }
+  return false;
+}
+
+export async function getWorkspace(userId: string): Promise<{ ownerId: string; role: DashboardTeamRole }> {
+  const admin = createAdminClient();
+  if (await isAccountMarkedForDeletion(admin, userId)) {
+    throw new Error("Konto ist zur Löschung vorgemerkt oder nicht verfügbar.");
+  }
+  const { data, error } = await admin.from("workspace_members").select("owner_id,role").eq("user_id", userId).maybeSingle();
+  if (error) {
+    if (isMissingRelationError(error)) return { ownerId: userId, role: "owner" };
+    throw new Error("Teamzuordnung konnte nicht geprüft werden.");
+  }
+  if (!data) return { ownerId: userId, role: "owner" };
+  const billing = await admin.from("billing_subscriptions").select("plan,subscription_status").eq("user_id", data.owner_id).single();
+  if (billing.error || !["active", "trialing"].includes(billing.data.subscription_status)) throw new Error("Teamabo nicht aktiv.");
+  const members = await admin.from("workspace_members").select("user_id").eq("owner_id", data.owner_id).order("created_at").order("user_id");
+  if (members.error) throw new Error("Teamplätze konnten nicht geprüft werden.");
+  const limit = billing.data.plan === "pro" ? 10 : billing.data.plan === "growth" ? 3 : 1;
+  if ((members.data ?? []).findIndex(m => m.user_id === userId) >= limit - 1) throw new Error("Teamplatz im aktuellen Tarif nicht verfügbar.");
+  return { ownerId: data.owner_id, role: data.role as DashboardTeamRole };
+}
+
+/** Resource context only. Never use this returned identity for login, 2FA or platform-admin checks. */
+export async function workspaceResourceUser(user: User, write = false): Promise<User> {
+  const workspace = await getWorkspace(user.id);
+  if (write && workspace.role === "viewer") throw new Error("Deine Teamrolle erlaubt nur Lesezugriff.");
+  if (workspace.ownerId === user.id) return { ...user, user_metadata: await hydratePrivateAssets(user.user_metadata,user.id) };
+  const { data, error } = await createAdminClient().auth.admin.getUserById(workspace.ownerId);
+  if (error || !data.user) throw new Error("Teamkonto nicht gefunden.");
+  // Preserve actor app_metadata so a team member never inherits platform administrator privileges.
+  return { ...data.user, app_metadata: user.app_metadata, user_metadata: await hydratePrivateAssets(data.user.user_metadata,workspace.ownerId) };
+}
