@@ -2,6 +2,7 @@ import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "
 import { createAuthRouteHandlerClient } from "@/lib/supabase/server";
 import { createNoStoreRedirect, createRedirectWithCookies, normalizeNextPath } from "@/lib/security/authResponses";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
+import { clearIncomingSupabaseAuthCookies } from "@/lib/supabase/clearAuthCookies";
 
 export const runtime = "nodejs";
 
@@ -24,13 +25,10 @@ export async function GET(request: Request) {
 
   const cookieJar = createNoStoreRedirect(`${appOrigin}/anmelden`, requestId);
   const supabase = await createAuthRouteHandlerClient(cookieJar);
-  // Clear any prior session so Google account-switch cannot inherit the old identity.
-  const {
-    data: { user: existingUser },
-  } = await supabase.auth.getUser();
-  if (existingUser) {
-    await supabase.auth.signOut();
-  }
+  // Always clear the local session. Invalid/obsolete chunked cookies have no user,
+  // but otherwise survive and can push the OAuth callback beyond Vercel's header limit.
+  await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  clearIncomingSupabaseAuthCookies(request, cookieJar);
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo, skipBrowserRedirect: true },
