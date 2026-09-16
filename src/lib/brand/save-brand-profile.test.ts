@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildActivatedBrandSettings } from "@/lib/brand/save-brand-profile";
+import {
+  buildActivatedBrandSettings,
+  buildUserMetadataForBrandSave,
+} from "@/lib/brand/save-brand-profile";
 
 describe("save-brand-profile", () => {
   it("merges brand fields into existing dashboard settings", () => {
@@ -68,5 +71,35 @@ describe("save-brand-profile", () => {
     });
 
     expect(settings.brandLabelReferenceUrl).toBe("");
+  });
+
+  it("strips legacy myBeers from auth metadata on brand save", () => {
+    const settings = buildActivatedBrandSettings({
+      latestMetadata: {},
+      origin: "http://localhost:3001",
+      input: {
+        breweryName: "ABK",
+        brandTone: "Heimatverbunden",
+        brandColors: "#1E90C8",
+        brandDos: "Tradition.",
+        brandDonts: "Keine Neonfarben.",
+        brandProfileSource: "url",
+      },
+      referenceImageUrls: [],
+    });
+
+    const metadata = buildUserMetadataForBrandSave({
+      latestMetadata: {
+        dashboard: {
+          myBeers: [{ id: "legacy", name: "Helles" }],
+          settings: {},
+        },
+      },
+      settings,
+    });
+
+    const dashboard = metadata.dashboard as Record<string, unknown>;
+    expect(dashboard.myBeers).toBeUndefined();
+    expect((dashboard.settings as { breweryName?: string }).breweryName).toBe("ABK");
   });
 });

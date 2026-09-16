@@ -513,16 +513,43 @@ export async function persistBeerLabelFromUrl(userId: string, sourceUrl: string)
   }
 }
 
+const LABEL_PERSIST_CONCURRENCY = 6;
+/** Gesamtes Zeitbudget — Onboarding darf nicht an 64 sequentiellen Downloads scheitern (Vercel 60s). */
+const LABEL_PERSIST_BUDGET_MS = 18_000;
+
 export async function persistSuggestedBeerLabels(
   userId: string,
   suggested: SuggestedBeerVariety[],
+  options?: { budgetMs?: number; concurrency?: number },
 ): Promise<SuggestedBeerVariety[]> {
-  const out: SuggestedBeerVariety[] = [];
-  for (const beer of suggested) {
-    const etikettUrl = beer.etikettUrl.trim()
-      ? await persistBeerLabelFromUrl(userId, beer.etikettUrl)
-      : "";
-    out.push({ ...beer, etikettUrl: etikettUrl.slice(0, 1200) });
+  const budgetMs = options?.budgetMs ?? LABEL_PERSIST_BUDGET_MS;
+  const concurrency = Math.max(1, options?.concurrency ?? LABEL_PERSIST_CONCURRENCY);
+  const deadline = Date.now() + budgetMs;
+
+  const out: SuggestedBeerVariety[] = suggested.map((beer) => ({
+    ...beer,
+    etikettUrl: beer.etikettUrl.trim().slice(0, 1200),
+  }));
+
+  const pending = out
+    .map((beer, index) => ({ index, url: beer.etikettUrl }))
+    .filter((item) => item.url && !isAlreadyPersistedLabelUrl(item.url));
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < pending.length) {
+      if (Date.now() >= deadline) return;
+      const current = pending[cursor++];
+      if (!current) return;
+      const persisted = await persistBeerLabelFromUrl(userId, current.url);
+      out[current.index] = {
+        ...out[current.index]!,
+        etikettUrl: persisted.slice(0, 1200),
+      };
+    }
   }
+
+  const workers = Array.from({ length: Math.min(concurrency, pending.length) }, () => worker());
+  await Promise.all(workers);
   return out;
 }

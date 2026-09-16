@@ -150,6 +150,7 @@ export function buildUserMetadataForBrandSave(params: {
   settings: DashboardSettings;
   myBeers?: DashboardBeer[];
 }): Record<string, unknown> {
+  void params.myBeers;
   const merged = mergeDashboardMetadata(params.latestMetadata, {
     settings: params.settings,
   });
@@ -158,8 +159,12 @@ export function buildUserMetadataForBrandSave(params: {
     (url) => parseBrandReferenceIdFromUrl(url) !== null,
   );
 
-  if (dashboard && typeof dashboard === "object" && !keepsInternalReferenceStore && "brandReferenceImages" in dashboard) {
-    delete dashboard.brandReferenceImages;
+  if (dashboard && typeof dashboard === "object") {
+    // Sortiment liegt in dashboard_beers — nie wieder in Auth-Cookies.
+    if ("myBeers" in dashboard) delete dashboard.myBeers;
+    if (!keepsInternalReferenceStore && "brandReferenceImages" in dashboard) {
+      delete dashboard.brandReferenceImages;
+    }
   }
 
   return {
@@ -213,10 +218,10 @@ export async function persistBrandProfileForUser(params: {
   });
 
   if (error) {
-    const prunedBase = buildPrunedAuthUserData(params.latestMetadata);
+    const prunedBase = buildPrunedAuthUserData(freshMetadata) ?? buildPrunedAuthUserData(params.latestMetadata);
     if (prunedBase) {
       userMetadata = buildUserMetadataForBrandSave({
-        latestMetadata: freshMetadata,
+        latestMetadata: prunedBase,
         settings,
         myBeers,
       });

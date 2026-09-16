@@ -188,7 +188,12 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
         error?: string;
         myBeers?: DashboardBeer[];
       };
-      if (!res.ok) throw new Error(json.error || "Markenprofil konnte nicht gespeichert werden.");
+      if (!res.ok) {
+        if (res.status === 504 || res.status === 524) {
+          throw new Error("Speichern hat zu lange gedauert. Bitte erneut „Studio öffnen“ tippen.");
+        }
+        throw new Error(json.error || "Markenprofil konnte nicht gespeichert werden.");
+      }
       if (Array.isArray(json.myBeers) && json.myBeers.length) {
         setBeers(json.myBeers);
       } else {
@@ -440,7 +445,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
                 className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-[14px] text-zinc-100 outline-none ring-amber-500/0 transition focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20"
                 value={breweryName}
                 onChange={(e) => setBreweryName(e.target.value)}
-                placeholder="z. B. Augustiner-Bräu"
+                placeholder="Name deiner Brauerei"
                 autoComplete="organization"
               />
             </label>
