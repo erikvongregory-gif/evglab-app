@@ -1,11 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hydratePrivateAssets } from "@/lib/supabase/privateAssets";
 import { sanitizeDashboardBeers, type DashboardBeer } from "@/lib/dashboard/metadata";
 
 export async function readDashboardBeers(userId: string): Promise<DashboardBeer[]> {
   const { data, error } = await createAdminClient().from("dashboard_beers")
     .select("item").eq("user_id", userId).order("position");
   if (error) throw new Error(`Sortiment konnte nicht geladen werden: ${error.message}`);
-  return sanitizeDashboardBeers((data ?? []).map((row) => row.item));
+  return hydratePrivateAssets(sanitizeDashboardBeers((data ?? []).map((row) => row.item)), userId);
 }
 
 export async function replaceDashboardBeers(userId: string, beers: DashboardBeer[]): Promise<DashboardBeer[]> {
@@ -26,5 +27,5 @@ export async function replaceDashboardBeers(userId: string, beers: DashboardBeer
     const { error: deleteError } = await admin.from("dashboard_beers").delete().eq("user_id", userId).in("id", staleIds);
     if (deleteError) throw new Error(`Sortiment konnte nicht gespeichert werden: ${deleteError.message}`);
   }
-  return sanitized;
+  return hydratePrivateAssets(sanitized, userId);
 }

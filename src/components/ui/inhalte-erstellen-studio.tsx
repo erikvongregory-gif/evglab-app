@@ -149,11 +149,36 @@ export function InhalteErstellenStudio({
   const [etikettUrl, setEtikettUrl] = useState("");
   const [beers, setBeers] = useState<DashboardBeer[]>([]);
   const [selectedBeer, setSelectedBeer] = useState<DashboardBeer | null>(null);
+  const [failedBeerImages, setFailedBeerImages] = useState<Set<string>>(() => new Set());
+  const [loadedBeerImages, setLoadedBeerImages] = useState<Set<string>>(() => new Set());
+  const [beerImageError, setBeerImageError] = useState("");
 
   const [extraReferences, setExtraReferences] = useState<Array<{ name: string; dataUrl: string }>>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [beerPickerOpen, setBeerPickerOpen] = useState(false);
+  const refreshBeerImages = useCallback(async () => {
+    try {
+      const response = await fetch("/api/dashboard/my-beers", { cache: "no-store", credentials: "include" });
+      if (!response.ok) throw new Error("Sortenbilder konnten nicht neu geladen werden.");
+      const data = await response.json() as { beers: DashboardBeer[] };
+      setBeers(data.beers);
+      setSelectedBeer((current) => {
+        if (!current) return current;
+        const fresh = data.beers.find((beer) => beer.id === current.id);
+        return fresh ? { ...current, etikettUrl: fresh.etikettUrl } : current;
+      });
+      setBeerImageError("");
+    } catch {
+      setBeerImageError("Sortenbilder konnten nicht neu geladen werden. Bitte erneut versuchen.");
+    }
+  }, []);
+
+  const beerImageFailed = (url: string) => setFailedBeerImages((current) => new Set(current).add(url));
+  const beerImageLoaded = (url: string) => setLoadedBeerImages((current) => new Set(current).add(url));
+  const beerPhotoStatus = (url: string) => !url ? "ohne Foto"
+    : failedBeerImages.has(url) ? "Foto nicht ladbar"
+      : loadedBeerImages.has(url) ? "Foto bereit" : "Foto wird geladen …";
   const [beerCreateOpen, setBeerCreateOpen] = useState(false);
   const [beerCreateError, setBeerCreateError] = useState("");
   const extraFileRef = useRef<HTMLInputElement>(null);
@@ -460,7 +485,9 @@ export function InhalteErstellenStudio({
   const beerEtikettUrl = selectedBeer?.etikettUrl?.trim() || "";
   // Biersorte: nur deren Foto. Hauptmarke (keine Sorte): Marken-Etikett.
   const profileEtikettUrl = selectedBeer ? beerEtikettUrl : etikettUrl;
-  const hasProductImage = Boolean(profileEtikettUrl);
+  const productImageFailed = failedBeerImages.has(profileEtikettUrl);
+  const productImageLoading = Boolean(profileEtikettUrl) && !productImageFailed && !loadedBeerImages.has(profileEtikettUrl);
+  const hasProductImage = Boolean(profileEtikettUrl) && !productImageFailed && !productImageLoading;
 
   // Request-Qualität für Vorschau und Payload — Server rechnet damit (nicht Compiler-Qualität).
   const studioRequestQuality = "medium" as const;
@@ -1048,7 +1075,11 @@ export function InhalteErstellenStudio({
     : !loading &&
       Boolean(userPrompt.trim() || activePreset) &&
       (etikettModus === "generisch" || hasProductImage);
-  const generateBlockReason = isSocialMode
+  const generateBlockReason = etikettModus === "marke" && productImageFailed
+    ? "Das Produktfoto ist nicht ladbar. Sortenbilder erneut laden oder das Foto unter Meine Biere ersetzen."
+    : etikettModus === "marke" && productImageLoading
+      ? "Das Produktfoto wird noch geladen."
+    : isSocialMode
     ? profileMode !== "guided" || !profileComplete
       ? "Aktives Markenprofil nötig — inkl. Marken-Schrift unter „Markenprofil“."
       : etikettModus === "marke" && !hasProductImage
@@ -1204,12 +1235,15 @@ export function InhalteErstellenStudio({
                 className={`studio-create-beer-picker__trigger${beerPickerOpen ? " is-open" : ""}`}
                 aria-haspopup="listbox"
                 aria-expanded={beerPickerOpen}
-                onClick={() => setBeerPickerOpen((open) => !open)}
+                onClick={() => {
+                  if (!beerPickerOpen) void refreshBeerImages();
+                  setBeerPickerOpen((open) => !open);
+                }}
               >
                 <span className="studio-create-beer-picker__thumb">
-                  {profileEtikettUrl ? (
+                  {profileEtikettUrl && !failedBeerImages.has(profileEtikettUrl) ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={profileEtikettUrl} alt="" />
+                    <img src={profileEtikettUrl} alt="" onLoad={() => beerImageLoaded(profileEtikettUrl)} onError={() => beerImageFailed(profileEtikettUrl)} />
                   ) : (
                     <span className="studio-create-beer-picker__initials">
                       {beerInitials(selectedBeer?.name || brandLabel)}
@@ -1220,10 +1254,8 @@ export function InhalteErstellenStudio({
                   <strong>{selectedBeer?.name || `${brandLabel} · Hauptmarke`}</strong>
                   <small>
                     {selectedBeer
-                      ? `${beerStyleLabel(selectedBeer.bierstil)}${profileEtikettUrl ? " · Foto bereit" : " · ohne Foto"}`
-                      : profileEtikettUrl
-                        ? "Markenprofil · Foto bereit"
-                        : "Markenprofil · ohne Foto"}
+                      ? `${beerStyleLabel(selectedBeer.bierstil)} · ${beerPhotoStatus(profileEtikettUrl)}`
+                      : `Markenprofil · ${beerPhotoStatus(profileEtikettUrl)}`}
                   </small>
                 </span>
                 <span
@@ -1266,9 +1298,9 @@ export function InhalteErstellenStudio({
                       }}
                     >
                       <span className="studio-create-beer-picker__thumb">
-                        {etikettUrl ? (
+                        {etikettUrl && !failedBeerImages.has(etikettUrl) ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={etikettUrl} alt="" />
+                          <img src={etikettUrl} alt="" onLoad={() => beerImageLoaded(etikettUrl)} onError={() => beerImageFailed(etikettUrl)} />
                         ) : (
                           <span className="studio-create-beer-picker__initials">
                             {beerInitials(brandLabel)}
@@ -1277,7 +1309,7 @@ export function InhalteErstellenStudio({
                       </span>
                       <span className="studio-create-beer-picker__meta">
                         <strong>{brandLabel} · Hauptmarke</strong>
-                        <small>{etikettUrl ? "Markenfoto hinterlegt" : "Kein Markenfoto"}</small>
+                        <small>{etikettUrl ? beerPhotoStatus(etikettUrl) : "Kein Markenfoto"}</small>
                       </span>
                       {!selectedBeer ? (
                         <span className="studio-create-beer-picker__check" aria-hidden="true">
@@ -1302,9 +1334,9 @@ export function InhalteErstellenStudio({
                           }}
                         >
                           <span className="studio-create-beer-picker__thumb">
-                            {thumb ? (
+                            {thumb && !failedBeerImages.has(thumb) ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={thumb} alt="" />
+                              <img src={thumb} alt="" onLoad={() => beerImageLoaded(thumb)} onError={() => beerImageFailed(thumb)} />
                             ) : (
                               <span className="studio-create-beer-picker__initials">
                                 {beerInitials(beer.name)}
@@ -1315,7 +1347,7 @@ export function InhalteErstellenStudio({
                             <strong>{beer.name}</strong>
                             <small>
                               {beerStyleLabel(beer.bierstil)}
-                              {thumb ? " · Foto bereit" : " · ohne Foto"}
+                              {` · ${beerPhotoStatus(thumb)}`}
                             </small>
                           </span>
                           {active ? (
@@ -1353,6 +1385,16 @@ export function InhalteErstellenStudio({
             <span className="studio-create-field__hint">
               Das Sortenfoto ist die Produkt-Referenz (Flasche + Etikett) — nicht die Szene.
             </span>
+            {beerImageError || productImageFailed || beers.some((beer) => failedBeerImages.has(beer.etikettUrl)) ? (
+              <div className="studio-create-field__hint" role="status">
+                {beerImageError || "Ein Sortenfoto konnte nicht geladen werden."}
+                <button type="button" className="studio-create-link" onClick={() => {
+                  setFailedBeerImages(new Set());
+                  setLoadedBeerImages(new Set());
+                  void refreshBeerImages();
+                }}>Sortenbilder erneut laden</button>
+              </div>
+            ) : null}
           </div>
 
           <div className="studio-create-field">

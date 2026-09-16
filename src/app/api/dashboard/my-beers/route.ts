@@ -147,10 +147,10 @@ export async function PUT(req: Request) {
 
   const sanitized = sanitizeDashboardBeers(beers);
   try {
-    await replaceDashboardBeers(user.id, sanitized);
+    const saved = await replaceDashboardBeers(user.id, sanitized);
+    return NextResponse.json({ ok: true, beers: saved });
   } catch {
     return NextResponse.json({ error: "Sortiment konnte nicht gespeichert werden." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, beers: sanitized });
 }
