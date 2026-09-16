@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 
 export const referenceRoleSchema = z.enum(["product", "label", "mood", "shape"]);
 
 export const compiledBriefSchema = z.object({
   normalized_brief: z.object({
-    scene: z.string().trim().min(1).max(400),
+    // The fallback stores the full accepted user brief here, without shortening it.
+    scene: hyperrealisticSchema.shape.zusatzWunsch.unwrap().min(1),
     action: z.string().trim().max(400).optional().default(""),
     people: z.string().trim().max(400).optional().default(""),
     mood: z.string().trim().max(200).optional().default(""),

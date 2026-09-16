@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
-import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
+import { hyperrealisticSchema, type HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import {
   assembleMasterPrompt,
   compileBrief,
@@ -30,6 +30,32 @@ const baseInput = {
 } satisfies HyperrealisticInput;
 
 describe("prompt-compiler", () => {
+  it.each([401, 800])("preserves a valid %i-character brief in the product-photo path", async (length) => {
+    const brief = "Biergarten mit warmem Licht. ".repeat(40).slice(0, length - 5) + "ENDE.";
+    const input = hyperrealisticSchema.parse({ ...baseInput, zusatzWunsch: brief });
+    const compiled = await compileBrief({
+      anthropic: null,
+      input,
+      hasProductPhoto: true,
+      hasShapeReference: true,
+    });
+    expect(compiled.blocking_issues).toEqual([]);
+    expect(compiled.normalized_brief.scene).toBe(brief);
+    expect(compiled.image_prompt).toContain(brief);
+  });
+
+  it("returns actionable blocking issues for a long brief without a required photo", async () => {
+    const input = hyperrealisticSchema.parse({ ...baseInput, zusatzWunsch: "Biergarten. ".repeat(60) });
+    const compiled = await compileBrief({
+      anthropic: null,
+      input,
+      hasProductPhoto: false,
+      hasShapeReference: true,
+    });
+    expect(compiled.blocking_issues.some((issue) => /Produktfoto/i.test(issue))).toBe(true);
+    expect(compiled.normalized_brief.scene).toBe(input.zusatzWunsch);
+  });
+
   it("exposes structured bottle catalog fields", () => {
     const nrw = FLASCHEN_TYPEN.nrw_500;
     expect(nrw.display_name).toContain("NRW");
