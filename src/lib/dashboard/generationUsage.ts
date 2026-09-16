@@ -1,7 +1,8 @@
 type JobRow = { created_at: string | null; charged: number | null };
 
 export type GenerationUsageStats = {
-  postsThisMonth: number;
+  /** null wenn die Monatszählung fehlgeschlagen ist (nicht mit 0 verwechseln). */
+  postsThisMonth: number | null;
   tokenUsageByDay: { date: string; tokens: number }[];
   degradedUsage: boolean;
 };
@@ -48,7 +49,7 @@ export async function loadGenerationUsageStats(
   now = new Date(),
 ): Promise<GenerationUsageStats> {
   const empty: GenerationUsageStats = {
-    postsThisMonth: 0,
+    postsThisMonth: null,
     tokenUsageByDay: [],
     degradedUsage: true,
   };

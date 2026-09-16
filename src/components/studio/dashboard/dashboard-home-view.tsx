@@ -128,7 +128,11 @@ export function DashboardHomeView({
   const hasActivePlan =
     unlimited ||
     (!billingUnknown && hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
-  const createHref = hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing";
+  const createHref = billingUnknown
+    ? null
+    : hasActivePlan
+      ? "/inhalte-erstellen"
+      : "/dashboard?tab=pricing";
   const planLabel = billingUnknown
     ? "Abo-Status unbekannt"
     : planLabelFromKey(summary?.plan ?? null, unlimited);
@@ -315,7 +319,9 @@ export function DashboardHomeView({
               >
                 {motifsThisMonth != null ? formatCompactNumber(motifsThisMonth) : "—"}
               </div>
-              <p className="stu-dash-home__kpi-meta">Dieser Monat</p>
+              <p className="stu-dash-home__kpi-meta">
+                {motifsThisMonth == null && summaryLoaded ? "Nicht verfügbar" : "Dieser Monat"}
+              </p>
             </StudioUiCard>
 
             <StudioUiCard padding="sm" className="stu-dash-home__enter stu-dash-home__kpi">
@@ -392,7 +398,11 @@ export function DashboardHomeView({
                 Tokens pro Tag
               </div>
               <div className="stu-dash-home__chart-total" aria-live="polite">
-                {loadingChart ? "…" : `Summe: ${formatDeNumber(tokenSeries.total)} Tokens (${TOKEN_RANGE_DAYS[activeRange]} Tage)`}
+                {loadingChart
+                  ? "…"
+                  : usageDegraded
+                    ? "Summe nicht verfügbar"
+                    : `Summe: ${formatDeNumber(tokenSeries.total)} Tokens (${TOKEN_RANGE_DAYS[activeRange]} Tage)`}
               </div>
             </div>
 
@@ -536,10 +546,16 @@ export function DashboardHomeView({
               </div>
             ) : recentGenerations.length === 0 ? (
               <div className="stu-dash-home__chart-empty" style={{ margin: 12 }}>
-                Noch keine Generierungen.{" "}
-                <Link href={createHref} style={{ color: "var(--ac)" }}>
-                  Erstes Motiv erstellen
-                </Link>
+                {createHref ? (
+                  <>
+                    Noch keine Generierungen.{" "}
+                    <Link href={createHref} style={{ color: "var(--ac)" }}>
+                      Erstes Motiv erstellen
+                    </Link>
+                  </>
+                ) : (
+                  <>Noch keine Generierungen. Tarifstatus konnte nicht geladen werden.</>
+                )}
               </div>
             ) : (
               <>

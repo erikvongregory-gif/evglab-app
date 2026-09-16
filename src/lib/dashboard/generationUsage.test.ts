@@ -64,7 +64,7 @@ describe("generationUsage", () => {
       const result = await loadGenerationUsageStats(queries, now);
 
       expect(result).toEqual({
-        postsThisMonth: 0,
+        postsThisMonth: null,
         tokenUsageByDay: [],
         degradedUsage: true,
       });

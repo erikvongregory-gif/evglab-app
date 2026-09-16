@@ -24,7 +24,7 @@ export type DashboardHomeSummary = {
   unlimited?: boolean;
   tokens: { monthly: number; used: number; remaining: number; unlimited?: boolean };
   periodEnd?: string | null;
-  postsThisMonth: number;
+  postsThisMonth: number | null;
   chargesTotal?: number;
   teamMembers: number;
   openInvites: number;
