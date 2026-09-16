@@ -7,6 +7,7 @@ import {
 } from "@/lib/dashboard/onboarding";
 import { getSupabaseAnonKey, getSupabaseUrl, isInviteOnlyEnabled } from "@/lib/supabase/env";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
+import { normalizeNextPath } from "@/lib/security/authResponses";
 import { clearIncomingSupabaseAuthCookies } from "@/lib/supabase/clearAuthCookies";
 import { getSharedCookieDomain } from "@/lib/siteConfig";
 
@@ -109,7 +110,9 @@ export async function updateSession(request: NextRequest) {
     const source = request.nextUrl.searchParams.get("source");
     const onboarding = onboardingStateFromUser(user);
     const requestedNext = request.nextUrl.searchParams.get("next");
-    const entry = requestedNext?.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : resolveStudioEntryPath(onboarding, "/dashboard");
+    const entry = requestedNext
+      ? normalizeNextPath(requestedNext)
+      : resolveStudioEntryPath(onboarding, "/dashboard");
     const targetUrl = new URL(entry, request.url);
     if (
       entry === "/dashboard" &&

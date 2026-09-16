@@ -9,6 +9,7 @@ import {
   isVerified2FAForUser,
 } from "@/lib/admin/emailTwoFactor";
 import { hasAdminAccess } from "@/lib/auth/owner";
+import { readPasswordEpoch } from "@/lib/auth/passwordRecoveryGate";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
 import { withRequestIdJson } from "@/lib/security/authResponses";
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
   const trustedDevice = isTrustedDeviceForUser(
     cookieStore.get(getTrustedDeviceCookieName())?.value ?? null,
     user.id,
+    readPasswordEpoch(user),
   );
   const hasPending = hasValidPending2FAForUser(cookieStore.get(getPendingCookieName())?.value ?? null, user.id);
   const twoFactorRequired = !verified && !trustedDevice && hasPending;

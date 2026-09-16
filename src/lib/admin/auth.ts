@@ -22,7 +22,7 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
   if (!hasAdminAccess(user)) return null;
-  if (!(await hasPassedTwoFactor(user.id))) return null;
+  if (!(await hasPassedTwoFactor(user))) return null;
   return { userId: user.id, email: user.email ?? null, role: readRole(user.app_metadata?.role) };
 }
 
@@ -34,7 +34,7 @@ export async function requireAdminPageAccess(options?: { allowWithout2FA?: boole
   } = await supabase.auth.getUser();
   if (!user) redirect("/admin/anmelden");
   if (!hasAdminAccess(user)) redirect("/dashboard");
-  if (!options?.allowWithout2FA && !(await hasPassedTwoFactor(user.id))) {
+  if (!options?.allowWithout2FA && !(await hasPassedTwoFactor(user))) {
     redirect(TWO_FACTOR_PAGE);
   }
   return {

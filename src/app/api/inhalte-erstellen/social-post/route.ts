@@ -1,4 +1,4 @@
-import { reserveGeneration, finishGeneration, saveGenerationProgress } from "@/lib/billing/generationJobs";
+import { reserveGeneration, finishGeneration, saveGenerationProgress, resumeGenerationIfPresent, buildGenerationBillingSnapshot } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import {
@@ -17,7 +17,7 @@ import {
   canUseCampaignWithTextProfile,
   getBrandProfileFromMetadata,
 } from "@/lib/dashboard/brandProfile";
-import { calculateGenerationTokenCost, calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
+import { calculateGenerationTokenCost, calculatePerVariantTokenCost, resolveImageBillingResolution } from "@/lib/billing/generationTokenCost";
 import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { compileBrief } from "@/lib/prompts/prompt-compiler";
@@ -35,6 +35,7 @@ import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
 import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
+import { persistGeneratedMediaItems } from "@/lib/dashboard/persistGeneratedMedia";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -71,8 +72,11 @@ export async function POST(req: Request) {
       const detail = issue ? `${issue.path.join(".")}: ${issue.message}` : "Payload validation failed.";
       return NextResponse.json({ error: `Ungueltige Anfrage. ${detail}` }, { status: 400 });
     }
+
     const { headline, subline, ctaText } = parsed.data;
     const input = applyClientIntentOverrides(parsed.data);
+    const resumed = await resumeGenerationIfPresent(req, guard.userId, input);
+    if (resumed) return resumed;
 
     const brandProfile = getBrandProfileFromMetadata(guard.userMetadata);
     if (!canUseCampaignWithTextProfile(brandProfile)) {
@@ -101,7 +105,7 @@ export async function POST(req: Request) {
       Boolean(effectiveEtikettBild) && !effectiveEtikettBild.includes("example.com/placeholder");
 
     let visionReference = null as Awaited<ReturnType<typeof resolveReferenceImageForVision>>;
-    if (hasEtikettInput && input.behaelter !== "G") {
+    if (hasEtikettInput && input.behaelter !== "G" && wantsBrandLabel) {
       try {
         visionReference = await resolveReferenceImageForVision(effectiveEtikettBild, guard.userMetadata);
       } catch (visionError) {
@@ -165,6 +169,9 @@ export async function POST(req: Request) {
         zusatzWunsch: briefParts.join(". ").slice(0, 800) || input.zusatzWunsch,
       };
       prompt = appendCopySpaceDirective(buildProductPlacementPrompt(placementInput));
+      if (brandProfileContext) {
+        prompt = `${prompt} ${brandProfileContext.replace(/\n+/g, " ")}`;
+      }
       if (input.stiltreue === "hoch" && wantsBrandLabel) {
         prompt = `${prompt} LABEL FIDELITY: Keep Image 1 label identical — every letter, logo, crest. Change only the environment.`;
       }
@@ -178,15 +185,18 @@ export async function POST(req: Request) {
     );
 
     const qualityEnv = process.env.OPENAI_IMAGE_QUALITY?.trim().toLowerCase();
+    const requestedQuality = input.quality === "high" ? "high" : "medium";
+    const billingResolution = resolveImageBillingResolution({
+      hasProductPhoto,
+      qualityEnv,
+      compiledOrRequestedQuality: requestedQuality,
+    });
     const openAiQuality: "low" | "medium" | "high" =
       qualityEnv === "low" || qualityEnv === "medium" || qualityEnv === "high"
         ? qualityEnv
-        : hasProductPhoto
+        : billingResolution === "2K"
           ? "high"
-          : compiled.generation_settings.quality === "high"
-            ? "high"
-            : "medium";
-    const billingResolution = (openAiQuality === "high" ? "2K" : "1K") as "1K" | "2K";
+          : "medium";
     const hasReferenceForBilling = referenceImages.length > 0;
     const strictLabelMode = wantsBrandLabel && hasProductPhoto;
     const perVariantCost = calculatePerVariantTokenCost({
@@ -300,10 +310,30 @@ export async function POST(req: Request) {
       );
     }
 
-    const consumeResult = await finishGeneration(job, perVariantCost * images.length, { images: images.map(imageUrl => ({ imageUrl })), jobId: job.id });
-
-    return NextResponse.json({
-      mode: "social_post_overlay",
+    const mediaTitle = (headline.trim() || input.beerName?.trim() || brandProfile.breweryName.trim() || "Social-Post").slice(
+      0,
+      120,
+    );
+    const mediaItems = await persistGeneratedMediaItems({
+      userId: guard.userId,
+      jobId: job.id,
+      images,
+      title: mediaTitle,
+      prompt: mediaTitle,
+      aspectRatio,
+      resolution: billingResolution === "2K" ? "2K" : "1K",
+      outputFormat: OUTPUT_FORMAT,
+    });
+    const mediaPersisted = mediaItems.length > 0;
+    const totalConsumed = perVariantCost * images.length;
+    const billing = buildGenerationBillingSnapshot({
+      state: currentState,
+      charged: totalConsumed,
+      perVariant: perVariantCost,
+      owner: Boolean(job.owner),
+    });
+    const responseBody = {
+      mode: "social_post_overlay" as const,
       images: images.map((imageUrl) => ({ imageUrl })),
       partial: images.length < variantsToCreate,
       expectedVariants: variantsToCreate,
@@ -311,13 +341,26 @@ export async function POST(req: Request) {
       usedBrandFont: Boolean(fontData),
       fontName,
       outputFormat: OUTPUT_FORMAT,
+      jobId: job.id,
+      mediaPersisted,
       billing: {
-        remainingTokens: Math.max(
-          consumeResult.state.monthly_tokens - consumeResult.state.used_tokens,
-          0,
-        ),
+        remainingTokens: billing.remainingTokens,
+        consumed: billing.consumed,
+        perVariant: billing.perVariant,
+        plan: billing.plan,
+        monthlyTokens: billing.monthlyTokens,
+        usedTokens: billing.usedTokens,
+        freeTrial: billing.freeTrial,
       },
+    };
+    const finished = await finishGeneration(job, totalConsumed, responseBody);
+    responseBody.billing = buildGenerationBillingSnapshot({
+      state: finished.state,
+      charged: totalConsumed,
+      perVariant: perVariantCost,
+      owner: Boolean(job.owner),
     });
+    return NextResponse.json(responseBody);
   } catch (error) {
     if (isProviderError(error)) {
       logProviderFailure(error.classified, { label: "inhalte-erstellen-social-post" });

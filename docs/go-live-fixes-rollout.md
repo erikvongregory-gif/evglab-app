@@ -44,10 +44,11 @@ Neue Migrationen, jeweils aus `docs/`:
 2. `go-live-security-migration.sql`
 3. `generation-jobs-migration.sql`
 4. `billing-periods-migration.sql`
-5. `workspaces-migration.sql`
-6. `account-deletion-migration.sql`
-7. `checkout-lock-migration.sql`
-8. `webhook-recovery-migration.sql`
+5. `generation-result-billing-migration.sql`
+6. `workspaces-migration.sql`
+7. `account-deletion-migration.sql`
+8. `checkout-lock-migration.sql`
+9. `webhook-recovery-migration.sql`
 
 Die neuen Tabellen und RPCs sind für `anon`/`authenticated` gesperrt. Der Server verwendet den Service-Role-Zugang. In einer Staging-Datenbank mit echten Supabase-Rollen noch einmal negativ testen; PGlite ersetzt keine vollständige Supabase-Instanz.
 

@@ -10,6 +10,7 @@ import {
   send2FACodeEmail,
 } from "@/lib/admin/emailTwoFactor";
 import { isOwnerUser } from "@/lib/auth/owner";
+import { readPasswordEpoch } from "@/lib/auth/passwordRecoveryGate";
 import { logAuthEvent } from "@/lib/security/authObservability";
 import { appendResponseCookies, createNoStoreRedirect, secureCookieOptions } from "@/lib/security/authResponses";
 
@@ -53,7 +54,7 @@ export async function redirectWithEmail2FAIfNeeded(
   if (!user?.email) return null;
 
   const trustedDevice = readCookie(request, getTrustedDeviceCookieName());
-  if (isTrustedDeviceForUser(trustedDevice, user.id)) return null;
+  if (isTrustedDeviceForUser(trustedDevice, user.id, readPasswordEpoch(user))) return null;
 
   const code = createOneTimeCode();
   try {

@@ -17,6 +17,7 @@ import {
   applyBridgedCookies,
   bridgeOAuthSession,
   peekBridgedOAuthSession,
+  pkceVerifierHashFromRequest,
 } from "@/lib/supabase/oauthSessionBridge";
 import { clearIncomingSupabaseAuthCookies } from "@/lib/supabase/clearAuthCookies";
 import { createAuthRouteHandlerClient, createOAuthExchangeClient } from "@/lib/supabase/server";
@@ -28,6 +29,11 @@ import {
   secureCookieOptions,
 } from "@/lib/security/authResponses";
 import { getOrCreateRequestId, logAuthEvent } from "@/lib/security/authObservability";
+import {
+  buildPasswordRecoveryToken,
+  getPasswordRecoveryCookieName,
+  PASSWORD_RECOVERY_TTL_SECONDS,
+} from "@/lib/auth/passwordRecoveryGate";
 import { parseCookieHeader } from "@supabase/ssr";
 
 function authErrorParam(code?: string) {
@@ -80,10 +86,10 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitForBridgedSession(code: string, maxMs: number) {
+async function waitForBridgedSession(code: string, pkceVerifierHash: string | null, maxMs: number) {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
-    const bridged = peekBridgedOAuthSession(code);
+    const bridged = peekBridgedOAuthSession(code, pkceVerifierHash);
     if (bridged) return bridged;
     await sleep(200);
   }
@@ -124,7 +130,18 @@ async function redirectAfterOAuthSuccess(
     opts;
 
   if (opts.oauthCode && user?.id) {
-    bridgeOAuthSession(opts.oauthCode, redirectResponse, user.id);
+    const pkceHash = pkceVerifierHashFromRequest(request);
+    if (pkceHash) {
+      bridgeOAuthSession(opts.oauthCode, redirectResponse, user.id, pkceHash);
+    }
+  }
+
+  if (isPasswordRecovery && user?.id) {
+    redirectResponse.cookies.set(getPasswordRecoveryCookieName(), buildPasswordRecoveryToken({ userId: user.id }), {
+      httpOnly: true,
+      ...secureCookieOptions(request),
+      maxAge: PASSWORD_RECOVERY_TTL_SECONDS,
+    });
   }
 
   if (!isPasswordRecovery && user?.id && hasTermsAcceptanceCookie(request)) {
@@ -176,7 +193,7 @@ async function finishFromBridge(
     logEvent: string;
   },
 ) {
-  const bridged = peekBridgedOAuthSession(opts.code);
+  const bridged = peekBridgedOAuthSession(opts.code, pkceVerifierHashFromRequest(request));
   if (!bridged) return null;
 
   const redirectResponse = createNoStoreRedirect(`${opts.appOrigin}${opts.postAuthNext}`, opts.requestId);
@@ -269,7 +286,7 @@ export async function handleAuthCallbackGet(request: Request) {
       durationMs: Date.now() - startedAt,
     });
 
-    await waitForBridgedSession(code, 40_000);
+    await waitForBridgedSession(code, pkceVerifierHashFromRequest(request), 40_000);
     const fromBridge = await finishFromBridge(request, {
       code,
       requestId,

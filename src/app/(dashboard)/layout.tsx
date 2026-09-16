@@ -23,7 +23,7 @@ export default async function StudioDashboardLayout({ children }: { children: Re
   }
 
   // 2FA ist fuer jedes Konto Pflicht — hier greift sie fuer alle Studio-Bereiche.
-  if (!(await hasPassedTwoFactor(user.id))) {
+  if (!(await hasPassedTwoFactor(user))) {
     redirect(TWO_FACTOR_PAGE);
   }
 

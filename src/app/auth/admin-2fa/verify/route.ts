@@ -15,6 +15,7 @@ import {
   verifyPending2FACode,
 } from "@/lib/admin/emailTwoFactor";
 import { isOwnerUser } from "@/lib/auth/owner";
+import { readPasswordEpoch } from "@/lib/auth/passwordRecoveryGate";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { appendResponseCookies, createNoStoreRedirect, normalizeNextPath, secureCookieOptions } from "@/lib/security/authResponses";
 import { getOrCreateRequestId, logAuthEvent } from "@/lib/security/authObservability";
@@ -33,6 +34,9 @@ export async function POST(request: NextRequest) {
   const code = String(formData.get("code") ?? "").trim();
   const next = normalizeNextPath(String(formData.get("next") ?? "/dashboard"));
   const verifyPage = next === "/dashboard" ? "/dashboard/2fa-email" : `/dashboard/2fa-email?next=${encodeURIComponent(next)}`;
+  const wantsJson =
+    String(formData.get("client") ?? "") === "1" ||
+    (request.headers.get("accept") ?? "").includes("application/json");
 
   const authResponse = NextResponse.next();
   const supabase = createRouteHandlerClient(request, authResponse);
@@ -40,10 +44,18 @@ export async function POST(request: NextRequest) {
     appendResponseCookies(response, authResponse);
     return response;
   };
+  const jsonResult = (body: Record<string, unknown>, status = 200) => {
+    const response = NextResponse.json(body, { status });
+    response.headers.set("Cache-Control", "no-store, max-age=0");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("x-request-id", requestId);
+    return withAuthCookies(response);
+  };
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email) {
+    if (wantsJson) return jsonResult({ ok: false, error: "auth" }, 401);
     return createNoStoreRedirect(`${origin}/anmelden?error=auth`, requestId);
   }
   const baseIdentifier = `twofa:${user.id}`;
@@ -107,9 +119,11 @@ export async function POST(request: NextRequest) {
   }
 
   if (!code) {
+    if (wantsJson) return jsonResult({ ok: false, error: "missing_code" }, 400);
     return createNoStoreRedirect(withQuery(verifyPage, "error=missing_code"), requestId);
   }
   if (!pendingToken && !usedBackupCode) {
+    if (wantsJson) return jsonResult({ ok: false, error: "admin_2fa_session_expired" }, 401);
     return createNoStoreRedirect(withQuery(verifyPage, "error=admin_2fa_session_expired"), requestId);
   }
   const verifyRateError = await enforceRateLimitPersistent(
@@ -130,32 +144,45 @@ export async function POST(request: NextRequest) {
       status: 303,
       durationMs: Date.now() - startedAt,
     });
+    if (wantsJson) return jsonResult({ ok: false, error: "admin_2fa_invalid" }, 401);
     return createNoStoreRedirect(withQuery(verifyPage, "error=admin_2fa_invalid"), requestId);
   }
 
-  const done = createNoStoreRedirect(`${origin}${next}`, requestId);
-  done.cookies.set(getVerifiedCookieName(), buildVerified2FAToken({ userId: user.id }), {
-    httpOnly: true,
-    ...cookieOptions,
-    maxAge: VERIFIED_TTL_SECONDS,
-  });
-  done.cookies.set(getTrustedDeviceCookieName(), buildTrustedDeviceToken({ userId: user.id }), {
-    httpOnly: true,
-    ...cookieOptions,
-    maxAge: TRUSTED_DEVICE_TTL_SECONDS,
-  });
-  done.cookies.set(getPendingCookieName(), "", {
-    httpOnly: true,
-    ...cookieOptions,
-    maxAge: 0,
-  });
+  const applyVerifiedCookies = (response: NextResponse) => {
+    response.cookies.set(getVerifiedCookieName(), buildVerified2FAToken({ userId: user.id }), {
+      httpOnly: true,
+      ...cookieOptions,
+      maxAge: VERIFIED_TTL_SECONDS,
+    });
+    response.cookies.set(getTrustedDeviceCookieName(), buildTrustedDeviceToken({
+      userId: user.id,
+      passwordEpoch: readPasswordEpoch(user),
+    }), {
+      httpOnly: true,
+      ...cookieOptions,
+      maxAge: TRUSTED_DEVICE_TTL_SECONDS,
+    });
+    response.cookies.set(getPendingCookieName(), "", {
+      httpOnly: true,
+      ...cookieOptions,
+      maxAge: 0,
+    });
+    return response;
+  };
+
   logAuthEvent({
     event: usedBackupCode ? "two_factor_backup_code_used" : "two_factor_verified",
     requestId,
     userId: user.id,
     email: user.email,
-    status: 303,
+    status: wantsJson ? 200 : 303,
     durationMs: Date.now() - startedAt,
   });
+
+  if (wantsJson) {
+    return applyVerifiedCookies(jsonResult({ ok: true, next }));
+  }
+
+  const done = applyVerifiedCookies(createNoStoreRedirect(`${origin}${next}`, requestId));
   return withAuthCookies(done);
 }

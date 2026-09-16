@@ -5,7 +5,12 @@ import {
   termsAcceptanceMetadata,
 } from "@/lib/auth/termsAcceptance";
 import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
-import { consumeInviteByToken } from "@/lib/invite/server";
+import {
+  consumeInviteByToken,
+  evaluateInvite,
+  getInviteByToken,
+  releaseInviteById,
+} from "@/lib/invite/server";
 import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
 import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
@@ -53,9 +58,23 @@ export async function POST(request: Request) {
     return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=invite_required`, requestId);
   }
 
+  let reservedInviteId: string | null = null;
   if (isInviteOnlyEnabled()) {
+    const invite = await getInviteByToken(inviteToken);
+    const status = evaluateInvite(invite, email);
+    if (status !== "valid" || !invite) {
+      const reason =
+        status === "expired"
+          ? "invite_expired"
+          : status === "used"
+            ? "invite_used"
+            : status === "email_mismatch"
+              ? "invite_email_mismatch"
+              : "invite_invalid";
+      return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=${reason}`, requestId);
+    }
     const consumed = await consumeInviteByToken(inviteToken, email);
-    if (!consumed.ok) {
+    if (!consumed.ok || !consumed.invite) {
       const reason =
         consumed.status === "expired"
           ? "invite_expired"
@@ -66,6 +85,7 @@ export async function POST(request: Request) {
               : "invite_invalid";
       return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=${reason}`, requestId);
     }
+    reservedInviteId = consumed.invite.id;
   }
 
   const admin = createAdminClient();
@@ -81,6 +101,9 @@ export async function POST(request: Request) {
   });
 
   if (error || !data.user) {
+    if (reservedInviteId) {
+      await releaseInviteById(reservedInviteId).catch(() => undefined);
+    }
     return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=auth`, requestId);
   }
 

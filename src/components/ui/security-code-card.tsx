@@ -17,6 +17,8 @@ export type SecurityCodeCardProps = {
   error?: string;
 };
 
+type Outcome = "idle" | "ok" | "fail";
+
 function errorMessage(error: string | undefined) {
   if (!error) return null;
   if (error === "missing_code") return "Bitte gib den Code ein.";
@@ -44,14 +46,18 @@ export function SecurityCodeCard({
   const [rattling, setRattling] = useState<boolean[]>(() => Array(DIGIT_COUNT).fill(false));
   const [backupCode, setBackupCode] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
-  const [verified, setVerified] = useState(false);
+  const [outcome, setOutcome] = useState<Outcome>("idle");
+  const [localError, setLocalError] = useState<string | undefined>(error);
   const [resendCooldown, setResendCooldown] = useState(0);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
-  const verifyFormRef = useRef<HTMLFormElement>(null);
   const timersRef = useRef<number[]>([]);
 
   const complete = digits.every((d) => d !== "") || (ownerHasBackupCode && backupCode.trim().length >= 6);
   const confirmOpacity = !complete && !verifyBusy ? 0.55 : 1;
+
+  useEffect(() => {
+    setLocalError(error);
+  }, [error]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -99,19 +105,82 @@ export function SecurityCodeCard({
     }
   };
 
+  const clearTimers = () => {
+    timersRef.current.forEach((id) => window.clearInterval(id));
+    timersRef.current = [];
+  };
+
+  const resetAfterFail = useCallback(() => {
+    setOutcome("idle");
+    setVerifyBusy(false);
+    setDigits(Array(DIGIT_COUNT).fill(""));
+    setDisplay(Array(DIGIT_COUNT).fill(""));
+    setRattling(Array(DIGIT_COUNT).fill(false));
+    setBackupCode("");
+    window.setTimeout(() => refs.current[0]?.focus(), 50);
+  }, []);
+
+  const submitCode = useCallback(async (): Promise<{ ok: true; next: string } | { ok: false; error: string }> => {
+    const code =
+      digits.every((d) => d !== "") ? digits.join("") : backupCode.trim();
+    const body = new FormData();
+    body.set("next", nextPath);
+    body.set("code", code);
+    body.set("client", "1");
+    const res = await fetch("/auth/admin-2fa/verify", {
+      method: "POST",
+      body,
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    let data: { ok?: boolean; next?: string; error?: string } | null = null;
+    try {
+      data = (await res.json()) as { ok?: boolean; next?: string; error?: string };
+    } catch {
+      data = null;
+    }
+    if (res.ok && data?.ok && data.next) return { ok: true, next: data.next };
+    return { ok: false, error: data?.error || "admin_2fa_invalid" };
+  }, [backupCode, digits, nextPath]);
+
+  const finishWithOutcome = useCallback(
+    async () => {
+      try {
+        const result = await submitCode();
+        if (result.ok) {
+          setOutcome("ok");
+          window.setTimeout(() => {
+            window.location.assign(result.next);
+          }, 900);
+          return;
+        }
+        setLocalError(result.error);
+        setOutcome("fail");
+        window.setTimeout(resetAfterFail, 1400);
+      } catch {
+        setLocalError("admin_2fa_invalid");
+        setOutcome("fail");
+        window.setTimeout(resetAfterFail, 1400);
+      }
+    },
+    [resetAfterFail, submitCode],
+  );
+
   const runVerifyAnimationThenSubmit = () => {
-    if (verifyBusy || verified) return;
+    if (verifyBusy || outcome !== "idle") return;
     const usingBackup = ownerHasBackupCode && backupCode.trim().length >= 6 && !digits.every((d) => d !== "");
     if (!complete) return;
 
+    setLocalError(undefined);
+    setVerifyBusy(true);
+
     if (usingBackup || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setVerifyBusy(true);
-      verifyFormRef.current?.requestSubmit();
+      void finishWithOutcome();
       return;
     }
 
+    clearTimers();
     const finalCode = [...digits];
-    setVerifyBusy(true);
     setRattling(finalCode.map(() => true));
     setDisplay([...finalCode]);
 
@@ -139,9 +208,8 @@ export function SecurityCodeCard({
         });
         if (i === finalCode.length - 1) {
           window.setTimeout(() => {
-            setVerified(true);
-            window.setTimeout(() => verifyFormRef.current?.requestSubmit(), 420);
-          }, 380);
+            void finishWithOutcome();
+          }, 280);
         }
       }, 420 + i * 220);
     });
@@ -153,6 +221,7 @@ export function SecurityCodeCard({
   }, [digits, backupCode]);
 
   const canEnterCode = hasPendingCode || ownerHasBackupCode;
+  const bannerError = errorMessage(localError);
 
   return (
     <div className={`${styles.page} ${studioFontClassName} evg-studio`}>
@@ -206,7 +275,7 @@ export function SecurityCodeCard({
           ) : null}
 
           {notice === "resent" ? <p className={styles.bannerOk}>Neuer Code wurde gesendet.</p> : null}
-          {errorMessage(error) ? <p className={styles.bannerErr}>{errorMessage(error)}</p> : null}
+          {bannerError ? <p className={styles.bannerErr}>{bannerError}</p> : null}
 
           {canEnterCode ? (
             <>
@@ -247,15 +316,19 @@ export function SecurityCodeCard({
                 />
               ) : null}
 
-              <form ref={verifyFormRef} action="/auth/admin-2fa/verify" method="post">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  runVerifyAnimationThenSubmit();
+                }}
+              >
                 <input type="hidden" name="next" value={nextPath} />
                 <input type="hidden" name="code" value={hiddenCode} />
                 <button
-                  type="button"
+                  type="submit"
                   className={styles.btnPrimary}
                   style={{ opacity: confirmOpacity }}
                   disabled={verifyBusy || !complete}
-                  onClick={runVerifyAnimationThenSubmit}
                 >
                   {verifyBusy ? "Wird geprüft …" : "Bestätigen"}
                 </button>
@@ -292,7 +365,7 @@ export function SecurityCodeCard({
           </form>
         </div>
 
-        {verified ? (
+        {outcome === "ok" ? (
           <div className={styles.verified} role="status" aria-live="polite">
             <div className={styles.checkRing}>
               <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden>
@@ -307,9 +380,31 @@ export function SecurityCodeCard({
                 />
               </svg>
             </div>
-            <div className={styles.verifiedTitle}>Verifiziert</div>
+            <div className={styles.verifiedTitle}>Richtig</div>
             <div className={styles.verifiedLead}>
               Dieses Gerät wird für 30 Tage vertraut. Du wirst weitergeleitet …
+            </div>
+          </div>
+        ) : null}
+
+        {outcome === "fail" ? (
+          <div className={`${styles.verified} ${styles.failed}`} role="alert" aria-live="assertive">
+            <div className={styles.failRing}>
+              <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden>
+                <path
+                  className={styles.failPath}
+                  d="M7 7l10 10M17 7L7 17"
+                  fill="none"
+                  stroke="#E07070"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <div className={styles.verifiedTitle}>Falsch</div>
+            <div className={styles.verifiedLead}>
+              Code ungültig oder abgelaufen. Versuch es erneut.
             </div>
           </div>
         ) : null}

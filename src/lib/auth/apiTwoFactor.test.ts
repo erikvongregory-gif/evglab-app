@@ -20,7 +20,7 @@ it("uses the workspace resource identity only after actor 2FA",async()=>{
  mocks.workspace.mockResolvedValue({id:"workspace-owner",user_metadata:{brand:"shared"}});
  expect(await requireImageGenerationUser(new Request("https://example.com/api",{method:"POST"}),"test"))
   .toEqual({ok:true,userId:"workspace-owner",userMetadata:{brand:"shared"}});
- expect(mocks.twoFactor).toHaveBeenCalledWith("actor");
+ expect(mocks.twoFactor).toHaveBeenCalledWith({ id: "actor", user_metadata: {} });
 });
 it("fails closed when a viewer attempts a write",async()=>{
  mocks.twoFactor.mockResolvedValue(true);mocks.workspace.mockRejectedValue(new Error("read only"));

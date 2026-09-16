@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   const origin = enforceSameOrigin(req); if (origin) return origin;
   const { data: { user } } = await (await createClient()).auth.getUser();
   if (!user?.email || !user.email_confirmed_at) return NextResponse.json({ error: "Bitte mit der eingeladenen E-Mail anmelden und diese bestätigen." }, { status: 401 });
-  if (!(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Bitte zuerst die Zwei-Faktor-Prüfung abschließen." }, { status: 403 });
+  if (!(await hasPassedTwoFactor(user))) return NextResponse.json({ error: "Bitte zuerst die Zwei-Faktor-Prüfung abschließen." }, { status: 403 });
   const limit=await enforceRateLimitPersistent(req,{keyPrefix:"team-accept",limit:10,windowMs:60000},{identifierParts:[user.id]});
   if(limit)return limit;
   const { token } = await req.json().catch(() => ({}));

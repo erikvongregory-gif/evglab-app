@@ -6,7 +6,7 @@ const db = new PGlite();
 const user = "00000000-0000-0000-0000-000000000001";
 beforeAll(async () => {
   await db.exec("create role anon;create role authenticated;create role service_role;create schema auth;create table auth.users(id uuid primary key);");
-  for (const file of ["billing-schema", "stripe-webhook-events-schema", "billing-atomic-migration", "billing-access-hardening-migration", "generation-jobs-migration", "billing-periods-migration", "go-live-security-migration", "workspaces-migration", "account-deletion-migration", "checkout-lock-migration", "webhook-recovery-migration"]) await db.exec(readFileSync(`docs/${file}.sql`, "utf8"));
+  for (const file of ["billing-schema", "stripe-webhook-events-schema", "billing-atomic-migration", "billing-access-hardening-migration", "generation-jobs-migration", "billing-periods-migration", "generation-result-billing-migration", "go-live-security-migration", "workspaces-migration", "account-deletion-migration", "checkout-lock-migration", "webhook-recovery-migration"]) await db.exec(readFileSync(`docs/${file}.sql`, "utf8"));
 }, 30000);
 afterAll(() => db.close());
 beforeEach(async () => {
@@ -42,6 +42,19 @@ it("refunds a job once, including after the monthly counters reset", async () =>
   await db.query("select generation_finish($1,$2,20,'{}')",[job.id,user]);
   await db.query("select generation_finish($1,$2,0,'{}')",[job.id,user]);
   expect(await available()).toBe(1180);
+});
+it("stores the balance from the settlement transaction in the job result", async () => {
+  await db.query("select billing_adjust_tokens_atomic($1,1100,'consume')",[user]);
+  const first=(await reserve(35)).job;
+  const second=(await reserve(35)).job;
+  const stale=JSON.stringify({billing:{consumed:35,perVariant:35,remainingTokens:65}});
+  await db.query("select generation_finish($1,$2,35,$3)",[first.id,user,stale]);
+  let result=await db.query<{remaining:number}>("select (result->'billing'->>'remainingTokens')::integer remaining from generation_jobs where id=$1",[first.id]);
+  expect(result.rows[0].remaining).toBe(30);
+  await db.query("select billing_adjust_tokens_atomic($1,40,'add')",[user]);
+  await db.query("select generation_finish($1,$2,35,$3)",[second.id,user,stale]);
+  result=await db.query<{remaining:number}>("select (result->'billing'->>'remainingTokens')::integer remaining from generation_jobs where id=$1",[second.id]);
+  expect(result.rows[0].remaining).toBe(70);
 });
 it("does not convert an expired refund into fresh tokens", async () => {
   const { job } = await reserve(100);

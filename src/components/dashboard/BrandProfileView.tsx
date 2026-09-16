@@ -459,7 +459,7 @@ export function BrandProfileView({
               <input
                 type="text"
                 className="studio-brand-font-name"
-                placeholder="Schriftname, z. B. Augustina Display"
+                placeholder="Schriftname, z. B. deine Markenschrift"
                 value={value.brandHeadlineFontName ?? ""}
                 onChange={(e) => onChange({ brandHeadlineFontName: e.target.value })}
                 onBlur={() => void onSave({ brandHeadlineFontName: value.brandHeadlineFontName })}

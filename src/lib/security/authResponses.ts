@@ -2,12 +2,48 @@ import { NextResponse } from "next/server";
 import { withRequestHeaders } from "@/lib/security/authObservability";
 
 const DEFAULT_REDIRECT_PATH = "/dashboard";
+const SAFE_PATH_BASE = "https://brewai.invalid";
+
+/**
+ * JSON.stringify allein reicht nicht in HTML-<script>: ein `</script>` im Wert
+ * beendet den Tag vor dem JS-Parser. Steuerzeichen für HTML escapen.
+ */
+export function jsonForHtmlScript(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
 
 export function normalizeNextPath(value: string | null | undefined): string {
   if (!value) return DEFAULT_REDIRECT_PATH;
-  if (!value.startsWith("/")) return DEFAULT_REDIRECT_PATH;
-  if (value.startsWith("//")) return DEFAULT_REDIRECT_PATH;
-  return value;
+  let path = value.trim();
+  if (!path) return DEFAULT_REDIRECT_PATH;
+
+  // Einmal dekodieren, damit %2F%2F / %5C-Bypässe nicht durchrutschen.
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    return DEFAULT_REDIRECT_PATH;
+  }
+
+  if (!path.startsWith("/")) return DEFAULT_REDIRECT_PATH;
+  if (path.startsWith("//") || path.includes("\\") || path.includes("://")) {
+    return DEFAULT_REDIRECT_PATH;
+  }
+  if (/[\s\0-\x1f\x7f]/.test(path)) return DEFAULT_REDIRECT_PATH;
+
+  try {
+    const resolved = new URL(path, SAFE_PATH_BASE);
+    if (resolved.origin !== SAFE_PATH_BASE) return DEFAULT_REDIRECT_PATH;
+    if (!resolved.pathname.startsWith("/")) return DEFAULT_REDIRECT_PATH;
+  } catch {
+    return DEFAULT_REDIRECT_PATH;
+  }
+
+  return path;
 }
 
 export function createNoStoreRedirect(url: string, requestId: string, status = 303): NextResponse {
@@ -60,8 +96,8 @@ export function createRecoveryHashForwardHtml(opts: {
   fallbackUrl: string;
   requestId: string;
 }): NextResponse {
-  const target = JSON.stringify(opts.targetUrl);
-  const fallback = JSON.stringify(opts.fallbackUrl);
+  const target = jsonForHtmlScript(opts.targetUrl);
+  const fallback = jsonForHtmlScript(opts.fallbackUrl);
   const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Passwort zurücksetzen</title></head><body><p style="font-family:system-ui,sans-serif;color:#c4bdb3;background:#131211;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center">Passwort-Reset wird vorbereitet …</p><script>
 (function(){var target=${target},fallback=${fallback},hash=location.hash||"",search=location.search||"";
 if(hash.indexOf("access_token")>=0){location.replace(target+hash);return}
@@ -85,7 +121,7 @@ export function createHtmlRedirect(
   requestId: string,
   cookieSource?: NextResponse,
 ): NextResponse {
-  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Weiterleitung</title></head><body><p style="font-family:system-ui;color:#6b6560">Weiterleitung …</p><script>location.replace(${JSON.stringify(url)})</script></body></html>`;
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Weiterleitung</title></head><body><p style="font-family:system-ui;color:#6b6560">Weiterleitung …</p><script>location.replace(${jsonForHtmlScript(url)})</script></body></html>`;
   const response = new NextResponse(html, {
     status: 200,
     headers: {
@@ -107,8 +143,8 @@ export function createOAuthSessionPollerHtml(
   opts: { successUrl: string; fallbackUrl: string; requestId: string },
   cookieSource?: NextResponse,
 ): NextResponse {
-  const success = JSON.stringify(opts.successUrl);
-  const fallback = JSON.stringify(opts.fallbackUrl);
+  const success = jsonForHtmlScript(opts.successUrl);
+  const fallback = jsonForHtmlScript(opts.fallbackUrl);
   const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Anmeldung</title></head><body><p style="font-family:system-ui,sans-serif;color:#c4bdb3;background:#131211;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center">Anmeldung wird abgeschlossen …</p><script>
 (function(){var ok=${success},fb=${fallback},n=0,max=120;
 function go(u){location.replace(u)}

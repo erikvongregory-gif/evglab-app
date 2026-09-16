@@ -30,6 +30,8 @@ type TrustedDevicePayload = {
   userId: string;
   expiresAt: number;
   issuedAt: number;
+  /** Muss zur aktuellen user_metadata.password_epoch passen. */
+  passwordEpoch: number;
 };
 
 function getSecret() {
@@ -137,21 +139,32 @@ export function isVerified2FAForUser(token: string | null | undefined, userId: s
  * Trusted Device: nach einmal bestandener 2FA darf dasselbe Gerät 30 Tage ohne
  * neuen Code rein. Das Cookie ersetzt keinen Login, nur den zweiten Faktor.
  */
-export function buildTrustedDeviceToken(input: { userId: string; ttlSeconds?: number }) {
+export function buildTrustedDeviceToken(input: {
+  userId: string;
+  passwordEpoch?: number;
+  ttlSeconds?: number;
+}) {
   const ttl = Math.max(input.ttlSeconds ?? TRUSTED_DEVICE_TTL_SECONDS, 300);
   const payload: TrustedDevicePayload = {
     userId: input.userId,
     issuedAt: Date.now(),
     expiresAt: Date.now() + ttl * 1000,
+    passwordEpoch: input.passwordEpoch ?? 0,
   };
   return encodeSigned(payload);
 }
 
-export function isTrustedDeviceForUser(token: string | null | undefined, userId: string) {
+export function isTrustedDeviceForUser(
+  token: string | null | undefined,
+  userId: string,
+  passwordEpoch = 0,
+) {
   const payload = decodeSigned<TrustedDevicePayload>(token);
   if (!payload) return false;
   if (payload.userId !== userId) return false;
   if (Date.now() > payload.expiresAt) return false;
+  const tokenEpoch = typeof payload.passwordEpoch === "number" ? payload.passwordEpoch : 0;
+  if (tokenEpoch !== passwordEpoch) return false;
   return true;
 }
 

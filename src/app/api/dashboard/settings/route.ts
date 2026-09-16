@@ -88,7 +88,7 @@ export async function GET(req: Request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user && !(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (user && !(await hasPassedTwoFactor(user))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
   if (user) { try { user = await workspaceResourceUser(user, false); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
@@ -179,7 +179,7 @@ export async function PUT(req: Request) {
     data: { user: probeUser },
   } = await authProbe.auth.getUser();
 
-  if (probeUser && !(await hasPassedTwoFactor(probeUser.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
+  if (probeUser && !(await hasPassedTwoFactor(probeUser))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
   if (probeUser) { try { probeUser = await workspaceResourceUser(probeUser, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!probeUser) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 

@@ -476,8 +476,13 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
       ? `Beside it: one poured ${glassPour}. The glass is a single pour from this ${bottleLitres} L bottle — never a larger mug than the bottle (no 0.5 L Seidel next to a 0.33 L bottle, no 1 L Maß).`
       : "";
 
+  const stiltreue = input.stiltreue ?? (input.etikettModus === "generisch" ? "frei" : "hoch");
   const labelLock =
-    "Keep unchanged from Image 1: bottle silhouette, glass color, and the entire printed label — logo, crest, pattern, colors, layout, and every letter. Do not redraw, restyle, recolor, or invent a different label.";
+    stiltreue === "hoch"
+      ? "Keep unchanged from Image 1: bottle silhouette, glass color, and the entire printed label — logo, crest, pattern, colors, layout, and every letter. Do not redraw, restyle, recolor, or invent a different label."
+      : stiltreue === "normal"
+        ? "Keep the bottle silhouette and brand identity from Image 1 clearly recognizable (logo, core colors, overall layout). Small artistic adaptations for lighting and perspective are allowed; do not invent a different brand."
+        : "Image 1 is loose product inspiration only — silhouette may guide the vessel, but redesign of label artwork is allowed.";
 
   const hyperrealHead = buildHyperrealismLockFragment();
   const hyperrealTail = [

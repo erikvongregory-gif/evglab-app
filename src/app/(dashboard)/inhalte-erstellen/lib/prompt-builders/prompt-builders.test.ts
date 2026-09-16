@@ -39,6 +39,7 @@ describe("inhalte-erstellen prompt builders", () => {
       personenModus: "B",
       tageszeit: "abend_warm",
       etikettModus: "marke",
+      stiltreue: "hoch",
       beerName: "ABK Hell",
       aspectRatio: "4:5",
       quality: "medium",
@@ -55,6 +56,50 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(prompt).toMatch(/NEGATIVE \(hyperreal\)/);
     expect(prompt).toMatch(/Forbidden/);
     expect(prompt).toMatch(/single pour/);
+  });
+
+  it("unterscheidet Stiltreue normal vs hoch beim Label-Lock", () => {
+    const hoch = buildProductPlacementPrompt({
+      aiWatermark: false,
+      stimmung: "entspannt",
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "goldene_stunde",
+      etikettModus: "marke",
+      stiltreue: "hoch",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    const normal = buildProductPlacementPrompt({
+      aiWatermark: false,
+      stimmung: "entspannt",
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "goldene_stunde",
+      etikettModus: "marke",
+      stiltreue: "normal",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(hoch).toMatch(/entire printed label/);
+    expect(normal).toMatch(/clearly recognizable/);
+    expect(normal).not.toMatch(/entire printed label/);
   });
 
   it("lets free-text intent override biergarten defaults for mountain toasting", () => {

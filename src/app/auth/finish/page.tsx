@@ -46,7 +46,7 @@ export default async function AuthFinishPage({
 
     if (user) {
       const next = entryPathForUser(user.user_metadata as Record<string, unknown> | undefined, preferred);
-      if (!(await hasPassedTwoFactor(user.id))) {
+      if (!(await hasPassedTwoFactor(user))) {
         redirect(twoFactorRedirectPath(next));
       }
       redirect(next);

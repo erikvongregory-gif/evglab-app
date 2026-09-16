@@ -21,6 +21,65 @@ export function calculateGenerationTokenCost(args: {
   return calculatePerVariantTokenCost(args) * count;
 }
 
+/**
+ * Gleiche Qualitäts→Abrechnungs-Auflösung wie create-task / social-post.
+ * Env überschreibt; sonst Produktfoto ⇒ high; sonst Compiler/Request-Qualität.
+ */
+export function resolveImageBillingResolution(args: {
+  hasProductPhoto: boolean;
+  qualityEnv?: string | null;
+  compiledOrRequestedQuality?: "low" | "medium" | "high" | null;
+}): "1K" | "2K" {
+  const env = args.qualityEnv?.trim().toLowerCase();
+  const openAiQuality: "low" | "medium" | "high" =
+    env === "low" || env === "medium" || env === "high"
+      ? env
+      : args.hasProductPhoto
+        ? "high"
+        : args.compiledOrRequestedQuality === "high"
+          ? "high"
+          : "medium";
+  return openAiQuality === "high" ? "2K" : "1K";
+}
+
+/**
+ * Client-Vorschau der create-task / social-post Kosten.
+ * Für OPENAI_IMAGE_QUALITY die öffentliche Spiegel-Variable NEXT_PUBLIC_OPENAI_IMAGE_QUALITY setzen.
+ */
+export function estimateStudioImageTokenCost(args: {
+  /** Produktfoto wird tatsächlich als Image-1-Referenz genutzt (Markenmodus). */
+  usesProductPhoto: boolean;
+  extraReferenceCount?: number;
+  /** Form-Referenz ohne Produktfoto (Flaschen-Silhouette). */
+  hasShapeReference?: boolean;
+  etikettModus: "marke" | "generisch";
+  variantCount?: number;
+  /** Request-/Compiler-Qualität (ohne Env-Override). */
+  requestedQuality?: "low" | "medium" | "high" | null;
+  /** Optional explizites Env; sonst NEXT_PUBLIC_OPENAI_IMAGE_QUALITY. */
+  qualityEnv?: string | null;
+}): number {
+  const qualityEnv =
+    args.qualityEnv ??
+    (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_OPENAI_IMAGE_QUALITY : undefined);
+  const resolution = resolveImageBillingResolution({
+    hasProductPhoto: args.usesProductPhoto,
+    qualityEnv,
+    compiledOrRequestedQuality: args.requestedQuality,
+  });
+  const hasReferenceImage =
+    args.usesProductPhoto ||
+    (args.extraReferenceCount ?? 0) > 0 ||
+    Boolean(args.hasShapeReference);
+  const strictLabelMode = args.etikettModus === "marke" && args.usesProductPhoto;
+  return calculateGenerationTokenCost({
+    resolution,
+    hasReferenceImage,
+    strictLabelMode,
+    variantCount: args.variantCount,
+  });
+}
+
 /** Standard-Video (Seedance 2 · 720p · ~8 s · ohne Audio) — deutlich teurer als Bilder. */
 export function calculateSeedanceVideoTokenCost(args: {
   resolution?: SeedanceResolution;

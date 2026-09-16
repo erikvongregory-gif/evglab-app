@@ -194,7 +194,7 @@ end $$;
 
 create or replace function generation_finish(p_id uuid,p_user_id uuid,p_charged integer,p_result jsonb)
 returns setof billing_subscriptions language plpgsql security definer set search_path=public as $$
-declare j generation_jobs; a jsonb; remaining_charge integer:=p_charged; spent integer; refund integer; m integer:=0; p integer:=0;
+declare j generation_jobs; b billing_subscriptions; a jsonb; final_result jsonb:=p_result; remaining_charge integer:=p_charged; spent integer; refund integer; m integer:=0; p integer:=0;
 begin
   perform 1 from billing_subscriptions where user_id=p_user_id for update;
   select * into j from generation_jobs where id=p_id and user_id=p_user_id for update;
@@ -213,8 +213,15 @@ begin
     monthly_spent=case when last_token_period_end is not distinct from j.token_period then greatest(0,monthly_spent-m) else monthly_spent end,
     purchased_spent=case when last_token_period_end is not distinct from j.token_period then greatest(0,purchased_spent-p) else purchased_spent end
     where user_id=p_user_id;
+  select * into b from billing_subscriptions where user_id=p_user_id;
+  if p_charged>0 and p_result ? 'billing' then
+    final_result:=jsonb_set(p_result,'{billing}',coalesce(p_result->'billing','{}'::jsonb)||jsonb_build_object(
+      'plan',b.plan,'monthlyTokens',b.monthly_tokens,'usedTokens',b.used_tokens,
+      'remainingTokens',greatest(b.monthly_tokens-b.used_tokens,0),'consumed',p_charged
+    ),true);
+  end if;
   update generation_jobs set status=case when p_charged=0 and (p_result ? 'error' or coalesce(p_result->>'state','') in ('failed','error','canceled','cancelled')) then 'failed' else 'completed' end,
-    charged=p_charged,result=p_result,finished_at=now() where id=p_id;
+    charged=p_charged,result=final_result,finished_at=now() where id=p_id;
   return query select * from billing_subscriptions where user_id=p_user_id;
 end $$;
 revoke all on function billing_refresh_monthly(uuid),billing_set_token_schedule(uuid,text,timestamptz),billing_debit_lots(uuid,integer) from public,anon,authenticated;

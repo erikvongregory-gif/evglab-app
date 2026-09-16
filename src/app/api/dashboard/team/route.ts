@@ -14,7 +14,7 @@ async function context(req: Request, manage = false) {
   const origin = enforceSameOrigin(req); if (origin) return origin;
   const { data: { user } } = await (await createClient()).auth.getUser();
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
-  if (!(await hasPassedTwoFactor(user.id))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich." }, { status: 403 });
+  if (!(await hasPassedTwoFactor(user))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich." }, { status: 403 });
   const limit = await enforceRateLimitPersistent(req,{ keyPrefix:"team",limit:30,windowMs:60000 },{identifierParts:[user.id]});
   if (limit) return limit;
   const workspace = await getWorkspace(user.id);

@@ -90,3 +90,15 @@ export async function consumeInviteByToken(token: string, consumedByEmail: strin
   }
   return { ok: true as const, status: "valid" as InviteStatus, invite: data as InviteRecord };
 }
+
+/** Macht eine verbrauchte Einladung wieder nutzbar, wenn die Registrierung scheitert. */
+export async function releaseInviteById(inviteId: string) {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("invites")
+    .update({ consumed_at: null, consumed_by_email: null })
+    .eq("id", inviteId);
+  if (error) {
+    throw new Error(`Invite release failed: ${error.message}`);
+  }
+}

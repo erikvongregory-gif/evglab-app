@@ -34,7 +34,7 @@ export async function requireImageGenerationUser(req: Request, keyPrefix: string
     return { ok: false, response: NextResponse.json({ error: "Nicht angemeldet.", code: "auth_required" }, { status: 401 }) };
   }
 
-  if (!(await hasPassedTwoFactor(user.id))) return { ok: false, response: NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 }) };
+  if (!(await hasPassedTwoFactor(user))) return { ok: false, response: NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 }) };
 
   const hourly = await enforceRateLimitPersistent(
     req,
@@ -73,7 +73,7 @@ export async function requireAuthenticatedUser(req: Request, keyPrefix: string):
     return { ok: false, response: NextResponse.json({ error: "Nicht angemeldet.", code: "auth_required" }, { status: 401 }) };
   }
 
-  if (!(await hasPassedTwoFactor(user.id))) return { ok: false, response: NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 }) };
+  if (!(await hasPassedTwoFactor(user))) return { ok: false, response: NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 }) };
 
   const rateError = await enforceRateLimitPersistent(
     req,

@@ -217,11 +217,14 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
         method: "POST",
         credentials: "include",
       });
-      if (bonusRes.ok) {
-        const data = (await bonusRes.json()) as { state?: { remainingTokens?: number } };
-        if (typeof data.state?.remainingTokens === "number") {
-          setTokens(data.state.remainingTokens);
-        }
+      if (!bonusRes.ok) {
+        throw new Error(
+          "Willkommensbonus konnte nicht gutgeschrieben werden. Bitte erneut „Studio öffnen“ tippen.",
+        );
+      }
+      const data = (await bonusRes.json()) as { state?: { remainingTokens?: number } };
+      if (typeof data.state?.remainingTokens === "number") {
+        setTokens(data.state.remainingTokens);
       }
       await patchOnboarding({
         flowVersion: 2,
@@ -365,6 +368,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
   ]);
 
   const handleSkip = useCallback(async () => {
+    setError("");
     try {
       await patchOnboarding({
         flowVersion: 2,
@@ -374,11 +378,11 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
         checklistDismissed: true,
         celebrated: true,
       });
-    } catch {
-      /* trotzdem weiter */
+      tour.setOpen(false);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Überspringen fehlgeschlagen. Bitte erneut versuchen.");
     }
-    tour.setOpen(false);
-    router.push("/dashboard");
   }, [router, tour]);
 
   const swatches = parseBrandColors(brand.brandColors);

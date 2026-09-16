@@ -1,4 +1,4 @@
-import { reserveGeneration, finishGeneration, saveGenerationProgress } from "@/lib/billing/generationJobs";
+import { reserveGeneration, finishGeneration, saveGenerationProgress, resumeGenerationIfPresent, buildGenerationBillingSnapshot } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import {
@@ -13,7 +13,7 @@ import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/sc
 import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
 import { buildBrandProfilePromptContext, getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
-import { calculateGenerationTokenCost, calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
+import { calculateGenerationTokenCost, calculatePerVariantTokenCost, resolveImageBillingResolution } from "@/lib/billing/generationTokenCost";
 import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { compileBrief } from "@/lib/prompts/prompt-compiler";
@@ -29,6 +29,7 @@ import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
 import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
+import { persistGeneratedMediaItems } from "@/lib/dashboard/persistGeneratedMedia";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -67,7 +68,10 @@ export async function POST(req: Request) {
       const detail = issue ? `${issue.path.join(".")}: ${issue.message}` : "Payload validation failed.";
       return NextResponse.json({ error: `Ungueltige Anfrage. ${detail}` }, { status: 400 });
     }
+
     const input = applyClientIntentOverrides(parsed.data);
+    const resumed = await resumeGenerationIfPresent(req, guard.userId, input);
+    if (resumed) return resumed;
 
     const brandProfile = getBrandProfileFromMetadata(guard.userMetadata);
     const brandProfileContext = buildBrandProfilePromptContext(brandProfile);
@@ -86,7 +90,8 @@ export async function POST(req: Request) {
       Boolean(effectiveEtikettBild) && !effectiveEtikettBild.includes("example.com/placeholder");
 
     let visionReference = null as Awaited<ReturnType<typeof resolveReferenceImageForVision>>;
-    if (hasEtikettInput && input.behaelter !== "G") {
+    // Produktfoto nur im Markenmodus — „Frei“/generisch darf kein i2i-Label-Lock erzwingen.
+    if (hasEtikettInput && input.behaelter !== "G" && wantsBrandLabel) {
       try {
         visionReference = await resolveReferenceImageForVision(effectiveEtikettBild, guard.userMetadata);
       } catch (visionError) {
@@ -156,6 +161,9 @@ export async function POST(req: Request) {
         zusatzWunsch: briefParts.join(". ").slice(0, 800) || input.zusatzWunsch,
       };
       prompt = buildProductPlacementPrompt(placementInput);
+      if (brandProfileContext) {
+        prompt = `${prompt} ${brandProfileContext.replace(/\n+/g, " ")}`;
+      }
       if (input.stiltreue === "hoch" && wantsBrandLabel) {
         prompt = `${prompt} LABEL FIDELITY: Keep Image 1 label identical — every letter, logo, crest. Change only the environment.`;
       }
@@ -180,16 +188,19 @@ export async function POST(req: Request) {
     });
 
     const qualityEnv = process.env.OPENAI_IMAGE_QUALITY?.trim().toLowerCase();
-    // Hyperreal-Finals mit Produktfoto: high, sofern nicht per Env anders gesetzt.
+    // Abrechnung und OpenAI-Qualität folgen Request/Env/Produktfoto — nicht Claude-Upgrades.
+    const requestedQuality = input.quality === "high" ? "high" : "medium";
+    const billingResolution = resolveImageBillingResolution({
+      hasProductPhoto,
+      qualityEnv,
+      compiledOrRequestedQuality: requestedQuality,
+    });
     const openAiQuality: "low" | "medium" | "high" =
       qualityEnv === "low" || qualityEnv === "medium" || qualityEnv === "high"
         ? qualityEnv
-        : hasProductPhoto
+        : billingResolution === "2K"
           ? "high"
-          : compiled.generation_settings.quality === "high"
-            ? "high"
-            : "medium";
-    const billingResolution = (openAiQuality === "high" ? "2K" : "1K") as "1K" | "2K";
+          : "medium";
     const hasReferenceForBilling = referenceImages.length > 0;
     const strictLabelMode = wantsBrandLabel && hasProductPhoto;
     const perVariantCost = calculatePerVariantTokenCost({
@@ -282,9 +293,30 @@ export async function POST(req: Request) {
     }
 
     const totalConsumed = perVariantCost * images.length;
-    const consumeResult = await finishGeneration(job, totalConsumed, { images: images.map(imageUrl => ({ imageUrl })), jobId: job.id });
-
-    return NextResponse.json({
+    const mediaTitle = (
+      input.zusatzWunsch?.trim() ||
+      input.beerName?.trim() ||
+      brandProfile.breweryName.trim() ||
+      "Motiv"
+    ).slice(0, 120);
+    const mediaItems = await persistGeneratedMediaItems({
+      userId: guard.userId,
+      jobId: job.id,
+      images,
+      title: mediaTitle,
+      prompt: mediaTitle,
+      aspectRatio,
+      resolution: billingResolution === "2K" ? "2K" : "1K",
+      outputFormat: OUTPUT_FORMAT,
+    });
+    const mediaPersisted = mediaItems.length > 0;
+    const billing = buildGenerationBillingSnapshot({
+      state: currentState,
+      charged: totalConsumed,
+      perVariant: perVariantCost,
+      owner: Boolean(job.owner),
+    });
+    const responseBody = {
       images: images.map((imageUrl) => ({ imageUrl })),
       variantCount: images.length,
       expectedVariants: variantsToCreate,
@@ -297,21 +329,23 @@ export async function POST(req: Request) {
       aspectRatio,
       outputDimensions,
       outputFormat: OUTPUT_FORMAT,
+      jobId: job.id,
+      mediaPersisted,
       compiled: {
         normalized_brief: compiled.normalized_brief,
         missing_information: compiled.missing_information,
         reference_roles: compiled.reference_roles,
       },
-      billing: {
-        freeTrial: false,
-        consumed: totalConsumed,
-        perVariant: perVariantCost,
-        plan: consumeResult.state.plan,
-        monthlyTokens: consumeResult.state.monthly_tokens,
-        usedTokens: consumeResult.state.used_tokens,
-        remainingTokens: Math.max(consumeResult.state.monthly_tokens - consumeResult.state.used_tokens, 0),
-      },
+      billing,
+    };
+    const finished = await finishGeneration(job, totalConsumed, responseBody);
+    responseBody.billing = buildGenerationBillingSnapshot({
+      state: finished.state,
+      charged: totalConsumed,
+      perVariant: perVariantCost,
+      owner: Boolean(job.owner),
     });
+    return NextResponse.json(responseBody);
   } catch (error) {
     if (isProviderError(error)) {
       logProviderFailure(error.classified, { label: "inhalte-erstellen-create-task" });

@@ -21,7 +21,7 @@ import {
   seasonBadgeLabel,
   type OccasionTemplate,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/occasion-templates";
-import { calculateGenerationTokenCost } from "@/lib/billing/generationTokenCost";
+import { estimateStudioImageTokenCost } from "@/lib/billing/generationTokenCost";
 import { hyperrealisticSchema, socialPostSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import type { SocialPostInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { hasUsableBeerEtikett, MAX_MY_BEERS, type DashboardBeer } from "@/lib/dashboard/metadata";
@@ -168,6 +168,8 @@ export function InhalteErstellenStudio({
   const [generationStep, setGenerationStep] = useState("");
   const [tokensRemaining, setTokensRemaining] = useState<number | null>(null);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState("");
+  const [bootstrapNonce, setBootstrapNonce] = useState(0);
 
   useEffect(() => {
     setProfileComplete(brandProfileComplete);
@@ -233,6 +235,7 @@ export function InhalteErstellenStudio({
   useEffect(() => {
     let ignore = false;
     (async () => {
+      setBootstrapError("");
       // Route warm halten — sonst bricht der erste Generate-Call beim Compile ab.
       void fetch("/api/inhalte-erstellen/create-task", {
         method: "GET",
@@ -245,14 +248,18 @@ export function InhalteErstellenStudio({
         cache: "no-store",
       }).catch(() => undefined);
 
-      const [settingsRes, summaryRes, beersRes] = await Promise.all([
+      const settled = await Promise.allSettled([
         fetch("/api/dashboard/settings", { cache: "no-store", credentials: "include" }),
         fetch("/api/dashboard/summary", { cache: "no-store", credentials: "include" }),
         fetch("/api/dashboard/my-beers", { cache: "no-store", credentials: "include" }),
       ]);
       if (ignore) return;
-      if (settingsRes.ok) {
-        const json = (await settingsRes.json()) as {
+
+      const [settingsOutcome, summaryOutcome, beersOutcome] = settled;
+      let failed = 0;
+
+      if (settingsOutcome.status === "fulfilled" && settingsOutcome.value.ok) {
+        const json = (await settingsOutcome.value.json()) as {
           settings?: {
             breweryName?: string;
             brandProfileMode?: "undecided" | "guided" | "skip";
@@ -277,9 +284,12 @@ export function InhalteErstellenStudio({
           const refs = json.settings?.brandReferenceImageUrls;
           setEtikettUrl(labelRef || (Array.isArray(refs) ? refs[0] : "") || "");
         }
+      } else {
+        failed += 1;
       }
-      if (summaryRes.ok) {
-        const json = (await summaryRes.json()) as {
+
+      if (summaryOutcome.status === "fulfilled" && summaryOutcome.value.ok) {
+        const json = (await summaryOutcome.value.json()) as {
           summary?: { tokens?: { remaining?: number }; plan?: string | null; billingStatus?: string };
         };
         if (typeof json.summary?.tokens?.remaining === "number") {
@@ -287,19 +297,32 @@ export function InhalteErstellenStudio({
         }
         const status = json.summary?.billingStatus ?? "none";
         setHasActiveSubscription(Boolean(json.summary?.plan) && status !== "none" && status !== "canceled");
+      } else {
+        failed += 1;
       }
-      if (beersRes.ok) {
-        const json = (await beersRes.json()) as { beers?: DashboardBeer[] };
+
+      if (beersOutcome.status === "fulfilled" && beersOutcome.value.ok) {
+        const json = (await beersOutcome.value.json()) as { beers?: DashboardBeer[] };
         const list = Array.isArray(json.beers) ? json.beers : [];
         setBeers(list);
         if (list[0] && !loadingRef.current) applyBeer(list[0]);
+      } else {
+        failed += 1;
       }
-    })();
+
+      if (failed === 3) {
+        setBootstrapError("Studio-Daten konnten nicht geladen werden. Bitte erneut versuchen.");
+      } else if (failed > 0) {
+        setBootstrapError("Einige Studio-Daten konnten nicht geladen werden. Du kannst es erneut versuchen.");
+      }
+    })().catch(() => {
+      if (!ignore) setBootstrapError("Studio-Daten konnten nicht geladen werden. Bitte erneut versuchen.");
+    });
     return () => {
       ignore = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount bootstrap only
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount / retry bootstrap only
+  }, [bootstrapNonce]);
 
   const persistBeers = useCallback(
     async (next: Array<DashboardBeer & { etikettPayload?: { base64: string; mime: string } }>) => {
@@ -377,19 +400,33 @@ export function InhalteErstellenStudio({
       setGruppenAnzahl(p.gruppenAnzahl ?? "3");
       setGruppenTyp(p.gruppenTyp ?? "gemischt");
       setGruppenDynamik(p.gruppenDynamik ?? "E2");
+    } else {
+      setGruppenAnzahl("3");
+      setGruppenTyp("gemischt");
+      setGruppenDynamik("E2");
     }
     setShotType(p.shotType);
     setExtras(p.extras);
     setPresetNote(p.promptNote);
-    if (!userPrompt.trim()) {
-      setUserPrompt(template.motifLine);
-    }
+    // Vorlage ersetzt die Motivbeschreibung vollständig — kein Vermischen alter Texte.
+    setUserPrompt(template.motifLine);
     setPresetModalOpen(false);
-  }, [userPrompt]);
+  }, []);
 
   const clearPreset = useCallback(() => {
     setActivePreset(null);
     setPresetNote("");
+    setExtras([]);
+    setPersonenModus("A");
+    setGruppenAnzahl("3");
+    setGruppenTyp("gemischt");
+    setGruppenDynamik("E2");
+    setShotType("A");
+    setStimmungTrend("nachhaltig");
+    setBehaelter("B");
+    setWo(WO_OPTIONS[0]);
+    setWie("goldene_stunde");
+    setAspectRatio("4:5");
   }, []);
 
   async function handleExtraReferenceUpload(files: FileList | File[]) {
@@ -425,15 +462,23 @@ export function InhalteErstellenStudio({
   const profileEtikettUrl = selectedBeer ? beerEtikettUrl : etikettUrl;
   const hasProductImage = Boolean(profileEtikettUrl);
 
+  // Request-Qualität für Vorschau und Payload — Server rechnet damit (nicht Compiler-Qualität).
+  const studioRequestQuality = "medium" as const;
+
   const generationTokenCost = useMemo(() => {
-    const hasRef = Boolean(etikettModus === "marke" && profileEtikettUrl);
-    return calculateGenerationTokenCost({
-      resolution: "1K",
-      hasReferenceImage: hasRef,
-      strictLabelMode: etikettModus === "marke" && hasRef,
+    const glassOnly = behaelter === "G";
+    const usesProductPhoto = Boolean(profileEtikettUrl) && !glassOnly && etikettModus === "marke";
+    const bottle = FLASCHEN_TYPEN[flaschenTyp];
+    const hasShapeReference = !glassOnly && !usesProductPhoto && Boolean(bottle?.hasShapeReference);
+    return estimateStudioImageTokenCost({
+      usesProductPhoto,
+      extraReferenceCount: extraReferences.length,
+      hasShapeReference,
+      etikettModus,
       variantCount,
+      requestedQuality: studioRequestQuality,
     });
-  }, [etikettModus, profileEtikettUrl, variantCount]);
+  }, [behaelter, etikettModus, extraReferences.length, flaschenTyp, profileEtikettUrl, variantCount]);
 
   const sortedPresets = useMemo(() => sortTemplatesForDate(OCCASION_TEMPLATES, new Date()), []);
 
@@ -508,20 +553,70 @@ export function InhalteErstellenStudio({
     resolution: "1K" | "2K" | "4K";
     outputFormat: "png" | "jpg";
   }) {
-    try {
-      await fetch("/api/dashboard/media", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...item,
-          title: item.title.trim().slice(0, 120),
-          prompt: item.prompt.trim().slice(0, 240),
-        }),
-      });
-    } catch {
-      /* ignore */
+    const res = await fetch("/api/dashboard/media", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...item,
+        title: item.title.trim().slice(0, 120),
+        prompt: item.prompt.trim().slice(0, 240),
+      }),
+    });
+    if (!res.ok) {
+      const json = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(json?.error || "Mediathek konnte nicht gespeichert werden.");
     }
+  }
+
+  async function waitForInProgressJob(jobId: string): Promise<{
+    images?: { imageUrl: string }[];
+    error?: string;
+    billing?: { remainingTokens?: number };
+    outputFormat?: "png" | "jpg";
+    partial?: boolean;
+    expectedVariants?: number;
+    partialErrors?: string[];
+    mediaPersisted?: boolean;
+  }> {
+    const deadline = Date.now() + 4 * 60_000;
+    let attempt = 0;
+    while (Date.now() < deadline) {
+      attempt += 1;
+      setGenerationStep(`Auftrag läuft noch — warte auf Ergebnis … (${attempt})`);
+      await new Promise((r) => window.setTimeout(r, Math.min(2500 + attempt * 500, 8000)));
+      const res = await fetch(`/api/dashboard/jobs?id=${encodeURIComponent(jobId)}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) continue;
+      const json = (await res.json()) as {
+        job?: { status?: string; result?: Record<string, unknown> | null };
+      };
+      const status = json.job?.status;
+      const result = json.job?.result;
+      if (status === "completed" && result) {
+        return result as {
+          images?: { imageUrl: string }[];
+          billing?: { remainingTokens?: number };
+          outputFormat?: "png" | "jpg";
+          partial?: boolean;
+          expectedVariants?: number;
+          partialErrors?: string[];
+          mediaPersisted?: boolean;
+        };
+      }
+      if (status === "failed") {
+        const err =
+          result && typeof result.error === "string"
+            ? result.error
+            : "Auftrag fehlgeschlagen.";
+        return { error: err };
+      }
+    }
+    throw new Error(
+      "Der vorherige Auftrag läuft noch. Bitte kurz warten und nicht erneut starten — sonst entstehen doppelte Kosten.",
+    );
   }
 
   async function generateSocialPost() {
@@ -571,7 +666,7 @@ export function InhalteErstellenStudio({
         zusatzWunsch,
         extraReferenceImages: extraReferences.map((r) => r.dataUrl).slice(0, 3),
         aspectRatio,
-        quality: "medium" as const,
+        quality: studioRequestQuality,
         variantCount,
         aiWatermark,
         headline: headline.trim(),
@@ -594,14 +689,18 @@ export function InhalteErstellenStudio({
       }
 
       setGenerationStep("Motiv wird generiert, Text wird in Marken-Schrift gelegt …");
+      const socialKey = crypto.randomUUID();
       const res = await fetch("/api/inhalte-erstellen/social-post", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": socialKey },
         body: JSON.stringify(parsedResult.data),
       });
-      const data = (await res.json()) as {
+      let data = (await res.json()) as {
         error?: string;
+        code?: string;
+        jobId?: string;
+        mediaPersisted?: boolean;
         images?: { imageUrl: string }[];
         partial?: boolean;
         expectedVariants?: number;
@@ -609,7 +708,21 @@ export function InhalteErstellenStudio({
         usedBrandFont?: boolean;
         billing?: { remainingTokens?: number };
       };
-      if (!res.ok) throw new Error(data.error ?? "Social-Post-Generierung fehlgeschlagen.");
+      if (
+        res.status === 409 &&
+        (data.code === "job_in_progress" || /bereits verarbeitet/i.test(data.error ?? "")) &&
+        data.jobId
+      ) {
+        const waited = await waitForInProgressJob(data.jobId);
+        if (waited.error) throw new Error(waited.error);
+        data = {
+          ...waited,
+          jobId: data.jobId,
+          mediaPersisted: waited.mediaPersisted === true,
+        };
+      } else if (!res.ok) {
+        throw new Error(data.error ?? "Social-Post-Generierung fehlgeschlagen.");
+      }
 
       const resultImages = Array.isArray(data.images) ? data.images : [];
       if (resultImages.length === 0) throw new Error(data.error ?? "Keine Variante konnte generiert werden.");
@@ -628,20 +741,29 @@ export function InhalteErstellenStudio({
       }
 
       const mediaPromptLabel = [headline.trim(), subline.trim()].filter(Boolean).join(" · ").slice(0, 120);
-      void (async () => {
-        for (const img of resultImages) {
-          await persistMediaItem({
-            id: crypto.randomUUID(),
-            imageUrl: img.imageUrl,
-            title: `${contentTab === "social" ? "Social" : "Kampagne"} · ${selectedBeer?.name || brandLabel}`,
-            prompt: mediaPromptLabel,
-            createdAt: new Date().toISOString(),
-            aspectRatio,
-            resolution: "1K",
-            outputFormat: "png",
-          });
+      if (!data.mediaPersisted) {
+        try {
+          for (const [index, img] of resultImages.entries()) {
+            await persistMediaItem({
+              id: data.jobId ? `gen-${data.jobId}-${index}` : crypto.randomUUID(),
+              imageUrl: img.imageUrl,
+              title: `${contentTab === "social" ? "Social" : "Kampagne"} · ${selectedBeer?.name || brandLabel}`,
+              prompt: mediaPromptLabel,
+              createdAt: new Date().toISOString(),
+              aspectRatio,
+              resolution: "2K",
+              outputFormat: "png",
+            });
+          }
+        } catch (mediaErr) {
+          setError(
+            mediaErr instanceof Error
+              ? `Bilder erzeugt, aber Mediathek-Speicherung fehlgeschlagen: ${mediaErr.message}`
+              : "Bilder erzeugt, aber Mediathek-Speicherung fehlgeschlagen.",
+          );
         }
-      })();
+      }
+      window.dispatchEvent(new CustomEvent("evglab-media-updated"));
 
       if (data.partial && data.partialErrors?.length) {
         setError(
@@ -714,7 +836,7 @@ export function InhalteErstellenStudio({
         zusatzWunsch,
         extraReferenceImages: extraReferences.map((r) => r.dataUrl).slice(0, 3),
         aspectRatio,
-        quality: "medium" as const,
+        quality: studioRequestQuality,
         variantCount,
         aiWatermark,
       };
@@ -750,6 +872,9 @@ export function InhalteErstellenStudio({
 
       type CreateTaskResponse = {
         error?: string;
+        code?: string;
+        jobId?: string;
+        mediaPersisted?: boolean;
         blocking_issues?: string[];
         missing_information?: string[];
         images?: { imageUrl: string }[];
@@ -808,6 +933,21 @@ export function InhalteErstellenStudio({
               await new Promise((r) => window.setTimeout(r, 2000 * attempt));
             }
             const result = await postCreateTask();
+            if (
+              result.res.status === 409 &&
+              (result.data.code === "job_in_progress" || /bereits verarbeitet/i.test(result.data.error ?? "")) &&
+              result.data.jobId
+            ) {
+              const waited = await waitForInProgressJob(result.data.jobId);
+              if (waited.error) throw new Error(waited.error);
+              data = {
+                ...waited,
+                jobId: result.data.jobId,
+                mediaPersisted: waited.mediaPersisted === true,
+              };
+              lastErr = undefined;
+              break;
+            }
             if (!result.res.ok && result.res.status >= 500 && attempt < 3) {
               lastErr = new Error(result.data.error ?? `HTTP ${result.res.status}`);
               continue;
@@ -854,21 +994,29 @@ export function InhalteErstellenStudio({
       setPreviewIndex(0);
 
       const mediaPromptLabel = (userPrompt.trim() || activePreset?.title || was.label).slice(0, 120);
-      void (async () => {
-        for (const [index, img] of resultImages.entries()) {
-          await persistMediaItem({
-            id: `openai-${Date.now()}-${index}`,
-            imageUrl: img.imageUrl,
-            title: mediaPromptLabel,
-            prompt: mediaPromptLabel,
-            createdAt: new Date().toISOString(),
-            aspectRatio: parsed.aspectRatio,
-            resolution: "1K",
-            outputFormat: data.outputFormat ?? "png",
-          });
+      if (!data.mediaPersisted) {
+        try {
+          for (const [index, img] of resultImages.entries()) {
+            await persistMediaItem({
+              id: data.jobId ? `gen-${data.jobId}-${index}` : `openai-${Date.now()}-${index}`,
+              imageUrl: img.imageUrl,
+              title: mediaPromptLabel,
+              prompt: mediaPromptLabel,
+              createdAt: new Date().toISOString(),
+              aspectRatio: parsed.aspectRatio,
+              resolution: "2K",
+              outputFormat: data.outputFormat ?? "png",
+            });
+          }
+        } catch (mediaErr) {
+          setError(
+            mediaErr instanceof Error
+              ? `Bilder erzeugt, aber Mediathek-Speicherung fehlgeschlagen: ${mediaErr.message}`
+              : "Bilder erzeugt, aber Mediathek-Speicherung fehlgeschlagen.",
+          );
         }
-        window.dispatchEvent(new CustomEvent("evglab-media-updated"));
-      })();
+      }
+      window.dispatchEvent(new CustomEvent("evglab-media-updated"));
 
       if (data.partial && data.partialErrors?.length) {
         setError(
@@ -910,6 +1058,21 @@ export function InhalteErstellenStudio({
 
   return (
     <div className="studio-create-page studio-create-studio">
+      {bootstrapError ? (
+        <div className="studio-create-banner studio-create-banner--brand" role="alert">
+          <div>
+            <div className="studio-create-banner__title">Laden unvollständig</div>
+            <div className="studio-create-banner__text">{bootstrapError}</div>
+          </div>
+          <button
+            type="button"
+            className="studio-create-banner__btn studio-create-banner__btn--primary"
+            onClick={() => setBootstrapNonce((n) => n + 1)}
+          >
+            Erneut laden
+          </button>
+        </div>
+      ) : null}
       {!profileComplete && profileMode !== "skip" ? (
         <div className="studio-create-banner studio-create-banner--brand">
           <div>

@@ -32,7 +32,7 @@ export default async function OnboardingPage() {
     redirect("/anmelden");
   }
 
-  if (!(await hasPassedTwoFactor(user.id))) {
+  if (!(await hasPassedTwoFactor(user))) {
     redirect(TWO_FACTOR_PAGE);
   }
 
