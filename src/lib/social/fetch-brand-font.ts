@@ -25,9 +25,12 @@ export async function fetchBrandFontBuffer(
       headers: { Accept: "font/woff2,font/woff,font/ttf,font/otf,application/octet-stream" },
     });
     if (res.status < 200 || res.status >= 300 || !res.body.byteLength) return null;
+    const responseMime = res.headers["content-type"]?.split(";")[0]?.trim();
     return {
       buffer: res.body,
-      mime: res.headers["content-type"]?.split(";")[0]?.trim() || mimeFromUrl(res.finalUrl),
+      mime: responseMime && Object.values(FONT_MIME_BY_EXT).includes(responseMime)
+        ? responseMime
+        : mimeFromUrl(res.finalUrl),
     };
   } catch {
     return null;
