@@ -13,7 +13,8 @@ import { getSharedCookieDomain } from "@/lib/siteConfig";
 const AUTH_COOKIE_SWEEP_PATHS = new Set([
   "/anmelden",
   "/registrieren",
-  "/auth/google",
+  // /auth/google absichtlich nicht: Middleware-Max-Age=0 race’t mit dem neuen PKCE-Verifier
+  // (Set-Cookie) und erzeugt dauerhaft pkce_code_verifier_not_found / oauth_state.
   "/auth/signin",
   "/auth/signup",
   "/auth/callback",
@@ -47,7 +48,7 @@ export async function updateSession(request: NextRequest) {
   if (AUTH_COOKIE_SWEEP_PATHS.has(pathname)) {
     clearIncomingSupabaseAuthCookies(request, supabaseResponse, {
       preserveCodeVerifier: pathname === "/auth/callback",
-      allSupabase: pathname === "/auth/google" || pathname === "/auth/clear-session",
+      allSupabase: pathname === "/auth/clear-session",
     });
   }
 

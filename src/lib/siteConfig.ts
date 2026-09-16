@@ -19,16 +19,15 @@ const productName =
 
 /**
  * Shared-Cookie-Domain für Login zwischen brewai.de und app.brewai.de.
- * Nur setzen, wenn NEXT_PUBLIC_COOKIE_DOMAIN in der Env steht (Production).
- * Preview/Localhost: undefined (Host-only Cookies).
+ * Preview/Localhost: undefined (Host-only). Production: Env oder Fallback brewai.de.
  */
 export function getSharedCookieDomain(): string | undefined {
+  // Preview/Localhost: Host-only — Domain=brewai.de würde lokalen Google-Login spoilern.
+  if (process.env.NODE_ENV !== "production") return undefined;
   const configured =
     typeof process !== "undefined" ? process.env.NEXT_PUBLIC_COOKIE_DOMAIN?.trim() : undefined;
-  if (!configured) return undefined;
-  // Preview/Localhost: Host-only Cookies. Sonst landet der PKCE-Verifier auf Domain=brewai.de und Google-Login stirbt.
-  if (process.env.NODE_ENV !== "production") return undefined;
-  return configured.replace(/^\./, "") || undefined;
+  if (configured) return configured.replace(/^\./, "") || undefined;
+  return "brewai.de";
 }
 
 /** Erlaubte Browser-Origins (Marketing + App). */

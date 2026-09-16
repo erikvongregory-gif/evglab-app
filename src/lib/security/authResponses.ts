@@ -20,9 +20,26 @@ export function createNoStoreRedirect(url: string, requestId: string, status = 3
 
 /** Cookies von einer Response auf eine andere kopieren — ohne name/value in den Options, sonst verwirft Next sie. */
 export function appendResponseCookies(target: NextResponse, source: NextResponse) {
+  const liveNames = new Set(
+    source.cookies
+      .getAll()
+      .filter((cookie) => cookie.value.length > 0 && cookie.maxAge !== 0)
+      .map((cookie) => cookie.name),
+  );
+
   for (const cookie of source.cookies.getAll()) {
     const { name, value, ...options } = cookie;
     target.cookies.set(name, value, options);
+  }
+
+  // Domain-Clears nur als raw Set-Cookie (cookies.set = ein Eintrag pro Name).
+  // Keine Domain-Max-Age=0 für Cookies, die wir im selben Response neu setzen (PKCE).
+  const raw = source.headers.getSetCookie?.() ?? [];
+  for (const header of raw) {
+    if (!/;\s*Domain=/i.test(header)) continue;
+    const name = header.split("=")[0]?.trim();
+    if (name && liveNames.has(name) && /Max-Age=0/i.test(header)) continue;
+    target.headers.append("Set-Cookie", header);
   }
   return target;
 }

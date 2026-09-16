@@ -46,6 +46,8 @@ function messageForError(
       return "E-Mail passt nicht zur Einladung.";
     case "invite_only":
       return "Google-Anmeldung ist derzeit nicht verfügbar.";
+    case "terms":
+      return "Bitte AGB und Datenschutzerklärung akzeptieren, bevor du ein Konto anlegst.";
     case "google":
       return "Google-Anmeldung fehlgeschlagen. Bitte erneut versuchen.";
     case "oauth_state":

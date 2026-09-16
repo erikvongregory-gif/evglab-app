@@ -57,9 +57,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
     }
 
-    const body = z.object({ pack: z.enum(["tokens_500", "tokens_2000"]) }).safeParse(await req.json());
+    const body = z
+      .object({
+        pack: z.enum(["tokens_500", "tokens_2000"]),
+        consumerEarlyPerformanceConsent: z.literal(true),
+      })
+      .safeParse(await req.json());
     if (!body.success) {
-      return NextResponse.json({ error: "Token-Pack fehlt." }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            "Bitte bestätige die Zustimmung zum Leistungsbeginn vor Ablauf der Widerrufsfrist.",
+          code: "CONSUMER_CONSENT_REQUIRED",
+        },
+        { status: 400 },
+      );
     }
     const pack: TokenPackKey = body.data.pack;
     const packConfig = getPackConfig(pack);
@@ -110,6 +122,8 @@ export async function POST(req: Request) {
         kind: "token_pack",
         tokens: String(packConfig.tokens),
         pack,
+        consumer_early_performance_consent: "1",
+        consumer_early_performance_consent_at: new Date().toISOString(),
       },
     });
 

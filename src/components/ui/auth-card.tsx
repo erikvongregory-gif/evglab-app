@@ -355,7 +355,10 @@ export function AuthCard({
               <div className={styles.terms}>
                 <input
                   id={`${reactId}-terms`}
+                  name="accepted_terms"
                   type="checkbox"
+                  value="1"
+                  required
                   checked={acceptedTerms}
                   onChange={(e) => {
                     setAcceptedTerms(e.target.checked);
@@ -370,8 +373,8 @@ export function AuthCard({
                   und die{" "}
                   <a href={privacyHref} target="_blank" rel="noopener noreferrer">
                     Datenschutzerklärung
-                  </a>
-                  .
+                  </a>{" "}
+                  und bestätige die Widerrufsbelehrung.
                 </label>
               </div>
             ) : null}
@@ -394,12 +397,24 @@ export function AuthCard({
                 {oauthProviders.includes("google") ? (
                   googleHref ? (
                     <a
-                      href={googleHref}
-                      onClick={clearLegacySupabaseSessionCookies}
+                      href={
+                        isSignup
+                          ? `${googleHref}${googleHref.includes("?") ? "&" : "?"}terms_accepted=1`
+                          : googleHref
+                      }
+                      onClick={(event) => {
+                        if (isSignup && !acceptedTerms) {
+                          event.preventDefault();
+                          setLocalError("Bitte AGB und Datenschutz bestätigen");
+                          return;
+                        }
+                        clearLegacySupabaseSessionCookies();
+                      }}
                       className={`${styles.oauthBtn} ${styles.oauthIcon}`}
                       rel="noopener"
                       aria-label="Mit Google"
                       title="Mit Google"
+                      aria-disabled={isSignup && !acceptedTerms}
                     >
                       <GoogleG />
                     </a>
@@ -407,8 +422,14 @@ export function AuthCard({
                     <button
                       type="button"
                       className={`${styles.oauthBtn} ${styles.oauthIcon}`}
-                      disabled={loading}
-                      onClick={() => onOAuth("google")}
+                      disabled={loading || (isSignup && !acceptedTerms)}
+                      onClick={() => {
+                        if (isSignup && !acceptedTerms) {
+                          setLocalError("Bitte AGB und Datenschutz bestätigen");
+                          return;
+                        }
+                        onOAuth("google");
+                      }}
                       aria-label="Mit Google"
                       title="Mit Google"
                     >

@@ -26,7 +26,6 @@ import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
 import {
   clearHomepageCheckoutParams,
   getHomepageCheckoutPlan,
-  startBillingCheckout,
 } from "@/lib/billing/checkoutClient";
 import { buildGenericBrandProfilePatch, isBrandProfileCompleteFromSettings } from "@/lib/dashboard/brandProfile";
 import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
@@ -440,15 +439,12 @@ export function DashboardRedesignShell(props: {
     }
 
     changeTab("pricing");
-    void (async () => {
-      const result = await startBillingCheckout({ plan: homepagePlan });
-      if (!result.ok && !result.redirected) {
-        setPricingCheckoutError(result.error);
-      }
-      clearHomepageCheckoutParams(params);
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    })();
+    setPricingCheckoutError(
+      "Bitte bestätige unten die Widerrufs-Zustimmung und wähle danach deinen Tarif.",
+    );
+    clearHomepageCheckoutParams(params);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsLoaded, summary, searchParams]);
 

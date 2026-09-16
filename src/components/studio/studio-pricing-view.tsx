@@ -187,6 +187,7 @@ export function StudioPricingView({
   const [tokenPackPending, setTokenPackPending] = useState<"tokens_500" | "tokens_2000" | null>(null);
   const [portalPending, setPortalPending] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(initialCheckoutError);
+  const [consumerConsent, setConsumerConsent] = useState(false);
 
   const activePlan = useMemo(
     () => STUDIO_PLANS.find((plan) => plan.id === currentPlan) ?? STUDIO_PLANS[1],
@@ -196,10 +197,20 @@ export function StudioPricingView({
 
   const startCheckout = useCallback(
     async (plan: SubscriptionPlanKey) => {
+      if (!consumerConsent) {
+        setCheckoutError(
+          "Bitte bestätige die Zustimmung zum Leistungsbeginn vor Ablauf der Widerrufsfrist.",
+        );
+        return;
+      }
       setCheckoutError(null);
       setCheckoutPending(plan);
       try {
-        const result = await startBillingCheckout({ plan, interval: billing });
+        const result = await startBillingCheckout({
+          plan,
+          interval: billing,
+          consumerEarlyPerformanceConsent: true,
+        });
         if (!result.ok && !result.redirected) {
           setCheckoutError(result.error);
         }
@@ -209,7 +220,7 @@ export function StudioPricingView({
         setCheckoutPending(null);
       }
     },
-    [billing],
+    [billing, consumerConsent],
   );
 
   const openPortal = useCallback(async () => {
@@ -231,6 +242,12 @@ export function StudioPricingView({
   }, []);
 
   const buyTokenPack = useCallback(async (pack: "tokens_500" | "tokens_2000") => {
+    if (!consumerConsent) {
+      setCheckoutError(
+        "Bitte bestätige die Zustimmung zum Leistungsbeginn vor Ablauf der Widerrufsfrist.",
+      );
+      return;
+    }
     setCheckoutError(null);
     setTokenPackPending(pack);
     try {
@@ -238,7 +255,7 @@ export function StudioPricingView({
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ pack }),
+        body: JSON.stringify({ pack, consumerEarlyPerformanceConsent: true }),
       });
       const json = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
       if (!res.ok || !json?.url) {
@@ -251,7 +268,7 @@ export function StudioPricingView({
     } finally {
       setTokenPackPending(null);
     }
-  }, []);
+  }, [consumerConsent]);
 
   return (
     <div className="studio-pricing-page">
@@ -269,6 +286,31 @@ export function StudioPricingView({
           <p className="studio-pricing-error__text">{checkoutError}</p>
         </div>
       ) : null}
+
+      <label className="mt-4 flex items-start gap-3 text-sm text-[color:var(--studio-muted)]">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={consumerConsent}
+          onChange={(event) => {
+            setConsumerConsent(event.target.checked);
+            if (event.target.checked) setCheckoutError(null);
+          }}
+        />
+        <span>
+          Ich stimme zu, dass BrewAI mit der digitalen Leistung vor Ablauf der 14-tägigen Widerrufsfrist
+          beginnt, und weiß, dass ich mein Widerrufsrecht bei Beginn der Ausführung verliere. Details:{" "}
+          <a
+            href="https://brewai.de/widerruf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2"
+          >
+            Widerrufsbelehrung
+          </a>
+          .
+        </span>
+      </label>
 
       <div className="studio-card studio-pricing-summary">
         <div>
@@ -309,8 +351,19 @@ export function StudioPricingView({
 
         <div className="studio-pricing-summary__portal">
           <StudioButton variant="ghost" size="sm" disabled={portalPending} onClick={() => void openPortal()}>
-            {portalPending ? "Öffnen …" : "Rechnung & Portal"}
+            {portalPending ? "Öffnen …" : "Abo kündigen / Rechnungen"}
           </StudioButton>
+          <p className="mt-2 text-xs text-[color:var(--studio-muted)]">
+            Kündigung und Rechnungen im Stripe-Kundenportal.{" "}
+            <a
+              href="https://brewai.de/widerruf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2"
+            >
+              Widerruf für Verbraucher
+            </a>
+          </p>
         </div>
       </div>
 
@@ -368,7 +421,11 @@ export function StudioPricingView({
       ) : null}
 
       <div className="studio-pricing-footnote">
-        <p>Alle Preise gemäß § 19 UStG ohne Umsatzsteuer · Monatlich kündbar · Tokens übertragbar je nach Plan · Videos via Seedance 2</p>
+        <p>
+          Alle Preise gemäß § 19 UStG ohne Umsatzsteuer · Monatlich oder jährlich abrechenbar · Monatlich
+          kündbar zum Ende des Abrechnungszeitraums · Tokens: Abo-Kontingent übertragbar je nach Plan;
+          separat gekaufte Token-Pakete verfallen 12 Monate nach Kauf · Videos via Seedance 2
+        </p>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { serializeCookieHeader } from "@supabase/ssr";
 import type { NextResponse } from "next/server";
 import { getSharedCookieDomain } from "@/lib/siteConfig";
 
@@ -23,10 +24,33 @@ function cookieNamesFromRequest(request: Request, pattern: RegExp): string[] {
   ];
 }
 
-function cookieDomainsToClear(): Array<string | undefined> {
-  const sharedDomain = getSharedCookieDomain();
-  if (!sharedDomain) return [undefined];
-  return [undefined, sharedDomain];
+function isBrewAiHost(hostname: string): boolean {
+  return hostname === "brewai.de" || hostname.endsWith(".brewai.de");
+}
+
+/** Host-only + Domain=brewai.de — cookies.set() überschreibt denselben Namen, daher append. */
+function cookieDomainsToClear(request: Request): Array<string | undefined> {
+  const domains = new Set<string | undefined>([undefined]);
+  const shared = getSharedCookieDomain();
+  if (shared) domains.add(shared);
+  try {
+    if (isBrewAiHost(new URL(request.url).hostname)) {
+      domains.add("brewai.de");
+    }
+  } catch {
+    /* ignore */
+  }
+  return [...domains];
+}
+
+function expireCookieHeader(name: string, domain: string | undefined, secure: boolean): string {
+  return serializeCookieHeader(name, "", {
+    path: "/",
+    sameSite: "lax",
+    secure,
+    maxAge: 0,
+    ...(domain ? { domain } : {}),
+  });
 }
 
 export function clearIncomingSupabaseAuthCookies(
@@ -40,18 +64,22 @@ export function clearIncomingSupabaseAuthCookies(
       ? AUTH_TOKEN_COOKIE_PRESERVE_VERIFIER
       : AUTH_TOKEN_COOKIE;
   const names = cookieNamesFromRequest(request, pattern);
+  const secure = process.env.NODE_ENV === "production";
 
   for (const name of names) {
-    for (const domain of cookieDomainsToClear()) {
-      const cookieOptions = {
-        path: "/" as const,
-        sameSite: "lax" as const,
-        secure: process.env.NODE_ENV === "production",
-        httpOnly: true,
-        maxAge: 0,
-        ...(domain ? { domain } : {}),
-      };
-      response.cookies.set(name, "", cookieOptions);
+    for (const domain of cookieDomainsToClear(request)) {
+      if (domain) {
+        // Domain-Variante nur per append — cookies.set überschreibt denselben Namen.
+        response.headers.append("Set-Cookie", expireCookieHeader(name, domain, secure));
+      } else {
+        // Host-only über cookies API, damit createHtmlRedirect/Cookie-Merges sie behalten.
+        response.cookies.set(name, "", {
+          path: "/",
+          sameSite: "lax",
+          secure,
+          maxAge: 0,
+        });
+      }
     }
   }
 }

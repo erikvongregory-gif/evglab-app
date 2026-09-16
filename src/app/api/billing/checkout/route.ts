@@ -22,6 +22,7 @@ import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/re
 const checkoutSchema = z.object({
   plan: z.enum(["start", "growth", "pro"]),
   interval: z.enum(["monthly", "yearly"]).optional().default("yearly"),
+  consumerEarlyPerformanceConsent: z.literal(true),
 });
 
 export async function POST(req: Request) {
@@ -63,7 +64,14 @@ export async function POST(req: Request) {
 
     const parsed = checkoutSchema.safeParse(await req.json());
     if (!parsed.success) {
-      return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            "Bitte bestätige die Zustimmung zum Leistungsbeginn vor Ablauf der Widerrufsfrist.",
+          code: "CONSUMER_CONSENT_REQUIRED",
+        },
+        { status: 400 },
+      );
     }
     const plan: SubscriptionPlanKey = parsed.data.plan;
     const interval: BillingInterval = parsed.data.interval;
@@ -113,12 +121,15 @@ export async function POST(req: Request) {
         user_id: user.id,
         plan,
         interval,
+        consumer_early_performance_consent: "1",
+        consumer_early_performance_consent_at: new Date().toISOString(),
       },
       subscription_data: {
         metadata: {
           user_id: user.id,
           plan,
           interval,
+          consumer_early_performance_consent: "1",
         },
       },
     }, { idempotencyKey: `checkout:${claim.data}` });

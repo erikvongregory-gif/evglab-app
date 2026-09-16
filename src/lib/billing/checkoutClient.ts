@@ -42,12 +42,17 @@ export function buildDashboardUrlForHomepageCheckout(plan: SubscriptionPlanKey):
 export async function startBillingCheckout(args: {
   plan: SubscriptionPlanKey;
   interval?: BillingInterval;
+  consumerEarlyPerformanceConsent: boolean;
 }): Promise<BillingCheckoutResult> {
   const res = await fetch("/api/billing/checkout", {
     method: "POST",
     credentials: "same-origin",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ plan: args.plan, interval: args.interval ?? "yearly" }),
+    body: JSON.stringify({
+      plan: args.plan,
+      interval: args.interval ?? "yearly",
+      consumerEarlyPerformanceConsent: args.consumerEarlyPerformanceConsent === true ? true : undefined,
+    }),
   });
   const json = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
 

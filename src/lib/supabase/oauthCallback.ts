@@ -2,6 +2,11 @@ import type { EmailOtpType, User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { redirectWithEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
 import { repairOversizedMetadataForUser } from "@/lib/auth/repairOversizedMetadata";
+import {
+  TERMS_ACCEPTANCE_COOKIE,
+  TERMS_ACCEPTANCE_VERSION,
+  termsAcceptanceMetadata,
+} from "@/lib/auth/termsAcceptance";
 import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import {
   acquireOAuthCode,
@@ -20,14 +25,51 @@ import {
   createOAuthSessionPollerHtml,
   createRecoveryHashForwardHtml,
   normalizeNextPath,
+  secureCookieOptions,
 } from "@/lib/security/authResponses";
 import { getOrCreateRequestId, logAuthEvent } from "@/lib/security/authObservability";
+import { parseCookieHeader } from "@supabase/ssr";
 
 function authErrorParam(code?: string) {
   if (code === "flow_state_not_found" || code === "pkce_code_verifier_not_found") {
     return "oauth_state";
   }
   return "auth";
+}
+
+function hasTermsAcceptanceCookie(request: Request): boolean {
+  return parseCookieHeader(request.headers.get("Cookie") ?? "").some(
+    (cookie) => cookie.name === TERMS_ACCEPTANCE_COOKIE && Boolean(cookie.value),
+  );
+}
+
+async function persistTermsAcceptanceIfPresent(
+  request: Request,
+  response: NextResponse,
+  supabase: Awaited<ReturnType<typeof createAuthRouteHandlerClient>>,
+  user: User | null | undefined,
+) {
+  if (!user?.id || !hasTermsAcceptanceCookie(request)) return;
+  const meta = user.user_metadata ?? {};
+  if (meta.terms_accepted_at && meta.terms_version === TERMS_ACCEPTANCE_VERSION) {
+    response.cookies.set(TERMS_ACCEPTANCE_COOKIE, "", {
+      ...secureCookieOptions(request),
+      httpOnly: true,
+      maxAge: 0,
+    });
+    return;
+  }
+  await supabase.auth.updateUser({
+    data: {
+      ...meta,
+      ...termsAcceptanceMetadata(),
+    },
+  });
+  response.cookies.set(TERMS_ACCEPTANCE_COOKIE, "", {
+    ...secureCookieOptions(request),
+    httpOnly: true,
+    maxAge: 0,
+  });
 }
 
 function finishUrl(appOrigin: string, safeNext: string) {
@@ -83,6 +125,11 @@ async function redirectAfterOAuthSuccess(
 
   if (opts.oauthCode && user?.id) {
     bridgeOAuthSession(opts.oauthCode, redirectResponse, user.id);
+  }
+
+  if (!isPasswordRecovery && user?.id && hasTermsAcceptanceCookie(request)) {
+    const supabase = await createAuthRouteHandlerClient(redirectResponse);
+    await persistTermsAcceptanceIfPresent(request, redirectResponse, supabase, user);
   }
 
   if (!isPasswordRecovery && user) {

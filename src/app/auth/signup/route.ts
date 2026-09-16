@@ -1,4 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  isTruthyTermsAcceptance,
+  TERMS_ACCEPTANCE_FORM_FIELD,
+  termsAcceptanceMetadata,
+} from "@/lib/auth/termsAcceptance";
 import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import { consumeInviteByToken } from "@/lib/invite/server";
 import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
@@ -20,6 +25,7 @@ export async function POST(request: Request) {
   const breweryName = String(formData.get("brewery") ?? "").trim();
   const inviteToken = String(formData.get("inviteToken") ?? "").trim();
   const next = normalizeNextPath(String(formData.get("next") ?? "/dashboard"));
+  const acceptedTerms = isTruthyTermsAcceptance(formData.get(TERMS_ACCEPTANCE_FORM_FIELD));
   const identifier = buildCompositeIdentifier(request, [email, inviteToken || null]);
   const rateLimitError = await enforceRateLimitPersistent(
     request,
@@ -31,6 +37,13 @@ export async function POST(request: Request) {
     { identifier },
   );
   if (rateLimitError) return rateLimitError;
+
+  if (!acceptedTerms) {
+    if (inviteToken) {
+      return createNoStoreRedirect(`${origin}/invite/${encodeURIComponent(inviteToken)}?error=terms`, requestId);
+    }
+    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=terms`, requestId);
+  }
 
   if (!email || !password) {
     return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=missing`, requestId);
@@ -63,6 +76,7 @@ export async function POST(request: Request) {
     user_metadata: {
       brewery_name: breweryName || null,
       invited_account: isInviteOnlyEnabled(),
+      ...termsAcceptanceMetadata(),
     },
   });
 

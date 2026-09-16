@@ -5,6 +5,7 @@ import { isInviteOnlyEnabled } from "@/lib/supabase/env";
 
 type InvitePageProps = {
   params: Promise<{ token: string }>;
+  searchParams?: Promise<{ error?: string }>;
 };
 
 function statusMessage(status: string) {
@@ -24,11 +25,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function InviteTokenPage({ params }: InvitePageProps) {
+export default async function InviteTokenPage({ params, searchParams }: InvitePageProps) {
   const { token } = await params;
+  const query = (await searchParams) ?? {};
   const inviteOnly = isInviteOnlyEnabled();
   const invite = inviteOnly ? await getInviteByToken(token).catch(() => null) : null;
   const status = inviteOnly ? evaluateInvite(invite) : "valid";
+  const termsError = query.error === "terms";
 
   return (
     <main className="mx-auto my-10 w-full max-w-md px-4">
@@ -37,6 +40,12 @@ export default async function InviteTokenPage({ params }: InvitePageProps) {
         <p className="mt-2 text-sm text-zinc-600">
           Registriere dich mit deiner eingeladenen E-Mail-Adresse, um Zugang zum Dashboard zu erhalten.
         </p>
+
+        {termsError ? (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Bitte AGB und Datenschutzerklärung akzeptieren.
+          </div>
+        ) : null}
 
         {!inviteOnly || status === "valid" ? (
           <form action="/auth/signup" method="post" className="mt-5 space-y-4">
@@ -78,6 +87,37 @@ export default async function InviteTokenPage({ params }: InvitePageProps) {
                 required
                 className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2.5"
               />
+            </div>
+            <div className="flex items-start gap-2 text-sm text-zinc-700">
+              <input
+                id="invite-terms"
+                name="accepted_terms"
+                type="checkbox"
+                value="1"
+                required
+                className="mt-1"
+              />
+              <label htmlFor="invite-terms">
+                Ich akzeptiere die{" "}
+                <a
+                  href="https://brewai.de/agb"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-[#c65a20] hover:underline"
+                >
+                  AGB
+                </a>{" "}
+                und die{" "}
+                <a
+                  href="https://brewai.de/datenschutz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-[#c65a20] hover:underline"
+                >
+                  Datenschutzerklärung
+                </a>
+                .
+              </label>
             </div>
             <button
               type="submit"
