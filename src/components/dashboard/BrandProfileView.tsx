@@ -453,7 +453,7 @@ export function BrandProfileView({
 
             <div className="studio-brand-section-label">Marken-Schrift</div>
             <p className="studio-brand-meta" style={{ marginBottom: 10 }}>
-              Für Social-Posts und Kampagnen — Headline wird in dieser Schrift über das Motiv gelegt.
+              Wird im Markenprofil gespeichert. Bildexporte verwenden derzeit die zuverlässig renderbare Work Sans.
             </p>
             <div style={{ display: "grid", gap: 10 }}>
               <input

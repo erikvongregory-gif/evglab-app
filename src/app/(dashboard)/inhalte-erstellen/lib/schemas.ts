@@ -152,6 +152,8 @@ export const hyperrealisticSchema = z.object({
   stiltreue: z.enum(["frei", "normal", "hoch"]).optional(),
   /** Content-Tab Framing fuer applyContentPresetPrompt. */
   contentPreset: z.enum(["hyperreal", "campaign_social"]).optional(),
+  /** Optionaler UI-Lock fuer besonders realistische Kamera-, Licht- und Materialwirkung. */
+  hyperreal: z.boolean().optional(),
   aspectRatio: aspectRatioSchema,
   quality: imageQualitySchema,
   variantCount: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),

@@ -1,10 +1,9 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
   composeSocialTextOverlay,
   parsePrimaryBrandColor,
+  wrapCampaignText,
 } from "@/lib/social/text-overlay";
 
 describe("text-overlay", () => {
@@ -13,29 +12,33 @@ describe("text-overlay", () => {
     expect(parsePrimaryBrandColor("warm orange")).toBe("#FFFFFF");
   });
 
+  it("balances campaign copy without orphaning or dropping words", () => {
+    expect(wrapCampaignText("Tief verwurzelt. Doppelt stark.", 20, 2)).toEqual([
+      "Tief verwurzelt.",
+      "Doppelt stark.",
+    ]);
+    expect(wrapCampaignText("Unser Doppelbock – gebraut mit Charakter", 30, 2).join(" ")).toBe(
+      "Unser Doppelbock – gebraut mit Charakter",
+    );
+  });
+
   it("renders German campaign text with the bundled fallback font", async () => {
     const imageBuffer = await sharp({
-      create: { width: 1024, height: 1024, channels: 3, background: "#8A6A42" },
+      create: { width: 1024, height: 1280, channels: 3, background: "#8A6A42" },
     }).png().toBuffer();
-    const fontBuffer = await readFile(
-      join(process.cwd(), "public", "public", "fonts", "work-sans-latin-ext-700-normal.woff2"),
-    );
     const output = await composeSocialTextOverlay({
       imageBuffer,
       overlay: {
         width: 1024,
-        height: 1024,
+        height: 1280,
         headline: "Frisch & gut <heute> – Grüße aus München",
         subline: "Jetzt im Biergarten",
         ctaText: "Mehr erfahren",
-        fontName: "Work Sans",
-        fontBuffer,
-        fontMime: "font/woff2",
       },
     });
     await expect(sharp(output).metadata()).resolves.toMatchObject({
       width: 1024,
-      height: 1024,
+      height: 1280,
       format: "png",
     });
 
@@ -43,11 +46,8 @@ describe("text-overlay", () => {
       imageBuffer,
       overlay: {
         width: 1024,
-        height: 1024,
+        height: 1280,
         headline,
-        fontName: "Work Sans",
-        fontBuffer,
-        fontMime: "font/woff2",
       },
     });
     const whiteSpan = async (buffer: Buffer) => {

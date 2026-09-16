@@ -4,8 +4,19 @@ import { buildHyperrealisticPrompt, buildProductPlacementPrompt, applyClientInte
 import { buildProductIsolatePrompt } from "./product-isolate";
 import { DEFAULT_GLAS_BY_STIL, buildProductStudioPrompt, resolveStudioGlas } from "./product-studio";
 import { campaignTextSchema, hyperrealisticSchema, productIsolateSchema, productStudioSchema } from "../schemas";
+import { applyContentPresetPrompt } from "@/lib/image-types/policy";
 
 describe("inhalte-erstellen prompt builders", () => {
+  it("activates the reusable Hyperreal prompt lock", () => {
+    const prompt = applyContentPresetPrompt("A beer in a garden.", "hyperreal");
+    expect(prompt).toContain("Preset lock (NON-NEGOTIABLE): Hyperreal Motif");
+    expect(prompt).toContain("real commercial beverage photography");
+    expect(prompt).toContain("85mm lens, f/5.6, ISO 100, 1/160 s");
+    expect(prompt).toContain("physically correct refraction");
+    expect(prompt).toContain("Strictly forbid illustration");
+    expect(prompt).toContain("film grain");
+  });
+
   it("builds a hyperrealistic prompt snapshot", () => {
     expect(
       buildHyperrealisticPrompt({
@@ -51,7 +62,11 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(prompt).not.toMatch(/EXACT TEXT/);
     expect(prompt).toMatch(/not an advertisement/i);
     expect(prompt).toMatch(/Kodak Portra 400/);
-    expect(prompt).toMatch(/Integrate the bottle from Image 1/);
+    expect(prompt).toMatch(/PRODUCT INTEGRATION — CRITICAL/);
+    expect(prompt).toMatch(/NOT as a flat cutout, sticker, pasted layer, or composited object/);
+    expect(prompt).toMatch(/Do NOT preserve the reference image's lighting/);
+    expect(prompt).toMatch(/share the SAME camera, lens, focal plane/);
+    expect(prompt).not.toMatch(/Keep unchanged from Image 1/i);
     expect(prompt).toMatch(/HYPERREALISM LOCK/);
     expect(prompt).toMatch(/NEGATIVE \(hyperreal\)/);
     expect(prompt).toMatch(/Forbidden/);
@@ -98,7 +113,7 @@ describe("inhalte-erstellen prompt builders", () => {
       variantCount: 1,
     });
     expect(hoch).toMatch(/entire printed label/);
-    expect(normal).toMatch(/clearly recognizable/);
+    expect(normal).toMatch(/faithful reference/);
     expect(normal).not.toMatch(/entire printed label/);
   });
 

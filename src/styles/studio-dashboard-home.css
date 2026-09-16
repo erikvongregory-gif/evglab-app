@@ -580,7 +580,8 @@
   flex-wrap: nowrap;
   min-height: var(--topbar-h, 60px);
   height: var(--topbar-h, 60px);
-  overflow: hidden;
+  /* Kein overflow:hidden — Safari clippt sonst Sticky-Header / Safe-Area-Inhalt */
+  overflow: visible;
 }
 
 .evg-studio .evg-shell-topbar-search {

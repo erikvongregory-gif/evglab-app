@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const viewport: Viewport = {
   themeColor: "#F6F6F4",
+  viewportFit: "cover",
 };
 
 export default async function StudioDashboardLayout({ children }: { children: React.ReactNode }) {

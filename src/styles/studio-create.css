@@ -1672,6 +1672,19 @@
   color: var(--t2);
 }
 
+.evg-studio .studio-create-chip--hyperreal {
+  min-height: 36px;
+  border-color: color-mix(in srgb, var(--m-hyperreal, var(--ac)) 35%, var(--line2));
+  color: var(--t1);
+}
+
+.evg-studio .studio-create-chip--hyperreal.is-active {
+  border-color: var(--m-hyperreal, var(--ac));
+  background: color-mix(in srgb, var(--m-hyperreal, var(--ac)) 16%, var(--s1));
+  color: var(--t1);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--m-hyperreal, var(--ac)) 30%, transparent);
+}
+
 .evg-studio .studio-create-preview-card {
   border: 1px solid var(--line2);
   border-radius: var(--r-lg);

@@ -22,9 +22,9 @@ import { calculateGenerationTokenCost, calculatePerVariantTokenCost, resolveImag
 import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { compileBrief } from "@/lib/prompts/prompt-compiler";
+import { applyContentPresetPrompt } from "@/lib/image-types/policy";
 import { appendCopySpaceDirective } from "@/lib/social/copy-space-prompt";
 import { composeSocialTextOverlay, parsePrimaryBrandColor } from "@/lib/social/text-overlay";
-import { fetchBrandFontBuffer } from "@/lib/social/fetch-brand-font";
 import { applyAiWatermark } from "@/lib/openai/aiWatermark";
 import {
   cropImageBufferToAspectRatio,
@@ -179,6 +179,9 @@ export async function POST(req: Request) {
     } else {
       prompt = appendCopySpaceDirective(compiled.image_prompt);
     }
+    if (input.hyperreal === true) {
+      prompt = applyContentPresetPrompt(prompt, "hyperreal");
+    }
     prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS);
 
     const referenceImages = [visionReference, ...extraRefs, shapeReference].filter(
@@ -226,10 +229,6 @@ export async function POST(req: Request) {
     const size = mapAspectRatioToOpenAiSize(aspectRatio);
     const outputDimensions = aspectRatioToOutputDimensions(aspectRatio);
 
-    const fontName = brandProfile.brandHeadlineFontName.trim() || brandProfile.breweryName.trim() || "Brand Sans";
-    const fontData = brandProfile.brandFontFileUrl.trim()
-      ? await fetchBrandFontBuffer(brandProfile.brandFontFileUrl)
-      : null;
     const brandAccent = parsePrimaryBrandColor(brandProfile.brandColors);
 
     const renderOne = async (variantIndex: number): Promise<string> => {
@@ -253,10 +252,6 @@ export async function POST(req: Request) {
           headline,
           subline,
           ctaText,
-          fontName,
-          fontWeight: brandProfile.brandFontWeight || "700",
-          fontBuffer: fontData?.buffer ?? null,
-          fontMime: fontData?.mime,
           textColor: "#FFFFFF",
           ctaBackground: brandAccent,
         },
@@ -343,8 +338,8 @@ export async function POST(req: Request) {
       partial: images.length < variantsToCreate,
       expectedVariants: variantsToCreate,
       partialErrors: errors.length ? errors : undefined,
-      usedBrandFont: Boolean(fontData),
-      fontName,
+      usedBrandFont: false,
+      fontName: "Work Sans",
       outputFormat: OUTPUT_FORMAT,
       jobId: job.id,
       mediaPersisted,

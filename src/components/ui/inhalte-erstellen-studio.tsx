@@ -88,10 +88,6 @@ function pixelLabel(aspect: Aspect): string {
   return `${width} × ${height} px`;
 }
 
-function contentPresetForTab(tab: ContentTab): "hyperreal" | "campaign_social" {
-  return tab === "produktfoto" ? "hyperreal" : "campaign_social";
-}
-
 export function InhalteErstellenStudio({
   initialBreweryName,
   brandProfileComplete = true,
@@ -119,8 +115,6 @@ export function InhalteErstellenStudio({
   const [headline, setHeadline] = useState("");
   const [subline, setSubline] = useState("");
   const [ctaText, setCtaText] = useState("");
-  const [brandFontName, setBrandFontName] = useState("");
-  const [brandFontReady, setBrandFontReady] = useState(false);
   const [suggestingCopy, setSuggestingCopy] = useState(false);
   const [userPrompt, setUserPrompt] = useState("");
   const [improving, setImproving] = useState(false);
@@ -130,6 +124,7 @@ export function InhalteErstellenStudio({
   const [aspectRatio, setAspectRatio] = useState<Aspect>("4:5");
   const [variantCount, setVariantCount] = useState<VariantCount>(1);
   const [aiWatermark, setAiWatermark] = useState(false);
+  const [hyperreal, setHyperreal] = useState(false);
 
   const [was, setWas] = useState(BEER_STYLE_OPTIONS[0]);
   const [wo, setWo] = useState(WO_OPTIONS[0]);
@@ -292,13 +287,9 @@ export function InhalteErstellenStudio({
             brandProfileMode?: "undecided" | "guided" | "skip";
             brandReferenceImageUrls?: string[];
             brandLabelReferenceUrl?: string;
-            brandHeadlineFontName?: string;
-            brandFontFileUrl?: string;
           };
         };
         if (json.settings?.breweryName?.trim()) setBreweryName(json.settings.breweryName.trim());
-        setBrandFontName(json.settings?.brandHeadlineFontName?.trim() || "");
-        setBrandFontReady(Boolean(json.settings?.brandFontFileUrl?.trim()));
         const settingsMode = json.settings?.brandProfileMode;
         if (settingsMode === "guided" || settingsMode === "skip" || settingsMode === "undecided") {
           setProfileMode(settingsMode);
@@ -656,7 +647,7 @@ export function InhalteErstellenStudio({
     setImages(Array.from({ length: variantCount }, () => ({} as ImageResponse)));
     setVariantProgress(Array.from({ length: variantCount }, () => 5));
     setPreviewIndex(0);
-    setGenerationStep("Motiv wird vorbereitet — Text kommt in deiner Marken-Schrift …");
+    setGenerationStep("Motiv wird vorbereitet — Text wird separat gesetzt …");
     try {
       if (profileMode !== "guided" || !profileComplete) {
         throw new Error("Social-Posts mit Text brauchen ein aktives Markenprofil.");
@@ -693,6 +684,7 @@ export function InhalteErstellenStudio({
         etikettModus,
         stiltreue,
         contentPreset: "campaign_social" as const,
+        hyperreal,
         beerName: selectedBeer?.name?.trim() || undefined,
         zusatzWunsch,
         extraReferenceImages: extraReferences.map((r) => r.dataUrl).slice(0, 3),
@@ -719,7 +711,7 @@ export function InhalteErstellenStudio({
         );
       }
 
-      setGenerationStep("Motiv wird generiert, Text wird in Marken-Schrift gelegt …");
+      setGenerationStep("Motiv wird generiert, Text wird lesbar darübergelegt …");
       const socialKey = crypto.randomUUID();
       const res = await fetch("/api/inhalte-erstellen/social-post", {
         method: "POST",
@@ -736,7 +728,6 @@ export function InhalteErstellenStudio({
         partial?: boolean;
         expectedVariants?: number;
         partialErrors?: string[];
-        usedBrandFont?: boolean;
         billing?: { remainingTokens?: number };
       };
       if (
@@ -766,10 +757,6 @@ export function InhalteErstellenStudio({
       setImages(resultImages.map((img) => ({ url: img.imageUrl })));
       setVariantProgress(resultImages.map(() => 100));
       setPreviewIndex(0);
-
-      if (!data.usedBrandFont && !brandFontReady) {
-        setError("Hinweis: Keine Marken-Schrift hinterlegt — Fallback-Typo genutzt. Im Markenprofil hochladen.");
-      }
 
       const mediaPromptLabel = [headline.trim(), subline.trim()].filter(Boolean).join(" · ").slice(0, 120);
       if (!data.mediaPersisted) {
@@ -866,7 +853,7 @@ export function InhalteErstellenStudio({
         kiPlattform: "gpt_image_2" as const,
         etikettModus,
         stiltreue,
-        contentPreset: contentPresetForTab(contentTab),
+        hyperreal,
         beerName: selectedBeer?.name?.trim() || undefined,
         zusatzWunsch,
         extraReferenceImages: extraReferences.map((r) => r.dataUrl).slice(0, 3),
@@ -1084,7 +1071,7 @@ export function InhalteErstellenStudio({
       ? "Das Produktfoto wird noch geladen."
     : isSocialMode
     ? profileMode !== "guided" || !profileComplete
-      ? "Aktives Markenprofil nötig — inkl. Marken-Schrift unter „Markenprofil“."
+      ? "Aktives Markenprofil nötig."
       : etikettModus === "marke" && !hasProductImage
         ? "Biersorte mit Flaschenfoto wählen — das Sortenfoto ist die Produkt-Referenz."
         : !headline.trim()
@@ -1137,6 +1124,14 @@ export function InhalteErstellenStudio({
           <p>Vom Produktfoto zum markenkonformen Motiv</p>
         </div>
         <div className="studio-create-page-head__actions">
+          <button
+            type="button"
+            className={`studio-create-chip studio-create-chip--hyperreal${hyperreal ? " is-active" : ""}`}
+            aria-pressed={hyperreal}
+            onClick={() => setHyperreal((v) => !v)}
+          >
+            Hyperreal
+          </button>
           <div className="studio-create-page-head__cost">
             Verfügbar <strong>{tokensRemaining !== null ? formatDeNumber(tokensRemaining) : "—"} Tokens</strong>
           </div>
@@ -1256,9 +1251,7 @@ export function InhalteErstellenStudio({
                 {suggestingCopy ? "Copy wird geschrieben …" : "Copy vorschlagen"}
               </button>
               <span className="studio-create-field__hint">
-                {brandFontReady
-                  ? `Text wird in „${brandFontName || "Marken-Schrift"}“ über das Motiv gelegt — nicht von der KI geraten.`
-                  : "Marken-Schrift fehlt noch — unter Markenprofil hochladen für exakte Typo (sonst Fallback)."}
+                Text wird serverseitig in Work Sans gesetzt — nicht vom Bildmodell geraten.
               </span>
             </div>
           ) : null}
@@ -1495,7 +1488,7 @@ export function InhalteErstellenStudio({
               maxLength={800}
               placeholder={
                 isSocialMode
-                  ? "Sommerliches Motiv mit Flasche im Biergarten — Text kommt separat in eurer Marken-Schrift."
+                  ? "Sommerliches Motiv mit Flasche im Biergarten — Text wird separat und gut lesbar gesetzt."
                   : "Helles Produktfoto unseres Pale Ale auf einer Holztischplatte. Natürliches Abendlicht, Kondenswasser auf der Flasche, ruhiger Hintergrund."
               }
               value={userPrompt}
@@ -1697,6 +1690,17 @@ export function InhalteErstellenStudio({
 
           <div className="studio-create-field studio-create-field--switch">
             <StudioUiSwitch
+              checked={hyperreal}
+              onCheckedChange={setHyperreal}
+              label="Hyperreal"
+            />
+            <span className="studio-create-field__hint">
+              Verstärkt echte Kameraanmutung, plausibles Licht und Materialien sowie natürliche Unperfektheit — ohne CGI-Look.
+            </span>
+          </div>
+
+          <div className="studio-create-field studio-create-field--switch">
+            <StudioUiSwitch
               checked={aiWatermark}
               onCheckedChange={setAiWatermark}
               label="AI-Kennzeichnung"
@@ -1712,6 +1716,7 @@ export function InhalteErstellenStudio({
             </div>
             <div>
               Format {aspectRatio} · Markenprofil {etikettModus === "marke" ? "aktiv" : "frei"}
+              {hyperreal ? " · Hyperreal" : ""}
               {aiWatermark ? " · AI-Label" : ""}
             </div>
             <div className="studio-create-summary__cost">

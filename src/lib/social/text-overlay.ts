@@ -1,7 +1,4 @@
 import sharp from "sharp";
-import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export type SocialTextOverlayInput = {
@@ -10,10 +7,6 @@ export type SocialTextOverlayInput = {
   headline: string;
   subline?: string;
   ctaText?: string;
-  fontName: string;
-  fontWeight?: string;
-  fontBuffer?: Buffer | null;
-  fontMime?: string;
   textColor?: string;
   ctaBackground?: string;
 };
@@ -27,58 +20,43 @@ function escapeXml(value: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function wrapLines(text: string, maxChars: number, maxLines: number): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [];
+export function wrapCampaignText(text: string, preferredChars: number, maxLines: number): string[] {
+  let words = text.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lineCount = Math.min(maxLines, Math.max(1, Math.ceil(text.trim().length / preferredChars)));
   const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length <= maxChars) {
-      current = next;
-      continue;
+  while (lines.length < lineCount - 1 && words.length > 1) {
+    const remainingLines = lineCount - lines.length;
+    const target = words.join(" ").length / remainingLines;
+    let bestSplit = 1;
+    let bestDelta = Number.POSITIVE_INFINITY;
+    for (let split = 1; split <= words.length - (remainingLines - 1); split += 1) {
+      const delta = Math.abs(words.slice(0, split).join(" ").length - target);
+      if (delta < bestDelta) {
+        bestSplit = split;
+        bestDelta = delta;
+      }
     }
-    if (current) lines.push(current);
-    current = word;
-    if (lines.length >= maxLines - 1) break;
+    lines.push(words.slice(0, bestSplit).join(" "));
+    words = words.slice(bestSplit);
   }
-  if (current && lines.length < maxLines) lines.push(current);
-  return lines.slice(0, maxLines);
-}
-
-function fontExtension(mime?: string): string {
-  if (mime?.includes("woff2")) return "woff2";
-  if (mime?.includes("woff")) return "woff";
-  if (mime?.includes("otf")) return "otf";
-  return "ttf";
+  lines.push(words.join(" "));
+  return lines;
 }
 
 type OverlayFont = { name: string; path: string };
 
-async function resolveOverlayFont(input: SocialTextOverlayInput): Promise<OverlayFont> {
-  const fallbackName = "Work Sans";
-  const fallbackPath = join(
-    process.cwd(),
-    "public",
-    "public",
-    "fonts",
-    "work-sans-latin-ext-700-normal.woff2",
-  );
-  const fallback = { name: fallbackName, path: fallbackPath };
-
-  if (!input.fontBuffer?.byteLength) return fallback;
-  const digest = createHash("sha256").update(input.fontBuffer).digest("hex");
-  // ponytail: one deterministic temp file per uploaded font; serverless instance cleanup evicts the cache.
-  const fontPath = join(tmpdir(), `brewai-overlay-${digest}.${fontExtension(input.fontMime)}`);
-  try {
-    await writeFile(fontPath, input.fontBuffer);
-    await sharp({
-      text: { text: "x", font: input.fontName, fontfile: fontPath, rgba: true },
-    }).png().toBuffer();
-    return { name: input.fontName, path: fontPath };
-  } catch {
-    return fallback;
-  }
+function overlayFont(): OverlayFont {
+  return {
+    name: "Work Sans",
+    path: join(
+      process.cwd(),
+      "public",
+      "public",
+      "fonts",
+      "work-sans-latin-ext-700-normal.woff2",
+    ),
+  };
 }
 
 async function renderText(args: {
@@ -88,7 +66,6 @@ async function renderText(args: {
   weight: string;
   color: string;
   width?: number;
-  spacing?: number;
 }): Promise<Buffer> {
   const markup = `<span foreground="${escapeXml(args.color)}" weight="${escapeXml(args.weight)}" size="${Math.round(args.size * 1024)}">${escapeXml(args.text)}</span>`;
   return sharp({
@@ -97,7 +74,6 @@ async function renderText(args: {
       font: args.font.name,
       fontfile: args.font.path,
       width: args.width,
-      spacing: args.spacing === undefined ? undefined : Math.round(args.spacing),
       rgba: true,
     },
   }).png().toBuffer();
@@ -115,12 +91,17 @@ function buildDecorationsSvg(args: {
     `<svg width="${args.width}" height="${args.height}" xmlns="http://www.w3.org/2000/svg">`,
     `<defs>`,
     `<linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">`,
-    `<stop offset="0%" stop-color="#000000" stop-opacity="0.45"/>`,
-    `<stop offset="55%" stop-color="#000000" stop-opacity="0.12"/>`,
+    `<stop offset="0%" stop-color="#000000" stop-opacity="0.58"/>`,
+    `<stop offset="60%" stop-color="#000000" stop-opacity="0.14"/>`,
     `<stop offset="100%" stop-color="#000000" stop-opacity="0"/>`,
     `</linearGradient>`,
+    `<linearGradient id="leftFade" x1="0" y1="0" x2="1" y2="0">`,
+    `<stop offset="0%" stop-color="#000000" stop-opacity="0.32"/>`,
+    `<stop offset="75%" stop-color="#000000" stop-opacity="0"/>`,
+    `</linearGradient>`,
     `</defs>`,
-    `<rect width="${args.width}" height="${Math.round(args.height * 0.42)}" fill="url(#topFade)"/>`,
+    `<rect width="${args.width}" height="${Math.round(args.height * 0.48)}" fill="url(#topFade)"/>`,
+    `<rect width="${Math.round(args.width * 0.78)}" height="${Math.round(args.height * 0.55)}" fill="url(#leftFade)"/>`,
     cta,
     `</svg>`,
   ].join(""));
@@ -133,13 +114,16 @@ export async function composeSocialTextOverlay(args: {
   const meta = await sharp(args.imageBuffer).metadata();
   const width = meta.width ?? args.overlay.width;
   const height = meta.height ?? args.overlay.height;
-  const font = await resolveOverlayFont(args.overlay);
-  const padX = Math.round(width * 0.08);
-  const headlineSize = Math.round(width * 0.085);
-  const sublineSize = Math.round(width * 0.042);
-  const ctaSize = Math.round(width * 0.034);
-  const headlineLines = wrapLines(args.overlay.headline, width < 900 ? 14 : 18, 3);
-  const sublineLines = args.overlay.subline ? wrapLines(args.overlay.subline, 28, 2) : [];
+  const font = overlayFont();
+  const story = height / width >= 1.6;
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+  const padX = Math.round(width * (story ? 0.07 : 0.075));
+  const copyWidth = Math.round(width * (story ? 0.68 : 0.62));
+  const headlineSize = Math.round(clamp(width * 0.065, 52, 78));
+  const sublineSize = Math.round(clamp(width * 0.032, 28, 42));
+  const ctaSize = Math.round(clamp(width * 0.028, 26, 36));
+  const headlineLines = wrapCampaignText(args.overlay.headline, story ? 17 : 20, 2);
+  const sublineLines = args.overlay.subline ? wrapCampaignText(args.overlay.subline, story ? 25 : 30, 2) : [];
   const textColor = args.overlay.textColor?.trim() || "#FFFFFF";
   const ctaBg = args.overlay.ctaBackground?.trim() || textColor;
   const ctaFg = ["#ffffff", "#fff"].includes(ctaBg.toLowerCase()) ? "#1A1A1A" : "#FFFFFF";
@@ -148,9 +132,13 @@ export async function composeSocialTextOverlay(args: {
   const ctaPadY = Math.round(ctaSize * 0.65);
   const ctaHeight = ctaSize + ctaPadY * 2;
   const ctaX = padX;
-  const ctaY = height - Math.round(height * 0.1) - ctaHeight;
-  const ctaWidth = cta
-    ? Math.round(Math.min(width - padX * 2, cta.length * ctaSize * 0.62 + ctaPadX * 2))
+  const ctaY = Math.round(height * (story ? 0.62 : 0.9)) - ctaHeight;
+  const ctaText = cta
+    ? await renderText({ text: cta, font, size: ctaSize, weight: "700", color: ctaFg })
+    : null;
+  const ctaTextMeta = ctaText ? await sharp(ctaText).metadata() : null;
+  const ctaWidth = ctaTextMeta
+    ? Math.min(width - padX * 2, (ctaTextMeta.width ?? 0) + ctaPadX * 2)
     : 0;
   const layers: Array<{ input: Buffer; top: number; left: number }> = [{
     input: buildDecorationsSvg({
@@ -162,16 +150,15 @@ export async function composeSocialTextOverlay(args: {
     left: 0,
   }];
 
-  let y = Math.round(height * 0.1);
+  let y = Math.round(height * (story ? 0.15 : 0.075));
   if (headlineLines.length) {
     const headlineText = await renderText({
       text: headlineLines.join("\n"),
       font,
       size: headlineSize,
-      weight: args.overlay.fontWeight?.trim() || "700",
+      weight: "700",
       color: textColor,
-      width: width - padX * 2,
-      spacing: headlineSize * 1.08,
+      width: copyWidth,
     });
     layers.push({
       input: headlineText,
@@ -179,7 +166,7 @@ export async function composeSocialTextOverlay(args: {
       left: padX,
     });
     const headlineMeta = await sharp(headlineText).metadata();
-    y += (headlineMeta.height ?? headlineLines.length * headlineSize * 1.15) + sublineSize * 0.5;
+    y += (headlineMeta.height ?? headlineLines.length * headlineSize * 1.15) + sublineSize * 0.65;
   }
   if (sublineLines.length) {
     layers.push({
@@ -189,26 +176,16 @@ export async function composeSocialTextOverlay(args: {
         size: sublineSize,
         weight: "500",
         color: textColor,
-        width: width - padX * 2,
-        spacing: sublineSize * 1.2,
+        width: copyWidth,
       }),
       top: Math.round(y),
       left: padX,
     });
   }
-  if (cta) {
-    const ctaText = await renderText({
-      text: cta,
-      font,
-      size: ctaSize,
-      weight: "700",
-      color: ctaFg,
-      width: Math.max(1, ctaWidth - ctaPadX * 2),
-    });
-    const ctaMeta = await sharp(ctaText).metadata();
+  if (ctaText && ctaTextMeta) {
     layers.push({
       input: ctaText,
-      top: Math.round(ctaY + (ctaHeight - (ctaMeta.height ?? ctaSize)) / 2),
+      top: Math.round(ctaY + (ctaHeight - (ctaTextMeta.height ?? ctaSize)) / 2),
       left: ctaX + ctaPadX,
     });
   }

@@ -51,7 +51,7 @@ const FONT_MIME: Record<string, string> = {
   otf: "font/otf",
 };
 
-/** Marken-Schriftdatei für Social-Post-Overlays (.woff2 bevorzugt). */
+/** Speichert eine Marken-Schriftdatei im privaten Markenprofil. */
 export async function uploadBrandFontToStorage(args: {
   userId: string;
   buffer: Buffer;

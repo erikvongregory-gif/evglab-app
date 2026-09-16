@@ -865,6 +865,7 @@
   padding: 0 16px;
   position: sticky; top: 0; z-index: 20; background: var(--s1);
   flex: none;
+  box-sizing: border-box;
 }
 .evg-crumb { font-family: var(--f-mono); font-size: 11.5px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .evg-crumb b { color: var(--t1); font-weight: 500; }
@@ -1280,7 +1281,14 @@
   .evg-bottom-nav { display: flex !important; }
   .evg-app { grid-template-columns: minmax(0, 1fr); }
   .evg-rail { display: none; }
-  .evg-top { height: var(--topbar-h-mobile, 54px); padding: 0 12px; gap: 10px; }
+  .evg-top {
+    height: calc(var(--topbar-h-mobile, 54px) + constant(safe-area-inset-top));
+    height: calc(var(--topbar-h-mobile, 54px) + env(safe-area-inset-top, 0px));
+    min-height: calc(var(--topbar-h-mobile, 54px) + env(safe-area-inset-top, 0px));
+    padding: constant(safe-area-inset-top) 12px 0;
+    padding: env(safe-area-inset-top, 0px) 12px 0;
+    gap: 10px;
+  }
   .evg-main {
     padding-bottom: calc(var(--bottom-nav-h, 62px) + env(safe-area-inset-bottom, 0px) + 16px);
   }

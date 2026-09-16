@@ -131,11 +131,15 @@ export function applyContentPresetPrompt(basePrompt: string, preset: ContentCrea
       trimmed,
       "",
       "Preset lock (NON-NEGOTIABLE): Hyperreal Motif",
-      "- Output must look indistinguishable from a real camera photograph.",
-      "- Enforce physically plausible lighting, real material response, true-to-life reflections, and natural imperfections.",
+      "- This lock overrides any earlier conflicting style, camera, lighting, grain, or rendering instruction.",
+      "- Capture style: real commercial beverage photography, a real photograph, premium beer advertising photography.",
+      "- Define the product precisely: exact beer-glass shape, beer color, liquid fill level, irregular foam height, bottle or can geometry, and label position.",
+      "- Beverage physics: transparent liquid, physically correct refraction through the glass, small varied CO2 bubbles, irregular natural foam, and condensation droplets of different sizes.",
+      "- Camera: full-frame camera, 85mm lens, f/5.6, ISO 100, 1/160 s; keep the product and label naturally sharp without exaggerated bokeh.",
+      "- Lighting: large soft key light, controlled backlight passing through the beer, subtle rim light on the glass, natural reflections, and physically plausible shadows.",
+      "- Preserve realistic imperfections: slight variation in droplet size, subtly uneven foam, natural highlights, reflections, and contact shadows.",
       "- Human anatomy and skin detail must be fully realistic (no beauty-filter skin, no uncanny face/hands artifacts).",
-      "- Real-world scene context only (no sterile packshot and no synthetic render environment).",
-      "- Strictly forbid illustration, cartoon, painting, CGI, 3D render, or stylized AI-art look.",
+      "- Strictly forbid illustration, cartoon, painting, CGI, 3D render, HDR look, plastic textures, exaggerated bokeh, artificial glow, film grain, or stylized AI-art look.",
     ].join("\n");
   }
   if (preset === "campaign_social") {

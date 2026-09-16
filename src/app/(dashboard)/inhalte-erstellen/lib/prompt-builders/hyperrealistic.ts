@@ -479,10 +479,22 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
   const stiltreue = input.stiltreue ?? (input.etikettModus === "generisch" ? "frei" : "hoch");
   const labelLock =
     stiltreue === "hoch"
-      ? "Keep unchanged from Image 1: bottle silhouette, glass color, and the entire printed label — logo, crest, pattern, colors, layout, and every letter. Do not redraw, restyle, recolor, or invent a different label."
+      ? "IDENTITY REFERENCE — PRESERVE EXACTLY: bottle or can shape and proportions, glass color, cap design, and the entire printed label — artwork, logo, crest, typography, colors, layout, label proportions, and every recognizable branding detail. Reconstruct these identity details faithfully; do not invent a different brand."
       : stiltreue === "normal"
-        ? "Keep the bottle silhouette and brand identity from Image 1 clearly recognizable (logo, core colors, overall layout). Small artistic adaptations for lighting and perspective are allowed; do not invent a different brand."
+        ? "Use the product silhouette and brand identity from Image 1 as a faithful reference (logo, core colors, overall layout). Reconstruct it for the new scene with natural lighting and perspective; do not invent a different brand."
         : "Image 1 is loose product inspiration only — silhouette may guide the vessel, but redesign of label artwork is allowed.";
+
+  const productIntegration = [
+    "PRODUCT INTEGRATION — CRITICAL:",
+    "Use Image 1 as an exact product identity and branding reference, NOT as a flat cutout, sticker, pasted layer, or composited object.",
+    "Photographically reconstruct the product as if the REAL physical bottle or can was present in this environment when the photograph was taken.",
+    "Do NOT preserve the reference image's lighting, reflections, shadows, highlights, white balance, sharpness, background, or photographic conditions.",
+    "The product must inherit the new scene's exact lighting and naturally receive environmental reflections, subtle color contamination, physically plausible glass refraction, ambient occlusion, table bounce light, accurate contact shadow, reflected light from nearby wet surfaces, and realistic interaction between condensation and surrounding light.",
+    "The product must share the SAME camera, lens, focal plane, depth of field, perspective, exposure, white balance, color response, dynamic range, sharpness, and optical characteristics as the rest of the photograph.",
+    "It must appear that the photographer placed the real product in the scene before taking the photograph.",
+    "Never make it cleaner, sharper, brighter, more centered, more perfectly aligned, or more professionally lit than the surrounding scene.",
+    "The product must naturally belong to the photograph, never look like a studio product shot inserted into a lifestyle photograph.",
+  ].join(" ");
 
   const hyperrealHead = buildHyperrealismLockFragment();
   const hyperrealTail = [
@@ -510,6 +522,7 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
       hyperrealHead,
       `USER SCENE (mandatory — fulfill exactly, this is the photograph to create): ${extra}`,
       "Image 1 is ONLY a product identity reference (the real beer bottle + printed label from the selected beer).",
+      productIntegration,
       "COMPLETELY DISCARD Image 1's background, wooden table, coaster, napkin, glass placement, people, trees, and camera framing. Do not remake Image 1. Invent a wholly new environment for the USER SCENE.",
       extraRefLine,
       labelLock,
@@ -525,15 +538,10 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
       .join(" ");
   }
 
-  const integrate =
-    hasPeople
-      ? "Integrate the bottle from Image 1 as a physically photographed object *inside* this real moment — matched lighting, perspective, occlusion, and contact shadows. Not a cutout collage."
-      : "Integrate the bottle from Image 1 as a physically photographed object in this scene — matched lighting, perspective, natural contact shadow. Not a cutout collage.";
-
   return [
     hyperrealHead,
     "Image 1 is a photograph of the real beer bottle from the selected beer variety.",
-    integrate,
+    productIntegration,
     extraRefLine,
     labelLock,
     `Composition: ${vessel}.`,

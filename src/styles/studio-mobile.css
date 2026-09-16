@@ -23,6 +23,7 @@
   .evg-studio.evg-app {
     width: 100%;
     min-height: 100dvh;
+    min-height: -webkit-fill-available;
     grid-template-columns: minmax(0, 1fr) !important;
     overflow: hidden;
   }
@@ -33,16 +34,30 @@
 
   .evg-studio .evg-main-wrap {
     width: 100%;
+    height: -webkit-fill-available;
     height: 100dvh;
     min-height: 0;
     overflow: hidden;
+    /* Landscape-Notch / Dynamic Island seitlich */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 
   .evg-studio .evg-top {
+    /* Sticky ist hier unnötig (Scroll liegt in .evg-main) und clippt unter Safari */
+    position: relative;
+    top: auto;
     box-sizing: border-box;
+    /* constant() = ältere iOS-Safari; env() überschreibt modern */
+    height: calc(var(--topbar-h-mobile) + constant(safe-area-inset-top));
     height: calc(var(--topbar-h-mobile) + env(safe-area-inset-top, 0px));
+    min-height: calc(var(--topbar-h-mobile) + constant(safe-area-inset-top));
     min-height: calc(var(--topbar-h-mobile) + env(safe-area-inset-top, 0px));
-    padding: env(safe-area-inset-top, 0px) 12px 0;
+    padding-top: constant(safe-area-inset-top);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: 12px;
+    padding-bottom: 0;
+    padding-left: 12px;
     gap: 8px;
     overflow: visible;
   }
@@ -780,7 +795,29 @@
   }
 
   .evg-studio .studio-create-page-head__actions {
-    width: auto;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .evg-studio .studio-create-chip--hyperreal {
+    min-height: 44px;
+    padding-inline: 14px;
+    font-size: 13px;
+  }
+
+  /* Sticky Generate darf Schalter nicht überdecken */
+  .evg-studio .studio-create-studio-col--right {
+    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 72px);
+  }
+
+  .evg-studio .studio-create-field--switch .stu-switch-row {
+    position: relative;
+    width: 100%;
+    min-height: 48px;
   }
 
   .evg-studio .studio-create-mobile-nav {

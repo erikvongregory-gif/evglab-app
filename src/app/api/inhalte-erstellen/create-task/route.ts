@@ -169,7 +169,10 @@ export async function POST(req: Request) {
         prompt = `${prompt} LABEL FIDELITY: Keep Image 1 label identical — every letter, logo, crest. Change only the environment.`;
       }
     } else {
-      prompt = applyContentPresetPrompt(compiled.image_prompt, input.contentPreset ?? "hyperreal");
+      prompt = compiled.image_prompt;
+    }
+    if (input.hyperreal === true || input.contentPreset === "hyperreal") {
+      prompt = applyContentPresetPrompt(prompt, "hyperreal");
     }
     prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS);
 
