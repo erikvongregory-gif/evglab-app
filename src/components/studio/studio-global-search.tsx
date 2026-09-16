@@ -95,8 +95,9 @@ export function StudioSearchProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!open || mediaLoaded) return;
+    if (!open) return;
     let ignore = false;
+    setMediaLoaded(false);
     void (async () => {
       try {
         const res = await fetch("/api/dashboard/media", { cache: "no-store", credentials: "include" });
@@ -112,7 +113,7 @@ export function StudioSearchProvider({ children }: { children: ReactNode }) {
     return () => {
       ignore = true;
     };
-  }, [open, mediaLoaded]);
+  }, [open]);
 
   const close = useCallback(() => setOpen(false), []);
 

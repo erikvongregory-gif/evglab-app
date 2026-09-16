@@ -47,6 +47,7 @@ type DashboardSummary = {
   billingStatus: string;
   plan: string | null;
   degradedBilling?: boolean;
+  tokenUsageByDay?: { date: string; tokens: number }[];
 };
 import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
@@ -272,7 +273,10 @@ export function DashboardRedesignShell(props: {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [mediaLoaded, setMediaLoaded] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [teamLoaded, setTeamLoaded] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
   const [settings, setSettings] = useState<SettingsPayload | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -337,9 +341,12 @@ export function DashboardRedesignShell(props: {
         if (res.ok) {
           const json = (await res.json()) as { items?: MediaItem[] };
           if (Array.isArray(json.items)) setMedia(json.items);
+          setMediaError(null);
+        } else {
+          setMediaError("Mediathek konnte nicht geladen werden.");
         }
       } catch {
-        /* Mediathek separat — Fehler nicht als Dashboard-Totalschaden */
+        if (!ignore) setMediaError("Netzwerkfehler beim Laden der Mediathek.");
       } finally {
         if (!ignore) setMediaLoaded(true);
       }
@@ -368,11 +375,18 @@ export function DashboardRedesignShell(props: {
     void (async () => {
       try {
         const res = await load("/api/dashboard/team");
-        if (!res || ignore || !res.ok) return;
-        const json = (await res.json()) as { members?: TeamMember[] };
-        if (Array.isArray(json.members)) setTeam(json.members);
+        if (!res || ignore) return;
+        if (res.ok) {
+          const json = (await res.json()) as { members?: TeamMember[] };
+          if (Array.isArray(json.members)) setTeam(json.members);
+          setTeamError(null);
+        } else {
+          setTeamError("Teamdaten konnten nicht geladen werden.");
+        }
       } catch {
-        /* Team optional */
+        if (!ignore) setTeamError("Netzwerkfehler beim Laden des Teams.");
+      } finally {
+        if (!ignore) setTeamLoaded(true);
       }
     })();
 
@@ -412,7 +426,9 @@ export function DashboardRedesignShell(props: {
     homepageCheckoutStartedRef.current = true;
     setShowBrandProfileChoice(false);
 
-    const hasActivePlan = hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus);
+    const hasActivePlan =
+      Boolean(summary?.unlimited || summary?.tokens.unlimited) ||
+      (!summary?.degradedBilling && hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
     if (hasActivePlan) {
       clearHomepageCheckoutParams(params);
       const qs = params.toString();
@@ -559,11 +575,39 @@ export function DashboardRedesignShell(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  const refreshSummary = useCallback(() => {
+    setSummaryLoaded(false);
+    setSummaryError(null);
+    void fetch("/api/dashboard/summary", { cache: "no-store", credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("fail");
+        const json = (await res.json()) as { summary?: DashboardSummary };
+        if (json.summary) setSummary(json.summary);
+      })
+      .catch(() => setSummaryError("Übersicht konnte nicht geladen werden."))
+      .finally(() => setSummaryLoaded(true));
+  }, []);
+
+  const refreshMedia = useCallback(() => {
+    setMediaLoaded(false);
+    setMediaError(null);
+    void fetch("/api/dashboard/media", { cache: "no-store", credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("fail");
+        const json = (await res.json()) as { items?: MediaItem[] };
+        if (Array.isArray(json.items)) setMedia(json.items);
+      })
+      .catch(() => setMediaError("Mediathek konnte nicht geladen werden."))
+      .finally(() => setMediaLoaded(true));
+  }, []);
+
   // Hinweis: Wir oeffnen das Setup-Modal NICHT mehr automatisch bei `guided + incomplete`.
   // Stattdessen wird der User ueber die Banner (Dashboard-Overview + Inhalte-erstellen)
   // sanft erinnert und kann selbst entscheiden, wann er das Markenprofil anlegt.
 
-  const hasActivePlan = hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus);
+  const hasActivePlan =
+    Boolean(summary?.unlimited || summary?.tokens.unlimited) ||
+    (!summary?.degradedBilling && hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
 
   return (
     <>
@@ -575,6 +619,7 @@ export function DashboardRedesignShell(props: {
           summaryError={summaryError}
           media={media}
           mediaLoaded={mediaLoaded}
+          mediaError={mediaError}
           settings={settings}
           settingsLoaded={settingsLoaded}
           profileName={profileName}
@@ -586,18 +631,8 @@ export function DashboardRedesignShell(props: {
             changeTab("brand");
             setBrandProfileSetupOpen(true);
           }}
-          onRetrySummary={() => {
-            setSummaryLoaded(false);
-            setSummaryError(null);
-            void fetch("/api/dashboard/summary", { cache: "no-store", credentials: "include" })
-              .then(async (res) => {
-                if (!res.ok) throw new Error("fail");
-                const json = (await res.json()) as { summary?: DashboardSummary };
-                if (json.summary) setSummary(json.summary);
-              })
-              .catch(() => setSummaryError("Übersicht konnte nicht geladen werden."))
-              .finally(() => setSummaryLoaded(true));
-          }}
+          onRetrySummary={refreshSummary}
+          onRetryMedia={refreshMedia}
         />
       ) : null}
       {tab === "assistant" ? <BrewAiAssistantView /> : null}
@@ -606,12 +641,25 @@ export function DashboardRedesignShell(props: {
           P={P}
           items={media}
           loaded={mediaLoaded}
+          loadError={mediaError}
+          onRetry={refreshMedia}
           onItemsChange={setMedia}
           hasActivePlan={hasActivePlan}
           initialQuery={searchParams.get("q") ?? ""}
         />
       ) : null}
-      {tab === "team" ? <TeamView P={P} members={team} onMembersChange={setTeam} /> : null}
+      {tab === "team" ? (
+        <TeamView
+          P={P}
+          members={team}
+          loaded={teamLoaded}
+          loadError={teamError}
+          onMembersChange={(next) => {
+            setTeam(next);
+            refreshSummary();
+          }}
+        />
+      ) : null}
       {tab === "brand" ? (
         <BrandProfileView
           value={settings}
@@ -782,10 +830,14 @@ export function DashboardRedesignShell(props: {
 
 function TeamView({
   members,
+  loaded = true,
+  loadError = null,
   onMembersChange,
 }: {
   P?: StudioPalette;
   members: TeamMember[];
+  loaded?: boolean;
+  loadError?: string | null;
   onMembersChange: (next: TeamMember[]) => void;
 }) {
   const [inviteEmail, setInviteEmail] = useState("");
@@ -860,8 +912,14 @@ function TeamView({
           <h1 className="studio-team-title">Mitglieder</h1>
           <p className="studio-team-sub">Lade Kolleginnen und Kollegen ein, um gemeinsam Motive zu erstellen.</p>
         </div>
-        <span className="studio-team-meta">{members.length}</span>
+        <span className="studio-team-meta">{loaded ? members.length : "…"}</span>
       </header>
+
+      {loadError ? (
+        <p className="studio-team-error" role="alert" style={{ color: "var(--warn)", marginBottom: 16 }}>
+          {loadError}
+        </p>
+      ) : null}
 
       <div className="studio-team-invite">
         <h2 className="studio-team-invite__title">Mitglied einladen</h2>

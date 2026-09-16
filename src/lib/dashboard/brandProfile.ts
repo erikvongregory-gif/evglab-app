@@ -105,16 +105,24 @@ export function isBrandProfileCompleteFromSettings(
   } | null,
 ): boolean {
   if (!settings) return false;
-  if (settings.brandProfileMode === "skip") return true;
-  if (settings.brandProfileMode !== "guided") return false;
-  const hasIdentity = Boolean(settings.breweryName?.trim() || settings.brandWebsiteUrl?.trim());
-  return Boolean(
-    hasIdentity &&
-      settings.brandTone?.trim() &&
-      settings.brandColors?.trim() &&
-      settings.brandDos?.trim() &&
-      settings.brandDonts?.trim(),
-  );
+  // ponytail: gleiche Regel wie isBrandProfileComplete — Website ersetzt keinen Brauereinamen
+  return isBrandProfileComplete({
+    brandProfileMode: settings.brandProfileMode ?? "undecided",
+    brandInstagramUrl: "",
+    brandWebsiteUrl: settings.brandWebsiteUrl ?? "",
+    brandProfileSource: "manual",
+    brandLockLevel: "strict",
+    breweryName: settings.breweryName ?? "",
+    brandTone: settings.brandTone ?? "",
+    brandColors: settings.brandColors ?? "",
+    brandDos: settings.brandDos ?? "",
+    brandDonts: settings.brandDonts ?? "",
+    brandReferenceImageUrls: [],
+    brandLabelReferenceUrl: "",
+    brandHeadlineFontName: "",
+    brandFontFileUrl: "",
+    brandFontWeight: "700",
+  });
 }
 
 /** „Kampagnenbild mit Text“ nur mit aktivem, ausgefülltem Markenprofil (nicht Modus „ohne Profil“). */
@@ -125,14 +133,7 @@ export function canUseCampaignWithTextProfile(profile: BrandProfile): boolean {
 /** Sichtbar „Markenstil aktiv“ — gleiche Logik wie Markenprofil-Ansicht (Textprofil), unabhängig vom Referenzbild. */
 export function isBrandProfileActive(profile: BrandProfile): boolean {
   if (profile.brandProfileMode === "skip" || profile.brandProfileMode === "undecided") return false;
-  if (isBrandProfileComplete(profile)) return true;
-  return Boolean(
-    profile.brandTone &&
-      profile.brandColors &&
-      profile.brandDos &&
-      profile.brandDonts &&
-      (profile.breweryName || profile.brandWebsiteUrl),
-  );
+  return isBrandProfileComplete(profile);
 }
 
 /** Entfernt gespeichertes Markenprofil und schaltet auf generische Generierung (Modus „skip“). */

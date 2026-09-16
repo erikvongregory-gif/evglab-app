@@ -31,6 +31,8 @@ export type DashboardHomeSummary = {
   billingStatus: string;
   plan: string | null;
   degradedBilling?: boolean;
+  /** Dauerhafter Tagesverbrauch aus generation_jobs (überlebt Mediathek-Löschen). */
+  tokenUsageByDay?: { date: string; tokens: number }[];
 };
 
 export type DashboardHomeSettings = {
@@ -129,12 +131,14 @@ export function tokenCostForMedia(item: DashboardHomeMediaItem) {
   return calculateGenerationTokenCost({ resolution: item.resolution, variantCount: 1 });
 }
 
-export type ChargesTotalSource = "unique-charge-numbers" | "mediathek-entries" | "estimated-from-counter";
+export type ChargesTotalSource = "summary-total" | "unique-charge-numbers" | "mediathek-entries" | "estimated-from-counter";
 
 export function chargesTotalSource(
   summary: DashboardHomeSummary | null,
   media: DashboardHomeMediaItem[],
 ): ChargesTotalSource {
+  if (typeof summary?.chargesTotal === "number") return "summary-total";
+
   const chargeNumbers = media
     .map((m) => m.generation?.chargeNumber)
     .filter((n): n is number => typeof n === "number" && n >= 1);
@@ -147,6 +151,11 @@ export function chargesTotalSource(
 
 export function describeChargesTotalKpi(summary: DashboardHomeSummary | null, media: DashboardHomeMediaItem[]) {
   switch (chargesTotalSource(summary, media)) {
+    case "summary-total":
+      return {
+        label: "Generierungen gesamt",
+        subtitle: "Abgeschlossene Generierungen",
+      };
     case "unique-charge-numbers":
       return {
         label: "Generierungen gesamt",
@@ -191,6 +200,25 @@ export function generationModeLabel(
   }
 }
 
+function utcDayKey(ms: number) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+function fillDailyBuckets(buckets: Map<string, number>, range: TokenRangeKey) {
+  if (buckets.size === 0) return { points: [] as { date: string; tokens: number }[], total: 0 };
+  const days = TOKEN_RANGE_DAYS[range];
+  const end = new Date();
+  end.setUTCHours(0, 0, 0, 0);
+  const points: { date: string; tokens: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const ms = end.getTime() - i * 86_400_000;
+    const date = utcDayKey(ms);
+    points.push({ date, tokens: buckets.get(date) ?? 0 });
+  }
+  const total = points.reduce((sum, p) => sum + p.tokens, 0);
+  return { points, total };
+}
+
 export function aggregateTokenUsage(media: DashboardHomeMediaItem[], range: TokenRangeKey) {
   const days = TOKEN_RANGE_DAYS[range];
   const cutoff = Date.now() - days * 86_400_000;
@@ -203,22 +231,50 @@ export function aggregateTokenUsage(media: DashboardHomeMediaItem[], range: Toke
     buckets.set(key, (buckets.get(key) ?? 0) + tokenCostForMedia(item));
   }
 
-  const points = [...buckets.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, tokens]) => ({ date, tokens }));
-
-  const total = points.reduce((sum, p) => sum + p.tokens, 0);
-  return { points, total };
+  return fillDailyBuckets(buckets, range);
 }
 
+/** Aggregiert serverseitigen Tagesverbrauch (generation_jobs) und füllt Lücken mit 0. */
+export function aggregateTokenUsageFromDays(
+  usageByDay: { date: string; tokens: number }[],
+  range: TokenRangeKey,
+) {
+  const days = TOKEN_RANGE_DAYS[range];
+  const cutoffKey = utcDayKey(Date.now() - days * 86_400_000);
+  const buckets = new Map<string, number>();
+  for (const row of usageByDay) {
+    if (!row.date || row.date < cutoffKey) continue;
+    buckets.set(row.date, (buckets.get(row.date) ?? 0) + (Number.isFinite(row.tokens) ? row.tokens : 0));
+  }
+  return fillDailyBuckets(buckets, range);
+}
+
+function historySpanDays(timestamps: number[]) {
+  if (timestamps.length === 0) return 0;
+  const oldest = Math.min(...timestamps);
+  return (Date.now() - oldest) / 86_400_000;
+}
+
+/** Freischaltung der Zeitraum-Tabs: 30d immer, 90d ab ~1 Monat Historie, 365d ab ~3 Monaten. */
+export function availableTokenRanges(media: DashboardHomeMediaItem[], usageByDay?: { date: string; tokens: number }[]) {
+  const fromJobs = (usageByDay ?? [])
+    .filter((r) => r.tokens > 0)
+    .map((r) => new Date(r.date).getTime())
+    .filter(Number.isFinite);
+  const fromMedia = media
+    .map((item) => new Date(item.createdAt).getTime())
+    .filter(Number.isFinite);
+  const spanDays = historySpanDays(fromJobs.length ? fromJobs : fromMedia);
+  if (spanDays <= 0 && fromJobs.length === 0 && fromMedia.length === 0) return [] as TokenRangeKey[];
+  const keys: TokenRangeKey[] = ["30d"];
+  if (spanDays >= TOKEN_RANGE_DAYS["30d"]) keys.push("90d");
+  if (spanDays >= TOKEN_RANGE_DAYS["90d"]) keys.push("365d");
+  return keys;
+}
+
+/** @deprecated use availableTokenRanges */
 export function canOfferAllTokenRanges(media: DashboardHomeMediaItem[]) {
-  if (media.length === 0) return false;
-  const oldest = media.reduce((min, item) => {
-    const t = new Date(item.createdAt).getTime();
-    return Number.isFinite(t) && t < min ? t : min;
-  }, Date.now());
-  const spanDays = (Date.now() - oldest) / 86_400_000;
-  return spanDays >= TOKEN_RANGE_DAYS["365d"];
+  return availableTokenRanges(media).length > 1;
 }
 
 export function shouldShowTokenChart(points: { date: string; tokens: number }[]) {
@@ -299,7 +355,7 @@ export function chartPathsWithinBounds(
 export function missingBrandFields(settings: DashboardHomeSettings | null) {
   if (!settings || settings.brandProfileMode === "skip") return [] as string[];
   const missing: string[] = [];
-  if (!settings.breweryName?.trim() && !settings.brandWebsiteUrl?.trim()) missing.push("Brauerei / Website");
+  if (!settings.breweryName?.trim()) missing.push("Brauereiname");
   if (!settings.brandTone?.trim()) missing.push("Tonalität");
   if (!settings.brandColors?.trim()) missing.push("Markenfarben");
   if (!settings.brandDos?.trim()) missing.push("Dos");

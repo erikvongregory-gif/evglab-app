@@ -57,8 +57,8 @@ export async function GET() {
   const activeMembers = await client.from("workspace_members").select("user_id").eq("owner_id",user.id);
   const pendingInvites = await client.from("workspace_invites").select("id").eq("owner_id",user.id).gt("expires_at",new Date().toISOString());
   if(activeMembers.error || pendingInvites.error)return NextResponse.json({error:"Teamdaten konnten nicht geladen werden."},{status:503});
-  const team = [{status:"active"}, ...(activeMembers.data??[]).map(()=>({status:"active"})), ...(pendingInvites.data??[]).map(()=>({status:"invited"}))];
-  const activeCampaigns = media.length === 0 ? 0 : Math.min(6, Math.ceil(media.length / 5));
+  const activeMemberCount = 1 + (activeMembers.data ?? []).length;
+  const invitedCount = (pendingInvites.data ?? []).length;
 
   const sortedMedia = media.slice().sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   const mediaActivities = sortedMedia.slice(0, 6).map((item) => ({
@@ -69,7 +69,50 @@ export async function GET() {
     time: item.createdAt,
     color: "blue" as const,
   }));
-  const invitedCount = team.filter((member) => member.status === "invited").length;
+
+  // Verbrauchsstatistik aus generation_jobs — überlebt Mediathek-Löschen
+  const monthStart = new Date();
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(0, 0, 0, 0);
+  const usageCutoff = new Date(Date.now() - 365 * 86_400_000).toISOString();
+  const jobsQuery = await client
+    .from("generation_jobs")
+    .select("created_at,charged,status")
+    .eq("user_id", user.id)
+    .eq("status", "completed")
+    .gte("created_at", usageCutoff)
+    .limit(5000);
+  const completedJobs = jobsQuery.error ? [] : (jobsQuery.data ?? []);
+  const tokenUsageBuckets = new Map<string, number>();
+  let postsThisMonth = 0;
+  for (const job of completedJobs) {
+    const created = typeof job.created_at === "string" ? job.created_at : "";
+    if (!created) continue;
+    const day = created.slice(0, 10);
+    const tokens = typeof job.charged === "number" && job.charged >= 0 ? job.charged : 0;
+    tokenUsageBuckets.set(day, (tokenUsageBuckets.get(day) ?? 0) + tokens);
+    if (created >= monthStart.toISOString()) postsThisMonth += 1;
+  }
+  // Fallback nur wenn Jobs-Tabelle nicht lesbar — sonst 0 bei leerer Historie
+  if (jobsQuery.error) {
+    postsThisMonth = media.filter((item) => {
+      const d = new Date(item.createdAt);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length;
+  }
+  const tokenUsageByDay = jobsQuery.error
+    ? undefined
+    : [...tokenUsageBuckets.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, tokens]) => ({ date, tokens }));
+
+  const chargesCount = await client
+    .from("generation_jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("status", "completed");
+  const chargesTotal = chargesCount.error ? undefined : (chargesCount.count ?? 0);
 
   const activities = [
     ...mediaActivities,
@@ -91,22 +134,22 @@ export async function GET() {
 
   return NextResponse.json({
     summary: {
+      unlimited: isOwner,
       tokens: {
         monthly: billing?.monthly_tokens ?? 0,
         used: billing?.used_tokens ?? 0,
         remaining: Math.max((billing?.monthly_tokens ?? 0) - (billing?.used_tokens ?? 0), 0),
+        unlimited: isOwner,
       },
-      postsThisMonth: media.filter((item) => {
-        const d = new Date(item.createdAt);
-        const now = new Date();
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      }).length,
-      activeCampaigns,
-      teamMembers: team.length,
+      periodEnd: billing?.current_period_end ?? null,
+      postsThisMonth,
+      chargesTotal,
+      teamMembers: activeMemberCount,
       openInvites: invitedCount,
       billingStatus: billing?.subscription_status ?? "none",
       plan: billing?.plan ?? null,
       degradedBilling,
+      ...(tokenUsageByDay ? { tokenUsageByDay } : {}),
     },
     activities,
   });

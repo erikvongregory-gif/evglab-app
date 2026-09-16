@@ -12,10 +12,11 @@ import {
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
 import {
   aggregateTokenUsage,
+  aggregateTokenUsageFromDays,
+  availableTokenRanges,
   brandProfileActiveFromSettings,
   brandStatusLabel,
   buildChartPaths,
-  canOfferAllTokenRanges,
   chartHasVariation,
   deriveChargesTotal,
   describeChargesTotalKpi,
@@ -51,6 +52,7 @@ export type DashboardHomeViewProps = {
   summaryError?: string | null;
   media: DashboardHomeMediaItem[];
   mediaLoaded: boolean;
+  mediaError?: string | null;
   settings: DashboardHomeSettings | null;
   settingsLoaded: boolean;
   profileName: string;
@@ -60,6 +62,7 @@ export type DashboardHomeViewProps = {
   onOpenTab: (tab: DashboardTab) => void;
   onOpenBrandSetup: () => void;
   onRetrySummary?: () => void;
+  onRetryMedia?: () => void;
 };
 
 function KpiSkeleton() {
@@ -101,6 +104,7 @@ export function DashboardHomeView({
   summaryError,
   media,
   mediaLoaded,
+  mediaError,
   settings,
   settingsLoaded,
   profileName,
@@ -110,31 +114,41 @@ export function DashboardHomeView({
   onOpenTab,
   onOpenBrandSetup,
   onRetrySummary,
+  onRetryMedia,
 }: DashboardHomeViewProps) {
   const [tokenRange, setTokenRange] = useState<TokenRangeKey>("30d");
 
   const brewery = breweryName || profileName || "deine Marke";
   const unlimited = Boolean(summary?.unlimited || summary?.tokens.unlimited);
-  const remaining = summary?.tokens.remaining ?? null;
+  const billingDegraded = Boolean(summary?.degradedBilling);
+  const remaining = billingDegraded ? null : (summary?.tokens.remaining ?? null);
   const monthly = summary?.tokens.monthly ?? 0;
-  const hasActivePlan = unlimited || hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus);
+  const hasActivePlan =
+    unlimited ||
+    (!billingDegraded && hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
   const createHref = hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing";
-  const planLabel = planLabelFromKey(summary?.plan ?? null, unlimited);
+  const planLabel = billingDegraded
+    ? "Abo-Status unbekannt"
+    : planLabelFromKey(summary?.plan ?? null, unlimited);
   const periodEndLabel = formatPeriodEnd(summary?.periodEnd);
   const showBrandCallout =
     hasActivePlan && settingsLoaded && !brandProfileComplete && brandProfileMode !== "skip";
 
   /* One dominant primary CTA for the view */
-  const primaryHref = !hasActivePlan
-    ? "/dashboard?tab=pricing"
-    : !brandProfileComplete && brandProfileMode !== "skip"
-      ? null
-      : "/inhalte-erstellen";
-  const primaryLabel = !hasActivePlan
-    ? "Tarif wählen"
-    : !brandProfileComplete && brandProfileMode !== "skip"
-      ? null
-      : "Motiv generieren";
+  const primaryHref = billingDegraded
+    ? null
+    : !hasActivePlan
+      ? "/dashboard?tab=pricing"
+      : !brandProfileComplete && brandProfileMode !== "skip"
+        ? null
+        : "/inhalte-erstellen";
+  const primaryLabel = billingDegraded
+    ? null
+    : !hasActivePlan
+      ? "Tarif wählen"
+      : !brandProfileComplete && brandProfileMode !== "skip"
+        ? null
+        : "Motiv generieren";
 
   const motifsThisMonth = summary?.postsThisMonth;
   const chargesTotal = summaryLoaded ? deriveChargesTotal(summary, media) : null;
@@ -150,11 +164,16 @@ export function DashboardHomeView({
   );
   const recentGenerations = sortedMedia.slice(0, 8);
 
-  const showRangeTabs = canOfferAllTokenRanges(sortedMedia);
-  const activeRange = showRangeTabs ? tokenRange : "30d";
+  const rangeKeys = availableTokenRanges(sortedMedia, summary?.tokenUsageByDay);
+  const showRangeTabs = rangeKeys.length > 1;
+  const activeRange = rangeKeys.includes(tokenRange) ? tokenRange : (rangeKeys[0] ?? "30d");
+  const usageFromJobs = Array.isArray(summary?.tokenUsageByDay);
   const tokenSeries = useMemo(
-    () => aggregateTokenUsage(sortedMedia, activeRange),
-    [sortedMedia, activeRange],
+    () =>
+      usageFromJobs
+        ? aggregateTokenUsageFromDays(summary?.tokenUsageByDay ?? [], activeRange)
+        : aggregateTokenUsage(sortedMedia, activeRange),
+    [usageFromJobs, summary?.tokenUsageByDay, sortedMedia, activeRange],
   );
   const chart = useMemo(() => buildChartPaths(tokenSeries.points), [tokenSeries.points]);
   const showChart = shouldShowTokenChart(tokenSeries.points);
@@ -169,7 +188,10 @@ export function DashboardHomeView({
     .slice(0, 6);
 
   const loadingKpis = !summaryLoaded;
-  const loadingChart = !mediaLoaded;
+  const loadingChart = usageFromJobs ? !summaryLoaded : !mediaLoaded;
+  const billingError =
+    summaryError ||
+    (billingDegraded ? "Abodaten konnten nicht geladen werden. Tarif und Tokens sind vorübergehend unbekannt." : null);
 
   return (
     <div className="stu-dash-home">
@@ -207,9 +229,9 @@ export function DashboardHomeView({
         </div>
       ) : null}
 
-      {summaryError ? (
+      {billingError ? (
         <StudioUiCard padding="md" className="stu-dash-home__enter">
-          <p style={{ margin: 0, color: "var(--t2)", fontSize: 13 }}>{summaryError}</p>
+          <p style={{ margin: 0, color: "var(--t2)", fontSize: 13 }}>{billingError}</p>
           {onRetrySummary ? (
             <StudioUiButton type="button" variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={onRetrySummary}>
               Erneut laden
@@ -337,11 +359,15 @@ export function DashboardHomeView({
             <div className="stu-dash-home__card-head">
               <div>
                 <h2 className="stu-dash-home__card-title">Tokens pro Tag</h2>
-                <p className="stu-dash-home__card-sub">Täglicher Token-Verbrauch aus der Mediathek</p>
+                <p className="stu-dash-home__card-sub">
+                  {usageFromJobs
+                    ? "Täglicher Token-Verbrauch aus dem Generierungsverlauf"
+                    : "Täglicher Token-Verbrauch aus der Mediathek"}
+                </p>
               </div>
               {showRangeTabs ? (
                 <div className="stu-dash-home__range-tabs" role="group" aria-label="Zeitraum">
-                  {(["30d", "90d", "365d"] as const).map((key) => (
+                  {rangeKeys.map((key) => (
                     <button
                       key={key}
                       type="button"
@@ -369,6 +395,20 @@ export function DashboardHomeView({
             {loadingChart ? (
               <div className="stu-dash-home__chart-empty">
                 <StudioUiSkeleton style={{ width: "100%", height: 160, borderRadius: 8 }} />
+              </div>
+            ) : mediaError && !usageFromJobs ? (
+              <div className="stu-dash-home__chart-empty" role="alert">
+                <div>
+                  <strong style={{ color: "var(--t1)", display: "block", marginBottom: 4, fontSize: 13 }}>
+                    Verlauf konnte nicht geladen werden
+                  </strong>
+                  <p style={{ margin: 0, color: "var(--t2)", fontSize: 12.5, lineHeight: 1.45 }}>{mediaError}</p>
+                  {onRetryMedia ? (
+                    <StudioUiButton type="button" variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={onRetryMedia}>
+                      Erneut laden
+                    </StudioUiButton>
+                  ) : null}
+                </div>
               </div>
             ) : !showChart ? (
               <div className="stu-dash-home__chart-empty" role="status">
@@ -461,6 +501,15 @@ export function DashboardHomeView({
                 <StudioUiSkeleton style={{ width: "100%", height: 48, marginBottom: 8 }} />
                 <StudioUiSkeleton style={{ width: "100%", height: 48, marginBottom: 8 }} />
                 <StudioUiSkeleton style={{ width: "100%", height: 48 }} />
+              </div>
+            ) : mediaError ? (
+              <div className="stu-dash-home__chart-empty" style={{ margin: 12 }} role="alert">
+                <p style={{ margin: 0 }}>{mediaError}</p>
+                {onRetryMedia ? (
+                  <StudioUiButton type="button" variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={onRetryMedia}>
+                    Erneut laden
+                  </StudioUiButton>
+                ) : null}
               </div>
             ) : recentGenerations.length === 0 ? (
               <div className="stu-dash-home__chart-empty" style={{ margin: 12 }}>

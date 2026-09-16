@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildBrandProfilePromptContext,
   buildGenericBrandProfilePatch,
+  isBrandProfileComplete,
+  isBrandProfileCompleteFromSettings,
   type BrandProfile,
 } from "@/lib/dashboard/brandProfile";
 import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
@@ -102,5 +104,38 @@ describe("buildBrandProfilePromptContext", () => {
     const context = buildBrandProfilePromptContext(makeProfile({ brandLockLevel: "loose" }));
     expect(context).toContain("LOOSE lock");
     expect(context).toContain('Only the "never" rules above are binding');
+  });
+});
+
+describe("isBrandProfileComplete alignment", () => {
+  it("Website allein reicht nicht — weder Server noch Settings-Adapter", () => {
+    const profile = makeProfile({ breweryName: "" });
+    expect(isBrandProfileComplete(profile)).toBe(false);
+    expect(
+      isBrandProfileCompleteFromSettings({
+        brandProfileMode: "guided",
+        breweryName: "",
+        brandWebsiteUrl: "https://brauerei.de",
+        brandTone: profile.brandTone,
+        brandColors: profile.brandColors,
+        brandDos: profile.brandDos,
+        brandDonts: profile.brandDonts,
+      }),
+    ).toBe(false);
+  });
+
+  it("Brauereiname + Felder gelten als complete", () => {
+    expect(isBrandProfileComplete(makeProfile())).toBe(true);
+    expect(
+      isBrandProfileCompleteFromSettings({
+        brandProfileMode: "guided",
+        breweryName: "Falter",
+        brandWebsiteUrl: "",
+        brandTone: "a",
+        brandColors: "b",
+        brandDos: "c",
+        brandDonts: "d",
+      }),
+    ).toBe(true);
   });
 });

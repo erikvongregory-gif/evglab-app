@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   aggregateTokenUsage,
+  aggregateTokenUsageFromDays,
+  availableTokenRanges,
   buildChartPaths,
   chartHasVariation,
   chartPathsWithinBounds,
   describeChargesTotalKpi,
   formatChartTextAlternative,
   shouldShowTokenChart,
+  TOKEN_RANGE_DAYS,
   tokenCostForMedia,
   tokensAvailablePct,
   type DashboardHomeMediaItem,
@@ -31,7 +34,7 @@ describe("dashboard-home-utils", () => {
       expect(result.total).toBe(0);
     });
 
-    it("aggregiert einen einzelnen Datenpunkt", () => {
+    it("füllt Lücken mit Nullen über den gesamten Zeitraum", () => {
       const items = [
         media({
           id: "a",
@@ -40,29 +43,39 @@ describe("dashboard-home-utils", () => {
         }),
       ];
       const result = aggregateTokenUsage(items, "30d");
-      expect(result.points).toHaveLength(1);
-      expect(result.points[0]!.tokens).toBe(25);
+      expect(result.points).toHaveLength(TOKEN_RANGE_DAYS["30d"]);
       expect(result.total).toBe(25);
+      expect(result.points.some((p) => p.tokens === 25)).toBe(true);
+      expect(result.points.filter((p) => p.tokens === 0).length).toBe(TOKEN_RANGE_DAYS["30d"] - 1);
     });
 
     it("summiert mehrere Einträge am selben Tag", () => {
-      const day = "2026-08-20T12:00:00.000Z";
+      const day = new Date().toISOString();
       const items = [
         media({ id: "a", createdAt: day, generation: { tokenCost: 10 } }),
         media({ id: "b", createdAt: day, generation: { tokenCost: 15 } }),
       ];
       const result = aggregateTokenUsage(items, "30d");
-      expect(result.points).toHaveLength(1);
-      expect(result.points[0]!.tokens).toBe(25);
+      expect(result.total).toBe(25);
+      expect(result.points.filter((p) => p.tokens > 0)).toHaveLength(1);
     });
 
-    it("sortiert unsortierte Einträge chronologisch", () => {
+    it("erhält chronologische Tagesreihenfolge mit Abstand", () => {
+      const recent = new Date();
+      const older = new Date(Date.now() - 2 * 86_400_000);
       const items = [
-        media({ id: "b", createdAt: "2026-08-22T12:00:00.000Z", generation: { tokenCost: 20 } }),
-        media({ id: "a", createdAt: "2026-08-20T12:00:00.000Z", generation: { tokenCost: 10 } }),
+        media({ id: "b", createdAt: recent.toISOString(), generation: { tokenCost: 20 } }),
+        media({ id: "a", createdAt: older.toISOString(), generation: { tokenCost: 10 } }),
       ];
       const result = aggregateTokenUsage(items, "30d");
-      expect(result.points.map((p) => p.date)).toEqual(["2026-08-20", "2026-08-22"]);
+      const active = result.points.filter((p) => p.tokens > 0);
+      expect(active).toHaveLength(2);
+      expect(active[0]!.tokens).toBe(10);
+      expect(active[1]!.tokens).toBe(20);
+      // Zwei Tage Abstand → ein Null-Tag dazwischen
+      const i0 = result.points.findIndex((p) => p.date === active[0]!.date);
+      const i1 = result.points.findIndex((p) => p.date === active[1]!.date);
+      expect(i1 - i0).toBe(2);
     });
 
     it("ignoriert ungültiges oder fehlendes Datum", () => {
@@ -71,7 +84,6 @@ describe("dashboard-home-utils", () => {
         media({ id: "good", createdAt: new Date().toISOString(), generation: { tokenCost: 10 } }),
       ];
       const result = aggregateTokenUsage(items, "30d");
-      expect(result.points).toHaveLength(1);
       expect(result.total).toBe(10);
     });
 
@@ -86,17 +98,9 @@ describe("dashboard-home-utils", () => {
       expect(result.total).toBe(5);
     });
 
-    it("behandelt konstante Werte", () => {
-      const items = Array.from({ length: 3 }).map((_, i) =>
-        media({
-          id: `m-${i}`,
-          createdAt: new Date(Date.now() - i * 86_400_000).toISOString(),
-          generation: { tokenCost: 40 },
-        }),
-      );
-      const result = aggregateTokenUsage(items, "30d");
-      expect(result.points.every((p) => p.tokens === 40)).toBe(true);
-      expect(chartHasVariation(result.points)).toBe(false);
+    it("erkennt konstante Werte über alle Tage", () => {
+      const flat = Array.from({ length: 30 }, () => ({ date: "x", tokens: 40 }));
+      expect(chartHasVariation(flat)).toBe(false);
     });
 
     it("summiert sehr große Werte ohne NaN", () => {
@@ -107,6 +111,33 @@ describe("dashboard-home-utils", () => {
       const result = aggregateTokenUsage(items, "30d");
       expect(result.total).toBe(3_000_000);
       expect(Number.isFinite(result.total)).toBe(true);
+    });
+  });
+
+  describe("aggregateTokenUsageFromDays", () => {
+    it("füllt Lücken aus Job-Buckets", () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const result = aggregateTokenUsageFromDays([{ date: today, tokens: 12 }], "30d");
+      expect(result.points).toHaveLength(30);
+      expect(result.total).toBe(12);
+    });
+  });
+
+  describe("availableTokenRanges", () => {
+    it("schaltet 90d frei ab 30 Tagen Historie", () => {
+      const items = [
+        media({ id: "old", createdAt: new Date(Date.now() - 40 * 86_400_000).toISOString() }),
+        media({ id: "new", createdAt: new Date().toISOString() }),
+      ];
+      expect(availableTokenRanges(items)).toEqual(["30d", "90d"]);
+    });
+
+    it("schaltet 365d frei ab 90 Tagen Historie", () => {
+      const items = [
+        media({ id: "old", createdAt: new Date(Date.now() - 100 * 86_400_000).toISOString() }),
+        media({ id: "new", createdAt: new Date().toISOString() }),
+      ];
+      expect(availableTokenRanges(items)).toEqual(["30d", "90d", "365d"]);
     });
   });
 
@@ -219,7 +250,7 @@ describe("dashboard-home-utils", () => {
   });
 
   describe("describeChargesTotalKpi", () => {
-    it("beschreibt eindeutige Chargennummern korrekt", () => {
+    it("bevorzugt Summary-Gesamtzahl aus Jobs", () => {
       const summary = { chargesTotal: 3 } as DashboardHomeSummary;
       const items = [
         media({ id: "a", createdAt: new Date().toISOString(), generation: { chargeNumber: 1 } }),
@@ -227,12 +258,12 @@ describe("dashboard-home-utils", () => {
       ];
       expect(describeChargesTotalKpi(summary, items)).toEqual({
         label: "Generierungen gesamt",
-        subtitle: "Eindeutige Chargennummern in der Mediathek",
+        subtitle: "Abgeschlossene Generierungen",
       });
     });
 
     it("beschreibt Mediathek-Fallback ohne Brauerei-Metapher", () => {
-      const summary = { chargesTotal: 2 } as DashboardHomeSummary;
+      const summary = {} as DashboardHomeSummary;
       const items = [
         media({ id: "a", createdAt: new Date().toISOString() }),
         media({ id: "b", createdAt: new Date().toISOString() }),

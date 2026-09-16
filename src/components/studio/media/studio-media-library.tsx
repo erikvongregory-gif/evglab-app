@@ -75,6 +75,8 @@ export type StudioMediaLibraryProps = {
   P: StudioPalette;
   items: MediaItem[];
   loaded?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
   onItemsChange: (next: MediaItem[]) => void;
   hasActivePlan?: boolean;
   initialQuery?: string;
@@ -85,6 +87,8 @@ export type StudioMediaLibraryProps = {
 export function StudioMediaLibrary({
   items,
   loaded = true,
+  loadError = null,
+  onRetry,
   onItemsChange,
   hasActivePlan = true,
   initialQuery = "",
@@ -248,6 +252,21 @@ export function StudioMediaLibrary({
                 <div className="studio-media-skeleton-card__line studio-media-skeleton-card__line--short" />
               </div>
             ))}
+          </div>
+        ) : loadError ? (
+          <div className="studio-media-empty" role="alert">
+            <div className="studio-media-empty__icon" aria-hidden>
+              <StudioIcon name="image" size={18} />
+            </div>
+            <h2 className="studio-media-empty__title">Mediathek nicht erreichbar</h2>
+            <p className="studio-media-empty__text">{loadError}</p>
+            {onRetry ? (
+              <div className="studio-media-empty__actions">
+                <StudioButton type="button" variant="ghost" onClick={onRetry}>
+                  Erneut laden
+                </StudioButton>
+              </div>
+            ) : null}
           </div>
         ) : items.length === 0 ? (
           <div className="studio-media-empty">
