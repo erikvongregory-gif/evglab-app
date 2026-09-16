@@ -1,5 +1,6 @@
 import { reserveGeneration, finishGeneration, saveGenerationProgress, resumeGenerationIfPresent, buildGenerationBillingSnapshot } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
+import { withAdultSceneContext } from "@/lib/prompts/imageSceneContext";
 import Anthropic from "@anthropic-ai/sdk";
 import {
   ProviderError,
@@ -178,7 +179,7 @@ export async function POST(req: Request) {
     } else {
       prompt = appendCopySpaceDirective(compiled.image_prompt);
     }
-    if (prompt.length > MAX_PROMPT_CHARS) prompt = prompt.slice(0, MAX_PROMPT_CHARS);
+    prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS);
 
     const referenceImages = [visionReference, ...extraRefs, shapeReference].filter(
       (ref): ref is OpenAiReferenceImage => Boolean(ref),
@@ -291,7 +292,7 @@ export async function POST(req: Request) {
         if (isProviderError(reason)) {
           providerFailures.push(reason);
           errors.push(reason.classified.userMessage);
-          if (!reason.classified.retryable && reason.classified.providerFault) break;
+          if (!reason.classified.retryable) break;
           continue;
         }
         errors.push(reason instanceof Error ? reason.message : `Variante ${i + 1}: Unbekannter Fehler.`);
@@ -299,10 +300,14 @@ export async function POST(req: Request) {
     }
 
     if (images.length === 0) {
-      await finishGeneration(job, 0, { error: errors[0] ?? "Generierung fehlgeschlagen.", images: [] });
+      const failure = providerFailures[0]?.classified;
+      const message = failure?.code === "provider_content_rejected"
+        ? `${failure.userMessage} Für diesen Auftrag wurden keine Tokens berechnet.`
+        : errors[0] ?? "Generierung fehlgeschlagen.";
+      await finishGeneration(job, 0, { error: message, code: failure?.code, images: [], billing: { consumed: 0 } });
       if (providerFailures.length > 0) {
         logProviderFailure(providerFailures[0].classified, { label: "inhalte-erstellen-social-post" });
-        return providerErrorResponse(providerFailures[0].classified);
+        return providerErrorResponse({ ...providerFailures[0].classified, userMessage: message });
       }
       return NextResponse.json(
         { error: errors[0] ?? "Social-Post konnte nicht generiert werden." },

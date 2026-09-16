@@ -620,6 +620,8 @@ export function InhalteErstellenStudio({
   }
 
   async function generateSocialPost() {
+    const previousImages = images;
+    const previousPreviewIndex = previewIndex;
     setLoading(true);
     setError("");
     setImages(Array.from({ length: variantCount }, () => ({} as ImageResponse)));
@@ -767,14 +769,15 @@ export function InhalteErstellenStudio({
 
       if (data.partial && data.partialErrors?.length) {
         setError(
-          `${resultImages.length} von ${data.expectedVariants ?? variantCount} Variante(n) erstellt — manche Generierungen wurden abgelehnt.`,
+          `${resultImages.length} von ${data.expectedVariants ?? variantCount} Variante(n) erstellt. Nur erstellte Bilder werden berechnet. ${data.partialErrors[0]}`,
         );
       }
       setGenerationStep("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Social-Post-Generierung fehlgeschlagen.");
       setGenerationStep("");
-      setImages((prev) => prev.filter((img) => Boolean(img.url || img.b64_json)));
+      setImages(previousImages);
+      setPreviewIndex(previousPreviewIndex);
     } finally {
       setLoading(false);
     }
@@ -785,6 +788,8 @@ export function InhalteErstellenStudio({
       await generateSocialPost();
       return;
     }
+    const previousImages = images;
+    const previousPreviewIndex = previewIndex;
     setLoading(true);
     setError("");
     setImages(Array.from({ length: variantCount }, () => ({} as ImageResponse)));
@@ -1020,14 +1025,15 @@ export function InhalteErstellenStudio({
 
       if (data.partial && data.partialErrors?.length) {
         setError(
-          `${resultImages.length} von ${data.expectedVariants ?? variantCount} Variante(n) erstellt — manche Generierungen wurden abgelehnt.`,
+          `${resultImages.length} von ${data.expectedVariants ?? variantCount} Variante(n) erstellt. Nur erstellte Bilder werden berechnet. ${data.partialErrors[0]}`,
         );
       }
       setGenerationStep("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Generierung fehlgeschlagen.");
       setGenerationStep("");
-      setImages((prev) => prev.filter((img) => Boolean(img.url || img.b64_json)));
+      setImages(previousImages);
+      setPreviewIndex(previousPreviewIndex);
     } finally {
       setLoading(false);
     }
@@ -1415,7 +1421,7 @@ export function InhalteErstellenStudio({
               onChange={(e) => setUserPrompt(e.target.value)}
             />
             <span className="studio-create-field__hint">
-              Freitext-Brief — wird strukturiert, mit Marken-/Flaschenwissen geprüft und erst dann an das Bildmodell gesendet.
+              Erwachsene ohne konkrete Altersangabe werden ab 25 Jahren dargestellt. Motiv, Kleidung und Stimmung bleiben Teil deiner Beschreibung.
             </span>
             <button
               type="button"

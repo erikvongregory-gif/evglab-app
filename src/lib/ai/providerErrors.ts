@@ -142,7 +142,7 @@ export function classifyProviderError(input: {
       ...base,
       code: "provider_content_rejected",
       userMessage:
-        "Der Inhaltsfilter des Bildmodells hat diese Anfrage blockiert. Formuliere den Prompt etwas neutraler oder wähle ein anderes Motiv.",
+        "Das Bildmodell konnte dieses Motiv wegen seiner Inhaltsprüfung nicht erstellen. Der genaue Auslöser ist nicht bekannt; auch Referenzbilder werden geprüft. Deine Eingaben bleiben erhalten. Prüfe die Motivbeschreibung und die gewählten Referenzen.",
       httpStatus: 422,
       retryable: false,
       providerFault: false,
