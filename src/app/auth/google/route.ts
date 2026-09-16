@@ -27,10 +27,9 @@ export async function GET(request: Request) {
   const { origin, searchParams } = new URL(request.url);
   const appOrigin = getAppBaseUrlOrigin(origin);
   const safeNext = normalizeNextPath(searchParams.get("next"));
-  const redirectTo =
-    safeNext === "/dashboard"
-      ? `${appOrigin}/auth/callback`
-      : `${appOrigin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
+  // Always include next so a Site-URL fallback (?code= on /) cannot be
+  // misclassified as password recovery by authEntryRedirect defaults.
+  const redirectTo = `${appOrigin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
 
   if (!isSupabaseConfigured()) {
     return createNoStoreRedirect(`${appOrigin}/anmelden?error=config`, requestId);

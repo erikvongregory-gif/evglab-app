@@ -3,11 +3,11 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function defaultNextForAuthType(type: string | undefined, hasCodeOnly: boolean): string {
+function defaultNextForAuthType(type: string | undefined): string {
   if (type === "recovery") return "/passwort-zuruecksetzen";
   if (type === "signup" || type === "email") return "/anmelden?notice=confirmed";
   if (type === "magiclink" || type === "invite") return "/dashboard";
-  if (hasCodeOnly) return "/passwort-zuruecksetzen";
+  // Bare ?code= (no type) is OAuth/PKCE — never treat as password recovery.
   return "/dashboard";
 }
 
@@ -27,7 +27,7 @@ export function resolveAuthCallbackRedirect(
   if (type) q.set("type", type);
 
   const explicitNext = first(searchParams.next);
-  const next = explicitNext ?? defaultNextForAuthType(type, Boolean(code && !type));
+  const next = explicitNext ?? defaultNextForAuthType(type);
   q.set("next", next);
 
   return `/auth/callback?${q.toString()}`;
