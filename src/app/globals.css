@@ -13,6 +13,8 @@
 @import "../styles/studio-search.css";
 @import "../styles/studio-beer-create.css";
 @import "../styles/studio-primitives.css";
+@import "../styles/studio-dashboard-home.css";
+@import "../styles/studio-mobile.css";
 @custom-variant dark (&:where(.dark, .dark *));
 /* Explizit alle TS/TSX unter src scannen (u. a. components/ui – Neon-Button-Klassen) */
 @source "..";

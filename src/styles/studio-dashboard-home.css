@@ -179,6 +179,10 @@
   color: var(--t2);
 }
 
+.stu-dash-home__recent-count--mobile {
+  display: none;
+}
+
 .stu-dash-home__card-head {
   display: flex;
   align-items: flex-start;
@@ -637,8 +641,7 @@
 }
 
 @media (max-width: 1023px) {
-  .evg-studio .evg-shell-topbar-search--desktop,
-  .evg-studio .evg-shell-topbar-search-trigger {
+  .evg-studio .evg-shell-topbar-search--desktop {
     display: none !important;
   }
 }

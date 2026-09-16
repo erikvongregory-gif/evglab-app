@@ -172,13 +172,14 @@ export function AdminDashboard() {
   const usersView = (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <input
+        className="studio-admin-search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Suche nach E-Mail, Rolle, Brauerei..."
         style={inputStyle}
       />
-      <div style={tableWrapStyle}>
-        <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
+      <div className="studio-admin-table-wrap" style={tableWrapStyle}>
+        <table className="studio-admin-table" style={{ minWidth: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--bg-2, #201f1d)" }}>
               <th style={thStyle}>E-Mail</th>
@@ -190,10 +191,10 @@ export function AdminDashboard() {
           <tbody>
             {users.map((user) => (
               <tr key={user.id}>
-                <td style={tdStyle}>{user.email}</td>
-                <td style={tdStyle}>{user.role}</td>
-                <td style={tdStyle}>{user.brewery || "—"}</td>
-                <td style={tdStyle}>
+                <td data-label="E-Mail" style={tdStyle}>{user.email}</td>
+                <td data-label="Rolle" style={tdStyle}>{user.role}</td>
+                <td data-label="Brauerei" style={tdStyle}>{user.brewery || "—"}</td>
+                <td data-label="Aktion" style={tdStyle}>
                   <StudioButton
                     size="sm"
                     variant="soft"
@@ -224,8 +225,8 @@ export function AdminDashboard() {
   );
 
   const billingView = (
-    <div style={tableWrapStyle}>
-      <table style={{ minWidth: "100%", borderCollapse: "collapse" }}>
+    <div className="studio-admin-table-wrap" style={tableWrapStyle}>
+      <table className="studio-admin-table" style={{ minWidth: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr style={{ background: "var(--bg-2, #201f1d)" }}>
             <th style={thStyle}>User ID</th>
@@ -242,21 +243,22 @@ export function AdminDashboard() {
         <tbody>
           {billingRows.map((row) => (
             <tr key={row.userId}>
-              <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: 11 }}>{row.userId}</td>
-              <td style={tdStyle}>{row.email || "—"}</td>
-              <td style={tdStyle}>{row.plan ?? "—"}</td>
-              <td style={tdStyle}>{row.monthlyTokens.toLocaleString("de-DE")}</td>
-              <td style={tdStyle}>{row.usedTokens.toLocaleString("de-DE")}</td>
-              <td style={{ ...tdStyle, fontWeight: 600, color: "var(--acc, #c9a227)" }}>
+              <td data-label="User ID" style={{ ...tdStyle, fontFamily: "monospace", fontSize: 11 }}>{row.userId}</td>
+              <td data-label="E-Mail" style={tdStyle}>{row.email || "—"}</td>
+              <td data-label="Plan" style={tdStyle}>{row.plan ?? "—"}</td>
+              <td data-label="Monatlich" style={tdStyle}>{row.monthlyTokens.toLocaleString("de-DE")}</td>
+              <td data-label="Verbraucht" style={tdStyle}>{row.usedTokens.toLocaleString("de-DE")}</td>
+              <td data-label="Verfügbar" style={{ ...tdStyle, fontWeight: 600, color: "var(--acc, #c9a227)" }}>
                 {row.remainingTokens.toLocaleString("de-DE")}
               </td>
-              <td style={tdStyle}>{row.status}</td>
-              <td style={tdStyle}>
+              <td data-label="Status" style={tdStyle}>{row.status}</td>
+              <td data-label="Periode bis" style={tdStyle}>
                 {row.currentPeriodEnd ? new Date(row.currentPeriodEnd).toLocaleString("de-DE") : "—"}
               </td>
-              <td style={tdStyle}>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, minWidth: "15rem" }}>
+              <td data-label="Aktion" style={tdStyle}>
+                <div className="studio-admin-billing-actions" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, minWidth: "15rem" }}>
                   <select
+                    className="studio-admin-plan-select"
                     value={billingPlanDrafts[row.userId] ?? "start"}
                     onChange={(e) =>
                       setBillingPlanDrafts((prev) => ({
@@ -293,7 +295,7 @@ export function AdminDashboard() {
           ))}
           {billingRows.length === 0 ? (
             <tr>
-              <td colSpan={9} style={{ ...tdStyle, textAlign: "center", color: "var(--tx-2)" }}>
+              <td data-empty="true" colSpan={9} style={{ ...tdStyle, textAlign: "center", color: "var(--tx-2)" }}>
                 Keine Billing-Daten gefunden.
               </td>
             </tr>
@@ -304,8 +306,9 @@ export function AdminDashboard() {
   );
 
   const genericTable = (rows: Array<Record<string, unknown>>) => (
-    <div style={tableWrapStyle}>
+    <div className="studio-admin-json-wrap" style={tableWrapStyle}>
       <pre
+        className="studio-admin-json"
         style={{
           maxHeight: "60vh",
           overflow: "auto",
@@ -321,8 +324,8 @@ export function AdminDashboard() {
   );
 
   return (
-    <StudioCard pad style={{ marginTop: 22 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+    <StudioCard pad className="studio-admin-card" style={{ marginTop: 22 }}>
+      <div className="studio-admin-tabs" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
         {tabButton("users", "Nutzer")}
         {tabButton("billing", "Billing")}
         {tabButton("team", "Team/Invites")}

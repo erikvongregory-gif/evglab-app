@@ -32,6 +32,7 @@ import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 
 type ImageResponse = { b64_json?: string; url?: string };
 type ContentTab = "produktfoto" | "kampagne" | "social";
+type MobileCreatePanel = "brief" | "preview" | "settings";
 type Stiltreue = "frei" | "normal" | "hoch";
 type VariantCount = 1 | 2 | 3;
 type Aspect = HyperrealisticInput["aspectRatio"];
@@ -113,6 +114,7 @@ export function InhalteErstellenStudio({
   const [profileMode, setProfileMode] = useState(brandProfileMode);
 
   const [contentTab, setContentTab] = useState<ContentTab>("produktfoto");
+  const [mobilePanel, setMobilePanel] = useState<MobileCreatePanel>("brief");
   const [postZiel, setPostZiel] = useState<SocialPostInput["postZiel"]>("community_engagement");
   const [headline, setHeadline] = useState("");
   const [subline, setSubline] = useState("");
@@ -811,6 +813,7 @@ export function InhalteErstellenStudio({
   }
 
   async function generate() {
+    setMobilePanel("preview");
     if (isSocialMode) {
       await generateSocialPost();
       return;
@@ -1140,9 +1143,38 @@ export function InhalteErstellenStudio({
         </div>
       </header>
 
+      <div className="studio-create-mobile-nav" role="group" aria-label="Bereich der Bilderstellung">
+        {(
+          [
+            ["brief", "Motiv"],
+            ["preview", "Vorschau"],
+            ["settings", "Ausgabe"],
+          ] as const
+        ).map(([id, label], index) => (
+          <button
+            key={id}
+            id={`studio-create-tab-${id}`}
+            type="button"
+            aria-pressed={mobilePanel === id}
+            aria-controls={`studio-create-panel-${id}`}
+            className={mobilePanel === id ? "is-active" : undefined}
+            onClick={() => setMobilePanel(id)}
+          >
+            <span aria-hidden="true">{index + 1}</span>
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="studio-create-studio-grid">
         {/* Left */}
-        <aside className="studio-create-studio-col studio-create-studio-col--left">
+        <aside
+          id="studio-create-panel-brief"
+          role="region"
+          aria-labelledby="studio-create-tab-brief"
+          className="studio-create-studio-col studio-create-studio-col--left"
+          data-mobile-active={mobilePanel === "brief" ? "true" : undefined}
+        >
           <div className="studio-create-tabs" role="tablist">
             {(
               [
@@ -1498,10 +1530,24 @@ export function InhalteErstellenStudio({
               </button>
             ) : null}
           </div>
+          <button
+            type="button"
+            className="studio-create-mobile-next"
+            onClick={() => setMobilePanel("preview")}
+          >
+            Vorschau prüfen
+            <span aria-hidden="true">→</span>
+          </button>
         </aside>
 
         {/* Center */}
-        <section className="studio-create-studio-col studio-create-studio-col--center">
+        <section
+          id="studio-create-panel-preview"
+          role="region"
+          aria-labelledby="studio-create-tab-preview"
+          className="studio-create-studio-col studio-create-studio-col--center"
+          data-mobile-active={mobilePanel === "preview" ? "true" : undefined}
+        >
           <div className="studio-create-preview-card">
             <div className="studio-create-preview-card__bar">
               <span
@@ -1571,10 +1617,24 @@ export function InhalteErstellenStudio({
             </div>
           </div>
           {error ? <p className="studio-create-error">{error}</p> : null}
+          <div className="studio-create-mobile-panel-actions">
+            <button type="button" onClick={() => setMobilePanel("brief")}>
+              Motiv ändern
+            </button>
+            <button type="button" className="is-primary" onClick={() => setMobilePanel("settings")}>
+              Ausgabe einstellen
+            </button>
+          </div>
         </section>
 
         {/* Right */}
-        <aside className="studio-create-studio-col studio-create-studio-col--right">
+        <aside
+          id="studio-create-panel-settings"
+          role="region"
+          aria-labelledby="studio-create-tab-settings"
+          className="studio-create-studio-col studio-create-studio-col--right"
+          data-mobile-active={mobilePanel === "settings" ? "true" : undefined}
+        >
           <div className="studio-create-field">
             <span className="studio-create-field__label">Format</span>
             <div className="studio-create-segment studio-create-segment--formats" role="radiogroup" aria-label="Bildformat">

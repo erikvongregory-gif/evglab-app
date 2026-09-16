@@ -1,6 +1,5 @@
 "use client";
 
-import "@/styles/studio-dashboard-home.css";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -512,14 +511,23 @@ export function DashboardHomeView({
             )}
           </StudioUiCard>
 
-          <StudioUiCard padding="none" className="stu-dash-home__enter">
+          <StudioUiCard padding="none" className="stu-dash-home__enter stu-dash-home__recent-card">
             <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)" }}>
               <div className="stu-dash-home__card-head">
                 <div>
                   <h2 className="stu-dash-home__card-title">Letzte Generierungen</h2>
                   <p className="stu-dash-home__card-sub">
                     {mediaLoaded
-                      ? `${recentGenerations.length} von ${sortedMedia.length} Einträgen`
+                      ? (
+                          <>
+                            <span className="stu-dash-home__recent-count--desktop">
+                              {recentGenerations.length} von {sortedMedia.length} Einträgen
+                            </span>
+                            <span className="stu-dash-home__recent-count--mobile">
+                              {Math.min(3, recentGenerations.length)} von {sortedMedia.length} Einträgen
+                            </span>
+                          </>
+                        )
                       : "Wird geladen …"}
                   </p>
                 </div>
@@ -615,7 +623,7 @@ export function DashboardHomeView({
         </div>
 
         <div className="stu-dash-home__stack">
-          <StudioUiCard padding="md" className="stu-dash-home__enter">
+          <StudioUiCard padding="md" className="stu-dash-home__enter stu-dash-home__mobile-secondary">
             <h2 className="stu-dash-home__card-title">Token-Budget</h2>
             <p className="stu-dash-home__card-sub">{planLabel}</p>
             {!summaryLoaded ? (
@@ -669,7 +677,9 @@ export function DashboardHomeView({
             </div>
           </StudioUiCard>
 
-          <StudioOnboardingChecklist placement="inline" />
+          <div className="stu-dash-home__onboarding">
+            <StudioOnboardingChecklist placement="inline" />
+          </div>
 
           <StudioUiCard padding="md" className="stu-dash-home__enter">
             <div className="stu-dash-home__card-head">
@@ -731,7 +741,7 @@ export function DashboardHomeView({
           </StudioUiCard>
 
           {teamMembers != null && teamMembers > 0 ? (
-            <StudioUiCard padding="md" className="stu-dash-home__enter">
+            <StudioUiCard padding="md" className="stu-dash-home__enter stu-dash-home__mobile-secondary">
               <h2 className="stu-dash-home__card-title">Team</h2>
               <p className="stu-dash-home__kpi-meta" style={{ marginTop: 8 }}>
                 {formatDeNumber(teamMembers)} Mitglieder
@@ -745,7 +755,7 @@ export function DashboardHomeView({
             </StudioUiCard>
           ) : null}
 
-          <StudioUiCard padding="md" className="stu-dash-home__enter">
+          <StudioUiCard padding="md" className="stu-dash-home__enter stu-dash-home__mobile-secondary">
             <h2 className="stu-dash-home__card-title">Schnellaktionen</h2>
             <div className="stu-dash-home__quick-list" style={{ marginTop: 10 }}>
               {hasActivePlan ? (

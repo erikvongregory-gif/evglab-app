@@ -214,6 +214,7 @@
 }
 
 .evg-studio .evg-shell-search-mobile-panel {
+  display: none;
   position: fixed;
   inset: 0;
   z-index: 140;
@@ -231,6 +232,24 @@
   background: var(--s2);
 }
 
+.evg-studio .evg-shell-search-mobile-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.evg-studio .evg-shell-search-mobile-close {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ac);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 @media (max-width: 1239px) {
   .evg-studio .evg-shell-topbar-search--desktop {
     display: none !important;
@@ -238,6 +257,10 @@
 
   .evg-studio .evg-shell-topbar-search-trigger {
     display: inline-flex !important;
+  }
+
+  .evg-studio .evg-shell-search-mobile-panel {
+    display: block;
   }
 }
 

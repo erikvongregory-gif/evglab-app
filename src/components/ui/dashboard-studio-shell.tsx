@@ -31,7 +31,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const PRICING_HREF = "/dashboard?tab=pricing";
-const MOBILE_MAX = 639;
+const MOBILE_QUERY =
+  "(max-width: 767px), ((hover: none) and (pointer: coarse) and (max-width: 1023px))";
 /** Intent-Delay wie Studio-Sidebars: nicht bei jedem Streifen sofort auf. */
 const RAIL_OPEN_MS = 90;
 const RAIL_CLOSE_MS = 120;
@@ -290,7 +291,6 @@ function StudioTopbar({
   hasActivePlan = true,
   accountInitials,
   breweryLabel,
-  isMobile,
 }: {
   breadcrumbLabel: string;
   tokensRemaining?: number;
@@ -303,49 +303,46 @@ function StudioTopbar({
   hasActivePlan?: boolean;
   accountInitials: string;
   breweryLabel: string;
-  isMobile: boolean;
 }) {
   return (
     <header className="evg-top">
-      {isMobile ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-          <BrewAILogoMark />
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: 14,
-                color: "var(--t1)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {breadcrumbLabel}
-            </div>
-            <div
-              className="evg-mono"
-              style={{
-                fontSize: 10,
-                color: "var(--t3)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {breweryLabel}
-            </div>
+      <div className="evg-top__mobile-brand">
+        <BrewAILogoMark />
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontWeight: 600,
+              fontSize: 14,
+              color: "var(--t1)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {breadcrumbLabel}
+          </div>
+          <div
+            className="evg-mono"
+            style={{
+              fontSize: 10,
+              color: "var(--t3)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {breweryLabel}
           </div>
         </div>
-      ) : (
-        <div className="evg-crumb" style={{ minWidth: 0 }}>
-          Studio / <b>{breadcrumbLabel}</b>
-        </div>
-      )}
+      </div>
 
-      {!isMobile ? <StudioTopbarSearchDesktop /> : null}
+      <div className="evg-crumb evg-top__desktop-brand" style={{ minWidth: 0 }}>
+        Studio / <b>{breadcrumbLabel}</b>
+      </div>
 
-      <div style={{ flex: isMobile ? 0 : 1, minWidth: 0 }} />
+      <StudioTopbarSearchDesktop />
+
+      <div className="evg-top__spacer" style={{ flex: 1, minWidth: 0 }} />
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
         <StudioTopbarSearchMobile />
@@ -358,11 +355,11 @@ function StudioTopbar({
           recentCharges={recentCharges}
         />
 
-        {showCreateCta && !isMobile ? (
+        {showCreateCta ? (
           <Link
             href={hasActivePlan ? "/inhalte-erstellen" : PRICING_HREF}
             aria-label={hasActivePlan ? "Neu erstellen" : "Tarif wählen"}
-            className="stu-btn stu-btn--primary stu-btn--sm"
+            className="stu-btn stu-btn--primary stu-btn--sm evg-top__desktop-only"
             style={{ textDecoration: "none", minHeight: 36 }}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -379,11 +376,14 @@ function StudioTopbar({
           </Link>
         ) : null}
 
-        {!isMobile ? (
-          <Link href="/dashboard?tab=settings" className="evg-avatar" aria-label="Konto & Einstellungen" title="Konto">
-            {accountInitials}
-          </Link>
-        ) : null}
+        <Link
+          href="/dashboard?tab=settings"
+          className="evg-avatar evg-top__desktop-only"
+          aria-label="Konto & Einstellungen"
+          title="Konto"
+        >
+          {accountInitials}
+        </Link>
       </div>
     </header>
   );
@@ -725,6 +725,7 @@ function StudioMobileBottomNav({
 }) {
   const primary: Array<{ key: StudioNavKey; label: string; icon: string; href: string }> = [
     { key: "dashboard", label: "Dashboard", icon: "dash", href: "/dashboard" },
+    { key: "assistant", label: "BrewAI", icon: "chat", href: "/dashboard?tab=assistant" },
     { key: "create", label: "Erstellen", icon: "spark", href: "/inhalte-erstellen" },
     { key: "media", label: "Mediathek", icon: "media", href: "/dashboard?tab=media" },
   ];
@@ -734,7 +735,6 @@ function StudioMobileBottomNav({
     activeNav === "team" ||
     activeNav === "settings" ||
     activeNav === "pricing" ||
-    activeNav === "assistant" ||
     activeNav === "create-video";
 
   return (
@@ -748,6 +748,7 @@ function StudioMobileBottomNav({
             href={href}
             scroll={false}
             className="evg-bottom-nav__item"
+            data-nav-key={tab.key}
             aria-current={active ? "page" : undefined}
           >
             <SidebarIcon name={tab.icon} />
@@ -758,6 +759,7 @@ function StudioMobileBottomNav({
       <button
         type="button"
         className="evg-bottom-nav__item"
+        data-nav-key="more"
         data-active={moreActive ? "true" : undefined}
         aria-expanded={moreOpen}
         aria-haspopup="dialog"
@@ -799,7 +801,6 @@ function StudioMobileMoreSheet({
   const close = () => onOpenChange(false);
 
   const sheetItems: NavItemDef[] = [
-    { key: "assistant", label: "BrewAI", icon: "chat", href: "/dashboard?tab=assistant" },
     ...NAV_BRAND,
     ...(videosEnabled
       ? [{ key: "create-video" as const, label: "Videos", icon: "video", href: "/videos-erstellen" }]
@@ -977,7 +978,7 @@ export function DashboardStudioShell({
   const [railHovered, setRailHovered] = useState(false);
   const [footMenuOpen, setFootMenuOpen] = useState(false);
   const workspaceNav = useWorkspaceNavItems();
-  const isMobile = useMediaQuery(`(max-width: ${MOBILE_MAX}px)`);
+  const isMobile = useMediaQuery(MOBILE_QUERY);
   const railOpen = !isMobile && (railHovered || footMenuOpen);
 
   const clearRailTimers = useCallback(() => {
@@ -1025,7 +1026,7 @@ export function DashboardStudioShell({
   useEffect(() => {
     if (!contentKey || !mainRef.current) return;
     mainRef.current.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
-  }, [contentKey, reduceMotion]);
+  }, [activeNav, contentKey, reduceMotion]);
 
   /* Sheet nach Navigation schließen */
   useEffect(() => {
@@ -1165,7 +1166,6 @@ export function DashboardStudioShell({
               hasActivePlan={hasActivePlan}
               accountInitials={initials}
               breweryLabel={accountName}
-              isMobile={isMobile}
             />
             <main
               ref={mainRef}

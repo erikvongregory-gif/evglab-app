@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import type { Viewport } from "next";
 import { StudioLayoutFallback, StudioWorkspaceShell } from "@/components/studio/studio-workspace-shell";
 import { hasAdminAccess, isOwnerUser } from "@/lib/auth/owner";
 import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
@@ -7,6 +8,10 @@ import { getFreshUserDashboardMetadata } from "@/lib/dashboard/freshMetadata";
 import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+
+export const viewport: Viewport = {
+  themeColor: "#F6F6F4",
+};
 
 export default async function StudioDashboardLayout({ children }: { children: React.ReactNode }) {
   if (!isSupabaseConfigured()) {

@@ -72,7 +72,11 @@ export function StudioOnboardingChecklist({
     () =>
       placement === "inline" ||
       typeof window === "undefined" ||
-      !window.matchMedia("(max-width: 639px)").matches,
+      !window
+        .matchMedia(
+          "(max-width: 767px), ((hover: none) and (pointer: coarse) and (max-width: 1023px))",
+        )
+        .matches,
   );
 
   const celebrating = Boolean(onboarding?.complete) && !onboarding?.state.celebrated;

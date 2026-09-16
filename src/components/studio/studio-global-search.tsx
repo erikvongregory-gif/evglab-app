@@ -33,6 +33,7 @@ type QuickLink = {
 
 const ALL_QUICK_LINKS: QuickLink[] = [
   { id: "dashboard", label: "Dashboard", href: "/dashboard", hint: "Übersicht", keywords: "dashboard home start" },
+  { id: "assistant", label: "BrewAI", href: "/dashboard?tab=assistant", hint: "KI-Assistent", keywords: "brewai chat assistent hilfe" },
   { id: "create", label: "Bilder Erstellen", href: "/inhalte-erstellen", hint: "KI-Bilder", keywords: "bilder generieren create inhalte" },
   { id: "videos", label: "Videos Erstellen", href: "/videos-erstellen", hint: "Video-Studio", keywords: "video reels story ugc tiktok" },
   { id: "media", label: "Mediathek", href: "/dashboard?tab=media", hint: "Alle Motive", keywords: "mediathek medien gallery bilder" },
@@ -300,15 +301,18 @@ function StudioSearchField() {
 export function StudioTopbarSearchDesktop() {
   const rootRef = useRef<HTMLDivElement>(null);
   const { close, open } = useStudioSearch();
+  const isMobileViewport = useMobileSearchViewport();
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !rootRef.current?.getClientRects().length) return;
     const onPointerDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) close();
     };
     window.addEventListener("mousedown", onPointerDown);
     return () => window.removeEventListener("mousedown", onPointerDown);
   }, [close, open]);
+
+  if (isMobileViewport) return null;
 
   return (
     <div ref={rootRef} data-tour="search" className="evg-shell-topbar-search evg-shell-topbar-search--desktop">
@@ -322,8 +326,6 @@ export function StudioTopbarSearchMobile() {
   const isMobileViewport = useMobileSearchViewport();
   const { open, openSearch, close } = useStudioSearch();
 
-  if (!isMobileViewport) return null;
-
   return (
     <>
       <button type="button" className="evg-shell-topbar-search-trigger" aria-label="Suche öffnen" onClick={openSearch}>
@@ -332,10 +334,15 @@ export function StudioTopbarSearchMobile() {
           <path d="M10.5 10.5 L13 13" strokeLinecap="round" />
         </svg>
       </button>
-      {open ? (
+      {open && isMobileViewport ? (
         <div className="evg-shell-search-mobile-panel" onClick={close} role="presentation">
           <div className="evg-shell-search-mobile-panel-inner" onClick={(e) => e.stopPropagation()}>
-            <StudioSearchField />
+            <div className="evg-shell-search-mobile-head">
+              <StudioSearchField />
+              <button type="button" className="evg-shell-search-mobile-close" onClick={close}>
+                Fertig
+              </button>
+            </div>
             <StudioSearchDropdown mobile />
           </div>
         </div>
