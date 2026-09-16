@@ -47,6 +47,7 @@ type DashboardSummary = {
   billingStatus: string;
   plan: string | null;
   degradedBilling?: boolean;
+  degradedUsage?: boolean;
   tokenUsageByDay?: { date: string; tokens: number }[];
 };
 import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
@@ -428,7 +429,9 @@ export function DashboardRedesignShell(props: {
 
     const hasActivePlan =
       Boolean(summary?.unlimited || summary?.tokens.unlimited) ||
-      (!summary?.degradedBilling && hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
+      (!summaryError &&
+        !summary?.degradedBilling &&
+        hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
     if (hasActivePlan) {
       clearHomepageCheckoutParams(params);
       const qs = params.toString();
@@ -607,7 +610,9 @@ export function DashboardRedesignShell(props: {
 
   const hasActivePlan =
     Boolean(summary?.unlimited || summary?.tokens.unlimited) ||
-    (!summary?.degradedBilling && hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
+    (!summaryError &&
+      !summary?.degradedBilling &&
+      hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
 
   return (
     <>

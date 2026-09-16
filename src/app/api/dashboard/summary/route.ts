@@ -9,6 +9,7 @@ import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/bil
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 import { readDashboardMedia } from "@/lib/dashboard/media-store";
+import { loadGenerationUsageStats } from "@/lib/dashboard/generationUsage";
 
 export async function GET() {
   if (!isSupabaseConfigured()) {
@@ -70,42 +71,30 @@ export async function GET() {
     color: "blue" as const,
   }));
 
-  // Verbrauchsstatistik aus generation_jobs — überlebt Mediathek-Löschen
-  const monthStart = new Date();
-  monthStart.setUTCDate(1);
-  monthStart.setUTCHours(0, 0, 0, 0);
-  const usageCutoff = new Date(Date.now() - 365 * 86_400_000).toISOString();
-  const jobsQuery = await client
-    .from("generation_jobs")
-    .select("created_at,charged,status")
-    .eq("user_id", user.id)
-    .eq("status", "completed")
-    .gte("created_at", usageCutoff)
-    .limit(5000);
-  const completedJobs = jobsQuery.error ? [] : (jobsQuery.data ?? []);
-  const tokenUsageBuckets = new Map<string, number>();
-  let postsThisMonth = 0;
-  for (const job of completedJobs) {
-    const created = typeof job.created_at === "string" ? job.created_at : "";
-    if (!created) continue;
-    const day = created.slice(0, 10);
-    const tokens = typeof job.charged === "number" && job.charged >= 0 ? job.charged : 0;
-    tokenUsageBuckets.set(day, (tokenUsageBuckets.get(day) ?? 0) + tokens);
-    if (created >= monthStart.toISOString()) postsThisMonth += 1;
-  }
-  // Fallback nur wenn Jobs-Tabelle nicht lesbar — sonst 0 bei leerer Historie
-  if (jobsQuery.error) {
-    postsThisMonth = media.filter((item) => {
-      const d = new Date(item.createdAt);
-      const now = new Date();
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    }).length;
-  }
-  const tokenUsageByDay = jobsQuery.error
-    ? undefined
-    : [...tokenUsageBuckets.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, tokens]) => ({ date, tokens }));
+  // Verbrauchsstatistik aus generation_jobs — überlebt Mediathek-Löschen (paginiert, kein Media-Fallback)
+  const usage = await loadGenerationUsageStats({
+    countCompletedSince: async (iso) => {
+      const result = await client
+        .from("generation_jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .gte("created_at", iso);
+      return { count: result.count ?? null, error: result.error };
+    },
+    listCompletedPage: async (cutoffIso, from, to) => {
+      const result = await client
+        .from("generation_jobs")
+        .select("created_at,charged")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .gte("created_at", cutoffIso)
+        .order("created_at", { ascending: true })
+        .range(from, to);
+      return { data: result.data ?? null, error: result.error };
+    },
+  });
+  const { postsThisMonth, tokenUsageByDay, degradedUsage } = usage;
 
   const chargesCount = await client
     .from("generation_jobs")
@@ -149,7 +138,8 @@ export async function GET() {
       billingStatus: billing?.subscription_status ?? "none",
       plan: billing?.plan ?? null,
       degradedBilling,
-      ...(tokenUsageByDay ? { tokenUsageByDay } : {}),
+      degradedUsage,
+      tokenUsageByDay,
     },
     activities,
   });

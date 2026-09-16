@@ -31,6 +31,8 @@ export type DashboardHomeSummary = {
   billingStatus: string;
   plan: string | null;
   degradedBilling?: boolean;
+  /** Verbrauchsstatistik aus generation_jobs fehlgeschlagen — kein Mediathek-Fallback. */
+  degradedUsage?: boolean;
   /** Dauerhafter Tagesverbrauch aus generation_jobs (überlebt Mediathek-Löschen). */
   tokenUsageByDay?: { date: string; tokens: number }[];
 };

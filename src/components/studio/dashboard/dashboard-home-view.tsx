@@ -121,13 +121,15 @@ export function DashboardHomeView({
   const brewery = breweryName || profileName || "deine Marke";
   const unlimited = Boolean(summary?.unlimited || summary?.tokens.unlimited);
   const billingDegraded = Boolean(summary?.degradedBilling);
-  const remaining = billingDegraded ? null : (summary?.tokens.remaining ?? null);
+  const billingUnknown = Boolean(summaryError) || billingDegraded;
+  const usageDegraded = Boolean(summary?.degradedUsage);
+  const remaining = billingUnknown ? null : (summary?.tokens.remaining ?? null);
   const monthly = summary?.tokens.monthly ?? 0;
   const hasActivePlan =
     unlimited ||
-    (!billingDegraded && hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
+    (!billingUnknown && hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
   const createHref = hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing";
-  const planLabel = billingDegraded
+  const planLabel = billingUnknown
     ? "Abo-Status unbekannt"
     : planLabelFromKey(summary?.plan ?? null, unlimited);
   const periodEndLabel = formatPeriodEnd(summary?.periodEnd);
@@ -135,14 +137,14 @@ export function DashboardHomeView({
     hasActivePlan && settingsLoaded && !brandProfileComplete && brandProfileMode !== "skip";
 
   /* One dominant primary CTA for the view */
-  const primaryHref = billingDegraded
+  const primaryHref = billingUnknown
     ? null
     : !hasActivePlan
       ? "/dashboard?tab=pricing"
       : !brandProfileComplete && brandProfileMode !== "skip"
         ? null
         : "/inhalte-erstellen";
-  const primaryLabel = billingDegraded
+  const primaryLabel = billingUnknown
     ? null
     : !hasActivePlan
       ? "Tarif wählen"
@@ -188,7 +190,7 @@ export function DashboardHomeView({
     .slice(0, 6);
 
   const loadingKpis = !summaryLoaded;
-  const loadingChart = usageFromJobs ? !summaryLoaded : !mediaLoaded;
+  const loadingChart = usageFromJobs || usageDegraded ? !summaryLoaded : !mediaLoaded;
   const billingError =
     summaryError ||
     (billingDegraded ? "Abodaten konnten nicht geladen werden. Tarif und Tokens sind vorübergehend unbekannt." : null);
@@ -360,9 +362,11 @@ export function DashboardHomeView({
               <div>
                 <h2 className="stu-dash-home__card-title">Tokens pro Tag</h2>
                 <p className="stu-dash-home__card-sub">
-                  {usageFromJobs
-                    ? "Täglicher Token-Verbrauch aus dem Generierungsverlauf"
-                    : "Täglicher Token-Verbrauch aus der Mediathek"}
+                  {usageDegraded
+                    ? "Verbrauchsstatistik vorübergehend nicht verfügbar"
+                    : usageFromJobs
+                      ? "Täglicher Token-Verbrauch aus dem Generierungsverlauf"
+                      : "Täglicher Token-Verbrauch aus der Mediathek"}
                 </p>
               </div>
               {showRangeTabs ? (
@@ -396,6 +400,23 @@ export function DashboardHomeView({
               <div className="stu-dash-home__chart-empty">
                 <StudioUiSkeleton style={{ width: "100%", height: 160, borderRadius: 8 }} />
               </div>
+            ) : usageDegraded ? (
+              <div className="stu-dash-home__chart-empty" role="alert">
+                <div>
+                  <strong style={{ color: "var(--t1)", display: "block", marginBottom: 4, fontSize: 13 }}>
+                    Verbrauch konnte nicht geladen werden
+                  </strong>
+                  <p style={{ margin: 0, color: "var(--t2)", fontSize: 12.5, lineHeight: 1.45 }}>
+                    Die Generierungsstatistik ist vorübergehend nicht verfügbar. Gelöschte Motive bleiben
+                    trotzdem in der Auswertung, sobald die Daten wieder geladen werden können.
+                  </p>
+                  {onRetrySummary ? (
+                    <StudioUiButton type="button" variant="secondary" size="sm" style={{ marginTop: 12 }} onClick={onRetrySummary}>
+                      Erneut laden
+                    </StudioUiButton>
+                  ) : null}
+                </div>
+              </div>
             ) : mediaError && !usageFromJobs ? (
               <div className="stu-dash-home__chart-empty" role="alert">
                 <div>
@@ -415,9 +436,11 @@ export function DashboardHomeView({
                 <div>
                   <strong style={{ color: "var(--t1)", display: "block", marginBottom: 4, fontSize: 13 }}>Noch kein Verlauf</strong>
                   <p style={{ margin: 0, color: "var(--t2)", fontSize: 12.5, lineHeight: 1.45 }}>
-                    {hasActivePlan
-                      ? "Nach der ersten Generierung erscheint hier der tägliche Token-Verbrauch."
-                      : "Mit einem Tarif kannst du Motive erzeugen — danach siehst du hier den Verbrauch."}
+                    {billingUnknown
+                      ? "Sobald die Abodaten wieder verfügbar sind, erscheint hier der Token-Verbrauch."
+                      : hasActivePlan
+                        ? "Nach der ersten Generierung erscheint hier der tägliche Token-Verbrauch."
+                        : "Mit einem Tarif kannst du Motive erzeugen — danach siehst du hier den Verbrauch."}
                   </p>
                 </div>
               </div>
@@ -590,6 +613,13 @@ export function DashboardHomeView({
                   Unbegrenzte Tokens
                 </p>
               </>
+            ) : billingUnknown ? (
+              <>
+                <BudgetRing pct={null} />
+                <p className="stu-dash-home__kpi-meta" style={{ textAlign: "center", marginTop: 16 }}>
+                  Abodaten vorübergehend nicht verfügbar
+                </p>
+              </>
             ) : monthly > 0 && remaining != null ? (
               <>
                 <BudgetRing pct={availPct} />
@@ -607,7 +637,11 @@ export function DashboardHomeView({
               </>
             )}
             <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
-              {hasActivePlan ? (
+              {billingUnknown ? (
+                <p className="stu-dash-home__kpi-meta" style={{ margin: 0, textAlign: "center" }}>
+                  Tarifstatus konnte nicht geladen werden.
+                </p>
+              ) : hasActivePlan ? (
                 <StudioUiButton variant="secondary" size="sm" onClick={() => onOpenTab("pricing")}>
                   Tarif verwalten
                 </StudioUiButton>
