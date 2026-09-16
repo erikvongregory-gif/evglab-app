@@ -3,7 +3,6 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import {
-  buildSocialTextOverlaySvg,
   composeSocialTextOverlay,
   parsePrimaryBrandColor,
 } from "@/lib/social/text-overlay";
@@ -12,23 +11,6 @@ describe("text-overlay", () => {
   it("parses primary brand hex", () => {
     expect(parsePrimaryBrandColor("#E8772E, #6B4423")).toBe("#E8772E");
     expect(parsePrimaryBrandColor("warm orange")).toBe("#FFFFFF");
-  });
-
-  it("embeds headline and escapes xml", () => {
-    const svg = buildSocialTextOverlaySvg({
-      width: 1024,
-      height: 1280,
-      headline: "Frisch & gut <test>",
-      subline: "Ab sofort im Ausschank",
-      ctaText: "Jetzt probieren",
-      fontName: "Augustina",
-      fontWeight: "700",
-    });
-    expect(svg).toContain("Frisch &amp; gut");
-    expect(svg).toContain("&lt;test&gt;");
-    expect(svg).toContain("Jetzt probieren");
-    expect(svg).toContain("Augustina");
-    expect(svg).not.toContain("@font-face");
   });
 
   it("renders German campaign text with the bundled fallback font", async () => {
@@ -43,7 +25,7 @@ describe("text-overlay", () => {
       overlay: {
         width: 1024,
         height: 1024,
-        headline: "Frisch gezapft – Grüße aus München",
+        headline: "Frisch & gut <heute> – Grüße aus München",
         subline: "Jetzt im Biergarten",
         ctaText: "Mehr erfahren",
         fontName: "Work Sans",

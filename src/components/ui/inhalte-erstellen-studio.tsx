@@ -1147,8 +1147,8 @@ export function InhalteErstellenStudio({
             {(
               [
                 ["produktfoto", "Produktfoto"],
-                ["kampagne", "Kampagne"],
-                ["social", "Social"],
+                ["kampagne", "Kampagne · Feed"],
+                ["social", "Social · Story"],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -1167,6 +1167,13 @@ export function InhalteErstellenStudio({
               </button>
             ))}
           </div>
+          {isSocialMode ? (
+            <p className="studio-create-field__hint">
+              {contentTab === "kampagne"
+                ? "Für Feed-Posts und Anzeigen; startet im Format 4:5."
+                : "Für Stories und Reels; startet im Hochformat 9:16."}
+            </p>
+          ) : null}
 
           {isSocialMode ? (
             <div className="studio-create-field studio-create-social-copy">
@@ -1663,7 +1670,9 @@ export function InhalteErstellenStudio({
             {loading
               ? "Generiert …"
               : isSocialMode
-                ? `${variantCount} Social-Post${variantCount === 1 ? "" : "s"} generieren`
+                ? contentTab === "kampagne"
+                  ? `${variantCount} Kampagnenmotiv${variantCount === 1 ? "" : "e"} generieren`
+                  : `${variantCount} Social-Story${variantCount === 1 ? "" : "s"} generieren`
                 : `${variantCount} Motiv${variantCount === 1 ? "" : "e"} generieren`}
           </button>
           {generateBlockReason && !loading ? (
