@@ -7,6 +7,7 @@ import { ImagePlus, Search, X } from "lucide-react";
 import { getMediaDisplayTitle } from "@/lib/dashboard/metadata";
 import { clearActiveGeneration, readActiveGeneration } from "@/lib/inhalte-erstellen/active-generation";
 import {
+  isLandscapeAspect,
   jobAspectStyle,
   leadingMediaForJobs,
   shouldShowJobCard,
@@ -538,9 +539,15 @@ export function StudioMediaLibrary({
 
         <LayoutGroup id="studio-media-library">
           {!loaded && visibleJobs.length === 0 ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" aria-busy="true">
+            <div
+              className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5"
+              aria-busy="true"
+            >
               {Array.from({ length: 5 }, (_, i) => (
-                <Card key={i} className="overflow-hidden shadow-xs">
+                <Card
+                  key={i}
+                  className="mb-3 break-inside-avoid gap-0 overflow-hidden py-0 shadow-none ring-1 ring-border/50"
+                >
                   <Skeleton className="aspect-[4/5] w-full rounded-none" />
                   <CardContent className="space-y-2 p-3">
                     <Skeleton className="h-4 w-3/4" />
@@ -583,7 +590,7 @@ export function StudioMediaLibrary({
           ) : visibleJobs.length === 0 && visibleItems.length === 0 ? (
             <p className="text-muted-foreground text-sm">Keine Motive passen zur Suche.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
               {visibleJobs.map((job) => {
                 const message = jobProgressMessage({
                   phase: job.phase,
@@ -595,7 +602,10 @@ export function StudioMediaLibrary({
                 return (
                   <Card
                     key={`job-${job.jobId}`}
-                    className={cn("overflow-hidden shadow-xs", job.highlighted && "ring-2 ring-primary")}
+                    className={cn(
+                      "mb-3 break-inside-avoid gap-0 overflow-hidden py-0 shadow-none ring-1 ring-border/50",
+                      job.highlighted && "ring-2 ring-primary",
+                    )}
                     aria-busy={job.status === "reserved" || undefined}
                     aria-label={message}
                   >
@@ -624,15 +634,15 @@ export function StudioMediaLibrary({
                   key={it.id}
                   type="button"
                   className={cn(
-                    "overflow-hidden rounded-xl border bg-card text-left shadow-xs transition-colors hover:bg-muted/40",
+                    "mb-3 w-full break-inside-avoid overflow-hidden rounded-xl bg-card text-left shadow-none ring-1 ring-border/50 transition-colors hover:bg-muted/40 hover:ring-border",
                     focusedJobId && it.id.startsWith(`gen-${focusedJobId}-`) && "ring-2 ring-primary",
                   )}
                   onClick={() => openMediaItem(it)}
                   aria-label={`${getMediaDisplayTitle(it)} in Großansicht öffnen`}
                 >
-                  <div className="relative w-full bg-muted" style={jobAspectStyle(it.aspectRatio)}>
+                  <div className="w-full overflow-hidden bg-muted" style={jobAspectStyle(it.aspectRatio)}>
                     <motion.img
-                      className="absolute inset-0 size-full object-cover"
+                      className="block h-full w-full object-cover"
                       layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
                       src={getMediaAssetUrl(it)}
                       alt=""
@@ -670,18 +680,31 @@ export function StudioMediaLibrary({
                   animate={{ opacity: 1, y: 0 }}
                   exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
                   transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
-                  className="grid max-h-[90dvh] w-full max-w-5xl overflow-hidden rounded-xl border bg-card shadow-lg md:grid-cols-[1.4fr_1fr]"
+                  className={cn(
+                    "flex max-h-[90dvh] w-full overflow-hidden rounded-xl bg-card shadow-lg ring-1 ring-border/50",
+                    isLandscapeAspect(selectedItem.aspectRatio)
+                      ? "max-w-5xl flex-col md:flex-row"
+                      : "max-w-3xl flex-col md:flex-row",
+                  )}
                 >
-                  <div className="relative min-h-64 bg-muted">
+                  <div
+                    className={cn(
+                      "flex min-h-0 items-center justify-center bg-muted p-3 sm:p-5",
+                      isLandscapeAspect(selectedItem.aspectRatio)
+                        ? "md:min-w-0 md:flex-1"
+                        : "md:w-[min(100%,26rem)] md:flex-none",
+                    )}
+                  >
                     <motion.img
-                      className="absolute inset-0 size-full object-contain"
+                      className="h-auto max-h-[min(70dvh,720px)] w-auto max-w-full object-contain"
+                      style={jobAspectStyle(selectedItem.aspectRatio)}
                       layoutId={reduceMotion ? undefined : `studio-media-${selectedItem.id}`}
                       src={getMediaAssetUrl(selectedItem)}
                       alt={getMediaDisplayTitle(selectedItem)}
                       transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
                     />
                   </div>
-                  <aside className="flex flex-col gap-4 p-4 md:p-6">
+                  <aside className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:max-w-sm md:p-6">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 space-y-2">
                         <label htmlFor={`media-title-${selectedItem.id}`} className="text-muted-foreground text-xs font-medium">

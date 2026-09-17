@@ -48,7 +48,32 @@ export function leadingMediaForJobs<T extends { id: string }>(jobs: Array<{ jobI
   return { leading, seen };
 }
 
-export function jobAspectStyle(aspectRatio: string | undefined) {
-  const ratio = (aspectRatio || "4:5").replace(":", " / ");
-  return { aspectRatio: ratio };
+export function jobAspectStyle(aspectRatio: string | undefined): { aspectRatio: string } {
+  const parts = parseAspectRatio(aspectRatio);
+  if (!parts) return { aspectRatio: "4 / 5" };
+  return { aspectRatio: `${parts.w} / ${parts.h}` };
+}
+
+/** Width/height from "16:9", "4/5", or a unitless ratio. */
+export function parseAspectRatio(aspectRatio: string | undefined): { w: number; h: number } | null {
+  const raw = (aspectRatio || "4:5").trim().toLowerCase();
+  const compact = raw.replace(/\s+/g, "");
+  const match = compact.match(/^(\d+(?:\.\d+)?)[/:](\d+(?:\.\d+)?)$/);
+  if (match) {
+    const w = Number(match[1]);
+    const h = Number(match[2]);
+    if (w > 0 && h > 0) return { w, h };
+    return null;
+  }
+  if (/^\d+(\.\d+)?$/.test(compact)) {
+    const w = Number(compact);
+    if (w > 0) return { w, h: 1 };
+  }
+  return null;
+}
+
+export function isLandscapeAspect(aspectRatio: string | undefined) {
+  const parts = parseAspectRatio(aspectRatio);
+  if (!parts) return false;
+  return parts.w / parts.h >= 1;
 }
