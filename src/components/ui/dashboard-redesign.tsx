@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -6,19 +6,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StudioViewTransition } from "@/components/studio/studio-view-transition";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { useStudioShell } from "@/components/studio/studio-workspace-shell";
-import {
-  STUDIO_PAD_X,
-  STUDIO_TOKENS,
-  useStudioPalette,
-  type StudioPalette,
-} from "@/components/ui/dashboard-studio-shell";
-import { StudioPricingView } from "@/components/studio/studio-pricing-view";
-import { StudioButton, StudioIconButton } from "@/components/studio/ui";
-import { StudioIcon } from "@/components/studio/icons";
-import { brandLockLabel, formatDomain } from "@/lib/brand/brand-profile-display";
+import { AdminHomeView } from "@/components/dashboard/admin-home-view";
+import { AdminPricingView } from "@/components/dashboard/admin-pricing-view";
+import { AdminSettingsView } from "@/components/dashboard/admin-settings-view";
+import { AdminTeamView } from "@/components/dashboard/admin-team-view";
 import { BrandProfileView } from "@/components/dashboard/BrandProfileView";
 import { BrandProfileSetupModal, type BrandScanSuggestion } from "@/components/dashboard/BrandProfileSetupModal";
-import { DashboardHomeView } from "@/components/studio/dashboard/dashboard-home-view";
 import { BrewAiAssistantView } from "@/components/studio/hopfen-hugo-assistant";
 import { StudioMediaLibrary, type MediaItem } from "@/components/studio/media/studio-media-library";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
@@ -31,7 +24,38 @@ import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboa
 import { fetchWithRetry } from "@/lib/http/fetchWithRetry";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
 
-type DashboardTab = "dashboard" | "assistant" | "media" | "team" | "brand" | "settings" | "pricing";
+type DashboardTab =
+  | "dashboard"
+  | "assistant"
+  | "media"
+  | "team"
+  | "brand"
+  | "settings"
+  | "pricing";
+
+const PATH_TABS = new Set<DashboardTab>([
+  "media",
+  "team",
+  "brand",
+  "settings",
+  "pricing",
+  "assistant",
+]);
+
+function tabFromPathname(pathname: string): DashboardTab | null {
+  const match = pathname.match(/^\/dashboard\/([^/?#]+)/);
+  if (!match?.[1]) return null;
+  const section = match[1].toLowerCase() as DashboardTab;
+  return PATH_TABS.has(section) ? section : null;
+}
+
+function hrefForTab(tab: DashboardTab, searchParams: URLSearchParams) {
+  const next = new URLSearchParams(searchParams.toString());
+  next.delete("tab");
+  const qs = next.toString();
+  if (tab === "dashboard") return qs ? `/dashboard?${qs}` : "/dashboard";
+  return qs ? `/dashboard/${tab}?${qs}` : `/dashboard/${tab}`;
+}
 
 type DashboardSummary = {
   unlimited?: boolean;
@@ -82,83 +106,27 @@ type SettingsPayload = {
   brandAnalyzedAt?: string;
 };
 
-const TOKENS = STUDIO_TOKENS;
-
+const isBrandProfileComplete = isBrandProfileCompleteFromSettings;
 
 function normalizeSettings(raw: Partial<SettingsPayload> | SettingsPayload): SettingsPayload {
   return sanitizeDashboardSettings(raw);
-}
-
-function initialsFromName(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const a = parts[0]?.[0] ?? "?";
-  const b = parts.length > 1 ? parts[1]?.[0] : parts[0]?.[1];
-  return (a + (b ?? "")).toUpperCase();
-}
-
-function formatDeNumber(n: number) {
-  return n.toLocaleString("de-DE");
-}
-
-
-const isBrandProfileComplete = isBrandProfileCompleteFromSettings;
-function WaveMark({ size = 28, color = TOKENS.ink }: { size?: number; color?: string }) {
-  const h = (size * 20) / 28;
-  return (
-    <svg width={size} height={h} viewBox="0 0 28 20" fill="none" aria-hidden="true">
-      <path d="M2 5 C6 1, 10 9, 14 5 S22 1, 26 5" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M2 11 C6 7, 10 15, 14 11 S22 7, 26 11" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <path d="M2 17 C6 13, 10 21, 14 17 S22 13, 26 17" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 function Placeholder({
   label,
   w = "100%",
   h = 64,
-  tone = "cream",
-  radius = 0,
 }: {
   label: string;
   w?: number | string;
   h?: number;
-  tone?: "cream" | "deep" | "amber";
-  radius?: number;
 }) {
-  const palettes = {
-    cream: { bg: "#EAE3D5", line: "#D8CFBC", text: "#6E6557" },
-    deep: { bg: "#2E1F12", line: "#3A2818", text: "#B89572" },
-    amber: { bg: "#F4D8B4", line: "#ECC692", text: "#8B5A22" },
-  };
-  const p = palettes[tone];
   return (
     <div
-      style={{
-        width: w,
-        height: h,
-        borderRadius: radius,
-        position: "relative",
-        overflow: "hidden",
-        background: `repeating-linear-gradient(135deg, ${p.bg} 0 10px, ${p.line} 10px 11px)`,
-        flexShrink: 0,
-      }}
+      className="relative shrink-0 overflow-hidden rounded-lg border border-dashed bg-muted"
+      style={{ width: w, height: h }}
     >
-      <span
-        style={{
-          position: "absolute",
-          bottom: 6,
-          left: 6,
-          fontFamily: TOKENS.mono,
-          fontSize: 9,
-          letterSpacing: 0.4,
-          color: p.text,
-          textTransform: "uppercase",
-          background: "rgba(255,255,255,0.55)",
-          padding: "2px 6px",
-          borderRadius: 2,
-        }}
-      >
+      <span className="absolute bottom-1.5 left-1.5 rounded bg-background/80 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
     </div>
@@ -245,27 +213,27 @@ export function DashboardRedesignShell(props: {
   initialProfileName?: string;
   initialBreweryName?: string;
   isAdmin?: boolean;
+  forcedTab?: string;
 }) {
-  const { userEmail, initialProfileName, initialBreweryName, isAdmin } = props;
+  const { userEmail, initialProfileName, initialBreweryName, isAdmin, forcedTab } = props;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const tabParam = (searchParams.get("tab") ?? "dashboard").toLowerCase();
-  const initialTab: DashboardTab =
-    tabParam === "media" ||
-    tabParam === "team" ||
-    tabParam === "brand" ||
-    tabParam === "settings" ||
-    tabParam === "pricing" ||
-    tabParam === "assistant"
-      ? (tabParam as DashboardTab)
-      : "dashboard";
+  const pathTab = tabFromPathname(pathname);
+  const tabParam = (forcedTab || pathTab || searchParams.get("tab") || "dashboard").toLowerCase();
+  const initialTab: DashboardTab = PATH_TABS.has(tabParam as DashboardTab)
+    ? (tabParam as DashboardTab)
+    : "dashboard";
   const [tab, setTab] = useState<DashboardTab>(initialTab);
 
-  const changeTab = useCallback((next: DashboardTab) => {
-    setTab(next);
-  }, []);
+  const changeTab = useCallback(
+    (next: DashboardTab) => {
+      setTab(next);
+      router.push(hrefForTab(next, new URLSearchParams(searchParams.toString())));
+    },
+    [router, searchParams],
+  );
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [summaryLoaded, setSummaryLoaded] = useState(false);
@@ -289,37 +257,31 @@ export function DashboardRedesignShell(props: {
 
   const profileName = settings?.profileName?.trim() || initialProfileName?.trim() || "";
   const breweryName = settings?.breweryName?.trim() || initialBreweryName?.trim() || "";
-  const accountName = breweryName || profileName || "BrewAI";
-  const initials = initialsFromName(accountName);
   const brandProfileComplete = isBrandProfileComplete(settings);
   const brandProfileMode = settings?.brandProfileMode ?? "undecided";
 
   useEffect(() => {
+    // Path-based URLs are canonical; keep query params except legacy tab.
     const p = new URLSearchParams(searchParams.toString());
-    if (tab === "dashboard") p.delete("tab");
-    else p.set("tab", tab);
-    const qs = p.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    if (p.has("tab")) {
+      p.delete("tab");
+      const qs = p.toString();
+      const target = tab === "dashboard" ? (qs ? `/dashboard?${qs}` : "/dashboard") : qs ? `/dashboard/${tab}?${qs}` : `/dashboard/${tab}`;
+      router.replace(target, { scroll: false });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   // Externe URL-Aenderungen (Sidebar-Links, Browser Back/Forward) -> Tab updaten.
   useEffect(() => {
-    const next = (searchParams.get("tab") ?? "dashboard").toLowerCase();
-    const resolved: DashboardTab =
-      next === "media" ||
-      next === "team" ||
-      next === "brand" ||
-      next === "settings" ||
-      next === "pricing" ||
-      next === "assistant"
-        ? (next as DashboardTab)
-        : "dashboard";
+    const fromPath = tabFromPathname(pathname);
+    const next = (fromPath || searchParams.get("tab") || "dashboard").toLowerCase();
+    const resolved: DashboardTab = PATH_TABS.has(next as DashboardTab) ? (next as DashboardTab) : "dashboard";
     if (resolved !== tab) {
       setTab(resolved);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     let ignore = false;
@@ -439,7 +401,7 @@ export function DashboardRedesignShell(props: {
 
     changeTab("pricing");
     setPricingCheckoutError(
-      "Bitte bestätige unten die Widerrufs-Zustimmung und wähle danach deinen Tarif.",
+      "Bitte bestÃ¤tige unten die Widerrufs-Zustimmung und wÃ¤hle danach deinen Tarif.",
     );
     clearHomepageCheckoutParams(params);
     const qs = params.toString();
@@ -464,7 +426,6 @@ export function DashboardRedesignShell(props: {
     return () => window.removeEventListener("evglab-billing-updated", onBillingUpdated);
   }, []);
 
-  const P = useStudioPalette();
   const { setBrandProfileActive } = useStudioShell();
 
   useEffect(() => {
@@ -529,7 +490,7 @@ export function DashboardRedesignShell(props: {
   );
 
   const handleChooseBrandProfileGuided = useCallback(() => {
-    // Wichtig: KEIN lokaler State-Wechsel vor Server-Save — das fuehrt sonst zu Drift,
+    // Wichtig: KEIN lokaler State-Wechsel vor Server-Save â€” das fuehrt sonst zu Drift,
     // wenn der User die Setup-Modal ohne Speichern schliesst. Der Modus wird erst durch
     // `applyBrandScanAndPersist` (saveProfileSettings) auf "guided" gesetzt.
     setShowBrandProfileChoice(false);
@@ -540,9 +501,9 @@ export function DashboardRedesignShell(props: {
     setShowBrandProfileChoice(false);
     try {
       await saveProfileSettings(buildGenericBrandProfilePatch());
-      setBrandProfileNotice("Markenprofil deaktiviert — du generierst jetzt generisch.");
+      setBrandProfileNotice("Markenprofil deaktiviert â€” du generierst jetzt generisch.");
     } catch {
-      setBrandProfileNotice("Zurücksetzen konnte nicht gespeichert werden.");
+      setBrandProfileNotice("ZurÃ¼cksetzen konnte nicht gespeichert werden.");
     }
   }, [saveProfileSettings]);
 
@@ -551,7 +512,7 @@ export function DashboardRedesignShell(props: {
   useEffect(() => {
     if (!settingsLoaded) return;
     if (brandProfileMode !== "undecided") return;
-    // Nur einmal pro Browser-Session anzeigen — wenn der User die Modal ohne
+    // Nur einmal pro Browser-Session anzeigen â€” wenn der User die Modal ohne
     // explizite Entscheidung schliesst, faellt er ueber die Banner zurueck und
     // wird beim naechsten Login erneut sanft erinnert.
     if (typeof window !== "undefined") {
@@ -582,22 +543,29 @@ export function DashboardRedesignShell(props: {
         const json = (await res.json()) as { summary?: DashboardSummary };
         if (json.summary) setSummary(json.summary);
       })
-      .catch(() => setSummaryError("Übersicht konnte nicht geladen werden."))
+      .catch(() => setSummaryError("Ãœbersicht konnte nicht geladen werden."))
       .finally(() => setSummaryLoaded(true));
   }, []);
 
-  const refreshMedia = useCallback(() => {
-    setMediaLoaded(false);
-    setMediaError(null);
+  const refreshMedia = useCallback((quiet = false) => {
+    if (!quiet) {
+      setMediaLoaded(false);
+      setMediaError(null);
+    }
     void fetch("/api/dashboard/media", { cache: "no-store", credentials: "include" })
       .then(async (res) => {
         if (!res.ok) throw new Error("fail");
         const json = (await res.json()) as { items?: MediaItem[] };
         if (Array.isArray(json.items)) setMedia(json.items);
+        if (!quiet) setMediaError(null);
       })
-      .catch(() => setMediaError("Mediathek konnte nicht geladen werden."))
+      .catch(() => {
+        if (!quiet) setMediaError("Mediathek konnte nicht geladen werden.");
+      })
       .finally(() => setMediaLoaded(true));
   }, []);
+
+  const refreshMediaQuiet = useCallback(() => refreshMedia(true), [refreshMedia]);
 
   // Hinweis: Wir oeffnen das Setup-Modal NICHT mehr automatisch bei `guided + incomplete`.
   // Stattdessen wird der User ueber die Banner (Dashboard-Overview + Inhalte-erstellen)
@@ -613,7 +581,7 @@ export function DashboardRedesignShell(props: {
     <>
       <StudioViewTransition viewKey={tab} variant="tab">
       {tab === "dashboard" ? (
-        <DashboardHomeView
+        <AdminHomeView
           summary={summary}
           summaryLoaded={summaryLoaded}
           summaryError={summaryError}
@@ -638,24 +606,24 @@ export function DashboardRedesignShell(props: {
       {tab === "assistant" ? <BrewAiAssistantView /> : null}
       {tab === "media" ? (
         <StudioMediaLibrary
-          P={P}
           items={media}
           loaded={mediaLoaded}
           loadError={mediaError}
-          onRetry={refreshMedia}
+          onRetry={() => refreshMedia(false)}
           onItemsChange={setMedia}
+          onMediaRefresh={refreshMediaQuiet}
           hasActivePlan={hasActivePlan}
           initialQuery={searchParams.get("q") ?? ""}
+          focusedJobId={searchParams.get("job") ?? ""}
         />
       ) : null}
       {tab === "team" ? (
-        <TeamView
-          P={P}
+        <AdminTeamView
           members={team}
           loaded={teamLoaded}
           loadError={teamError}
           onMembersChange={(next) => {
-            setTeam(next);
+            setTeam(next as TeamMember[]);
             refreshSummary();
           }}
         />
@@ -683,10 +651,9 @@ export function DashboardRedesignShell(props: {
         />
       ) : null}
       {tab === "settings" ? (
-        <SettingsView
-          P={P}
+        <AdminSettingsView
           value={settings}
-          onChange={setSettings}
+          onChange={(next) => setSettings((prev) => (prev ? { ...prev, ...next } : (next as SettingsPayload)))}
           loaded={settingsLoaded}
           loadError={settingsError}
           brandProfileComplete={brandProfileComplete}
@@ -701,7 +668,7 @@ export function DashboardRedesignShell(props: {
         />
       ) : null}
       {tab === "pricing" ? (
-        <StudioPricingView
+        <AdminPricingView
           currentPlan={(summary?.plan ?? null) as SubscriptionPlanKey | null}
           monthlyTokens={summary?.tokens.monthly ?? 0}
           usedTokens={summary?.tokens.used ?? 0}
@@ -741,8 +708,8 @@ export function DashboardRedesignShell(props: {
             <button
               type="button"
               className="studio-brand-choice__close"
-              aria-label="Schließen"
-              title="Schließen"
+              aria-label="SchlieÃŸen"
+              title="SchlieÃŸen"
               onClick={() => setShowBrandProfileChoice(false)}
             >
               <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden>
@@ -773,8 +740,8 @@ export function DashboardRedesignShell(props: {
               Willst du deinen Markenstil fixieren?
             </h3>
             <p className="studio-brand-choice__lead">
-              Gib einfach die Website deiner Marke ein — die KI erkennt Tonality, Farben und Bildsprache und
-              erstellt dein Markenprofil. Du kannst das später unter Einstellungen jederzeit ändern.
+              Gib einfach die Website deiner Marke ein â€” die KI erkennt Tonality, Farben und Bildsprache und
+              erstellt dein Markenprofil. Du kannst das spÃ¤ter unter Einstellungen jederzeit Ã¤ndern.
             </p>
 
             <div className="studio-brand-choice__actions">
@@ -828,474 +795,3 @@ export function DashboardRedesignShell(props: {
 }
 
 
-function TeamView({
-  members,
-  loaded = true,
-  loadError = null,
-  onMembersChange,
-}: {
-  P?: StudioPalette;
-  members: TeamMember[];
-  loaded?: boolean;
-  loadError?: string | null;
-  onMembersChange: (next: TeamMember[]) => void;
-}) {
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteName, setInviteName] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">("editor");
-  const [inviting, setInviting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-
-  async function sendInvite() {
-    setError(null);
-    setNotice(null);
-    const email = inviteEmail.trim();
-    if (!email) {
-      setError("Bitte eine E-Mail eingeben.");
-      return;
-    }
-    setInviting(true);
-    try {
-      const res = await fetch("/api/dashboard/team", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name: inviteName.trim() || undefined, role: inviteRole }),
-      });
-      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; members?: TeamMember[] } | null;
-      if (!res.ok) {
-        setError(json?.error || "Einladung fehlgeschlagen.");
-        return;
-      }
-      if (Array.isArray(json?.members)) onMembersChange(json.members);
-      setNotice(`Einladung an ${email} verschickt.`);
-      setInviteEmail("");
-      setInviteName("");
-      setInviteRole("editor");
-    } catch {
-      setError("Einladung konnte nicht gesendet werden.");
-    } finally {
-      setInviting(false);
-    }
-  }
-
-  async function removeMember(memberId: string) {
-    setError(null);
-    setNotice(null);
-    setRemovingId(memberId);
-    try {
-      const res = await fetch(`/api/dashboard/team?memberId=${encodeURIComponent(memberId)}`, {
-        method: "DELETE",
-        credentials: "same-origin",
-      });
-      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; members?: TeamMember[] } | null;
-      if (!res.ok) {
-        setError(json?.error || "Mitglied konnte nicht entfernt werden.");
-        return;
-      }
-      if (Array.isArray(json?.members)) onMembersChange(json.members);
-      setNotice("Mitglied entfernt.");
-    } catch {
-      setError("Mitglied konnte nicht entfernt werden.");
-    } finally {
-      setRemovingId(null);
-    }
-  }
-
-  return (
-    <div className="studio-team-page">
-      <header className="studio-team-header">
-        <div>
-          <span className="studio-team-header__eyebrow">Team</span>
-          <h1 className="studio-team-title">Mitglieder</h1>
-          <p className="studio-team-sub">Lade Kolleginnen und Kollegen ein, um gemeinsam Motive zu erstellen.</p>
-        </div>
-        <span className="studio-team-meta">{loaded ? members.length : "…"}</span>
-      </header>
-
-      {loadError ? (
-        <p className="studio-team-error" role="alert" style={{ color: "var(--warn)", marginBottom: 16 }}>
-          {loadError}
-        </p>
-      ) : null}
-
-      <div className="studio-team-invite">
-        <h2 className="studio-team-invite__title">Mitglied einladen</h2>
-        <div className="studio-team-invite__grid">
-          <div className="studio-team-field">
-            <span className="studio-team-field__label">E-Mail</span>
-            <span className="studio-team-field__hint">Einladung mit Login-Link</span>
-            <input
-              type="email"
-              className="studio-team-input"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="kollege@beispiel.de"
-              disabled={inviting}
-            />
-          </div>
-          <div className="studio-team-field">
-            <span className="studio-team-field__label">Name</span>
-            <span className="studio-team-field__hint">Optional</span>
-            <input
-              type="text"
-              className="studio-team-input"
-              value={inviteName}
-              onChange={(e) => setInviteName(e.target.value)}
-              placeholder="Vorname Nachname"
-              disabled={inviting}
-            />
-          </div>
-          <div className="studio-team-field">
-            <span className="studio-team-field__label">Rolle</span>
-            <select
-              className="studio-team-select"
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as "admin" | "editor" | "viewer")}
-              disabled={inviting}
-            >
-              <option value="editor">Editor</option>
-              <option value="admin">Admin</option>
-              <option value="viewer">Viewer</option>
-            </select>
-          </div>
-          <div className="studio-team-invite__actions">
-            <StudioButton variant="primary" size="sm" disabled={inviting} onClick={() => void sendInvite()}>
-              {inviting ? "Sende …" : "Einladen"}
-            </StudioButton>
-          </div>
-        </div>
-        {error ? <p className="studio-team-feedback studio-team-feedback--error">{error}</p> : null}
-        {notice ? <p className="studio-team-feedback studio-team-feedback--ok">{notice}</p> : null}
-      </div>
-
-      <div className="studio-team-members">
-        <div className="studio-team-members__head">
-          <span className="studio-team-members__title">Teammitglieder</span>
-          {members.length > 0 ? (
-            <span className="studio-team-members__summary">
-              {members.filter((m) => m.status === "active").length} aktiv
-              {members.some((m) => m.status === "invited")
-                ? ` · ${members.filter((m) => m.status === "invited").length} Einladung offen`
-                : ""}
-            </span>
-          ) : null}
-        </div>
-
-        {members.length === 0 ? (
-          <div className="studio-team-empty">Noch keine Teammitglieder.</div>
-        ) : (
-          members.map((m) => (
-            <div key={m.id} className="studio-team-row">
-              <div className="studio-team-row__person">
-                <span
-                  className={`studio-team-row__avatar${m.status === "invited" ? " studio-team-row__avatar--invited" : ""}`}
-                  aria-hidden="true"
-                >
-                  {initialsFromName(m.name || m.email)}
-                </span>
-                <div style={{ minWidth: 0 }}>
-                  <div className="studio-team-row__name">{m.name}</div>
-                  <div className="studio-team-row__email">{m.email}</div>
-                </div>
-              </div>
-              <div className="studio-team-row__meta">
-                <span className="studio-team-badge studio-team-badge--role">{m.role}</span>
-                <span
-                  className={`studio-team-badge ${m.status === "invited" ? "studio-team-badge--invited" : "studio-team-badge--active"}`}
-                >
-                  <span className="studio-team-badge__dot" aria-hidden="true" />
-                  {m.status === "invited" ? "Einladung offen" : "Aktiv"}
-                </span>
-              </div>
-              <div className="studio-team-row__meta">
-                {m.role !== "owner" ? (
-                  <StudioButton
-                    variant="ghost"
-                    size="sm"
-                    disabled={removingId === m.id}
-                    onClick={() => void removeMember(m.id)}
-                    style={{ color: removingId === m.id ? undefined : "var(--err)" }}
-                  >
-                    {removingId === m.id ? "Entferne …" : "Entfernen"}
-                  </StudioButton>
-                ) : (
-                  <span className="studio-faint" style={{ fontSize: 12 }}>
-                    Inhaber
-                  </span>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SettingsView({
-  value,
-  onChange,
-  loaded,
-  loadError,
-  brandProfileComplete,
-  brandProfileNotice,
-  onOpenBrandTab,
-  onOpenBrandSetup,
-  onSkipBrandProfile,
-  onResetBrandProfile,
-}: {
-  P?: StudioPalette;
-  value: SettingsPayload | null;
-  onChange: (v: SettingsPayload) => void;
-  loaded: boolean;
-  loadError: string | null;
-  brandProfileComplete: boolean;
-  brandProfileNotice: string;
-  onOpenBrandTab: () => void;
-  onOpenBrandSetup: () => void;
-  onSkipBrandProfile: () => void;
-  onResetBrandProfile: () => void | Promise<void>;
-}) {
-  const [saving, setSaving] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const draft = value;
-
-  const setField = <K extends keyof SettingsPayload>(key: K, next: SettingsPayload[K]) => {
-    if (!draft) return;
-    onChange({ ...draft, [key]: next });
-  };
-
-  const save = async () => {
-    if (!draft) return;
-    setSaving(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const res = await fetch("/api/dashboard/settings", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(draft),
-      });
-      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; settings?: SettingsPayload } | null;
-      if (!res.ok) {
-        setError(json?.error || "Einstellungen konnten nicht gespeichert werden.");
-        return;
-      }
-      if (json?.settings) onChange(json.settings);
-      // Sidebar-Fußzeile (Avatar + Name) sofort aktualisieren, ohne Server-Reload.
-      const savedSettings = json?.settings ?? draft;
-      window.dispatchEvent(
-        new CustomEvent("evglab-profile-updated", {
-          detail: {
-            breweryName: savedSettings.breweryName ?? "",
-            profileName: savedSettings.profileName ?? "",
-          },
-        }),
-      );
-      setNotice("Gespeichert.");
-    } catch {
-      setError("Einstellungen konnten nicht gespeichert werden.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="studio-settings-page">
-      <header className="studio-settings-header">
-        <span className="studio-settings-header__eyebrow">Einstellungen</span>
-        <h1 className="studio-settings-title">Profil & Marke</h1>
-        <p className="studio-settings-sub">Diese Angaben erscheinen in der Begrüßung und in Dashboard-Überschriften.</p>
-      </header>
-
-      {!draft ? (
-        <div className="studio-settings-empty">
-          {!loaded ? (
-            "Lade Einstellungen…"
-          ) : loadError ? (
-            <>
-              {loadError}{" "}
-              <button type="button" onClick={() => window.location.reload()}>
-                Erneut versuchen
-              </button>
-            </>
-          ) : (
-            "Keine Einstellungen verfügbar."
-          )}
-        </div>
-      ) : (
-        <>
-          {brandProfileComplete && draft.brandProfileMode !== "skip" ? (
-            <div className="studio-settings-callout">
-              <div className="studio-settings-callout__body">
-                <div className="studio-settings-callout__title">Markenprofil aktiv</div>
-                <div className="studio-settings-callout__sub">
-                  {draft.brandWebsiteUrl ? formatDomain(draft.brandWebsiteUrl) : draft.breweryName || "Marke"}
-                  {" · "}
-                  Brand-Lock auf „{brandLockLabel(draft.brandLockLevel)}“
-                </div>
-              </div>
-              <div className="studio-settings-callout__actions">
-                <StudioButton type="button" variant="soft" size="sm" onClick={onOpenBrandTab}>
-                  Profil verwalten
-                </StudioButton>
-                <StudioButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  style={{ color: "var(--warn)" }}
-                  onClick={() => {
-                    const confirmed = window.confirm(
-                      "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Stil-Vorgaben werden entfernt.",
-                    );
-                    if (!confirmed) return;
-                    void onResetBrandProfile();
-                  }}
-                >
-                  Generisch nutzen
-                </StudioButton>
-              </div>
-            </div>
-          ) : (
-            <div className="studio-settings-callout">
-              <div className="studio-settings-callout__body">
-                <div className="studio-settings-callout__title">Markenprofil</div>
-                <div className="studio-settings-callout__sub">
-                  {draft.brandProfileMode === "skip"
-                    ? "Du nutzt BrewAI ohne Markenprofil. Über den Button kannst du jederzeit ein Profil anlegen."
-                    : "Lege dein Markenprofil fest: Website-Link eingeben, KI wertet Stil und Vorgaben aus."}
-                  {brandProfileNotice ? ` · ${brandProfileNotice}` : ""}
-                </div>
-              </div>
-              <div className="studio-settings-callout__actions">
-                <StudioButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
-                  Markenprofil erstellen
-                </StudioButton>
-                {draft.brandProfileMode !== "skip" ? (
-                  <StudioButton type="button" variant="ghost" size="sm" onClick={onSkipBrandProfile}>
-                    Ohne Markenprofil nutzen
-                  </StudioButton>
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          <div className="studio-settings-stack">
-            <section className="studio-settings-section">
-              <h2 className="studio-settings-section__title">Profil</h2>
-              <div className="studio-settings-fields">
-                <label className="studio-settings-field">
-                  <span className="studio-settings-field__label">Dein Name</span>
-                  <span className="studio-settings-field__hint">z. B. „Guten Morgen, Team“</span>
-                  <input
-                    className="studio-settings-input"
-                    value={draft.profileName}
-                    onChange={(e) => setField("profileName", e.target.value)}
-                  />
-                </label>
-                <label className="studio-settings-field">
-                  <span className="studio-settings-field__label">Telefon</span>
-                  <input
-                    className="studio-settings-input"
-                    value={draft.profilePhone}
-                    onChange={(e) => setField("profilePhone", e.target.value)}
-                  />
-                </label>
-                <label className="studio-settings-field">
-                  <span className="studio-settings-field__label">Marke</span>
-                  <span className="studio-settings-field__hint">z. B. „… für deine Marke“</span>
-                  <input
-                    className="studio-settings-input"
-                    value={draft.breweryName}
-                    onChange={(e) => setField("breweryName", e.target.value)}
-                  />
-                </label>
-              </div>
-            </section>
-
-            <section className="studio-settings-section">
-              <h2 className="studio-settings-section__title">Benachrichtigungen</h2>
-              <SettingsToggle
-                checked={draft.emailNotifications}
-                onChange={(v) => setField("emailNotifications", v)}
-                label="E-Mail-Benachrichtigungen"
-                hint="Status zu Generierungen, Einladungen und Sicherheit."
-              />
-              <SettingsToggle
-                checked={draft.weeklySummary}
-                onChange={(v) => setField("weeklySummary", v)}
-                label="Wochenzusammenfassung"
-                hint="Jeden Montag eine kurze E-Mail mit deinen Highlights."
-              />
-            </section>
-          </div>
-
-          <div className="studio-settings-save-row">
-            <StudioButton type="button" variant="primary" size="sm" disabled={saving} onClick={() => void save()}>
-              {saving ? "Speichert…" : "Speichern"}
-            </StudioButton>
-            {notice ? <span className="studio-settings-notice">{notice}</span> : null}
-            {error ? <span className="studio-settings-error">{error}</span> : null}
-          </div>
-
-          <section className="studio-settings-account">
-            <div className="studio-settings-account__row">
-              <div>
-                <div className="studio-settings-account__label">Konto</div>
-                <div className="studio-settings-account__hint">Sitzung auf diesem Gerät beenden</div>
-              </div>
-              <StudioButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={signingOut}
-                onClick={() => {
-                  setSigningOut(true);
-                  void signOutAndRedirect();
-                }}
-              >
-                {signingOut ? "Abmelden …" : "Abmelden"}
-              </StudioButton>
-            </div>
-          </section>
-        </>
-      )}
-    </div>
-  );
-}
-
-function SettingsToggle({
-  checked,
-  onChange,
-  label,
-  hint,
-}: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-  hint?: string;
-}) {
-  return (
-    <label className={`studio-settings-toggle${checked ? " on" : ""}`}>
-      <div className="studio-settings-toggle__copy">
-        <div className="studio-settings-toggle__label">{label}</div>
-        {hint ? <div className="studio-settings-toggle__hint">{hint}</div> : null}
-      </div>
-      <span className="studio-settings-switch" aria-hidden="true">
-        <span className="studio-settings-switch-knob" />
-      </span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="studio-settings-toggle-input"
-      />
-    </label>
-  );
-}

@@ -8,21 +8,21 @@ import {
 
 describe("instagram-oauth-state", () => {
   it("sanitizeReturnTo erlaubt nur relative Pfade", () => {
-    expect(sanitizeReturnTo("/dashboard?tab=brand")).toBe("/dashboard?tab=brand");
+    expect(sanitizeReturnTo("/dashboard/brand")).toBe("/dashboard/brand");
     expect(sanitizeReturnTo("https://evil.example/phish")).toBe(
-      "/dashboard?tab=brand&openBrand=1&brandInput=instagram",
+      "/dashboard/brand?openBrand=1&brandInput=instagram",
     );
     expect(sanitizeReturnTo("//evil.example/phish")).toBe(
-      "/dashboard?tab=brand&openBrand=1&brandInput=instagram",
+      "/dashboard/brand?openBrand=1&brandInput=instagram",
     );
   });
 
   it("serialisiert und parst OAuth-State", () => {
-    const state = createInstagramOAuthState("user-1", "/dashboard?tab=brand");
+    const state = createInstagramOAuthState("user-1", "/dashboard/brand");
     const raw = serializeInstagramOAuthState(state);
     const parsed = parseInstagramOAuthState(raw);
     expect(parsed?.state).toBe(state.state);
     expect(parsed?.userId).toBe("user-1");
-    expect(parsed?.returnTo).toBe("/dashboard?tab=brand");
+    expect(parsed?.returnTo).toBe("/dashboard/brand");
   });
 });

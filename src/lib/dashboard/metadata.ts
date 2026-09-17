@@ -25,6 +25,24 @@ export function formatChargeNumber(n: number | null | undefined): string | null 
   return String(Math.floor(n)).padStart(4, "0");
 }
 
+export const PRODUKT_KATEGORIEN = ["bier", "limonade", "tafelwasser", "mineralwasser"] as const;
+export type ProduktKategorie = (typeof PRODUKT_KATEGORIEN)[number];
+
+export const GETRANKEART_OPTIONS: Array<{ id: ProduktKategorie; label: string }> = [
+  { id: "bier", label: "Bier" },
+  { id: "limonade", label: "Limonade" },
+  { id: "tafelwasser", label: "Tafelwasser" },
+  { id: "mineralwasser", label: "Mineralwasser" },
+];
+
+export function sanitizeProduktKategorie(value: unknown): ProduktKategorie {
+  return value === "limonade" || value === "tafelwasser" || value === "mineralwasser" ? value : "bier";
+}
+
+export function produktKategorieLabel(kategorie: ProduktKategorie): string {
+  return GETRANKEART_OPTIONS.find((option) => option.id === kategorie)?.label ?? "Bier";
+}
+
 /**
  * Ein Bier aus dem Sortiment der Brauerei ("Meine Biere") — einmal angelegt,
  * belegt es im Erstell-Flow Bierstil, Flasche, Farbe und Etikett per Klick vor.
@@ -32,6 +50,8 @@ export function formatChargeNumber(n: number | null | undefined): string | null 
 export type DashboardBeer = {
   id: string;
   name: string;
+  /** Getränkekategorie; Altbestand ohne Feld gilt als Bier. */
+  produktKategorie?: ProduktKategorie;
   /** Bierstil-Code, z. B. "helles", "pils" (siehe WAS_OPTIONS im Erstell-Flow). */
   bierstil: string;
   /** Flaschentyp-Code, z. B. "nrw_500" (siehe FLASCHEN_TYPEN). */
@@ -46,6 +66,58 @@ export type DashboardBeer = {
 
 /** Obergrenze pro Brauerei. Die Datensätze liegen in public.dashboard_beers. */
 export const MAX_MY_BEERS = 64;
+
+/**
+ * Wiederverwendbare Personen-Identität am Markenprofil (optional).
+ * Fotos einmal hinterlegen, dann im Erstell-Flow auswählen.
+ */
+export type DashboardCharacter = {
+  id: string;
+  name: string;
+  /** Rolle, z. B. „Braumeister“. */
+  role: string;
+  /** HTTPS-URLs der Referenzfotos (nie Base64). */
+  referenceImageUrls: string[];
+  /**
+   * Higgsfield-Style Appearance Lock: Textbeschreibung aus den Fotos.
+   * Wird an OpenAI geschickt statt Gesichtsfotos (OpenAI lehnt Face-Identity ab).
+   */
+  appearanceLock: string;
+  createdAt: string;
+};
+
+export const MAX_MY_CHARACTERS = 16;
+export const MAX_CHARACTER_REFERENCE_IMAGES = 8;
+
+export function sanitizeDashboardCharacters(value: unknown): DashboardCharacter[] {
+  if (!Array.isArray(value)) return [];
+  const out: DashboardCharacter[] = [];
+  for (const raw of value) {
+    const item = asObj(raw);
+    const id = typeof item.id === "string" ? item.id.trim().slice(0, 64) : "";
+    const name = typeof item.name === "string" ? item.name.trim().slice(0, 80) : "";
+    if (!id || !name) continue;
+    const urls = Array.isArray(item.referenceImageUrls)
+      ? item.referenceImageUrls
+          .filter((u): u is string => typeof u === "string")
+          .map((u) => u.trim().slice(0, 2500))
+          .filter(Boolean)
+          .slice(0, MAX_CHARACTER_REFERENCE_IMAGES)
+      : [];
+    out.push({
+      id,
+      name,
+      role: typeof item.role === "string" ? item.role.trim().slice(0, 60) : "",
+      referenceImageUrls: urls,
+      appearanceLock:
+        typeof item.appearanceLock === "string" ? item.appearanceLock.trim().slice(0, 600) : "",
+      createdAt: typeof item.createdAt === "string" ? item.createdAt.slice(0, 40) : "",
+    });
+    if (out.length >= MAX_MY_CHARACTERS) break;
+  }
+  return out;
+}
+
 
 /** KIE-Temp-URLs sind oft tot oder vom Server nicht ladbar — Etikett dann neu hochladen. */
 export function hasUsableBeerEtikett(url: string): boolean {
@@ -69,14 +141,25 @@ export function sanitizeDashboardBeers(value: unknown): DashboardBeer[] {
     const id = typeof item.id === "string" ? item.id.trim().slice(0, 64) : "";
     const name = typeof item.name === "string" ? item.name.trim().slice(0, 80) : "";
     if (!id || !name) continue;
+    const produktKategorie = sanitizeProduktKategorie(item.produktKategorie);
     out.push({
       id,
       name,
-      bierstil: typeof item.bierstil === "string" && item.bierstil.trim() ? item.bierstil.trim().slice(0, 60) : "helles",
+      produktKategorie,
+      bierstil:
+        typeof item.bierstil === "string" && item.bierstil.trim()
+          ? item.bierstil.trim().slice(0, 60)
+          : produktKategorie === "bier"
+            ? "helles"
+            : produktKategorie,
       flaschenTyp:
         typeof item.flaschenTyp === "string" && item.flaschenTyp.trim() ? item.flaschenTyp.trim().slice(0, 60) : "nrw_500",
       flaschenfarbe:
-        item.flaschenfarbe === "gruen" || item.flaschenfarbe === "klar" ? item.flaschenfarbe : "braun",
+        item.flaschenfarbe === "gruen" || item.flaschenfarbe === "klar"
+          ? item.flaschenfarbe
+          : produktKategorie === "bier"
+            ? "braun"
+            : "klar",
       glasTyp:
         typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim().slice(0, 40) : undefined,
       etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",

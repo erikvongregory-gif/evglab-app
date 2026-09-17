@@ -60,6 +60,19 @@ describe("enforceHyperrealisticPromptConstraints", () => {
     expect(out).toMatch(/NOT a stemmed Pilsner/i);
     expect(out).toMatch(/LABEL LOCK 1:1/i);
     expect(out).toMatch(/ABK Hell/i);
+    expect(out).toMatch(/CLOSURE LOGIC/i);
+    expect(out).toMatch(/crown cap must NEVER sit on the bottle mouth/i);
+    expect(out).toMatch(/OPEN SERVING/i);
+  });
+
+  it("does not force an open bottle when there is no poured glass", () => {
+    const out = enforceHyperrealisticPromptConstraints("A sealed beer bottle on a table.", {
+      ...baseInput,
+      behaelter: "F",
+      glasTyp: undefined,
+    });
+    expect(out).not.toMatch(/already poured into a glass/i);
+    expect(out).toMatch(/untouched unopened product shot/i);
   });
 
   it("skips image reference for glass-only generation", () => {

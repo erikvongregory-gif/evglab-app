@@ -28,7 +28,7 @@ export function parseInstagramOAuthState(raw: string | undefined): InstagramOAut
     return {
       state: String(parsed.state),
       userId: String(parsed.userId),
-      returnTo: sanitizeReturnTo(parsed.returnTo ?? "/dashboard?tab=brand&openBrand=1&brandInput=instagram"),
+      returnTo: sanitizeReturnTo(parsed.returnTo ?? "/dashboard/brand?openBrand=1&brandInput=instagram"),
     };
   } catch {
     return null;
@@ -37,8 +37,8 @@ export function parseInstagramOAuthState(raw: string | undefined): InstagramOAut
 
 export function sanitizeReturnTo(input: string): string {
   const trimmed = input.trim();
-  if (!trimmed.startsWith("/")) return "/dashboard?tab=brand&openBrand=1&brandInput=instagram";
-  if (trimmed.startsWith("//")) return "/dashboard?tab=brand&openBrand=1&brandInput=instagram";
+  if (!trimmed.startsWith("/")) return "/dashboard/brand?openBrand=1&brandInput=instagram";
+  if (trimmed.startsWith("//")) return "/dashboard/brand?openBrand=1&brandInput=instagram";
   return trimmed.slice(0, 500);
 }
 

@@ -85,7 +85,7 @@ export async function GET() {
     listCompletedPage: async (cutoffIso, from, to) => {
       const result = await client
         .from("generation_jobs")
-        .select("created_at,charged")
+        .select("created_at,charged,result")
         .eq("user_id", user.id)
         .eq("status", "completed")
         .gte("created_at", cutoffIso)

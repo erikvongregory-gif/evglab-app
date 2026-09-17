@@ -3,10 +3,31 @@ import {
   accumulateTokenUsageByDay,
   loadGenerationUsageStats,
   monthStartIso,
+  resolveJobTokenUsage,
   type GenerationUsageQueries,
 } from "./generationUsage";
 
 describe("generationUsage", () => {
+  describe("resolveJobTokenUsage", () => {
+    it("nimmt positive charged-Werte", () => {
+      expect(resolveJobTokenUsage({ created_at: "2026-03-01T00:00:00.000Z", charged: 35 })).toBe(35);
+    });
+
+    it("nutzt Nominalkosten aus Result bei charged=0 (Owner)", () => {
+      expect(
+        resolveJobTokenUsage({
+          created_at: "2026-03-01T00:00:00.000Z",
+          charged: 0,
+          result: { billing: { perVariant: 20, consumed: 0 }, completedVariants: 2 },
+        }),
+      ).toBe(40);
+    });
+
+    it("fällt auf Standardkosten zurück wenn Result fehlt", () => {
+      expect(resolveJobTokenUsage({ created_at: "2026-03-01T00:00:00.000Z", charged: 0 })).toBe(10);
+    });
+  });
+
   describe("accumulateTokenUsageByDay", () => {
     it("summiert Tokens pro Tag und ignoriert negative charged", () => {
       expect(
@@ -20,6 +41,19 @@ describe("generationUsage", () => {
         { date: "2026-03-01", tokens: 15 },
         { date: "2026-03-02", tokens: 0 },
       ]);
+    });
+
+    it("zeigt Owner-Generierungen mit Nominalverbrauch", () => {
+      expect(
+        accumulateTokenUsageByDay([
+          {
+            created_at: "2026-03-01T10:00:00.000Z",
+            charged: 0,
+            result: { billing: { perVariant: 10 }, variantCount: 3 },
+          },
+          { created_at: "2026-03-01T11:00:00.000Z", charged: 0 },
+        ]),
+      ).toEqual([{ date: "2026-03-01", tokens: 40 }]);
     });
   });
 

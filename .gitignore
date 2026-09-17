@@ -53,3 +53,11 @@ _t-onb2-prototype/
 # Local auth identity gate artifacts
 _auth-gate/
 
+
+# Local / bulky — nicht committen
+_template_dashboard/
+graphify-out/
+video-brief-assets/
+video-brief-assets.zip
+supabase/.temp/
+.agents/

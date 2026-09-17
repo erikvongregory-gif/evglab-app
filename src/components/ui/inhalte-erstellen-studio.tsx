@@ -1826,3 +1826,11 @@ export function InhalteErstellenStudio({
     </div>
   );
 }
+
+/** Gemeinsame Eingabeleiste für Einstieg und Mediathek-Arbeitsbereich. */
+export function StudioCreateComposer(
+  props: Parameters<typeof InhalteErstellenStudio>[0] & { variant?: "landing" | "dock" },
+) {
+  const { variant: _variant, ...rest } = props;
+  return <InhalteErstellenStudio {...rest} />;
+}

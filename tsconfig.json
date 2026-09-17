@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "_autopilot-qa"]
+  "exclude": ["node_modules", "_autopilot-qa", "_template_dashboard", "_t-onb2-prototype"]
 }

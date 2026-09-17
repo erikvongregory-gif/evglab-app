@@ -1,8 +1,10 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import AIMessage from "@/components/ui/ai-message";
+import GradientChatInput from "@/components/ui/gradient-chat-input";
 
 export type HopfenHugoMessage = {
   role: "user" | "assistant";
@@ -28,6 +30,31 @@ const msgVariants = {
   visible: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 480, damping: 32 } },
 };
 
+function BrewAiAvatar({ size = 19 }: { size?: number }) {
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full bg-[var(--ac,oklch(0.55_0.14_55))]"
+      style={{ width: size + 8, height: size + 8 }}
+      aria-hidden
+    >
+      <svg width={size} height={size} viewBox="0 0 22 22" fill="none">
+        <path
+          d="M11 3c-3 0-5 3-5 6.5C6 14 8.3 17 11 19c2.7-2 5-5 5-9.5C16 6 14 3 11 3z"
+          fill="#fff"
+          opacity="0.95"
+        />
+        <path
+          d="M8.6 8.3c.4-1 1.3-1.6 2.4-1.6s2 .6 2.4 1.6"
+          stroke="var(--ac-3, oklch(0.45 0.1 55))"
+          strokeWidth="1"
+          strokeLinecap="round"
+          opacity="0.7"
+        />
+      </svg>
+    </div>
+  );
+}
+
 export function HopfenHugoChat({
   messages,
   inputValue,
@@ -51,15 +78,18 @@ export function HopfenHugoChat({
     el.scrollTop = el.scrollHeight;
   }, [messages, isThinking, showSuggestions]);
 
-  const handleSubmit = useCallback(
-    (e: FormEvent) => {
-      e.preventDefault();
-      if (!inputValue.trim() || loading) return;
+  const triggerSend = useCallback(
+    (text: string) => {
+      if (!text.trim() || loading) return;
       setTypingPulse(true);
-      onSubmit();
+      if (onSendText) {
+        onSendText(text);
+      } else {
+        onSubmit();
+      }
       window.setTimeout(() => setTypingPulse(false), 800);
     },
-    [inputValue, loading, onSubmit],
+    [loading, onSendText, onSubmit],
   );
 
   const handleSuggestion = useCallback(
@@ -75,7 +105,7 @@ export function HopfenHugoChat({
   return (
     <div
       className={cn("evg-brewai-page", variant === "column" && "evg-brewai-page--column")}
-      data-tour="brewai-assistant"
+      data-view="brewai-assistant"
     >
       <div
         className={cn(
@@ -88,20 +118,7 @@ export function HopfenHugoChat({
           <div className="evg-hopfenhugo-head-inner">
             <div className="evg-hopfenhugo-avatar-wrap">
               <div className="evg-hopfenhugo-avatar-bob" aria-hidden>
-                <svg width="19" height="19" viewBox="0 0 22 22" fill="none">
-                  <path
-                    d="M11 3c-3 0-5 3-5 6.5C6 14 8.3 17 11 19c2.7-2 5-5 5-9.5C16 6 14 3 11 3z"
-                    fill="#fff"
-                    opacity="0.95"
-                  />
-                  <path
-                    d="M8.6 8.3c.4-1 1.3-1.6 2.4-1.6s2 .6 2.4 1.6"
-                    stroke="var(--ac-3)"
-                    strokeWidth="1"
-                    strokeLinecap="round"
-                    opacity="0.7"
-                  />
-                </svg>
+                <BrewAiAvatar />
               </div>
               <span className="evg-hopfenhugo-status" aria-hidden />
             </div>
@@ -121,34 +138,25 @@ export function HopfenHugoChat({
               variants={msgVariants}
               initial="hidden"
               animate="visible"
-              className={cn("evg-hopfenhugo-row", msg.role === "user" && "evg-hopfenhugo-row--user")}
+              className="w-full"
             >
-              {msg.role === "assistant" ? (
-                <div className="evg-hopfenhugo-msg-avatar" aria-hidden>
-                  <svg width="11" height="11" viewBox="0 0 22 22" fill="none">
-                    <path
-                      d="M11 3c-3 0-5 3-5 6.5C6 14 8.3 17 11 19c2.7-2 5-5 5-9.5C16 6 14 3 11 3z"
-                      fill="#fff"
-                    />
-                  </svg>
-                </div>
-              ) : null}
-              <div className="evg-hopfenhugo-row-body">
-                <div
-                  className={cn(
-                    "evg-hopfenhugo-bubble",
-                    msg.role === "user" ? "evg-hopfenhugo-bubble--user" : "evg-hopfenhugo-bubble--assistant",
-                  )}
-                >
-                  {msg.role === "assistant" ? (
-                    <span className="evg-hopfenhugo-bubble-label">{ASSISTANT_NAME}</span>
-                  ) : null}
-                  <p>{msg.text}</p>
-                </div>
-                {msg.role === "assistant" && index === 0 ? (
-                  <div className="evg-hopfenhugo-time">gerade eben</div>
-                ) : null}
-              </div>
+              <AIMessage
+                from={msg.role}
+                avatar={msg.role === "assistant" ? <BrewAiAvatar size={14} /> : undefined}
+                copyText={msg.role === "assistant" ? msg.text : undefined}
+                timestamp={msg.role === "assistant" && index === 0 ? "gerade eben" : undefined}
+              >
+                {msg.role === "assistant" ? (
+                  <>
+                    <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                      {ASSISTANT_NAME}
+                    </span>
+                    {msg.text}
+                  </>
+                ) : (
+                  msg.text
+                )}
+              </AIMessage>
             </motion.div>
           ))}
 
@@ -168,49 +176,30 @@ export function HopfenHugoChat({
           ) : null}
 
           {isThinking ? (
-            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="evg-hopfenhugo-row">
-              <div className="evg-hopfenhugo-msg-avatar" aria-hidden>
-                <svg width="11" height="11" viewBox="0 0 22 22" fill="none">
-                  <path
-                    d="M11 3c-3 0-5 3-5 6.5C6 14 8.3 17 11 19c2.7-2 5-5 5-9.5C16 6 14 3 11 3z"
-                    fill="#fff"
-                  />
-                </svg>
-              </div>
-              <div className="evg-hopfenhugo-row-body">
-                <div className="evg-hopfenhugo-bubble evg-hopfenhugo-bubble--assistant evg-hopfenhugo-bubble--typing">
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+              <AIMessage from="assistant" avatar={<BrewAiAvatar size={14} />} bubble>
+                <span className="inline-flex items-center gap-1.5 py-0.5" aria-label="Denkt nach">
                   <span className="evg-hopfenhugo-dot" />
                   <span className="evg-hopfenhugo-dot" />
                   <span className="evg-hopfenhugo-dot" />
-                </div>
-              </div>
+                </span>
+              </AIMessage>
             </motion.div>
           ) : null}
         </div>
 
         <footer className="evg-hopfenhugo-foot">
-          <form className="evg-hopfenhugo-form" onSubmit={handleSubmit}>
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => onInputChange(e.target.value)}
-              placeholder="Frag BrewAI zu allem …"
-              className="evg-hopfenhugo-input"
-              maxLength={1200}
-              autoComplete="off"
-              aria-label="Nachricht an BrewAI"
-            />
-            <button
-              type="submit"
-              className="evg-hopfenhugo-send"
-              disabled={!inputValue.trim() || loading}
-              aria-label="Nachricht senden"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M1.5 8L14 2.2 9.4 14.5l-2.3-5.1L1.5 8z" fill="#fff" />
-              </svg>
-            </button>
-          </form>
+          <GradientChatInput
+            value={inputValue}
+            onChange={onInputChange}
+            onSend={triggerSend}
+            disabled={loading}
+            placeholder="Frag BrewAI zu allem …"
+            autoReply={null}
+            showBubbles={false}
+            sound={false}
+            className="max-w-none"
+          />
           <p className="evg-hopfenhugo-policy">
             Antworten folgen den{" "}
             <a href="/agb" target="_blank" rel="noopener noreferrer">

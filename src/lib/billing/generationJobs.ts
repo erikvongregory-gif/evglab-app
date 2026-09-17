@@ -12,6 +12,8 @@ export type GenerationJob = {
   status: string;
   result: Record<string, unknown> | null;
   owner?: boolean;
+  provider_task_id?: string | null;
+  created_at?: string;
 };
 
 export function generationRequestHash(req: Request, payload: unknown): string {
@@ -126,7 +128,7 @@ export async function getGenerationJobForUser(
 ): Promise<GenerationJob | null> {
   const { data, error } = await createAdminClient()
     .from("generation_jobs")
-    .select("id,user_id,amount,status,result")
+    .select("id,user_id,amount,status,result,provider_task_id,created_at")
     .eq("id", jobId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -178,10 +180,15 @@ export async function linkProviderTask(job: GenerationJob, taskId: string) {
   if (error) throw new Error("Task-Zuordnung ausstehend; bitte Support kontaktieren.");
 }
 
-export async function saveGenerationProgress(job: GenerationJob, images: string[], perVariantCost: number) {
+export async function saveGenerationProgress(
+  job: GenerationJob,
+  patch: Record<string, unknown>,
+) {
+  const current = await getGenerationJobForUser(job.user_id, job.id);
+  const previous = current?.result && typeof current.result === "object" ? current.result : {};
   const { error } = await createAdminClient()
     .from("generation_jobs")
-    .update({ result: { images: images.map((imageUrl) => ({ imageUrl })), perVariantCost } })
+    .update({ result: { ...previous, ...patch } })
     .eq("id", job.id)
     .eq("user_id", job.user_id)
     .eq("status", "reserved");

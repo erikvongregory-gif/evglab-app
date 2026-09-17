@@ -99,8 +99,8 @@ export async function POST(req: Request) {
       mode: "subscription",
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/dashboard?tab=pricing&billing=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/dashboard?tab=pricing&billing=cancel`,
+      success_url: `${origin}/dashboard/pricing?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/dashboard/pricing?billing=cancel`,
       billing_address_collection: automaticTaxEnabled ? "required" : "auto",
       tax_id_collection: { enabled: automaticTaxEnabled },
       customer_update: automaticTaxEnabled

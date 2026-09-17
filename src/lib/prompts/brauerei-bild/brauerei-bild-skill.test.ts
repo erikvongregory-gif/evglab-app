@@ -48,5 +48,27 @@ describe("brauerei-bild skill", () => {
     expect(brief.markenname).toBe("Paulaner");
     expect(brief.glasTyp).toBe("Willibecher");
     expect(brief.kiPlattform).toBe("GPT Image 2.5 Sunburst (OpenAI gpt-image-2.5-sunburst)");
+    expect(brief.produktKategorie).toBe("bier");
+  });
+
+  it("maps mineral water without beer type", () => {
+    const brief = hyperrealisticInputToBrauereiBrief({
+      aiWatermark: false,
+      etikettBild: "https://example.com/label.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "klar",
+      produktKategorie: "mineralwasser",
+      bierstil: "mineralwasser",
+      szene: "biergarten_sommer",
+      personImBild: false,
+      tageszeit: "goldene_stunde",
+      stimmung: "entspannt",
+      aspectRatio: "4:5",
+      quality: "high",
+      variantCount: 1,
+    });
+    expect(brief.produktKategorie).toBe("mineralwasser");
+    expect(brief.getraenk).toBe("mineral water");
+    expect(brief.biertyp).toBe("mineral water");
   });
 });

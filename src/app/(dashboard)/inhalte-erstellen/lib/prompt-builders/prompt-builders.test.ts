@@ -37,6 +37,56 @@ describe("inhalte-erstellen prompt builders", () => {
     ).toMatchSnapshot();
   });
 
+  it("does not describe beer foam or hops for mineral water", () => {
+    const prompt = buildHyperrealisticPrompt({
+      aiWatermark: false,
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "klar",
+      produktKategorie: "mineralwasser",
+      bierstil: "mineralwasser",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      personImBild: false,
+      tageszeit: "goldene_stunde",
+      stimmung: "gesellig",
+      aspectRatio: "4:5",
+      quality: "high",
+      variantCount: 1,
+    });
+    expect(prompt).toMatch(/mineral-water bottle|mineral water/i);
+    expect(prompt).not.toMatch(/SRM /);
+    expect(prompt).toMatch(/no beer foam/i);
+    expect(prompt).not.toMatch(/Hopfenranken|hop vines/i);
+  });
+
+  it("places mineral water without a poured beer glass", () => {
+    const prompt = buildProductPlacementPrompt({
+      aiWatermark: false,
+      stimmung: "entspannt",
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "klar",
+      produktKategorie: "mineralwasser",
+      bierstil: "mineralwasser",
+      glasTyp: "willibecher",
+      szene: "stadtbalkon_abend",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "abend_warm",
+      etikettModus: "marke",
+      stiltreue: "hoch",
+      beerName: "Quelle Naturell",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(prompt).toMatch(/mineral-water bottle/i);
+    expect(prompt).toMatch(/no beer foam/i);
+    expect(prompt).not.toMatch(/poured beer glass/);
+  });
+
   it("places the product photo without describing a brand name for the label", () => {
     const prompt = buildProductPlacementPrompt({
       aiWatermark: false, stimmung: "entspannt", etikettBild: "https://example.com/etikett.png",
@@ -71,6 +121,9 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(prompt).toMatch(/NEGATIVE \(hyperreal\)/);
     expect(prompt).toMatch(/Forbidden/);
     expect(prompt).toMatch(/single pour/);
+    expect(prompt).toMatch(/CLOSURE LOGIC/);
+    expect(prompt).toMatch(/crown cap must NEVER sit on the bottle mouth/i);
+    expect(prompt).not.toMatch(/cap design, and the entire printed label/);
   });
 
   it("unterscheidet Stiltreue normal vs hoch beim Label-Lock", () => {

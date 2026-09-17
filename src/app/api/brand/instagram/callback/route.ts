@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   const appOrigin = getAppBaseUrlOrigin(new URL(req.url).origin);
 
   if (!isSupabaseConfigured() || !isInstagramOAuthConfigured()) {
-    return NextResponse.redirect(buildReturnUrl(appOrigin, "/dashboard?tab=brand", { instagram: "config" }));
+    return NextResponse.redirect(buildReturnUrl(appOrigin, "/dashboard/brand", { instagram: "config" }));
   }
 
   const supabase = await createClient();
@@ -38,14 +38,14 @@ export async function GET(req: Request) {
   if (user && !(await hasPassedTwoFactor(user))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
   if (user) { try { user = await workspaceResourceUser(user, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
   if (!user) {
-    return NextResponse.redirect(`${appOrigin}/anmelden?next=${encodeURIComponent("/dashboard?tab=brand&openBrand=1")}`);
+    return NextResponse.redirect(`${appOrigin}/anmelden?next=${encodeURIComponent("/dashboard/brand?openBrand=1")}`);
   }
 
   const { searchParams } = new URL(req.url);
   const oauthError = searchParams.get("error_description") ?? searchParams.get("error");
   const cookieStore = await cookies();
   const cookieState = parseInstagramOAuthState(cookieStore.get(instagramOAuthCookieName())?.value);
-  const returnTo = sanitizeReturnTo(cookieState?.returnTo ?? "/dashboard?tab=brand&openBrand=1&brandInput=instagram");
+  const returnTo = sanitizeReturnTo(cookieState?.returnTo ?? "/dashboard/brand?openBrand=1&brandInput=instagram");
 
   if (oauthError) {
     const redirect = NextResponse.redirect(buildReturnUrl(appOrigin, returnTo, { instagram: "denied" }));

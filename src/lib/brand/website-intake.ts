@@ -82,6 +82,10 @@ const PRODUCT_CATALOG_PATH_SIGNALS = [
   "produkte",
   "shop",
   "getraenke",
+  "limonade",
+  "mineralwasser",
+  "tafelwasser",
+  "wasser",
 ];
 
 const BEER_PRODUCT_SIGNALS = [
@@ -233,6 +237,14 @@ const SUBPAGE_LINK_SIGNALS: Array<{ signal: string; weight: number }> = [
   { signal: "biere", weight: 22 },
   { signal: "produkte", weight: 22 },
   { signal: "spezialitaeten", weight: 20 },
+  { signal: "limonade", weight: 28 },
+  { signal: "limo", weight: 20 },
+  { signal: "mineralwasser", weight: 28 },
+  { signal: "tafelwasser", weight: 28 },
+  { signal: "getraenke", weight: 22 },
+  { signal: "spezi", weight: 18 },
+  { signal: "cola", weight: 16 },
+  { signal: "wasser", weight: 12 },
   { signal: "marken", weight: 16 },
   { signal: "story", weight: 12 },
   { signal: "werte", weight: 12 },

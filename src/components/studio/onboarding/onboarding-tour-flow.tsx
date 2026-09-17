@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EvglabMark } from "@/components/studio/evglab-mark";
 import { Tour, useTour, type TourStep } from "@/components/ui/product-tour";
 import type { DashboardBeer } from "@/lib/dashboard/metadata";
+import { GETRANKEART_OPTIONS, produktKategorieLabel, sanitizeProduktKategorie } from "@/lib/dashboard/metadata";
 import { BRAND_SETTINGS_LIMITS, clampBrandSettingsFields } from "@/lib/dashboard/settingsPayload";
 import { ONBOARDING_TOUR_VERSION } from "@/lib/dashboard/onboarding";
 import {
@@ -392,6 +393,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
       : (brand.suggestedBeers ?? []).map((b, i) => ({
           id: `preview-${i}`,
           name: b.name,
+          produktKategorie: sanitizeProduktKategorie(b.produktKategorie),
           bierstil: b.bierstil,
           flaschenTyp: b.flaschenTyp,
           flaschenfarbe: b.flaschenfarbe,
@@ -514,7 +516,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
           {brandReady ? (
             <div id="onboarding-beers" className="mt-4">
               <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                Biersorten {previewBeers.length ? `(${previewBeers.length})` : ""}
+                Sortiment {previewBeers.length ? `(${previewBeers.length})` : ""}
               </p>
               {previewBeers.length ? (
                 <ul className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
@@ -541,7 +543,37 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-[12px] font-medium text-zinc-200">{beer.name}</p>
-                        <p className="truncate text-[10px] text-zinc-500">{beer.bierstil}</p>
+                        {beers.length > 0 ? (
+                          <p className="truncate text-[10px] text-zinc-500">
+                            {produktKategorieLabel(sanitizeProduktKategorie(beer.produktKategorie))}
+                          </p>
+                        ) : (
+                          <select
+                            className="mt-0.5 w-full rounded-md border border-zinc-800 bg-zinc-950 px-1 py-0.5 text-[10px] text-zinc-400"
+                            value={sanitizeProduktKategorie(beer.produktKategorie)}
+                            onChange={(e) => {
+                              const produktKategorie = sanitizeProduktKategorie(e.target.value);
+                              setBrand((current) => ({
+                                ...current,
+                                suggestedBeers: current.suggestedBeers?.map((item, itemIndex) =>
+                                  `preview-${itemIndex}` === beer.id
+                                    ? {
+                                        ...item,
+                                        produktKategorie,
+                                        bierstil: produktKategorie === "bier" ? item.bierstil : produktKategorie,
+                                      }
+                                    : item,
+                                ),
+                              }));
+                            }}
+                          >
+                            {GETRANKEART_OPTIONS.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </li>
                   ))}

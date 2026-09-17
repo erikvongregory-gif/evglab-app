@@ -3,10 +3,118 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { StudioButton, StudioIconButton } from "@/components/studio/ui";
-import { StudioIcon } from "@/components/studio/icons";
+import { ImagePlus, Search, X } from "lucide-react";
 import { getMediaDisplayTitle } from "@/lib/dashboard/metadata";
-import type { StudioPalette } from "@/components/ui/dashboard-studio-shell";
+import { clearActiveGeneration, readActiveGeneration } from "@/lib/inhalte-erstellen/active-generation";
+import {
+  jobAspectStyle,
+  leadingMediaForJobs,
+  shouldShowJobCard,
+  type MediaJobCard,
+} from "@/lib/inhalte-erstellen/media-job-cards";
+import { jobProgressMessage, pollGenerationJob, type PolledJobResult } from "@/lib/inhalte-erstellen/poll-generation-job";
+import { StudioCreateComposer } from "@/components/ui/inhalte-erstellen-studio";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+
+/** Frosted-Reveal: Wipe erst, wenn das Motiv-Bild geladen ist. */
+function MediaJobRevealThumb({
+  job,
+  message,
+}: {
+  job: MediaJobCard;
+  message: string;
+}) {
+  const imageUrl = job.images[job.images.length - 1]?.imageUrl?.trim() || null;
+  const done = job.status === "completed" && Boolean(imageUrl);
+  const failed = job.status === "failed";
+  const [imageReady, setImageReady] = useState(false);
+  const [reveal, setReveal] = useState(0);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    setImageReady(false);
+    setReveal(0);
+  }, [imageUrl]);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img?.complete && img.naturalWidth > 0) setImageReady(true);
+  }, [imageUrl]);
+
+  useEffect(() => {
+    if (!imageReady || failed) return;
+    if (done) {
+      setReveal(100);
+      return;
+    }
+    const id = window.setInterval(() => {
+      setReveal((prev) => {
+        if (prev >= 100) return 100;
+        const step = prev < 40 ? 2.2 : prev < 75 ? 1.4 : 0.9;
+        return Math.min(100, prev + step);
+      });
+    }, 48);
+    return () => window.clearInterval(id);
+  }, [imageReady, done, failed]);
+
+  const wipe = Math.max(0, Math.min(100, reveal));
+  const showWipe = Boolean(imageUrl) && imageReady && !failed && wipe < 100;
+
+  return (
+    <div className="relative w-full overflow-hidden bg-muted" style={jobAspectStyle(job.aspectRatio)}>
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(120% 90% at 85% 100%, rgba(199, 105, 30, 0.55) 0%, transparent 55%),
+            radial-gradient(90% 70% at 15% 20%, rgba(180, 175, 210, 0.55) 0%, transparent 50%),
+            radial-gradient(70% 60% at 50% 50%, rgba(230, 228, 235, 0.9) 0%, #d8d6de 100%)
+          `,
+        }}
+      />
+      {imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          ref={imgRef}
+          className="absolute inset-0 size-full object-cover"
+          src={imageUrl}
+          alt=""
+          onLoad={() => setImageReady(true)}
+        />
+      ) : null}
+      {showWipe ? (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          initial={false}
+          animate={{
+            clipPath: `polygon(0 ${wipe}%, 100% ${wipe}%, 100% 100%, 0 100%)`,
+          }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          style={{
+            backdropFilter: "blur(28px)",
+            WebkitBackdropFilter: "blur(28px)",
+            background:
+              "linear-gradient(105deg, rgba(245,244,248,0.72) 0%, rgba(232,180,130,0.5) 55%, rgba(199,105,30,0.4) 100%)",
+            maskImage: `linear-gradient(to bottom, transparent ${Math.max(0, wipe - 4)}%, black ${Math.min(100, wipe + 6)}%)`,
+            WebkitMaskImage: `linear-gradient(to bottom, transparent ${Math.max(0, wipe - 4)}%, black ${Math.min(100, wipe + 6)}%)`,
+          }}
+        />
+      ) : null}
+      {!imageReady && !failed ? (
+        <div className="absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-black/45 to-transparent p-2 pt-8">
+          <p className="text-[11px] font-medium text-white/95">{message}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export type MediaItem = {
   id: string;
@@ -42,6 +150,169 @@ function formatRelativeTime(iso: string) {
   return `vor ${days} Tagen`;
 }
 
+type JobsApiJob = {
+  id: string;
+  status?: string;
+  result?: PolledJobResult | null;
+  created_at?: string;
+};
+
+function cardFromJob(job: JobsApiJob, highlighted: boolean, fallback?: Partial<MediaJobCard>): MediaJobCard {
+  const result = (job.result ?? {}) as PolledJobResult;
+  const snapshot = result.snapshot;
+  const status: MediaJobCard["status"] =
+    job.status === "failed" ? "failed" : job.status === "completed" ? "completed" : "reserved";
+  return {
+    jobId: job.id,
+    status,
+    phase: result.phase || (status === "reserved" ? "queued" : status),
+    aspectRatio: result.aspectRatio || snapshot?.aspectRatio || fallback?.aspectRatio || "4:5",
+    expectedVariants: result.expectedVariants || snapshot?.variantCount || fallback?.expectedVariants || 1,
+    images: result.images ?? fallback?.images ?? [],
+    error: typeof result.error === "string" ? result.error : fallback?.error,
+    partial: result.partial,
+    highlighted,
+  };
+}
+
+function isLiveListedJob(job: JobsApiJob, focusedJobId: string) {
+  if (job.id === focusedJobId) return true;
+  if (job.status === "reserved") return true;
+  const createdAt = job.created_at ? Date.parse(job.created_at) : 0;
+  const recent = createdAt > 0 && Date.now() - createdAt < 15 * 60_000;
+  if (job.status === "failed" && recent) return true;
+  if (job.status === "completed" && job.result?.mediaPersisted === false && recent) return true;
+  return false;
+}
+
+function optimisticJobCard(jobId: string): MediaJobCard {
+  const stored = typeof window === "undefined" ? null : readActiveGeneration();
+  const match = stored?.jobId === jobId ? stored : null;
+  return {
+    jobId,
+    status: "reserved",
+    phase: "queued",
+    aspectRatio: match?.aspectRatio || "4:5",
+    expectedVariants: match?.variantCount || 1,
+    images: [],
+    highlighted: true,
+  };
+}
+
+function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
+  const [jobs, setJobs] = useState<MediaJobCard[]>([]);
+  const [pollNonce, setPollNonce] = useState(0);
+
+  const mergeJob = useCallback((next: MediaJobCard) => {
+    setJobs((current) => {
+      const others = current.filter((item) => item.jobId !== next.jobId);
+      return [next, ...others];
+    });
+  }, []);
+
+  const cards = useMemo(() => {
+    if (!focusedJobId || jobs.some((job) => job.jobId === focusedJobId)) return jobs;
+    return [optimisticJobCard(focusedJobId), ...jobs];
+  }, [focusedJobId, jobs]);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    const refreshIfNeeded = (jobId: string) => {
+      onMediaRefresh?.();
+      const active = readActiveGeneration();
+      if (active?.jobId === jobId) clearActiveGeneration();
+    };
+
+    const pollOne = (card: MediaJobCard) => {
+      if (card.status !== "reserved") return;
+      void pollGenerationJob({
+        jobId: card.jobId,
+        expectedVariants: card.expectedVariants,
+        signal: ac.signal,
+        onProgress: (_message, result) => {
+          mergeJob({
+            ...card,
+            ...cardFromJob({ id: card.jobId, status: result.status || "reserved", result }, Boolean(card.highlighted), card),
+            connectionIssue: result.connectionIssue,
+            pending: result.pending,
+          });
+        },
+      }).then((result) => {
+        if (ac.signal.aborted) return;
+        const next = {
+          ...card,
+          ...cardFromJob(
+            { id: card.jobId, status: result.status || (result.error ? "failed" : result.pending ? "reserved" : "completed"), result },
+            Boolean(card.highlighted),
+            card,
+          ),
+          connectionIssue: result.connectionIssue,
+          pending: result.pending,
+          error: result.error,
+        };
+        mergeJob(next);
+        if (!result.pending && !result.connectionIssue && (result.images?.length || result.error)) {
+          refreshIfNeeded(card.jobId);
+        }
+      });
+    };
+
+    void (async () => {
+      try {
+        const listed: JobsApiJob[] = [];
+        const listRes = await fetch("/api/dashboard/jobs", {
+          credentials: "include",
+          cache: "no-store",
+          signal: ac.signal,
+        });
+        if (listRes.ok) {
+          const listJson = (await listRes.json()) as { jobs?: JobsApiJob[] };
+          if (Array.isArray(listJson.jobs)) {
+            listed.push(...listJson.jobs.filter((job) => isLiveListedJob(job, focusedJobId)));
+          }
+        }
+        if (focusedJobId && !listed.some((job) => job.id === focusedJobId)) {
+          const oneRes = await fetch(`/api/dashboard/jobs?id=${encodeURIComponent(focusedJobId)}`, {
+            credentials: "include",
+            cache: "no-store",
+            signal: ac.signal,
+          });
+          if (oneRes.ok) {
+            const oneJson = (await oneRes.json()) as { job?: JobsApiJob };
+            if (oneJson.job?.id) listed.unshift(oneJson.job);
+          } else if (oneRes.status === 404) {
+            mergeJob({
+              jobId: focusedJobId,
+              status: "failed",
+              phase: "failed",
+              aspectRatio: "4:5",
+              expectedVariants: 1,
+              images: [],
+              error: "Auftrag nicht gefunden.",
+              highlighted: true,
+            });
+          }
+        }
+        const nextCards = listed.map((job) => cardFromJob(job, job.id === focusedJobId));
+        setJobs((current) => {
+          const byId = new Map(nextCards.map((job) => [job.jobId, job]));
+          for (const job of current) {
+            if (!byId.has(job.jobId)) byId.set(job.jobId, job);
+          }
+          return [...byId.values()];
+        });
+        for (const card of nextCards) pollOne(card);
+      } catch (error) {
+        if (ac.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
+      }
+    })();
+
+    return () => ac.abort();
+  }, [focusedJobId, mergeJob, onMediaRefresh, pollNonce]);
+
+  return { jobs: cards, recheck: () => setPollNonce((n) => n + 1) };
+}
+
 export function getMediaAssetUrl(item: MediaItem): string {
   if (item.imageUrl.startsWith("data:") || item.imageUrl.startsWith("/api/kie/download?")) {
     return item.imageUrl;
@@ -72,14 +343,15 @@ export async function downloadMediaItem(item: MediaItem): Promise<string | null>
 }
 
 export type StudioMediaLibraryProps = {
-  P: StudioPalette;
   items: MediaItem[];
   loaded?: boolean;
   loadError?: string | null;
   onRetry?: () => void;
   onItemsChange: (next: MediaItem[]) => void;
+  onMediaRefresh?: () => void;
   hasActivePlan?: boolean;
   initialQuery?: string;
+  focusedJobId?: string;
   /** QA only: skip real download fetch */
   mockDownload?: boolean;
 };
@@ -90,8 +362,10 @@ export function StudioMediaLibrary({
   loadError = null,
   onRetry,
   onItemsChange,
+  onMediaRefresh,
   hasActivePlan = true,
   initialQuery = "",
+  focusedJobId = "",
   mockDownload = false,
 }: StudioMediaLibraryProps) {
   const reduceMotion = useReducedMotion();
@@ -103,6 +377,7 @@ export function StudioMediaLibrary({
   const [titleError, setTitleError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const { jobs, recheck } = useStudioJobCards(focusedJobId, onMediaRefresh);
 
   useEffect(() => {
     // Sync URL query param when navigating with ?q=
@@ -204,229 +479,281 @@ export function StudioMediaLibrary({
     );
   }, [items, search]);
 
-  const createHref = hasActivePlan ? "/inhalte-erstellen" : "/dashboard?tab=pricing";
+  const mediaIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
+  const visibleJobs = useMemo(
+    () => jobs.filter((job) => shouldShowJobCard(job, mediaIds)),
+    [jobs, mediaIds],
+  );
+  const { leading, seen } = useMemo(
+    () => leadingMediaForJobs(jobs, visibleItems),
+    [jobs, visibleItems],
+  );
+  const restItems = useMemo(
+    () => visibleItems.filter((item) => !seen.has(item.id)),
+    [visibleItems, seen],
+  );
+  const hasAny = visibleJobs.length > 0 || items.length > 0;
+
+  const createHref = hasActivePlan ? "/inhalte-erstellen" : "/dashboard/pricing";
   const createLabel = hasActivePlan ? "Motiv generieren" : "Tarif wählen";
 
   return (
-    <div className="studio-media-page">
-      <header className="studio-media-head">
-        <div className="studio-media-head__main">
-          <span className="studio-media-head__eyebrow">Mediathek</span>
-          <h1>Mediathek</h1>
-          <p>Alle generierten Motive deiner Brauerei — sortiert nach Datum.</p>
-        </div>
-        <div className="studio-media-head__actions">
-          <Link href={createHref} className="evg-btn evg-btn--primary">
-            {createLabel}
-          </Link>
-        </div>
-      </header>
-
-      {loaded && items.length > 0 ? (
-        <div className="studio-media-toolbar">
-          <label className="studio-media-search">
-            <span className="studio-media-search__icon" aria-hidden>
-              <StudioIcon name="search" size={14} />
-            </span>
-            <input
-              className="studio-media-search__input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Nach Motiv, Bier oder Anlass suchen …"
-              aria-label="Mediathek durchsuchen"
-            />
-          </label>
-          <div className="studio-media-filters" aria-label="Medienfilter">
-            <span className="studio-media-filter studio-media-filter--active">Bilder · {items.length}</span>
-          </div>
-        </div>
-      ) : null}
-
-      <LayoutGroup id="studio-media-library">
-        {!loaded ? (
-          <div className="studio-media-skeleton-grid" aria-busy="true" aria-label="Motive werden geladen">
-            {Array.from({ length: 5 }, (_, i) => (
-              <div key={i} className="studio-media-skeleton-card">
-                <div className="studio-media-skeleton-card__img" />
-                <div className="studio-media-skeleton-card__line" />
-                <div className="studio-media-skeleton-card__line studio-media-skeleton-card__line--short" />
-              </div>
-            ))}
-          </div>
-        ) : loadError ? (
-          <div className="studio-media-empty" role="alert">
-            <div className="studio-media-empty__icon" aria-hidden>
-              <StudioIcon name="image" size={18} />
-            </div>
-            <h2 className="studio-media-empty__title">Mediathek nicht erreichbar</h2>
-            <p className="studio-media-empty__text">{loadError}</p>
-            {onRetry ? (
-              <div className="studio-media-empty__actions">
-                <StudioButton type="button" variant="ghost" onClick={onRetry}>
-                  Erneut laden
-                </StudioButton>
-              </div>
-            ) : null}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="studio-media-empty">
-            <div className="studio-media-empty__icon" aria-hidden>
-              <StudioIcon name="image" size={18} />
-            </div>
-            <h2 className="studio-media-empty__title">Noch keine Motive in der Mediathek</h2>
-            <p className="studio-media-empty__text">
-              Wähle Sortiment und Anlass und generiere dein erstes Motiv — es landet automatisch hier.
+    <div data-content-padding="false" className="flex min-h-[calc(100dvh-var(--dashboard-header-height,3rem))] flex-col">
+      <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-3xl leading-none tracking-tight">Mediathek</h1>
+            <p className="text-muted-foreground text-sm">
+              Fertige Motive und laufende Aufträge — Eingabe bleibt unten verfügbar.
             </p>
-            <div className="studio-media-empty__actions">
-              <Link href={createHref} className="evg-btn evg-btn--primary">
-                {hasActivePlan ? "Erstes Motiv erstellen" : "Tarif wählen"}
-              </Link>
-              <Link href="/dashboard?tab=brand" className="evg-btn">
-                Markenprofil prüfen
-              </Link>
-            </div>
           </div>
-        ) : visibleItems.length === 0 ? (
-          <p className="studio-media-search-empty">Keine Motive passen zur Suche.</p>
-        ) : (
-          <div className="studio-media-grid">
-            {visibleItems.map((it) => (
-              <button
-                key={it.id}
-                type="button"
-                className="studio-media-card"
-                onClick={() => openMediaItem(it)}
-                aria-label={`${getMediaDisplayTitle(it)} in Großansicht öffnen`}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/inhalte-erstellen">Zur Einstiegsseite</Link>
+            </Button>
+            <Button asChild>
+              <Link href={createHref}>
+                <ImagePlus data-icon="inline-start" />
+                {createLabel}
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        {loaded && hasAny ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative max-w-md flex-1">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Nach Motiv, Bier oder Anlass suchen …"
+                aria-label="Mediathek durchsuchen"
+              />
+            </div>
+            <Badge variant="secondary">Bilder · {items.length}</Badge>
+          </div>
+        ) : null}
+
+        <LayoutGroup id="studio-media-library">
+          {!loaded && visibleJobs.length === 0 ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" aria-busy="true">
+              {Array.from({ length: 5 }, (_, i) => (
+                <Card key={i} className="overflow-hidden shadow-xs">
+                  <Skeleton className="aspect-[4/5] w-full rounded-none" />
+                  <CardContent className="space-y-2 p-3">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : loadError && !hasAny ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Mediathek nicht erreichbar</CardTitle>
+                <CardDescription className="text-destructive">{loadError}</CardDescription>
+              </CardHeader>
+              {onRetry ? (
+                <CardContent>
+                  <Button variant="outline" onClick={onRetry}>
+                    Erneut laden
+                  </Button>
+                </CardContent>
+              ) : null}
+            </Card>
+          ) : !hasAny ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Noch keine Motive in der Mediathek</CardTitle>
+                <CardDescription>
+                  Wähle Sortiment und Anlass und generiere dein erstes Motiv — es landet automatisch hier.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <Link href={createHref}>{hasActivePlan ? "Erstes Motiv erstellen" : "Tarif wählen"}</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard/brand">Markenprofil prüfen</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : visibleJobs.length === 0 && visibleItems.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Keine Motive passen zur Suche.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {visibleJobs.map((job) => {
+                const message = jobProgressMessage({
+                  phase: job.phase,
+                  status: job.status,
+                  completed: job.images.length,
+                  expected: job.expectedVariants,
+                  connectionIssue: job.connectionIssue,
+                });
+                return (
+                  <Card
+                    key={`job-${job.jobId}`}
+                    className={cn("overflow-hidden shadow-xs", job.highlighted && "ring-2 ring-primary")}
+                    aria-busy={job.status === "reserved" || undefined}
+                    aria-label={message}
+                  >
+                    <MediaJobRevealThumb job={job} message={message} />
+                    <CardContent className="space-y-1 p-3">
+                      <p className="truncate text-sm font-medium">{message}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {job.aspectRatio}
+                        {job.expectedVariants > 1 ? ` · ${job.images.length}/${job.expectedVariants}` : ""}
+                        {job.partial ? " · teilweise" : ""}
+                      </p>
+                      {job.error && !job.pending ? (
+                        <p className="text-destructive text-xs">{job.error}</p>
+                      ) : null}
+                      {job.pending || job.connectionIssue ? (
+                        <Button type="button" variant="ghost" size="sm" className="h-auto px-0" onClick={recheck}>
+                          Status erneut prüfen
+                        </Button>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {[...leading, ...restItems].map((it) => (
+                <button
+                  key={it.id}
+                  type="button"
+                  className={cn(
+                    "overflow-hidden rounded-xl border bg-card text-left shadow-xs transition-colors hover:bg-muted/40",
+                    focusedJobId && it.id.startsWith(`gen-${focusedJobId}-`) && "ring-2 ring-primary",
+                  )}
+                  onClick={() => openMediaItem(it)}
+                  aria-label={`${getMediaDisplayTitle(it)} in Großansicht öffnen`}
+                >
+                  <div className="relative w-full bg-muted" style={jobAspectStyle(it.aspectRatio)}>
+                    <motion.img
+                      className="absolute inset-0 size-full object-cover"
+                      layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
+                      src={getMediaAssetUrl(it)}
+                      alt=""
+                      transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
+                    />
+                  </div>
+                  <div className="space-y-0.5 p-3">
+                    <p className="truncate text-sm font-medium">{clampText(getMediaDisplayTitle(it), 48)}</p>
+                    <p className="text-muted-foreground text-xs">
+                      {it.aspectRatio} · {formatRelativeTime(it.createdAt)}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <AnimatePresence>
+            {selectedItem ? (
+              <motion.div
+                key="studio-media-lightbox"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Bild in Großansicht"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
+                onClick={() => setSelectedItem(null)}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
               >
-                <div className="studio-media-card__frame">
-                  <motion.img
-                    className="studio-media-card__img"
-                    layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
-                    src={getMediaAssetUrl(it)}
-                    alt=""
-                    transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
-                  />
-                </div>
-                <div className="studio-media-card__cap">
-                  <span className="studio-media-card__title">{clampText(getMediaDisplayTitle(it), 48)}</span>
-                  <span className="studio-media-card__meta">
-                    {it.aspectRatio} · {formatRelativeTime(it.createdAt)}
-                  </span>
-                </div>
-              </button>
-            ))}
+                <motion.div
+                  onClick={(event) => event.stopPropagation()}
+                  initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                  transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
+                  className="grid max-h-[90dvh] w-full max-w-5xl overflow-hidden rounded-xl border bg-card shadow-lg md:grid-cols-[1.4fr_1fr]"
+                >
+                  <div className="relative min-h-64 bg-muted">
+                    <motion.img
+                      className="absolute inset-0 size-full object-contain"
+                      layoutId={reduceMotion ? undefined : `studio-media-${selectedItem.id}`}
+                      src={getMediaAssetUrl(selectedItem)}
+                      alt={getMediaDisplayTitle(selectedItem)}
+                      transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
+                    />
+                  </div>
+                  <aside className="flex flex-col gap-4 p-4 md:p-6">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <label htmlFor={`media-title-${selectedItem.id}`} className="text-muted-foreground text-xs font-medium">
+                          Motiv-Titel
+                        </label>
+                        <Input
+                          id={`media-title-${selectedItem.id}`}
+                          ref={titleInputRef}
+                          value={titleDraft}
+                          onChange={(event) => setTitleDraft(event.target.value)}
+                          onBlur={() => {
+                            if (selectedItem) void saveMediaTitle(selectedItem, titleDraft);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              if (selectedItem) void saveMediaTitle(selectedItem, titleDraft);
+                            }
+                          }}
+                          maxLength={120}
+                          disabled={titleSaving}
+                          placeholder="z. B. Hefeweizen · Hero-Glas"
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={titleSaving || titleDraft.trim() === getMediaDisplayTitle(selectedItem)}
+                            onClick={() => void saveMediaTitle(selectedItem, titleDraft)}
+                          >
+                            Titel speichern
+                          </Button>
+                          <span className="text-muted-foreground text-xs">
+                            {selectedItem.resolution} · {selectedItem.aspectRatio} ·{" "}
+                            {selectedItem.outputFormat.toUpperCase()} · {formatRelativeTime(selectedItem.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" aria-label="Schließen" onClick={() => setSelectedItem(null)}>
+                        <X />
+                      </Button>
+                    </div>
+                    {titleError ? <p className="text-destructive text-sm">{titleError}</p> : null}
+                    {titleSaving ? <p className="text-muted-foreground text-sm">Titel wird gespeichert …</p> : null}
+                    {downloadError ? <p className="text-destructive text-sm">{downloadError}</p> : null}
+                    <div className="mt-auto flex flex-wrap gap-2">
+                      <Button disabled={downloading} onClick={() => void handleDownload(selectedItem)}>
+                        {downloading ? "Wird heruntergeladen …" : "Herunterladen"}
+                      </Button>
+                      <Button variant="outline" onClick={() => setSelectedItem(null)}>
+                        Schließen
+                      </Button>
+                    </div>
+                  </aside>
+                </motion.div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </LayoutGroup>
+      </div>
+
+      <div className="sticky bottom-0 border-t bg-background/95 p-3 backdrop-blur md:p-4">
+        {hasActivePlan ? (
+          <StudioCreateComposer variant="dock" />
+        ) : (
+          <div className="flex justify-center">
+            <Button asChild>
+              <Link href="/dashboard/pricing">Tarif wählen, um zu generieren</Link>
+            </Button>
           </div>
         )}
-
-        <AnimatePresence>
-          {selectedItem ? (
-            <motion.div
-              key="studio-media-lightbox"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Bild in Großansicht"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
-              onClick={() => setSelectedItem(null)}
-              className="evg-scrim studio-media-detail-scrim"
-            >
-              <motion.div
-                onClick={(event) => event.stopPropagation()}
-                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
-                transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
-                className="studio-media-detail"
-              >
-                <div className="studio-media-detail__stage">
-                  <motion.img
-                    className="studio-media-detail__img"
-                    layoutId={reduceMotion ? undefined : `studio-media-${selectedItem.id}`}
-                    src={getMediaAssetUrl(selectedItem)}
-                    alt={getMediaDisplayTitle(selectedItem)}
-                    transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
-                  />
-                </div>
-                <aside className="studio-media-detail__aside">
-                  <div className="studio-media-detail__head">
-                    <div className="studio-media-detail__title-row">
-                      <label htmlFor={`media-title-${selectedItem.id}`} className="evg-rubrik">
-                        Motiv-Titel
-                      </label>
-                      <input
-                        id={`media-title-${selectedItem.id}`}
-                        ref={titleInputRef}
-                        className="evg-input"
-                        value={titleDraft}
-                        onChange={(event) => setTitleDraft(event.target.value)}
-                        onBlur={() => {
-                          if (selectedItem) void saveMediaTitle(selectedItem, titleDraft);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            if (selectedItem) void saveMediaTitle(selectedItem, titleDraft);
-                          }
-                        }}
-                        maxLength={120}
-                        disabled={titleSaving}
-                        placeholder="z. B. Hefeweizen · Hero-Glas · Public Viewing"
-                        style={{ marginTop: 8, height: 36, fontWeight: 500 }}
-                      />
-                      <div className="studio-media-detail__save-hint">
-                        <span>Enter oder Speichern</span>
-                        <StudioButton
-                          size="sm"
-                          variant="soft"
-                          disabled={titleSaving || titleDraft.trim() === getMediaDisplayTitle(selectedItem)}
-                          onClick={() => void saveMediaTitle(selectedItem, titleDraft)}
-                        >
-                          Titel speichern
-                        </StudioButton>
-                      </div>
-                      <dl className="evg-sheet" style={{ marginTop: 14 }}>
-                        <dt>Format</dt>
-                        <dd>
-                          {selectedItem.resolution} · {selectedItem.aspectRatio} ·{" "}
-                          {selectedItem.outputFormat.toUpperCase()}
-                        </dd>
-                        <dt>Zeit</dt>
-                        <dd>{formatRelativeTime(selectedItem.createdAt)}</dd>
-                      </dl>
-                    </div>
-                    <StudioIconButton aria-label="Schließen" onClick={() => setSelectedItem(null)}>
-                      <StudioIcon name="x" size={16} />
-                    </StudioIconButton>
-                  </div>
-                  {titleError ? (
-                    <p className="evg-note" style={{ margin: 0, fontSize: 12.5 }}>
-                      {titleError}
-                    </p>
-                  ) : null}
-                  {titleSaving ? (
-                    <p style={{ margin: 0, fontSize: 12.5, color: "var(--fg-5)" }}>Titel wird gespeichert …</p>
-                  ) : null}
-                  {downloadError ? (
-                    <p className="evg-note" style={{ margin: 0, fontSize: 12.5 }}>
-                      {downloadError}
-                    </p>
-                  ) : null}
-                  <div className="studio-media-detail__actions">
-                    <StudioButton disabled={downloading} onClick={() => void handleDownload(selectedItem)}>
-                      {downloading ? "Wird heruntergeladen …" : "Herunterladen"}
-                    </StudioButton>
-                    <StudioButton variant="ghost" onClick={() => setSelectedItem(null)}>
-                      Schließen
-                    </StudioButton>
-                  </div>
-                </aside>
-              </motion.div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </LayoutGroup>
+      </div>
     </div>
   );
 }

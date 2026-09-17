@@ -6,13 +6,12 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
-import { getBrandProfileFromMetadata, isBrandProfileActive, isBrandProfileComplete } from "@/lib/dashboard/brandProfile";
 import { isOwnerUser } from "@/lib/auth/owner";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { hasActiveSubscription } from "@/lib/billing/access";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
 import { CreateContentLockedView } from "@/components/studio/create-content-locked-view";
-import { InhalteErstellenRedesign } from "@/components/ui/inhalte-erstellen-redesign";
+import { InhalteErstellenMoonChatPage } from "@/components/ui/inhalte-erstellen-moon-chat-page";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -57,24 +56,6 @@ export default async function InhalteErstellenPage() {
     redirect("/onboarding");
   }
 
-  const dashboard = getDashboardMetadata(resourceUser.user_metadata);
-  const settings = dashboard.settings as Record<string, unknown> | undefined;
-  const profileName =
-    typeof settings?.profileName === "string"
-      ? settings.profileName
-      : typeof resourceUser.user_metadata?.full_name === "string"
-        ? resourceUser.user_metadata.full_name
-        : undefined;
-  const breweryName =
-    typeof settings?.breweryName === "string"
-      ? settings.breweryName
-      : typeof resourceUser.user_metadata?.brewery === "string"
-        ? resourceUser.user_metadata.brewery
-        : undefined;
-
-  const brandProfile = getBrandProfileFromMetadata(resourceUser.user_metadata);
-
-  // Owner brauchen kein Stripe-Abo — Tokens und API-Guards sind separat freigeschaltet.
   if (!isOwnerUser(user)) {
     await ensureBillingRow(resourceUser.id);
     let billing = await getBillingRow(resourceUser.id);
@@ -98,14 +79,5 @@ export default async function InhalteErstellenPage() {
     }
   }
 
-  return (
-    <InhalteErstellenRedesign
-      userEmail={user.email}
-      initialProfileName={profileName}
-      initialBreweryName={breweryName}
-      brandProfileComplete={isBrandProfileComplete(brandProfile)}
-      brandProfileActive={isBrandProfileActive(brandProfile)}
-      brandProfileMode={brandProfile.brandProfileMode}
-    />
-  );
+  return <InhalteErstellenMoonChatPage />;
 }

@@ -282,7 +282,6 @@
     .studio-modal-close,
     .studio-create-modal__close,
     .evg-hopfenhugo-close,
-    .studio-onb-widget-close
   ) {
     min-width: 44px;
     min-height: 44px;
@@ -291,9 +290,6 @@
   .evg-studio :is(
     .stu-input,
     .stu-select,
-    .studio-team-input,
-    .studio-team-select,
-    .studio-settings-input,
     .studio-field,
     .studio-field-with-icon,
     .studio-create-select,
@@ -317,96 +313,6 @@
     transform: scale(0.98);
   }
 
-  /* ── Dashboard: Kerndaten zuerst, keine redundanten Blöcke ── */
-
-  .evg-studio .stu-dash-home {
-    gap: 12px;
-    padding-bottom: 0;
-  }
-
-  .evg-studio .stu-dash-home__head {
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 0;
-  }
-
-  .evg-studio .stu-dash-home__title {
-    font-size: 22px;
-  }
-
-  .evg-studio .stu-dash-home__actions {
-    margin-left: auto;
-  }
-
-  .evg-studio .stu-dash-home__actions .stu-btn {
-    min-height: 40px;
-  }
-
-  .evg-studio .stu-dash-home__kpi-grid {
-    gap: 8px;
-  }
-
-  .evg-studio .stu-dash-home__kpi-grid .stu-card {
-    min-height: 112px;
-    padding: 12px;
-  }
-
-  .evg-studio .stu-dash-home__kpi-value {
-    font-size: 25px;
-  }
-
-  .evg-studio .stu-dash-home__main-grid,
-  .evg-studio .stu-dash-home__stack {
-    gap: 10px;
-  }
-
-  .evg-studio .stu-dash-home__main-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .evg-studio .stu-dash-home__chart-card .stu-dash-home__chart-wrap {
-    min-height: 0;
-    margin-top: 10px;
-  }
-
-  .evg-studio .stu-dash-home__chart-legend {
-    margin-top: 10px;
-    gap: 8px;
-  }
-
-  .evg-studio .stu-dash-home__chart-axis span:not(:first-child):not(:last-child):nth-child(even) {
-    display: none;
-  }
-
-  .evg-studio .stu-dash-home__table-wrap {
-    display: none;
-  }
-
-  .evg-studio .stu-dash-home__mobile-list {
-    display: block;
-  }
-
-  .evg-studio .stu-dash-home__recent-count--desktop {
-    display: none;
-  }
-
-  .evg-studio .stu-dash-home__recent-count--mobile {
-    display: inline;
-  }
-
-  .evg-studio .stu-dash-home__mobile-row {
-    min-height: 58px;
-    padding: 10px 14px;
-  }
-
-  .evg-studio .stu-dash-home__mobile-row:nth-child(n + 4) {
-    display: none;
-  }
-
-  .evg-studio .stu-dash-home__mobile-secondary,
-  .evg-studio .stu-dash-home__assistant {
-    display: none !important;
-  }
 
   /* ── Mediathek ───────────────────────────────────────── */
 
@@ -479,105 +385,33 @@
     width: 100%;
   }
 
-  /* ── Team & Einstellungen ─────────────────────────────── */
-
-  .evg-studio :is(.studio-team-title, .studio-settings-title, .studio-brand-title) {
-    font-size: 22px;
-  }
-
-  .evg-studio :is(.studio-team-header, .studio-settings-header, .studio-brand-header) {
-    margin-bottom: 14px;
-  }
-
-  .evg-studio .studio-team-header,
-  .evg-studio .studio-brand-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .evg-studio .studio-team-invite__grid,
-  .evg-studio .studio-team-row,
-  .evg-studio .studio-settings-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .evg-studio .studio-team-invite {
-    padding: 14px;
-  }
-
-  .evg-studio .studio-team-invite__actions .stu-btn {
-    width: 100%;
-  }
-
-  .evg-studio .studio-team-invite-submit {
-    min-height: 44px;
-    padding: 0 10px;
-  }
-
-  .evg-studio .studio-team-members__head {
-    padding: 12px 14px;
-  }
-
-  .evg-studio .studio-team-row {
-    gap: 10px;
-    padding: 12px 14px;
-  }
-
-  .evg-studio .studio-team-row__meta:last-child .stu-btn {
-    width: 100%;
-  }
-
-  .evg-studio .studio-settings-callout,
-  .evg-studio .studio-settings-section {
-    padding: 14px;
-  }
-
-  .evg-studio .studio-settings-callout {
-    flex-direction: column;
-  }
-
-  .evg-studio .studio-settings-callout__actions .stu-btn {
-    flex: 1 1 100%;
-    width: 100%;
-  }
-
-  .evg-studio .studio-settings-save-row {
-    position: sticky;
-    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 8px);
-    z-index: 8;
-    margin: 14px -4px 0;
-    padding: 8px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    background: color-mix(in srgb, var(--s1) 94%, transparent);
-    box-shadow: var(--sh-toast);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
-
-  .evg-studio .studio-settings-save-row .stu-btn {
-    flex: 1;
-  }
 
   /* ── Markenprofil & modale Abläufe ────────────────────── */
+
+  .evg-studio .studio-brand-quick {
+    padding: 14px;
+    max-width: none;
+  }
 
   .evg-studio .studio-brand-empty-card {
     padding: 22px 14px;
   }
 
-  .evg-studio .studio-brand-grid,
+  .evg-studio .studio-brand-id,
+  .evg-studio .studio-brand-layout,
+  .evg-studio .studio-brand-21st,
   .evg-studio .studio-brand-skeleton,
   .evg-studio .studio-brand-review-rules {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .evg-studio .studio-brand-lock-card {
+  .evg-studio .studio-brand-aside {
     order: -1;
   }
 
-  .evg-studio .studio-brand-website-head,
-  .evg-studio .studio-brand-website-left {
-    gap: 10px;
+  .evg-studio .studio-brand-id__type {
+    border-right: 0;
+    min-height: 140px;
   }
 
   .evg-studio .studio-brand-rule-row {
@@ -661,129 +495,8 @@
     right: 10px;
   }
 
-  /* ── Abonnement: Tarife seitlich wischen statt endlos scrollen ── */
 
-  .evg-studio .studio-pricing-page {
-    padding-bottom: 8px;
-  }
-
-  .evg-studio .studio-pricing-header {
-    margin-bottom: 18px;
-  }
-
-  .evg-studio .studio-pricing-title {
-    font-size: 24px;
-  }
-
-  .evg-studio .studio-pricing-sub {
-    margin-top: 6px;
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    overflow: hidden;
-  }
-
-  .evg-studio .studio-pricing-summary {
-    display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-    align-items: start;
-    gap: 14px;
-    padding: 16px;
-  }
-
-  .evg-studio .studio-pricing-summary__tokens {
-    width: auto;
-    min-width: 0;
-  }
-
-  .evg-studio .studio-pricing-summary__billing {
-    display: none;
-  }
-
-  .evg-studio .studio-pricing-summary__portal {
-    grid-column: 1 / -1;
-    width: 100%;
-    margin: 0;
-  }
-
-  .evg-studio .studio-pricing-summary__portal p {
-    display: none;
-  }
-
-  .evg-studio .studio-pricing-summary__tokens-meta {
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  .evg-studio .studio-pricing-yearly-toggle {
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    padding: 14px;
-  }
-
-  .evg-studio .studio-pricing-yearly-toggle-copy {
-    min-width: 0;
-  }
-
-  .evg-studio .studio-pricing-yearly-switch {
-    align-self: center;
-  }
-
-  .evg-studio .studio-pricing-plans {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: min(86vw, 340px);
-    gap: 12px;
-    margin: 0 -12px 18px;
-    padding: 4px 12px 14px;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 12px;
-    scrollbar-width: none;
-  }
-
-  .evg-studio .studio-pricing-plans::-webkit-scrollbar,
-  .evg-studio .studio-pricing-token-packs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .evg-studio .studio-pricing-card-wrap {
-    scroll-snap-align: start;
-  }
-
-  .evg-studio .studio-pricing-card {
-    padding: 20px 18px 18px;
-  }
-
-  .evg-studio .studio-pricing-card:hover {
-    transform: none;
-  }
-
-  .evg-studio .studio-pricing-token-section {
-    padding: 18px 16px;
-  }
-
-  .evg-studio .studio-pricing-token-packs {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: min(78vw, 280px);
-    gap: 10px;
-    margin-right: -16px;
-    padding-right: 16px;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-  }
-
-  .evg-studio .studio-pricing-token-pack {
-    scroll-snap-align: start;
-  }
-
-  /* ── Bilderstellung als drei kompakte App-Panels ───────── */
+  /* ── Bilderstellung: Umschaltung Motiv / Ergebnis ───────── */
 
   .evg-studio .studio-create-page-head {
     gap: 8px;
@@ -794,24 +507,37 @@
     font-size: 22px;
   }
 
-  .evg-studio .studio-create-page-head__actions {
-    width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+  .evg-studio .studio-create-mobile-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 3px;
+    border-radius: var(--r-md);
+    background: var(--s3);
+  }
+
+  .evg-studio .studio-create-mobile-switch button {
+    min-height: 40px;
+    border: 0;
+    border-radius: calc(var(--r-md) - 2px);
+    background: transparent;
+    color: var(--t3);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .evg-studio .studio-create-mobile-switch button.is-active {
+    background: var(--s1);
+    color: var(--t1);
   }
 
   .evg-studio .studio-create-chip--hyperreal {
     min-height: 44px;
     padding-inline: 14px;
     font-size: 13px;
-  }
-
-  /* Sticky Generate darf Schalter nicht überdecken */
-  .evg-studio .studio-create-studio-col--right {
-    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 72px);
   }
 
   .evg-studio .studio-create-field--switch .stu-switch-row {
@@ -821,140 +547,106 @@
   }
 
   .evg-studio .studio-create-mobile-nav {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-    margin: 0 -12px 14px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--line);
-    background: color-mix(in srgb, var(--bg) 94%, transparent);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
-
-  .evg-studio .studio-create-mobile-nav button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-width: 0;
-    min-height: 44px;
-    padding: 0 8px;
-    border: 1px solid transparent;
-    border-radius: var(--r-md);
-    background: transparent;
-    color: var(--t3);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .evg-studio .studio-create-mobile-nav button > span {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--s3);
-    font-family: var(--f-mono);
-    font-size: 10px;
-  }
-
-  .evg-studio .studio-create-mobile-nav button.is-active {
-    border-color: var(--ac-line);
-    background: var(--ac-tint);
-    color: var(--t1);
-  }
-
-  .evg-studio .studio-create-mobile-nav button.is-active > span {
-    background: var(--ac);
-    color: var(--ac-ink);
-  }
-
-  .evg-studio .studio-create-studio-grid {
-    display: block;
-  }
-
-  .evg-studio .studio-create-studio-col:not([data-mobile-active="true"]) {
     display: none;
   }
 
-  .evg-studio .studio-create-studio-col[data-mobile-active="true"] {
+  .evg-studio .studio-create-studio-grid {
     display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 84px);
+  }
+
+  .evg-studio .studio-create-editor,
+  .evg-studio .studio-create-stage {
+    display: none;
+  }
+
+  .evg-studio .studio-create-editor[data-mobile-active="true"],
+  .evg-studio .studio-create-stage[data-mobile-active="true"] {
+    display: flex;
+  }
+
+  .evg-studio .studio-create-editor {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .evg-studio .studio-create-editor-controls .studio-create-generate {
+    display: none;
+  }
+
+  .evg-studio .studio-create-templates {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .evg-studio .studio-create-product__photo,
+  .evg-studio .studio-create-product__empty {
+    max-height: 180px;
+  }
+
+  .evg-studio .studio-create-ref-card,
+  .evg-studio .studio-create-ref-add {
+    flex: 0 0 64px;
+    width: 64px;
+  }
+
+  .evg-studio .studio-create-ref-card img,
+  .evg-studio .studio-create-ref-add {
+    height: 80px;
   }
 
   .evg-studio .studio-create-tabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .evg-studio .studio-create-tabs__btn {
     padding-inline: 5px;
-    font-size: 11px;
-    white-space: normal;
-  }
-
-  .evg-studio .studio-create-upload,
-  .evg-studio .studio-create-beer-preview {
-    min-height: 88px;
+    font-size: 12px;
   }
 
   .evg-studio .studio-create-textarea {
-    min-height: 120px;
+    min-height: 96px;
   }
 
-  .evg-studio .studio-create-mobile-next {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    min-height: 46px;
-    margin-top: 4px;
-    border: 0;
-    border-radius: var(--r-md);
-    background: var(--ac);
-    color: var(--ac-ink);
-    font: inherit;
-    font-weight: 600;
-  }
-
+  .evg-studio .studio-create-mobile-next,
   .evg-studio .studio-create-mobile-panel-actions {
-    display: grid;
-    grid-template-columns: 1fr 1.35fr;
-    gap: 8px;
-  }
-
-  .evg-studio .studio-create-mobile-panel-actions button {
-    min-height: 46px;
-    border: 1px solid var(--line2);
-    border-radius: var(--r-md);
-    background: var(--s2);
-    color: var(--t1);
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .evg-studio .studio-create-mobile-panel-actions button.is-primary {
-    border-color: var(--ac);
-    background: var(--ac);
-    color: var(--ac-ink);
+    display: none;
   }
 
   .evg-studio .studio-create-preview-stage[data-aspect="9:16"] {
     max-height: 52dvh;
   }
 
-  .evg-studio .studio-create-generate {
-    position: sticky;
-    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 8px);
-    z-index: 8;
-    min-height: 50px;
-    box-shadow: 0 8px 24px rgba(24, 20, 15, 0.16);
+  .evg-studio .studio-create-col-generate {
+    display: none;
+  }
+
+  .evg-studio .studio-create-dock {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: fixed;
+    left: env(safe-area-inset-left, 0px);
+    right: env(safe-area-inset-right, 0px);
+    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+    z-index: 12;
+    margin: 0;
+    padding: 10px 12px;
+    background: color-mix(in srgb, var(--s1) 94%, transparent);
+    border-top: 1px solid var(--line2);
+    border-radius: 0;
+  }
+
+  .evg-studio .studio-create-dock .studio-create-generate {
+    position: static;
+    flex: 1;
+    min-height: 48px;
+    box-shadow: none;
+    display: block;
   }
 
   .evg-studio .studio-create-modal {
@@ -1046,21 +738,6 @@
     font-size: 16px;
   }
 
-  .evg-studio.studio-onb-dock {
-    left: 10px;
-    right: 10px;
-    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 10px);
-  }
-
-  .evg-studio .studio-onb-widget {
-    width: 100%;
-    max-height: min(62dvh, 520px);
-    overflow-y: auto;
-  }
-
-  .evg-studio .studio-onb-task {
-    min-height: 48px;
-  }
 
   .stu-toaster {
     right: 10px;
@@ -1263,17 +940,6 @@
     display: none;
   }
 
-  .evg-studio .stu-dash-home__kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .evg-studio .stu-dash-home__kpi-grid .stu-card {
-    padding: 10px;
-  }
-
-  .evg-studio .stu-dash-home__kpi-value {
-    font-size: 22px;
-  }
 
   .evg-studio .studio-create-mobile-nav button {
     gap: 4px;
@@ -1284,7 +950,4 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .evg-studio .studio-pricing-summary {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }

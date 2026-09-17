@@ -5,8 +5,8 @@ import {
   sanitizeDashboardSettings,
 } from "@/lib/dashboard/settingsPayload";
 import {
-  mergeSuggestedBeers,
   persistSuggestedBeerLabels,
+  replaceSuggestedBeers,
   type SuggestedBeerVariety,
 } from "@/lib/brand/beer-catalog-intake";
 import { getFreshUserMetadata } from "@/lib/dashboard/freshMetadata";
@@ -20,6 +20,19 @@ import {
 import { storeBrandReferenceImagesAsUrls } from "@/lib/brand/persist-reference-urls";
 import { parseBrandReferenceIdFromUrl, repairBrandReferenceImageUrls } from "@/lib/brand/reference-image-store";
 import { normalizeWebsiteUrl } from "@/lib/brand/url-intake";
+
+/** Sortiment gehört zur aktiven Marke — Domain, sonst Brauereiname. */
+export function brandCatalogKey(input: { brandWebsiteUrl?: string; breweryName?: string }): string {
+  const normalized = normalizeWebsiteUrl(input.brandWebsiteUrl ?? "");
+  if (normalized) {
+    try {
+      return new URL(normalized).hostname.replace(/^www\./, "").toLowerCase();
+    } catch {
+      /* fall through */
+    }
+  }
+  return (input.breweryName ?? "").trim().toLowerCase();
+}
 
 export type BrandReferencePayload = {
   base64: string;
@@ -194,6 +207,14 @@ export async function persistBrandProfileForUser(params: {
   });
 
   const freshMetadata = await getFreshUserMetadata(params.userId, params.latestMetadata);
+  const previousSettings = sanitizeDashboardSettings(getDashboardMetadata(freshMetadata).settings);
+  const previousCatalogKey = brandCatalogKey(previousSettings);
+  const nextCatalogKey = brandCatalogKey({
+    brandWebsiteUrl: params.input.brandWebsiteUrl,
+    breweryName: params.input.breweryName,
+  });
+  const brandChanged = Boolean(nextCatalogKey) && previousCatalogKey !== nextCatalogKey;
+
   let existingBeers: DashboardBeer[] = [];
   try {
     existingBeers = await readDashboardBeers(params.userId);
@@ -203,7 +224,11 @@ export async function persistBrandProfileForUser(params: {
   let myBeers: DashboardBeer[] | undefined;
   if (params.input.suggestedBeers && params.input.suggestedBeers.length > 0) {
     const withLabels = await persistSuggestedBeerLabels(params.userId, params.input.suggestedBeers);
-    myBeers = mergeSuggestedBeers(existingBeers, withLabels);
+    // Beim Aktivieren ist der Scan die Quelle der Wahrheit — fremde Sorten fliegen raus.
+    myBeers = replaceSuggestedBeers(existingBeers, withLabels);
+  } else if (brandChanged || params.input.brandProfileSource === "url") {
+    // Neue Marke / URL-Scan ohne Treffer: altes Sortiment nicht stehen lassen.
+    myBeers = [];
   }
 
   const admin = createAdminClient();
@@ -235,7 +260,7 @@ export async function persistBrandProfileForUser(params: {
     throw new Error(error.message || "Markenprofil konnte nicht gespeichert werden.");
   }
 
-  if (myBeers) await replaceDashboardBeers(params.userId, myBeers);
+  if (myBeers) await replaceDashboardBeers(params.userId, myBeers, { force: true });
 
   return {
     settings,

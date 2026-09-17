@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+export const produktKategorieSchema = z.enum(["bier", "limonade", "tafelwasser", "mineralwasser"]);
 export const flaschenTypSchema = z.enum([
   // 0,33 l
   "euro_longneck_330",
@@ -99,6 +100,7 @@ export const hyperrealisticSchema = z.object({
   etikettBild: z.string().url(),
   flaschenTyp: flaschenTypSchema,
   flaschenfarbe: z.enum(["braun", "gruen", "klar"]).default("braun"),
+  produktKategorie: produktKategorieSchema.optional().default("bier"),
   bierstil: z.string().trim().min(1),
   glasTyp: glasTypSchema.optional(),
   szene: z.enum([
@@ -143,11 +145,30 @@ export const hyperrealisticSchema = z.object({
   zusatzWunsch: z.string().trim().max(800).optional(),
   /** Sortenname aus „Meine Biere“ — fuer den 1:1-Etikett-Lock. */
   beerName: z.string().trim().max(80).optional(),
+  /** Charaktername aus Markenprofil — Identitaet aus Referenzfotos. */
+  characterName: z.string().trim().max(80).optional(),
+  /** Rolle des Charakters, z. B. Braumeister. */
+  characterRole: z.string().trim().max(60).optional(),
+  /** Higgsfield-Style Appearance Lock (Text) — Ergänzung zur Foto-Identität. */
+  characterAppearanceLock: z.string().trim().max(600).optional(),
+  /**
+   * Charakter-Gesichtsfotos (HTTPS oder data:). Bei gesetztem Charakter → Nano Banana Identity-Pfad.
+   * Nicht mit extraReferenceImages vermischen.
+   */
+  characterReferenceImages: z.array(z.string().min(8).max(12_000_000)).max(3).optional(),
   /**
    * Zusaetzliche Kontext-Referenzen (Kiste, Location, Stimmung) — nicht das Sorten-Etikett.
    * data:-URLs oder https. Max. 3.
    */
   extraReferenceImages: z.array(z.string().min(8).max(12_000_000)).max(3).optional(),
+  extraReferenceRoles: z.array(z.enum(["scene", "look"])).max(3).optional(),
+  /**
+   * Produktfoto als Etikett-Anker. Unabhängig von applyBrandLook:
+   * aus = Szene frei, Produktidentität nicht erzwungen.
+   */
+  keepLabel: z.boolean().optional(),
+  /** Markenfarben, Licht und Bildsprache aus dem Profil — ändert nicht das Etikett. */
+  applyBrandLook: z.boolean().optional(),
   /** Client-Stiltreue: frei=generisches Etikett, normal/hoch=Marken-Lock (hoch strenger). */
   stiltreue: z.enum(["frei", "normal", "hoch"]).optional(),
   /** Content-Tab Framing fuer applyContentPresetPrompt. */

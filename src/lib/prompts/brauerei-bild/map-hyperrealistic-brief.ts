@@ -1,5 +1,9 @@
 import { FLASCHEN_TYPEN, GLAS_TYPEN, isDoseTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
+import {
+  beverageDrinkNoun,
+  inputProduktKategorie,
+} from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
 
 const SZENE_LABELS: Record<HyperrealisticInput["szene"], string> = {
   biergarten_sommer: "Biergarten im Sommer",
@@ -182,10 +186,14 @@ export function hyperrealisticInputToBrauereiBrief(
   const behaelter = input.behaelter ?? (glas ? "B" : "F");
   const personen = describePersonenModus(input);
   const etikettModus = input.etikettModus ?? "marke";
+  const produktKategorie = inputProduktKategorie(input);
+  const drink = beverageDrinkNoun(input);
 
   return {
     modus: "hyperrealistic_dashboard",
-    biertyp: input.bierstil,
+    produktKategorie,
+    getraenk: drink,
+    biertyp: produktKategorie === "bier" ? input.bierstil : drink,
     behaelter: BEHAELTER_LABELS[behaelter],
     behaelterCode: behaelter,
     flaschenTyp: behaelter === "G" ? null : flasche.label,
@@ -233,7 +241,11 @@ export function buildHyperrealisticClaudeUserMessage(
 
   const lines: string[] = [
     "Erstelle einen kopierfertigen englischen Bildgenerierungs-Prompt fuer den BrewAI Dashboard-Modus „Hyperrealistisch“.",
-    `Zielmodell: ${targetModel} — schreibe einen natürlichsprachlichen, beschreibenden englischen Prompt (KEINE Midjourney-/Nano-Banana-Parameter wie --ar, --v, --style, --no, KEINE Seitenverhältnis-Flags). Nutze SRM-Farbtabelle und Schaumcharakteristik aus dem Skill.`,
+    `Zielmodell: ${targetModel} — schreibe einen natürlichsprachlichen, beschreibenden englischen Prompt (KEINE Midjourney-/Nano-Banana-Parameter wie --ar, --v, --style, --no, KEINE Seitenverhältnis-Flags). ${
+      inputProduktKategorie(input) === "bier"
+        ? "Nutze SRM-Farbtabelle und Schaumcharakteristik aus dem Skill."
+        : `Das Getränk ist ${beverageDrinkNoun(input)} — KEINE Bierfarbe, KEIN Hopfen, KEIN Bierschaum. Wasser farblos. Kohlensäure und Limonadenfarbe nur aus Produktname oder Referenzfoto ableiten.`
+    }`,
   ];
 
   const hasReferenceImage = Boolean(options?.hasReferenceImage) && input.etikettModus === "marke";
@@ -262,7 +274,9 @@ export function buildHyperrealisticClaudeUserMessage(
     );
   } else {
     lines.push(
-      "GENERISCHES ETIKETT (PFLICHT): Es gibt KEIN Referenzbild. Die Bild-KI soll selbst ein originelles, professionell wirkendes Etikett (bei Dose: Wrap-around-Artwork) gestalten, das zum Bierstil und zur Stimmung passt.",
+      inputProduktKategorie(input) === "bier"
+        ? "GENERISCHES ETIKETT (PFLICHT): Es gibt KEIN Referenzbild. Die Bild-KI soll selbst ein originelles, professionell wirkendes Etikett (bei Dose: Wrap-around-Artwork) gestalten, das zum Bierstil und zur Stimmung passt."
+        : "GENERISCHES ETIKETT (PFLICHT): Es gibt KEIN Referenzbild. Die Bild-KI soll selbst ein originelles, professionell wirkendes Etikett (bei Dose: Wrap-around-Artwork) gestalten, das zum Getränk und zur Stimmung passt.",
       "Erfinde dafuer einen plausiblen FIKTIVEN Markennamen + passendes Logo (KEINE echte, real existierende Brauerei, keine fremden Marken) und beschreibe ihn konkret im englischen Prompt: klare, gut lesbare Typografie, stimmige Farbpalette, sauberes realistisches Layout.",
       "Die Flasche/Dose darf NICHT leer oder unbranded sein. Du DARFST hier einen fiktiven Markennamen via EXACT TEXT vorgeben (im Gegensatz zum Referenzbild-Workflow, wo nichts erfunden wird).",
     );
@@ -303,7 +317,9 @@ export function buildHyperrealisticClaudeUserMessage(
     const glas = GLAS_TYPEN[input.glasTyp];
     if (glas) {
       lines.push(
-        `KRITISCH GLASFORM (PFLICHT): Jedes Bierglas MUSS ein ${glas.label} sein: ${glas.promptDescription}.`,
+        inputProduktKategorie(input) === "bier"
+          ? `KRITISCH GLASFORM (PFLICHT): Jedes Bierglas MUSS ein ${glas.label} sein: ${glas.promptDescription}.`
+          : `KRITISCH GLASFORM (PFLICHT): Jedes Glas MUSS ein ${glas.label} sein: ${glas.promptDescription}. Das Getränk ist ${beverageDrinkNoun(input)} — KEIN Bierschaum, KEINE Bierfarbe.`,
         "Ergaenze am Promptende einen 'GLASS SHAPE LOCK (MANDATORY)'-Satz. Kein Ersatzglas (Willibecher nicht als Pilstulpe rendern).",
       );
     }
@@ -318,7 +334,9 @@ export function buildHyperrealisticClaudeUserMessage(
 
   lines.push(
     "HYPERREALISM (PFLICHT): Das Bild muss wie eine echte Handheld-Kameraaufnahme wirken — keine CGI, keine Beauty-Retusche, keine cinematic orange grade, kein Werbe-Hero-Look.",
-    "Nutze SRM-Farbe + Hex aus der Farbtabelle, Schaumcharakteristik, Kondenswasser-Realismus und mindestens 3 konkrete Umgebungs-Mikrodetails.",
+    inputProduktKategorie(input) === "bier"
+      ? "Nutze SRM-Farbe + Hex aus der Farbtabelle, Schaumcharakteristik, Kondenswasser-Realismus und mindestens 3 konkrete Umgebungs-Mikrodetails."
+      : `Getränk: ${beverageDrinkNoun(input)}. KEINE SRM-Bierfarbe, KEIN Hopfen, KEIN Bierschaum. Wasser farblos. Kondenswasser-Realismus und mindestens 3 konkrete Umgebungs-Mikrodetails.`,
     "Menschen: natuerliche Hauttextur (Poren, keine waxy plastic skin), korrekte Haende/Finger, keine Stock-Photo-Posen.",
     "Kamera: explizites Objektiv (35/50/85/100mm), Blende, Bildausschnitt und Tiefenschaerfe.",
     "Negative am Ende: CGI, cartoon, plastic foam, sticker condensation, waxy skin, generic stock look.",

@@ -41,6 +41,7 @@ const bodySchema = z.object({
     .array(
       z.object({
         name: z.string().min(1).max(80),
+        produktKategorie: z.enum(["bier", "limonade", "tafelwasser", "mineralwasser"]).optional(),
         bierstil: z.string().min(1).max(60),
         flaschenTyp: z.string().min(1).max(60),
         flaschenfarbe: z.enum(["braun", "gruen", "klar"]),

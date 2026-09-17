@@ -15,6 +15,7 @@ describe("sanitizeDashboardBeers", () => {
     expect(beer).toEqual({
       id: "b1",
       name: "Falter Hell",
+      produktKategorie: "bier",
       bierstil: "helles",
       flaschenTyp: "nrw_500",
       flaschenfarbe: "braun",
@@ -39,6 +40,17 @@ describe("sanitizeDashboardBeers", () => {
     expect(beer.flaschenTyp).toBe("buegel_500");
     expect(beer.flaschenfarbe).toBe("gruen");
     expect(beer.etikettUrl).toBe("https://cdn.example.com/etikett.jpg");
+  });
+
+  it("setzt fehlende Kategorie auf Bier und behaelt Limonade", () => {
+    const [legacy] = sanitizeDashboardBeers([{ id: "b3", name: "Helles" }]);
+    expect(legacy?.produktKategorie).toBe("bier");
+    const [limo] = sanitizeDashboardBeers([
+      { id: "b4", name: "Spezi", produktKategorie: "limonade", bierstil: "spezi" },
+    ]);
+    expect(limo?.produktKategorie).toBe("limonade");
+    expect(limo?.bierstil).toBe("spezi");
+    expect(limo?.flaschenfarbe).toBe("klar");
   });
 
   it("deckelt auf MAX_MY_BEERS Eintraege", () => {

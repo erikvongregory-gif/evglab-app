@@ -174,10 +174,19 @@ export function classifyProviderError(input: {
   }
 
   if (status !== null && status >= 400) {
+    const characterLikenessHint = matches(haystack, [
+      /likeness/,
+      /real person/,
+      /photorealistic.*person/,
+      /biometric/,
+      /face\s*match/,
+    ]);
     return {
       ...base,
       code: "provider_bad_request",
-      userMessage: "Die Anfrage wurde vom Bildmodell abgelehnt. Bitte prüf deine Eingaben und versuch es erneut.",
+      userMessage: characterLikenessHint
+        ? "Das Bildmodell hat die Personen-Referenz abgelehnt. Versuch es mit einem anderen Charakter-Foto oder ohne Charakter erneut."
+        : "Die Anfrage wurde vom Bildmodell abgelehnt. Bitte prüf deine Eingaben und versuch es erneut.",
       httpStatus: 400,
       retryable: false,
       providerFault: false,

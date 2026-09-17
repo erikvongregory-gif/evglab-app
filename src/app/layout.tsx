@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { SITE } from "@/lib/siteConfig";
+import { fontVars } from "@/lib/fonts/registry";
+import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
+import { ThemeBootScript } from "@/scripts/admin/theme-boot";
 import "./globals.css";
 
 const inter = Inter({
@@ -27,9 +30,13 @@ export const metadata: Metadata = {
   description: SITE.defaultDescription,
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
   icons: {
-    icon: [{ url: "/icon.svg?v=20260607", type: "image/svg+xml" }],
-    shortcut: ["/icon.svg?v=20260607"],
-    apple: [{ url: "/icon.png?v=20260607", sizes: "180x180", type: "image/png" }],
+    icon: [
+      { url: "/favicon.ico?v=20260917", sizes: "any" },
+      { url: "/icon.svg?v=20260917", type: "image/svg+xml" },
+      { url: "/icon.png?v=20260917", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: ["/favicon.ico?v=20260917"],
+    apple: [{ url: "/icon.png?v=20260917", sizes: "180x180", type: "image/png" }],
   },
 };
 
@@ -38,7 +45,7 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: "cover" as const,
-  themeColor: "#0a0f14",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -46,9 +53,25 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { theme_mode, theme_preset, content_layout, navbar_style, sidebar_variant, sidebar_collapsible, font } =
+    PREFERENCE_DEFAULTS;
   return (
-    <html lang="de" className={`${inter.variable} ${playfair.variable}`}>
-      <body className="min-h-[100dvh] bg-gray-50 text-neutral-900 antialiased dark:bg-gray-950">{children}</body>
+    <html
+      lang="de"
+      className={`${inter.variable} ${playfair.variable} ${fontVars}`}
+      data-theme-mode={theme_mode}
+      data-theme-preset={theme_preset}
+      data-content-layout={content_layout}
+      data-navbar-style={navbar_style}
+      data-sidebar-variant={sidebar_variant}
+      data-sidebar-collapsible={sidebar_collapsible}
+      data-font={font}
+      suppressHydrationWarning
+    >
+      <head>
+        <ThemeBootScript />
+      </head>
+      <body className="min-h-[100dvh] bg-background text-foreground antialiased">{children}</body>
     </html>
   );
 }

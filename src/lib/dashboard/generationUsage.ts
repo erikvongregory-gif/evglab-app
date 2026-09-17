@@ -1,4 +1,10 @@
-type JobRow = { created_at: string | null; charged: number | null };
+import { calculateGenerationTokenCost } from "@/lib/billing/generationTokenCost";
+
+type JobRow = {
+  created_at: string | null;
+  charged: number | null;
+  result?: Record<string, unknown> | null;
+};
 
 export type GenerationUsageStats = {
   /** null wenn die Monatszählung fehlgeschlagen ist (nicht mit 0 verwechseln). */
@@ -26,14 +32,55 @@ export function monthStartIso(now = new Date()) {
   return d.toISOString();
 }
 
+/**
+ * Abgerechnete Tokens; bei Owner/charged=0 Nominalkosten aus Result
+ * (perVariant × Varianten), sonst Standardkosten — damit die Aktivitätskurve
+ * Generierungen sichtbar macht, auch wenn nichts vom Kontingent abgezogen wurde.
+ */
+export function resolveJobTokenUsage(job: JobRow): number {
+  if (typeof job.charged === "number" && job.charged > 0) return job.charged;
+  if (typeof job.charged === "number" && job.charged < 0) return 0;
+
+  const result = job.result && typeof job.result === "object" ? job.result : null;
+  if (result) {
+    const billing =
+      result.billing && typeof result.billing === "object"
+        ? (result.billing as Record<string, unknown>)
+        : null;
+    const perVariant =
+      billing && typeof billing.perVariant === "number" && Number.isFinite(billing.perVariant)
+        ? billing.perVariant
+        : null;
+    const variantsRaw =
+      typeof result.completedVariants === "number"
+        ? result.completedVariants
+        : typeof result.variantCount === "number"
+          ? result.variantCount
+          : 1;
+    const variants = Math.max(1, Math.floor(variantsRaw));
+    if (perVariant != null && perVariant > 0) return perVariant * variants;
+
+    const resolution =
+      result.resolution === "2K" || result.resolution === "4K" || result.resolution === "1K"
+        ? result.resolution
+        : "1K";
+    return calculateGenerationTokenCost({ resolution, variantCount: variants });
+  }
+
+  // Abgeschlossener Job ohne Result-Details (z. B. Owner mit charged=0)
+  if (job.charged === 0 || job.charged == null) {
+    return calculateGenerationTokenCost({ resolution: "1K", variantCount: 1 });
+  }
+  return 0;
+}
+
 export function accumulateTokenUsageByDay(jobs: JobRow[]) {
   const buckets = new Map<string, number>();
   for (const job of jobs) {
     const created = typeof job.created_at === "string" ? job.created_at : "";
     if (!created) continue;
     const day = created.slice(0, 10);
-    const tokens = typeof job.charged === "number" && job.charged >= 0 ? job.charged : 0;
-    buckets.set(day, (buckets.get(day) ?? 0) + tokens);
+    buckets.set(day, (buckets.get(day) ?? 0) + resolveJobTokenUsage(job));
   }
   return [...buckets.entries()]
     .sort(([a], [b]) => a.localeCompare(b))

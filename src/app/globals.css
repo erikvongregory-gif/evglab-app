@@ -1,27 +1,52 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Admin shell (Shadcn) is the visual source of truth for the dashboard.
+   studio-* sheets remain only for not-yet-ported surfaces (brand, create, media, assistant). */
+@import "../styles/admin-theme.css";
+@import "../styles/admin-media.css";
 @import "../styles/studio-tokens.css";
-@import "../styles/studio-screens.css";
 @import "../styles/studio-create.css";
 @import "../styles/studio-hugo.css";
 @import "../styles/studio-media.css";
 @import "../styles/studio-brand.css";
-@import "../styles/studio-pricing.css";
 @import "../styles/studio-locked.css";
-@import "../styles/studio-settings.css";
-@import "../styles/studio-team.css";
-@import "../styles/studio-search.css";
 @import "../styles/studio-beer-create.css";
 @import "../styles/studio-primitives.css";
-@import "../styles/studio-dashboard-home.css";
 @import "../styles/studio-mobile.css";
-@custom-variant dark (&:where(.dark, .dark *));
+@import "../styles/claude-create.css";
+@custom-variant dark (&:is(.dark *));
 /* Explizit alle TS/TSX unter src scannen (u. a. components/ui – Neon-Button-Klassen) */
 @source "..";
 
 @theme inline {
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-glow-slow: glow 2.5s ease-in-out infinite;
+  --animate-bounce-drop: bounceDrop 0.8s ease;
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@keyframes bounceDrop {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0);
+  }
 }
 
 @keyframes accordion-down {
@@ -42,18 +67,18 @@
   }
 }
 
-/* Tailwind: Sans = Inter, Display = Playfair (Marketing auf <html>) */
+/* Admin/Template: --font-sans folgt data-font (Default Geist). Marketing nutzt --font-main = Inter. */
 /* Studio-Semantik: Flächen/Akzent für Utilities unter .evg-studio */
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans);
   --font-display: var(--font-serif), Georgia, "Times New Roman", serif;
   /* Studio-Tailwind: Inter Tight über --font-inter-tight (studioFontClassName) */
   --font-studio-sans: var(--font-inter-tight), "Inter Tight", system-ui, sans-serif;
   --font-studio-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
   --font-studio-brand: var(--font-newsreader), "Newsreader", Georgia, serif;
 
-  --color-background: #ffffff;
-  --color-foreground: #0f172a;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
 
   /* BrewAI Studio — B2B Light */
   --color-bg: #F6F6F4;
@@ -63,7 +88,8 @@
   --color-border: #E5E3DE;
   --color-strong: #D8D5CE;
   --color-fg: #18140F;
-  --color-muted: #4A4339;
+  /* Nicht --color-muted: kollidiert mit Shadcn bg-muted (helle Icon-Flächen) */
+  --color-studio-muted: #4A4339;
   --color-faint: #5E574E;
   --color-acc: #C7691E;
   --color-acc-deep: #A85518;
@@ -77,6 +103,19 @@
   --color-mode-studio: #7E96AE;
   --color-mode-isolate: #8E82B0;
   --color-mode-campaign: #B0808C;
+
+  /* Nur „Bilder erstellen“-Composer — Werte kommen vom Wrapper .brewai-claude-create */
+  --color-cc-bg-0: var(--cc-bg-0);
+  --color-cc-bg-100: var(--cc-bg-100);
+  --color-cc-bg-200: var(--cc-bg-200);
+  --color-cc-bg-300: var(--cc-bg-300);
+  --color-cc-text-100: var(--cc-text-100);
+  --color-cc-text-200: var(--cc-text-200);
+  --color-cc-text-300: var(--cc-text-300);
+  --color-cc-text-400: var(--cc-text-400);
+  --color-cc-text-500: var(--cc-text-500);
+  --color-cc-accent: var(--cc-accent);
+  --color-cc-accent-hover: var(--cc-accent-hover);
 }
 
 :root {
@@ -233,6 +272,7 @@ svg {
 }
 
 :root {
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --akq-green: #14532d;
   --font-main: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-insurance: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -271,6 +311,13 @@ body {
   background: #0a0f14;
   /* overflow-x: clip statt hidden – verhindert Scroll-Buckling auf Desktop */
   overflow-x: clip;
+}
+
+/* Dashboard: Template-Schrift (Geist via data-font), nicht Marketing-Inter */
+body:has(.brewai-admin) {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 @media (max-width: 768px) {
@@ -1886,17 +1933,21 @@ body[data-legal-page="true"] {
 }
 
 /*
- * Große Displays: leicht erhöhte Basis-Typografie, damit UI/Schrift
- * auf 1440p/4K visuell nicht zu klein wirkt.
+ * Große Displays: leicht erhöhte Basis-Typografie für Marketing.
+ * Dashboard (.brewai-admin) bleibt bei Browser-Default 16px — wie Template.
  */
+html:has(.brewai-admin) {
+  font-size: 16px;
+}
+
 @media (min-width: 1536px) {
-  html {
+  html:not(:has(.brewai-admin)) {
     font-size: 17px;
   }
 }
 
 @media (min-width: 2560px) {
-  html {
+  html:not(:has(.brewai-admin)) {
     font-size: 18px;
   }
 }

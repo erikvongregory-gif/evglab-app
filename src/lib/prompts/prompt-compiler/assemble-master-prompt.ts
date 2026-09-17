@@ -1,5 +1,11 @@
-import { FLASCHEN_TYPEN, isDoseTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
+import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
+import { isPouredGlassServing } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
+import {
+  beverageContainerNoun,
+  beverageDrinkNoun,
+  inputProduktKategorie,
+} from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
 import { MASTER_PROMPT_SECTIONS } from "./schema";
 
 const CLOSURE_LABEL: Record<string, string> = {
@@ -37,7 +43,9 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
   const mood = ctx.moodOverride?.trim() || input.stimmungTrend || input.stimmung || "authentic";
   const channel = ctx.channel?.trim() || "Instagram, Website, POS";
   const format = input.aspectRatio || "4:5";
-  const productNoun = isDoseTyp(input.flaschenTyp) ? "beverage can" : "beer bottle";
+  const productNoun = beverageContainerNoun(input);
+  const drink = beverageDrinkNoun(input);
+  const isBeer = inputProduktKategorie(input) === "bier";
 
   const refs: string[] = [];
   if (ctx.hasProductPhoto) {
@@ -89,10 +97,23 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
       `Produkttyp: ${bottle.display_name}.`,
       `Geometrie: ${bottle.geometry_profile}.`,
       `Glasfarbe: ${glassColor}.`,
-      `Verschluss: ${closure}.`,
+      isBeer
+        ? ""
+        : `Getränk: ${drink}. Keine Bierfarbe, kein Hopfen, kein Bierschaum. ${
+            drink.includes("water")
+              ? "Wasser farblos. Kohlensäure nur bei gesicherter Produktangabe."
+              : "Limonadenfarbe nur aus Produktname oder Foto."
+          }`,
+      isPouredGlassServing(input)
+        ? isBeer
+          ? "Verschluss: geöffnet — kein Kronkorken auf der Mündung (Bier ist eingeschenkt)."
+          : `Verschluss: geöffnet — kein Kronkorken auf der Mündung (${drink} ist eingeschenkt).`
+        : `Verschluss: ${closure}.`,
       `Bewahre Flaschensilhouette, Hals, Schulter, Proportionen, Etikettenposition und Verschlussform.`,
       bottle.forbidden,
-    ].join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n"),
     REFERENZEN: refs.join("\n"),
     "SZENE UND KOMPOSITION": [
       `Szene (verbindlich): ${scene}`,

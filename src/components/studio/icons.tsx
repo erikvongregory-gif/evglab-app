@@ -183,6 +183,25 @@ export function StudioIcon({ name, size = 18 }: { name: string; size?: number })
           <path d="M6 6 L18 18 M18 6 L6 18" />
         </svg>
       );
+    /** Iconsax Linear — cup (Sortenauswahl) */
+    case "cup":
+      return (
+        <svg {...common}>
+          <path d="M6 8.5 H18" />
+          <path d="M6.5 8.5 V9.5 C6.5 12.54 8.96 15 12 15 C15.04 15 17.5 12.54 17.5 9.5 V8.5" />
+          <path d="M9 8.5 V5.5 C9 4.67 9.67 4 10.5 4 H13.5 C14.33 4 15 4.67 15 5.5 V8.5" />
+          <path d="M12 15 V19" />
+          <path d="M9.5 21 H14.5" />
+        </svg>
+      );
+    /** Iconsax Linear — profile / user (Charakter) */
+    case "user":
+      return (
+        <svg {...common}>
+          <path d="M12.16 10.87 C12.06 10.86 11.94 10.86 11.83 10.87 C9.45 10.79 7.56 8.84 7.56 6.44 C7.56 3.99 9.54 2 12 2 C14.45 2 16.44 3.99 16.44 6.44 C16.43 8.84 14.54 10.79 12.16 10.87 Z" />
+          <path d="M7.16 14.56 C4.74 16.18 4.74 18.82 7.16 20.43 C9.91 22.27 14.42 22.27 17.17 20.43 C19.59 18.81 19.59 16.17 17.17 14.56 C14.43 12.73 9.92 12.73 7.16 14.56 Z" />
+        </svg>
+      );
     default:
       return <svg {...common}><circle cx="12" cy="12" r="2" fill="currentColor" /></svg>;
   }

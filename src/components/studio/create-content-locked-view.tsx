@@ -83,7 +83,7 @@ export function CreateContentLockedView({ feature = "images" }: CreateContentLoc
       </ul>
 
       <div className="evg-locked__actions">
-        <Link href="/dashboard?tab=pricing" className="evg-locked__cta">
+        <Link href="/dashboard/pricing" className="evg-locked__cta">
           Tarif wählen
           <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true">
             <path

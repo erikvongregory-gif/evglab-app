@@ -109,6 +109,21 @@ describe("prompt-compiler", () => {
     }
     expect(prompt).toMatch(/in der brauerei wird angestoßen/);
     expect(prompt).toMatch(/NRW/);
+    expect(prompt).toMatch(/kein Kronkorken auf der Mündung/);
+    expect(prompt).toMatch(/beer bottle/);
+  });
+
+  it("uses water language instead of beer bottle for mineral water", () => {
+    const prompt = assembleMasterPrompt({
+      input: { ...baseInput, produktKategorie: "mineralwasser", bierstil: "mineralwasser", flaschenfarbe: "klar" },
+      breweryName: "ABK",
+      hasProductPhoto: true,
+      hasShapeReference: true,
+    });
+    expect(prompt).toMatch(/mineral-water bottle/);
+    expect(prompt).toMatch(/Wasser farblos/);
+    expect(prompt).toMatch(/kein Hopfen/);
+    expect(prompt).not.toMatch(/beer bottle/);
   });
 
   it("compileBrief returns blocking issues without calling Claude", async () => {

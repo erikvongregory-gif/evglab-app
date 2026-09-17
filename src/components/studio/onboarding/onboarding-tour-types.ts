@@ -1,4 +1,4 @@
-import type { DashboardBeer, DashboardSettings } from "@/lib/dashboard/metadata";
+import type { DashboardBeer, DashboardSettings, ProduktKategorie } from "@/lib/dashboard/metadata";
 
 export type OnboardingBrandDraft = {
   breweryName: string;
@@ -14,6 +14,7 @@ export type OnboardingBrandDraft = {
   referenceImagePayloads?: { base64: string; mime: string }[];
   suggestedBeers?: Array<{
     name: string;
+    produktKategorie?: ProduktKategorie;
     bierstil: string;
     flaschenTyp: string;
     flaschenfarbe: "braun" | "gruen" | "klar";

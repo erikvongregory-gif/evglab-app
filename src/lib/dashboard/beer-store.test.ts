@@ -8,7 +8,8 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 vi.mock("@/lib/supabase/env", () => ({ getSupabaseUrl: () => "https://project.supabase.co" }));
-import { readDashboardBeers, replaceDashboardBeers } from "./beer-store";
+import { readDashboardBeers, replaceDashboardBeers, upsertDashboardBeer, AssortmentConflictError } from "./beer-store";
+import { beersRevision } from "@/lib/inhalte-erstellen/studio-config";
 
 const path = "beer-labels/owner/bottle.png";
 const expired = `https://project.supabase.co/storage/v1/object/sign/generated-images/${path}?token=expired`;
@@ -56,12 +57,40 @@ describe("beer image access", () => {
   });
 
   it("returns renewed photos after saving a previously loaded assortment", async () => {
-    mocks.from.mockReturnValueOnce(query(null)).mockReturnValueOnce(query([{ id: beer.id }]));
-    expect((await replaceDashboardBeers("owner", [beer]))[0].etikettUrl).toBe(fresh);
+    mocks.from.mockReturnValue(query([{ item: beer, id: beer.id }]));
+    expect((await replaceDashboardBeers("owner", [beer], { force: true }))[0].etikettUrl).toBe(fresh);
   });
 
   it("does not silently return an empty assortment when the read fails", async () => {
     mocks.from.mockReturnValue(query(null, { message: "unavailable" }));
     await expect(readDashboardBeers("owner")).rejects.toThrow("Sortiment konnte nicht geladen werden");
+  });
+
+  it("adds one beer without deleting siblings", async () => {
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const sibling = { id: "keep-me", position: 0 };
+    mocks.from.mockImplementation(() => ({
+      select() { return this; },
+      eq() { return this; },
+      order() { return this; },
+      upsert,
+      then(resolve: (result: unknown) => unknown) {
+        return Promise.resolve({ data: [sibling, { item: beer }], error: null }).then(resolve);
+      },
+    }));
+    const next = { ...beer, id: "new-beer", name: "Pils" };
+    const saved = await upsertDashboardBeer("owner", next);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(upsert.mock.calls[0][0]).toMatchObject({ id: "new-beer", user_id: "owner" });
+    expect(saved.some((item) => item.id === "beer")).toBe(true);
+  });
+
+  it("rejects two stale full replacements instead of deleting a sibling", async () => {
+    const sibling = { ...beer, id: "keep-c", name: "Weizen" };
+    mocks.from.mockReturnValue(query([{ item: beer }, { item: sibling }]));
+    const staleRevision = beersRevision([beer]);
+    await expect(
+      replaceDashboardBeers("owner", [{ ...beer, name: "Helles Extra" }], { expectedRevision: staleRevision }),
+    ).rejects.toBeInstanceOf(AssortmentConflictError);
   });
 });

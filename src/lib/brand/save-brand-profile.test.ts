@@ -1,10 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
   buildActivatedBrandSettings,
+  brandCatalogKey,
   buildUserMetadataForBrandSave,
 } from "@/lib/brand/save-brand-profile";
 
 describe("save-brand-profile", () => {
+  it("brandCatalogKey prefers website host over brewery name", () => {
+    expect(
+      brandCatalogKey({
+        brandWebsiteUrl: "https://www.langbraeu.de/biere",
+        breweryName: "Lang Bräu",
+      }),
+    ).toBe("langbraeu.de");
+    expect(
+      brandCatalogKey({
+        brandWebsiteUrl: "abk-beer.de",
+        breweryName: "ABK",
+      }),
+    ).toBe("abk-beer.de");
+    expect(brandCatalogKey({ breweryName: "  Lang Bräu  " })).toBe("lang bräu");
+  });
   it("merges brand fields into existing dashboard settings", () => {
     const latestMetadata = {
       dashboard: {

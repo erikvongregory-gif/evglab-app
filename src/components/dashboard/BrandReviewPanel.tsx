@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { StudioButton, StudioEyebrow, StudioFieldLabel } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
+import { ColorPaletteCard } from "@/components/ui/color-palette-card";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { RemovableBadges } from "@/components/ui/removable-badges";
 import {
   computeProfileStrength,
   formatConfidenceLabel,
@@ -12,6 +15,7 @@ import {
   reviewReferencePreviews,
 } from "./brand-review-utils";
 import type { BrandScanSuggestion } from "./BrandProfileSetupModal";
+import { GETRANKEART_OPTIONS, sanitizeProduktKategorie } from "@/lib/dashboard/metadata";
 
 type BrandReviewPanelProps = {
   review: BrandScanSuggestion;
@@ -99,13 +103,12 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
           </div>
         ) : null}
 
-        <div className="studio-brand-review-strength" title="Wie tragfähig dein Profil für die Bildgenerierung ist">
-          <div className="studio-brand-review-strength-bar">
-            <div className="studio-brand-review-strength-fill" style={{ width: `${strength.percent}%` }} />
-          </div>
-          <span className="studio-brand-review-strength-label">
-            Profil-Stärke · {strength.label}
-          </span>
+        <div className="mt-5">
+          <ProgressBar
+            value={strength.percent}
+            label={`Profil-Stärke · ${strength.label}`}
+            completeLabel="Sehr stark"
+          />
         </div>
       </div>
 
@@ -135,24 +138,70 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
           )}
         </div>
 
-        {review.suggestedBeers && review.suggestedBeers.length > 0 ? (
+        {review.suggestedBeers ? (
           <div>
-            <StudioFieldLabel className="studio-brand-review-label">Biersorten</StudioFieldLabel>
+            <StudioFieldLabel className="studio-brand-review-label">Sortiment</StudioFieldLabel>
             <p className="studio-modal-sub" style={{ marginTop: 8, marginBottom: 8 }}>
-              {review.suggestedBeers.length} Sorten von der Website erkannt — werden beim Aktivieren automatisch angelegt.
+              {review.suggestedBeers.length
+                ? `${review.suggestedBeers.length} Sorten von der Website erkannt — Kategorie korrigieren oder Falschtreffer entfernen.`
+                : "Keine Sorten übernommen — du kannst sie später im Dashboard anlegen."}
             </p>
-            <div className="studio-brand-review-refs">
-              {review.suggestedBeers.map((beer) => (
-                <div key={beer.name} className="studio-brand-review-ref-wrap" title={beer.name}>
-                  {beer.etikettUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={beer.etikettUrl} alt={beer.name} className="studio-brand-review-ref" />
-                  ) : (
-                    <div className="studio-brand-review-ref studio-brand-review-ref--empty">{beer.name.slice(0, 1)}</div>
-                  )}
-                </div>
-              ))}
-            </div>
+            {review.suggestedBeers.length > 0 ? (
+              <div className="studio-brand-review-beers">
+                {review.suggestedBeers.map((beer, index) => (
+                  <div key={`${beer.name}-${index}`} className="studio-brand-review-beer">
+                    {beer.etikettUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={beer.etikettUrl} alt="" className="studio-brand-review-ref" />
+                    ) : (
+                      <div className="studio-brand-review-ref studio-brand-review-ref--empty">{beer.name.slice(0, 1)}</div>
+                    )}
+                    <div className="studio-brand-review-beer-copy">
+                      <div className="truncate" title={beer.name}>{beer.name}</div>
+                      <select
+                        className="studio-field"
+                        value={sanitizeProduktKategorie(beer.produktKategorie)}
+                        disabled={busy}
+                        aria-label={`Kategorie für ${beer.name}`}
+                        onChange={(e) => {
+                          const produktKategorie = sanitizeProduktKategorie(e.target.value);
+                          onChange({
+                            suggestedBeers: review.suggestedBeers?.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? {
+                                    ...item,
+                                    produktKategorie,
+                                    bierstil: produktKategorie === "bier" ? item.bierstil : produktKategorie,
+                                  }
+                                : item,
+                            ),
+                          });
+                        }}
+                      >
+                        {GETRANKEART_OPTIONS.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      className="studio-brand-review-beer-remove"
+                      disabled={busy}
+                      onClick={() =>
+                        onChange({
+                          suggestedBeers: review.suggestedBeers?.filter((_, itemIndex) => itemIndex !== index),
+                        })
+                      }
+                      aria-label={`${beer.name} entfernen`}
+                    >
+                      <StudioIcon name="x" size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -169,15 +218,13 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
 
         <div>
           <StudioFieldLabel className="studio-brand-review-label">Tonalität</StudioFieldLabel>
-          <div className="studio-brand-review-chips">
-            {tones.map((tone) => (
-              <span key={tone} className="studio-brand-review-chip">
-                {tone}
-                <button type="button" disabled={busy} onClick={() => removeTone(tone)} aria-label={`${tone} entfernen`}>
-                  <StudioIcon name="x" size={9} />
-                </button>
-              </span>
-            ))}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <RemovableBadges
+              items={tones.map((tone) => ({ id: tone, label: tone }))}
+              onRemove={(id) => {
+                if (!busy) removeTone(id);
+              }}
+            />
             {addingTone ? (
               <input
                 ref={toneRef}
@@ -206,15 +253,18 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
 
         <div>
           <StudioFieldLabel className="studio-brand-review-label">Markenfarben</StudioFieldLabel>
-          <div className="studio-brand-review-colors">
+          <div className="mt-3">
+            <ColorPaletteCard
+              colors={colors.map((c) => c.replace(/^#/, ""))}
+              statsText={`${colors.length} Farben · tippen zum Hex`}
+              className="h-[160px] border border-[var(--line)] shadow-sm"
+            />
+          </div>
+          <div className="studio-brand-review-colors mt-3">
             {colors.map((color, i) => (
               <div key={`${color}-${i}`} className="studio-brand-review-color">
                 <div className="studio-brand-review-color-swatch-wrap">
-                  <div
-                    className="studio-brand-review-color-swatch"
-                    style={{ background: color }}
-                    title={color}
-                  />
+                  <div className="studio-brand-review-color-swatch" style={{ background: color }} title={color} />
                   <button type="button" disabled={busy} onClick={() => removeColor(i)} aria-label="Farbe entfernen">
                     <StudioIcon name="x" size={9} />
                   </button>

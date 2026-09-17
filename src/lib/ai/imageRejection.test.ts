@@ -16,7 +16,9 @@ vi.mock("@/lib/billing/generationJobs", () => ({
   reserveGeneration: async () => ({ id: "job", user_id: "user" }),
   finishGeneration: mocks.finish,
   saveGenerationProgress: vi.fn(),
-  buildGenerationBillingSnapshot: vi.fn(),
+  buildGenerationBillingSnapshot: vi.fn(() => ({ consumed: 0 })),
+  linkProviderTask: vi.fn(),
+  getGenerationJobForUser: async () => ({ id: "job", user_id: "user", result: {} }),
 }));
 vi.mock("@/lib/openai/imageApiKey", () => ({ requireOpenAiImageApiKey: () => "test-key" }));
 vi.mock("@/lib/brand/reference-image-bytes", () => ({ resolveReferenceImageForVision: async () => null }));
@@ -42,6 +44,10 @@ vi.mock("@/lib/openai/generateImage", () => ({
 }));
 vi.mock("@/lib/supabase/storage", () => ({ uploadGeneratedImageToStorage: vi.fn() }));
 vi.mock("@/lib/dashboard/persistGeneratedMedia", () => ({ persistGeneratedMediaItems: mocks.persist }));
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: () => undefined };
+});
 
 import { POST as product } from "@/app/api/inhalte-erstellen/create-task/route";
 import { POST as social } from "@/app/api/inhalte-erstellen/social-post/route";
@@ -66,15 +72,17 @@ describe.each([["product", product], ["social", social]] as const)("%s image rej
         zusatzWunsch: "2 junge attraktive frauen auf dem oktoberfest trinken im dirndl ihr bier",
       }),
     }));
-    expect(response.status).toBe(422);
-    const result = await response.json();
-    expect(result.code).toBe("provider_content_rejected");
-    expect(result.error).toContain("keine Tokens berechnet");
+    expect(response.status).toBe(202);
+    const accepted = await response.json();
+    expect(accepted.jobId).toBe("job");
+    const settled = mocks.finish.mock.calls[0]?.[2] as { code?: string; error?: string };
+    expect(settled?.code).toBe("provider_content_rejected");
+    expect(settled?.error).toContain("keine Tokens berechnet");
     expect(mocks.render).toHaveBeenCalledTimes(1);
     expect(mocks.render.mock.calls[0][0].prompt).toContain("aged 25 or older");
     expect(mocks.finish).toHaveBeenCalledWith(
       expect.objectContaining({ id: "job" }), 0,
-      expect.objectContaining({ error: result.error, images: [], billing: { consumed: 0 } }),
+      expect.objectContaining({ error: settled.error, images: [], billing: { consumed: 0 } }),
     );
     expect(mocks.persist).not.toHaveBeenCalled();
   });
@@ -90,7 +98,8 @@ describe.each([["product", product], ["social", social]] as const)("%s image rej
         stiltreue: "frei", variantCount: 1, headline: "Oktoberfest",
       }),
     }));
-    expect(response.status).toBe(500);
-    expect((await response.json()).error).not.toContain("keine Tokens berechnet");
+    expect(response.status).toBe(202);
+    expect((await response.json()).error).toBeUndefined();
+    expect(String(mocks.finish.mock.calls[0]?.[2]?.error ?? "")).toContain("keine Tokens berechnet");
   });
 });

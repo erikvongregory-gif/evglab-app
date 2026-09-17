@@ -15,6 +15,7 @@ import {
   type GlasTyp,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { readAndCompressImage } from "@/lib/images/compress-image";
+import { GETRANKEART_OPTIONS, sanitizeProduktKategorie, type ProduktKategorie } from "@/lib/dashboard/metadata";
 
 const EASE = [0.2, 0.7, 0.2, 1] as const;
 
@@ -44,6 +45,7 @@ const FARBE_LABEL: Record<(typeof FARBE_CHOICES)[number]["code"], string> = {
 
 export type BeerCreateDraft = {
   name: string;
+  produktKategorie: ProduktKategorie;
   bierstil: string;
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
@@ -69,6 +71,7 @@ function BottleIcon({ className }: { className?: string }) {
 
 function buildPromptPreview(parts: {
   name: string;
+  produktKategorie: ProduktKategorie;
   bierstil: string;
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
@@ -76,7 +79,9 @@ function buildPromptPreview(parts: {
   brandTone: string;
 }): string {
   const segments: string[] = [];
-  const style = beerStyleLabel(parts.bierstil);
+  const style = parts.produktKategorie === "bier"
+    ? beerStyleLabel(parts.bierstil)
+    : GETRANKEART_OPTIONS.find((option) => option.id === parts.produktKategorie)?.label;
   if (style) segments.push(style);
   const vessel = FLASCHEN_CHOICES.find((f) => f.code === parts.flaschenTyp)?.label;
   if (vessel) segments.push(vessel);
@@ -94,12 +99,14 @@ function buildPromptPreview(parts: {
 export function BeerCreatePanel({
   brandTone = "",
   error = "",
+  initialKategorie = "bier",
   reducedMotion: reducedMotionProp,
   onSave,
   onCancel,
 }: {
   brandTone?: string;
   error?: string;
+  initialKategorie?: ProduktKategorie;
   reducedMotion?: boolean;
   onSave: (draft: BeerCreateDraft) => Promise<void>;
   onCancel: () => void;
@@ -111,9 +118,10 @@ export function BeerCreatePanel({
 
   const [manualOnly, setManualOnly] = useState(false);
   const [name, setName] = useState("");
-  const [bierstil, setBierstil] = useState("helles");
+  const [produktKategorie, setProduktKategorie] = useState<ProduktKategorie>(() => sanitizeProduktKategorie(initialKategorie));
+  const [bierstil, setBierstil] = useState(sanitizeProduktKategorie(initialKategorie) === "bier" ? "helles" : sanitizeProduktKategorie(initialKategorie));
   const [flaschenTyp, setFlaschenTyp] = useState("nrw_500");
-  const [flaschenfarbe, setFlaschenfarbe] = useState<"braun" | "gruen" | "klar">("braun");
+  const [flaschenfarbe, setFlaschenfarbe] = useState<"braun" | "gruen" | "klar">(sanitizeProduktKategorie(initialKategorie) === "bier" ? "braun" : "klar");
   const [glasTyp, setGlasTyp] = useState<GlasTyp>(findBeerStyle("helles")?.glasTyp ?? "willibecher");
   const [etikettDataUrl, setEtikettDataUrl] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -123,7 +131,7 @@ export function BeerCreatePanel({
   const [previewKey, setPreviewKey] = useState(0);
 
   const showDose = isDoseTyp(flaschenTyp as keyof typeof FLASCHEN_TYPEN);
-  const preview = buildPromptPreview({ name, bierstil, flaschenTyp, flaschenfarbe, glasTyp, brandTone });
+  const preview = buildPromptPreview({ name, produktKategorie, bierstil, flaschenTyp, flaschenfarbe, glasTyp, brandTone });
   const displayError = localError || error || uploadError;
   const busy = phase === "saving" || phase === "success";
 
@@ -156,7 +164,8 @@ export function BeerCreatePanel({
     try {
       await onSave({
         name: trimmed.slice(0, 80),
-        bierstil,
+        produktKategorie,
+        bierstil: produktKategorie === "bier" ? bierstil : produktKategorie,
         flaschenTyp,
         flaschenfarbe,
         glasTyp,
@@ -314,6 +323,34 @@ export function BeerCreatePanel({
           </label>
 
           <div className="studio-beer-create-field">
+            <span className="studio-beer-create-label">Getränkeart</span>
+            <div className="studio-beer-create-chips" role="group" aria-label="Getränkeart">
+              {GETRANKEART_OPTIONS.map((opt) => {
+                const on = produktKategorie === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`studio-beer-create-chip${on ? " is-on" : ""}`}
+                    aria-pressed={on}
+                    disabled={busy}
+                    onClick={() => {
+                      setProduktKategorie(opt.id);
+                      setBierstil(opt.id === "bier" ? "helles" : opt.id);
+                      setFlaschenfarbe(opt.id === "bier" ? "braun" : "klar");
+                      if (opt.id === "bier") setGlasTyp(findBeerStyle("helles")?.glasTyp ?? "willibecher");
+                      setPreviewKey((k) => k + 1);
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {produktKategorie === "bier" ? (
+          <div className="studio-beer-create-field">
             <span className="studio-beer-create-label">Bierstil</span>
             <div className="studio-beer-create-chips" role="group" aria-label="Bierstil">
               {BEER_STYLE_OPTIONS.map((opt) => {
@@ -337,6 +374,9 @@ export function BeerCreatePanel({
               })}
             </div>
           </div>
+          ) : (
+            <p className="studio-beer-create-label">{GETRANKEART_OPTIONS.find((option) => option.id === produktKategorie)?.label}</p>
+          )}
 
           <div className="studio-beer-create-attrs">
             <div className="studio-beer-create-field">

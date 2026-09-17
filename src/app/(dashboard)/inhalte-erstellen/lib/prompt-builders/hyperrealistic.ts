@@ -1,7 +1,6 @@
 import { FLASCHEN_TYPEN, GLAS_TYPEN, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 import {
-  buildBeerPhysicsFragment,
   buildBottleShapeLockFragment,
   buildCameraFragment,
   buildClosureLogicFragment,
@@ -9,7 +8,13 @@ import {
   buildHumanRealismFragment,
   buildHyperrealismLockFragment,
   buildAuthenticityFragment,
+  buildLiquidPhysicsFragment,
   buildSceneTextureAnchors,
+  beverageContainerNoun,
+  beverageDrinkNoun,
+  bottleGeometryPrompt,
+  inputProduktKategorie,
+  withoutBeerFoam,
   HYPERREALISM_NEGATIVE,
 } from "./hyperrealism-blocks";
 
@@ -82,18 +87,20 @@ function buildBrandLockFragment(input: HyperrealisticInput, breweryName?: string
   if ((input.etikettModus ?? "marke") !== "marke" || !breweryName?.trim()) return "";
   const brand = breweryName.trim();
   const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  const drinkGlass = inputProduktKategorie(input) === "bier" ? "beer glass" : "glass";
   if (behaelter === "G") {
     return `
-GLASS BRAND LOCK (MANDATORY): Every beer glass in frame MUST display the "${brand}" logo/branding (etched or printed on glass), matching reference label artwork — correct colors, legible typography.
+GLASS BRAND LOCK (MANDATORY): Every ${drinkGlass} in frame MUST display the "${brand}" logo/branding (etched or printed on glass), matching reference label artwork — correct colors, legible typography.
 FORBIDDEN: plain unbranded glasses, wrong brewery names on glass, fictional brands, missing logos.
 COMPOSITION: GLASS ONLY — no bottle, no can, no packaging anywhere in the image.`;
   }
   const brandSurface = isDoseTyp(input.flaschenTyp) ? "can wrap-around artwork" : "bottle label";
   const brandVessel = isDoseTyp(input.flaschenTyp) ? "can" : "bottle";
+  const glassLock = inputProduktKategorie(input) === "bier" ? "beer glasses" : "glasses";
   return `
 BRAND IDENTITY LOCK (MANDATORY): Every visible brand touchpoint — ${brandSurface}, glass logo/etching, coasters, napkins, signage — MUST show "${brand}" only, matching the reference label artwork.
 FORBIDDEN: any other brewery names, fictional brands, wrong logos on glasses (e.g. random text like "Brauhaus Weißbach"), unbranded glasses when a branded ${brandVessel} is present, or mixed competing brands in one frame.
-All beer glasses in frame must carry the same "${brand}" branding as the ${brandVessel} — consistent logo placement, legible, not distorted.`;
+All ${glassLock} in frame must carry the same "${brand}" branding as the ${brandVessel} — consistent logo placement, legible, not distorted.`;
 }
 
 function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<HyperrealisticInput["behaelter"]>): string {
@@ -107,7 +114,9 @@ function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<
   }
   if (modus === "B") {
     if (behaelter === "G") {
-      return "Anonymous hands holding a branded beer glass only — NO bottle, NO can — cropped at wrist level, no face visible, no body.";
+      return inputProduktKategorie(input) === "bier"
+        ? "Anonymous hands holding a branded beer glass only — NO bottle, NO can — cropped at wrist level, no face visible, no body."
+        : `Anonymous hands holding a branded ${beverageDrinkNoun(input)} glass only — NO bottle, NO can — cropped at wrist level, no face visible, no body.`;
     }
     if (behaelter === "F") {
       return "Anonymous hands holding the branded bottle only — NO glass — cropped at wrist level, no face visible, no body.";
@@ -115,6 +124,27 @@ function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<
     return PERSON_FRAGMENTS.B;
   }
   if (modus === "D") {
+    if (input.characterAppearanceLock?.trim() || input.characterName?.trim()) {
+      const lock =
+        input.characterAppearanceLock?.trim() ||
+        `identical original adult character (${[input.characterName?.trim(), input.characterRole?.trim()].filter(Boolean).join(", ")})`;
+      const body =
+        input.personKoerper === "ganzkoerper"
+          ? "full body visible"
+          : input.personKoerper === "halbkoerper"
+            ? "half body visible"
+            : "head and shoulders only";
+      const mood =
+        input.personMood === "lachend"
+          ? "laughing naturally"
+          : input.personMood === "nachdenklich"
+            ? "calm and contemplative"
+            : input.personMood === "aktiv"
+              ? "active and dynamic"
+              : "relaxed and natural";
+      // ponytail: Text-Lock wie Higgsfield Character Sheet — keine Face-Fotos an OpenAI.
+      return `${lock}, ${body}, ${mood}. Keep this same original character consistent. Natural authentic body language, no catalog-model posing.`;
+    }
     const gender =
       input.personGender === "weiblich"
         ? "young woman"
@@ -151,12 +181,20 @@ function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<
         ? "three"
         : "four to five";
   const setting = groupSettingPhrase(input);
+  const drink = beverageDrinkNoun(input);
+  const isBeer = inputProduktKategorie(input) === "bier";
   const groupVessel =
     behaelter === "G"
-      ? "branded beer glasses"
+      ? isBeer
+        ? "branded beer glasses"
+        : `branded ${drink} glasses`
       : behaelter === "F"
-        ? "branded beer bottles"
-        : "branded beer glasses and bottles";
+        ? isBeer
+          ? "branded beer bottles"
+          : `branded ${beverageContainerNoun(input)}s`
+        : isBeer
+          ? "branded beer glasses and bottles"
+          : `branded ${drink} glasses and bottles`;
   switch (input.gruppenDynamik) {
     case "E1":
       return `Candid POV selfie-style group shot, ${n} anonymous adults in their mid-20s holding ${groupVessel} stretched toward the camera, laughing naturally into lens, one hand extended holding phone, tight energetic framing, spontaneous unposed atmosphere ${setting}.`;
@@ -167,7 +205,7 @@ function buildPersonFragment(input: HyperrealisticInput, behaelter: NonNullable<
     case "E4":
       return `Group of ${n} anonymous adults walking ${setting}, casually holding ${groupVessel}, smiling and talking, candid natural movement with believable stride and hand grip.`;
     default:
-      return `Group of ${n} anonymous adults enjoying beer together ${setting}, candid documentary lifestyle moment, no specific real persons, no catalog-model posing.`;
+      return `Group of ${n} anonymous adults enjoying ${drink} together ${setting}, candid documentary lifestyle moment, no specific real persons, no catalog-model posing.`;
   }
 }
 
@@ -178,7 +216,6 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
   const lighting = TAGESZEIT_LIGHTING[input.tageszeit];
   const trend = STIMMUNG_TREND_PROMPT[input.stimmungTrend ?? "nachhaltig"];
   const personenModus = input.personenModus ?? (input.personImBild ? "D" : "A");
-  const shot = SHOT_TYPE_PROMPT[input.shotType ?? "A"];
   const behaelter = input.behaelter ?? (glas ? "B" : "F");
   const etikettModus = input.etikettModus ?? "marke";
   const brandLock = buildBrandLockFragment(input, options?.breweryName);
@@ -194,37 +231,46 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
 
   const personPart = buildPersonFragment(input, behaelter);
   const humanRealismPart = buildHumanRealismFragment(input);
-  const beerPhysicsPart = buildBeerPhysicsFragment(input.bierstil, behaelter);
+  const beerPhysicsPart = buildLiquidPhysicsFragment(input, behaelter);
   const sceneTexturePart = buildSceneTextureAnchors(input.szene);
   const cameraPart = buildCameraFragment(input.shotType ?? "A", input.aspectRatio);
+  const drink = beverageDrinkNoun(input);
+  const containerNoun = beverageContainerNoun(input);
+  const isBeer = inputProduktKategorie(input) === "bier";
+  const productLabelNoun = isBeer ? "beer label" : "product label";
+  const shot =
+    !isBeer && (input.shotType ?? "A") === "E"
+      ? "close-up of condensation and label"
+      : SHOT_TYPE_PROMPT[input.shotType ?? "A"];
 
   const bottlePart =
     behaelter === "G"
       ? ""
       : etikettModus === "marke"
-        ? `${flasche.promptDescription}${materialClause}. The ${istDose ? "wrap-around artwork on the can" : "label on the bottle"} MUST be reproduced 1:1 EXACTLY from the reference image — same artwork, same typography, same colors, same proportions, no reinterpretation, no stylization. Treat the ${istDose ? "can artwork as a fixed graphic asset wrapped around the cylindrical can body" : "label as a fixed graphic asset to be applied flat-perspective-corrected onto the bottle"}.`
-        : `${flasche.promptDescription}${materialClause}. Design an original, professionally branded ${istDose ? "wrap-around can artwork" : "beer label"} that fits the beer style "${input.bierstil}" and the overall mood — invent a plausible FICTIONAL brand name and matching logo (NOT any real existing brewery), with clean legible typography, a coherent color palette and a tasteful, realistic layout. The ${gebindeNoun} MUST look professionally ${istDose ? "printed" : "labelled"}, never blank, never unlabelled.`;
+        ? `${bottleGeometryPrompt(input, flasche.promptDescription)}${materialClause}. The ${istDose ? "wrap-around artwork on the can" : "label on the bottle"} MUST be reproduced 1:1 EXACTLY from the reference image — same artwork, same typography, same colors, same proportions, no reinterpretation, no stylization. Treat the ${istDose ? "can artwork as a fixed graphic asset wrapped around the cylindrical can body" : "label as a fixed graphic asset to be applied flat-perspective-corrected onto the bottle"}.`
+        : `${bottleGeometryPrompt(input, flasche.promptDescription)}${materialClause}. Design an original, professionally branded ${istDose ? "wrap-around can artwork" : productLabelNoun} that fits the ${isBeer ? `beer style "${input.bierstil}"` : `${drink} product`} and the overall mood — invent a plausible FICTIONAL brand name and matching logo (NOT any real existing ${isBeer ? "brewery" : "brand"}), with clean legible typography, a coherent color palette and a tasteful, realistic layout. The ${gebindeNoun} MUST look professionally ${istDose ? "printed" : "labelled"}, never blank, never unlabelled.`;
 
   const glasFillMl =
     behaelter !== "F" && input.glasTyp ? pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter) : 0;
-  const glasPour = input.glasTyp && glasFillMl ? glassPourPromptDescription(input.glasTyp, glasFillMl) : "";
+  const glasPourRaw = input.glasTyp && glasFillMl ? glassPourPromptDescription(input.glasTyp, glasFillMl) : "";
+  const glasPour = isBeer ? glasPourRaw : withoutBeerFoam(glasPourRaw);
 
   const glasPart =
     behaelter === "F"
       ? ""
       : glas
-        ? `HERO SUBJECT: A poured ${glasPour} ${behaelter === "B" ? `stands next to the ${gebindeNoun}` : "in centered hero position — ONLY the glass, absolutely NO bottle or can anywhere in frame"}. The beer color matches the style "${input.bierstil}".${
+        ? `HERO SUBJECT: A poured ${glasPour} ${behaelter === "B" ? `stands next to the ${gebindeNoun}` : "in centered hero position — ONLY the glass, absolutely NO bottle or can anywhere in frame"}. The ${isBeer ? `beer color matches the style "${input.bierstil}"` : `${drink} matches the product photo — no beer color or beer foam`}.${
             etikettModus === "marke" && options?.breweryName?.trim()
               ? ` EXACT TEXT on the glass: "${options.breweryName.trim()}". The glass MUST show this logo/branding clearly on the glass surface — never plain/unbranded, never a different brewery name.`
               : etikettModus !== "marke"
-                ? ` Design an original, professionally branded glass: invent a plausible FICTIONAL brewery name and matching logo (NOT any real existing brewery) and show it tastefully etched or printed on the glass surface with clean legible typography — the glass MUST look professionally branded, never a plain unbranded glass.`
+                ? ` Design an original, professionally branded glass: invent a plausible FICTIONAL ${isBeer ? "brewery" : "brand"} name and matching logo (NOT any real existing ${isBeer ? "brewery" : "brand"}) and show it tastefully etched or printed on the glass surface with clean legible typography — the glass MUST look professionally branded, never a plain unbranded glass.`
                 : ""
           }${behaelter === "B" ? ` Maintain correct proportional scale: the glass is a single pour from this ${flascheVolumeMl(input.flaschenTyp) / 1000} L ${gebindeNoun} (${glasFillMl} ml) — never a larger mug than the container.` : ""}`
         : "";
 
   const subjectBlock =
     behaelter === "G"
-      ? `SUBJECT: ${glasPart || "Branded beer glass hero shot — glass only, no bottle."}`
+      ? `SUBJECT: ${glasPart || `Branded ${isBeer ? "beer glass" : `${drink} glass`} hero shot — glass only, no bottle.`}`
       : `SUBJECT: ${bottlePart}\n\n${glasPart}`.trim();
 
   const bottleShapeLock = behaelter === "G" ? "" : buildBottleShapeLockFragment(input);
@@ -427,6 +473,8 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
   const scene = SZENE_DESCRIPTIONS[input.szene];
   const light = TAGESZEIT_LIGHTING[input.tageszeit];
   const extra = input.zusatzWunsch?.trim();
+  const isBeer = inputProduktKategorie(input) === "bier";
+  const containerNoun = beverageContainerNoun(input);
   const intent = extra ? detectPeopleIntent(extra) : null;
   const toasting = Boolean(intent?.toasting);
   const heroPerson = Boolean(intent?.hasPeople && !intent.toasting && !intent.group);
@@ -440,6 +488,14 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
   } else if (groupPeople || (intent?.hasPeople && personenModus === "E")) {
     people =
       "PEOPLE FROM USER SCENE (mandatory, sharp, readable): include every person described — faces/bodies visible in the foreground or mid-ground, matching age/clothing/action. Sitting/standing as described. NEVER replace them with an empty bottle+glass table still life. NEVER background-only silhouettes.";
+  } else if (
+    (input.characterAppearanceLock?.trim() || input.characterName?.trim()) &&
+    (personenModus === "D" || heroPerson || Boolean(intent?.hasPeople))
+  ) {
+    const lock =
+      input.characterAppearanceLock?.trim() ||
+      `identical original adult character (${[input.characterName?.trim(), input.characterRole?.trim()].filter(Boolean).join(", ")})`;
+    people = `HERO PERSON (mandatory): ${lock}. Sharp and readable, natural face, real hands. Keep the same original character.`;
   } else if (heroPerson || (intent?.hasPeople && personenModus === "D")) {
     people =
       "HERO PERSON (mandatory, sharp enough to read emotion): one real adult matching the USER SCENE — natural face, real hands, clearly present. Not a tiny background blur. Not a static packshot without people.";
@@ -455,6 +511,9 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
     people =
       "Follow USER SCENE for people: if people are described, show them sharp and readable; never replace them with an empty product still life.";
   }
+  if (!isBeer) {
+    people = people.replace(/\bbeer glasses\b/gi, "glasses").replace(/\bbeer glass\b/gi, "glass");
+  }
 
   const vessel = toasting
     ? "two people toasting: glasses held in hands mid-clink in the foreground; the bottle from Image 1 stands on a surface nearby or is held by someone — products must rest on real hands or a real surface, never hover"
@@ -464,12 +523,15 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
         ? "glass only, no bottle"
         : behaelter === "F"
           ? "the bottle from Image 1 only, no poured glass"
-          : "the bottle from Image 1 plus a poured beer glass beside it";
+          : isBeer
+            ? "the bottle from Image 1 plus a poured beer glass beside it"
+            : `the bottle from Image 1 plus a poured ${beverageDrinkNoun(input)} glass beside it, no beer foam`;
 
-  const glassPour =
+  const glassPourRaw =
     behaelter !== "F" && input.glasTyp
       ? glassPourPromptDescription(input.glasTyp, pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter))
       : "";
+  const glassPour = isBeer ? glassPourRaw : withoutBeerFoam(glassPourRaw);
   const bottleLitres = flascheVolumeMl(input.flaschenTyp) / 1000;
   const pourLock =
     !toasting && !intent?.hasPeople && behaelter === "B" && glassPour
@@ -477,9 +539,17 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
       : "";
 
   const stiltreue = input.stiltreue ?? (input.etikettModus === "generisch" ? "frei" : "hoch");
+  const poured = behaelter === "B";
+  const identityBits = poured
+    ? "bottle or can shape and proportions, glass color, and the entire printed label"
+    : "bottle or can shape and proportions, glass color, cap design, and the entire printed label";
   const labelLock =
     stiltreue === "hoch"
-      ? "IDENTITY REFERENCE — PRESERVE EXACTLY: bottle or can shape and proportions, glass color, cap design, and the entire printed label — artwork, logo, crest, typography, colors, layout, label proportions, and every recognizable branding detail. Reconstruct these identity details faithfully; do not invent a different brand."
+      ? `IDENTITY REFERENCE — PRESERVE EXACTLY: ${identityBits} — artwork, logo, crest, typography, colors, layout, label proportions, and every recognizable branding detail. Reconstruct these identity details faithfully; do not invent a different brand.${
+          poured
+            ? " The glass is already poured, so do NOT copy a sealed crown cap from Image 1 onto the bottle mouth — bottle must be open, cap off."
+            : ""
+        }`
       : stiltreue === "normal"
         ? "Use the product silhouette and brand identity from Image 1 as a faithful reference (logo, core colors, overall layout). Reconstruct it for the new scene with natural lighting and perspective; do not invent a different brand."
         : "Image 1 is loose product inspiration only — silhouette may guide the vessel, but redesign of label artwork is allowed.";
@@ -513,15 +583,18 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
   const extraRefCount = input.extraReferenceImages?.filter(Boolean).length ?? 0;
   const extraRefLine =
     extraRefCount > 0
-      ? `Image 2${extraRefCount > 1 ? `–${1 + extraRefCount}` : ""}: optional context only (crate, location, props, mood). Use for environment cues. Never copy foreign brands/logos/text from these onto the beer. Image 1 remains the only product identity.`
+      ? `Image 2${extraRefCount > 1 ? `–${1 + extraRefCount}` : ""}: optional context only (crate, location, props, mood). Use for environment cues. Never copy foreign brands/logos/text from these onto the ${isBeer ? "beer" : "product"}. Image 1 remains the only product identity.`
       : "";
+  const closureLogic = behaelter === "G" ? "" : buildClosureLogicFragment(input);
 
   // Freitext-Pfad: User-Szene ist Pflicht — Image 1 nur Produktidentität.
   if (extra) {
     return [
       hyperrealHead,
       `USER SCENE (mandatory — fulfill exactly, this is the photograph to create): ${extra}`,
-      "Image 1 is ONLY a product identity reference (the real beer bottle + printed label from the selected beer).",
+      isBeer
+        ? "Image 1 is ONLY a product identity reference (the real beer bottle + printed label from the selected beer)."
+        : `Image 1 is ONLY a product identity reference (the real ${containerNoun} + printed label from the selected product).`,
       productIntegration,
       "COMPLETELY DISCARD Image 1's background, wooden table, coaster, napkin, glass placement, people, trees, and camera framing. Do not remake Image 1. Invent a wholly new environment for the USER SCENE.",
       extraRefLine,
@@ -532,6 +605,7 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
       `Light: ${light}. Match lighting to the NEW scene so the bottle looks physically photographed there — real glass refraction, true contact shadows, physically plausible condensation (irregular, not sticker grid).`,
       camera,
       forbidden,
+      closureLogic,
       hyperrealTail,
     ]
       .filter(Boolean)
@@ -540,7 +614,9 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
 
   return [
     hyperrealHead,
-    "Image 1 is a photograph of the real beer bottle from the selected beer variety.",
+    isBeer
+      ? "Image 1 is a photograph of the real beer bottle from the selected beer variety."
+      : `Image 1 is a photograph of the real ${containerNoun} from the selected product.`,
     productIntegration,
     extraRefLine,
     labelLock,
@@ -552,6 +628,7 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
     camera,
     "This is not an advertisement, not CGI, not cinematic orange glow, not beauty-filtered skin.",
     forbidden,
+    closureLogic,
     hyperrealTail,
   ]
     .filter(Boolean)

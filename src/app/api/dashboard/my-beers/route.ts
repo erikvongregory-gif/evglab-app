@@ -5,10 +5,17 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { readDashboardBeers, replaceDashboardBeers } from "@/lib/dashboard/beer-store";
+import {
+  AssortmentConflictError,
+  beersRevision,
+  readDashboardBeers,
+  replaceDashboardBeers,
+  upsertDashboardBeer,
+} from "@/lib/dashboard/beer-store";
 import {
   MAX_MY_BEERS,
   sanitizeDashboardBeers,
+  sanitizeProduktKategorie,
   type DashboardBeer,
 } from "@/lib/dashboard/metadata";
 import { uploadUserImageToStorage } from "@/lib/supabase/storage";
@@ -20,6 +27,7 @@ const beerSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(80),
   bierstil: z.string().min(1).max(60),
+  produktKategorie: z.enum(["bier", "limonade", "tafelwasser", "mineralwasser"]).optional(),
   flaschenTyp: z.string().min(1).max(60),
   flaschenfarbe: z.enum(["braun", "gruen", "klar"]),
   glasTyp: z.string().min(1).max(40).optional(),
@@ -36,6 +44,11 @@ const beerSchema = z.object({
 
 const putSchema = z.object({
   beers: z.array(beerSchema).max(MAX_MY_BEERS),
+  expectedRevision: z.string().min(1).max(80),
+});
+
+const postSchema = z.object({
+  beer: beerSchema,
 });
 
 function toHttpUrlOrEmpty(value: string): string {
@@ -47,6 +60,79 @@ function toHttpUrlOrEmpty(value: string): string {
   } catch {
     return "";
   }
+}
+
+async function requireBeerUser(req: Request, write: boolean) {
+  const rateError = await enforceRateLimitPersistent(req, {
+    keyPrefix: "dashboard-my-beers",
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (rateError) return { error: rateError as NextResponse };
+  if (write) {
+    const originError = enforceSameOrigin(req);
+    if (originError) return { error: originError };
+  }
+  if (!isSupabaseConfigured()) {
+    return { error: NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 }) };
+  }
+  const supabase = await createClient();
+  let {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user && !(await hasPassedTwoFactor(user))) {
+    return { error: NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 }) };
+  }
+  if (user) {
+    try {
+      user = await workspaceResourceUser(user, write);
+    } catch {
+      return { error: NextResponse.json({ error: "Teamzugriff nicht erlaubt." }, { status: 403 }) };
+    }
+  }
+  if (!user) return { error: NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 }) };
+  return { user };
+}
+
+async function beerFromParsed(
+  userId: string,
+  beer: z.infer<typeof beerSchema>,
+): Promise<DashboardBeer | NextResponse> {
+  let etikettUrl = toHttpUrlOrEmpty(beer.etikettUrl);
+  if (beer.etikettPayload) {
+    try {
+      const buffer = Buffer.from(beer.etikettPayload.base64, "base64");
+      if (buffer.byteLength < 32) {
+        return NextResponse.json(
+          { error: `Etikett für „${beer.name}“ ist leer oder beschädigt.` },
+          { status: 400 },
+        );
+      }
+      etikettUrl = await uploadUserImageToStorage({
+        userId,
+        buffer,
+        mime: beer.etikettPayload.mime,
+        folder: "beer-labels",
+      });
+    } catch (uploadError) {
+      console.warn("[dashboard/my-beers] Etikett-Upload fehlgeschlagen:", uploadError);
+      return NextResponse.json(
+        { error: `Etikett für „${beer.name}“ konnte nicht gespeichert werden. Bitte erneut versuchen.` },
+        { status: 502 },
+      );
+    }
+  }
+  return {
+    id: beer.id,
+    name: beer.name.trim(),
+    produktKategorie: sanitizeProduktKategorie(beer.produktKategorie),
+    bierstil: beer.bierstil,
+    flaschenTyp: beer.flaschenTyp,
+    flaschenfarbe: beer.flaschenfarbe,
+    glasTyp: beer.glasTyp,
+    etikettUrl,
+    createdAt: beer.createdAt || new Date().toISOString(),
+  };
 }
 
 export async function GET() {
@@ -63,25 +149,45 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
   try {
-    return NextResponse.json({ beers: await readDashboardBeers(user.id) });
+    const beers = await readDashboardBeers(user.id);
+    return NextResponse.json({ beers, revision: beersRevision(beers) });
   } catch {
     return NextResponse.json({ error: "Sortiment konnte nicht geladen werden." }, { status: 500 });
   }
 }
 
-export async function PUT(req: Request) {
-  const rateError = await enforceRateLimitPersistent(req, {
-    keyPrefix: "dashboard-my-beers",
-    limit: 20,
-    windowMs: 60_000,
-  });
-  if (rateError) return rateError;
-  const originError = enforceSameOrigin(req);
-  if (originError) return originError;
+export async function POST(req: Request) {
+  const auth = await requireBeerUser(req, true);
+  if ("error" in auth) return auth.error;
 
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
   }
+  const parsed = postSchema.safeParse(body);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const detail = issue ? `${issue.path.join(".")}: ${issue.message}` : "Validierung fehlgeschlagen.";
+    return NextResponse.json({ error: `Ungültige Bier-Daten (${detail}).` }, { status: 400 });
+  }
+
+  const beer = await beerFromParsed(auth.user.id, parsed.data.beer);
+  if (beer instanceof NextResponse) return beer;
+  try {
+    const saved = await upsertDashboardBeer(auth.user.id, beer);
+    return NextResponse.json({ ok: true, beers: saved, revision: beersRevision(saved) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Sortiment konnte nicht gespeichert werden.";
+    const conflict = /maximal/i.test(message);
+    return NextResponse.json({ error: message }, { status: conflict ? 409 : 500 });
+  }
+}
+
+export async function PUT(req: Request) {
+  const auth = await requireBeerUser(req, true);
+  if ("error" in auth) return auth.error;
 
   let body: unknown;
   try {
@@ -97,60 +203,23 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: `Ungültige Bier-Daten (${detail}).` }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  let {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user && !(await hasPassedTwoFactor(user))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
-  if (user) { try { user = await workspaceResourceUser(user, true); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
-  if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
-
-  // Etikett-Uploads in kurze HTTPS-URLs umwandeln (nie Base64 in user_metadata).
   const beers: DashboardBeer[] = [];
-  for (const beer of parsed.data.beers) {
-    let etikettUrl = toHttpUrlOrEmpty(beer.etikettUrl);
-    if (beer.etikettPayload) {
-      try {
-        const buffer = Buffer.from(beer.etikettPayload.base64, "base64");
-        if (buffer.byteLength < 32) {
-          return NextResponse.json(
-            { error: `Etikett für „${beer.name}“ ist leer oder beschädigt.` },
-            { status: 400 },
-          );
-        }
-        etikettUrl = await uploadUserImageToStorage({
-          userId: user.id,
-          buffer,
-          mime: beer.etikettPayload.mime,
-          folder: "beer-labels",
-        });
-      } catch (uploadError) {
-        console.warn("[dashboard/my-beers] Etikett-Upload fehlgeschlagen:", uploadError);
-        return NextResponse.json(
-          { error: `Etikett für „${beer.name}“ konnte nicht gespeichert werden. Bitte erneut versuchen.` },
-          { status: 502 },
-        );
-      }
-    }
-    beers.push({
-      id: beer.id,
-      name: beer.name.trim(),
-      bierstil: beer.bierstil,
-      flaschenTyp: beer.flaschenTyp,
-      flaschenfarbe: beer.flaschenfarbe,
-      glasTyp: beer.glasTyp,
-      etikettUrl,
-      createdAt: beer.createdAt || new Date().toISOString(),
-    });
+  for (const raw of parsed.data.beers) {
+    const beer = await beerFromParsed(auth.user.id, raw);
+    if (beer instanceof NextResponse) return beer;
+    beers.push(beer);
   }
 
   const sanitized = sanitizeDashboardBeers(beers);
   try {
-    const saved = await replaceDashboardBeers(user.id, sanitized);
-    return NextResponse.json({ ok: true, beers: saved });
-  } catch {
+    const saved = await replaceDashboardBeers(auth.user.id, sanitized, {
+      expectedRevision: parsed.data.expectedRevision,
+    });
+    return NextResponse.json({ ok: true, beers: saved, revision: beersRevision(saved) });
+  } catch (error) {
+    if (error instanceof AssortmentConflictError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
     return NextResponse.json({ error: "Sortiment konnte nicht gespeichert werden." }, { status: 500 });
   }
-
 }

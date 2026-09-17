@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Dashboard-UI
+
+Das Studio-Dashboard basiert auf dem MIT-Template [next-shadcn-admin-dashboard](https://github.com/arhamkhnz/next-shadcn-admin-dashboard) von arhamkhnz. Attribution: [`ATTRIBUTION-studio-admin.md`](./ATTRIBUTION-studio-admin.md). Migrationsstand und Risiken: [`docs/dashboard-shell-migration.md`](./docs/dashboard-shell-migration.md).
+
 ## Getting Started
 
 First, run the development server:

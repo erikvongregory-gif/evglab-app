@@ -81,6 +81,7 @@ export function StudioUiConfirmDialog({
             variant={destructive ? "danger" : "primary"}
             loading={isBusy}
             onClick={async () => {
+              if (isBusy) return;
               try {
                 setBusy(true);
                 await onConfirm?.();

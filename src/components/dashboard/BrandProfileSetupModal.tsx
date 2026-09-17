@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { BrandReviewPanel } from "@/components/dashboard/BrandReviewPanel";
 import { StudioButton } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { TaskSteps, type TaskStep } from "@/components/ui/task-steps";
 import { fetchWithRetry, isTransientFetchError } from "@/lib/http/fetchWithRetry";
 import { BRAND_SETTINGS_LIMITS, clampBrandSettingsFields } from "@/lib/dashboard/settingsPayload";
+import { MAX_MY_BEERS, sanitizeProduktKategorie } from "@/lib/dashboard/metadata";
 import { FALLBACK_SWATCHES, formatDomain } from "@/lib/brand/brand-profile-display";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +23,7 @@ export type BrandReferenceImagePayload = {
 
 export type BrandSuggestedBeer = {
   name: string;
+  produktKategorie?: "bier" | "limonade" | "tafelwasser" | "mineralwasser";
   bierstil: string;
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
@@ -130,15 +133,27 @@ function parseSuggestedBeers(value: unknown): BrandSuggestedBeer[] | undefined {
     if (!raw || typeof raw !== "object") continue;
     const item = raw as Partial<BrandSuggestedBeer>;
     if (typeof item.name !== "string" || !item.name.trim()) continue;
+    const produktKategorie = sanitizeProduktKategorie(item.produktKategorie);
     beers.push({
       name: item.name.trim().slice(0, 80),
-      bierstil: typeof item.bierstil === "string" && item.bierstil.trim() ? item.bierstil.trim() : "helles",
+      produktKategorie,
+      bierstil:
+        typeof item.bierstil === "string" && item.bierstil.trim()
+          ? item.bierstil.trim()
+          : produktKategorie === "bier"
+            ? "helles"
+            : produktKategorie,
       flaschenTyp: typeof item.flaschenTyp === "string" && item.flaschenTyp.trim() ? item.flaschenTyp.trim() : "nrw_500",
-      flaschenfarbe: item.flaschenfarbe === "gruen" || item.flaschenfarbe === "klar" ? item.flaschenfarbe : "braun",
+      flaschenfarbe:
+        item.flaschenfarbe === "gruen" || item.flaschenfarbe === "klar"
+          ? item.flaschenfarbe
+          : produktKategorie === "bier"
+            ? "braun"
+            : "klar",
       glasTyp: typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim() : "willibecher",
       etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",
     });
-    if (beers.length >= 8) break;
+    if (beers.length >= MAX_MY_BEERS) break;
   }
   return beers.length > 0 ? beers : undefined;
 }
@@ -353,6 +368,10 @@ export function BrandProfileSetupModal({
   const filledCount = slots.filter((s) => s.file).length;
   const modalTitle = title ?? "Marke einlesen";
   const analysisSteps = inputTab === "instagram" ? INSTAGRAM_ANALYSIS_STEPS : ANALYSIS_STEPS;
+  const taskSteps: TaskStep[] = useMemo(
+    () => analysisSteps.map((label, i) => ({ id: `step-${i}`, label })),
+    [analysisSteps],
+  );
   const instagramNeedsConnect = !instagramStatus.connected || instagramStatus.expired;
   const analysisTargetLabel =
     inputTab === "url"
@@ -784,37 +803,18 @@ export function BrandProfileSetupModal({
                 Ein Link genügt — BrewAI liest deine Website samt Unterseiten und erkennt Tonalität, Farben und Bildsprache.
               </p>
 
-              <div className="studio-modal-tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={inputTab === "url"}
-                  className={cn("studio-modal-tab", inputTab === "url" && "on")}
-                  onClick={() => setInputTab("url")}
-                >
-                  <StudioIcon name="link" size={15} />
-                  Website
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={inputTab === "instagram"}
-                  className={cn("studio-modal-tab", inputTab === "instagram" && "on")}
-                  onClick={() => setInputTab("instagram")}
-                >
-                  <StudioIcon name="media" size={15} />
-                  Instagram
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={inputTab === "manual"}
-                  className={cn("studio-modal-tab", inputTab === "manual" && "on")}
-                  onClick={() => setInputTab("manual")}
-                >
-                  <StudioIcon name="pencil" size={15} />
-                  Screenshots
-                </button>
+              <div className="mt-6">
+                <SegmentedControl
+                  label="Quelle"
+                  className="w-full"
+                  value={inputTab}
+                  onValueChange={(v) => setInputTab(v as InputTab)}
+                  options={[
+                    { value: "url", label: "Website" },
+                    { value: "instagram", label: "Instagram" },
+                    { value: "manual", label: "Screenshots" },
+                  ]}
+                />
               </div>
 
               {inputTab === "url" ? (
@@ -965,26 +965,12 @@ export function BrandProfileSetupModal({
                 <StudioIcon name={inputTab === "url" ? "globe" : "media"} size={13} />
                 <span>{analysisTargetLabel}</span>
               </div>
-              <div className="studio-brand-analyzing-steps" role="status" aria-live="polite">
-                {analysisSteps.map((label, i) => {
-                  const done = i < analysisStepIndex;
-                  const activeStep = i === analysisStepIndex;
-                  return (
-                    <div
-                      key={label}
-                      className={cn("studio-brand-analyzing-step", done && "done", activeStep && "active")}
-                    >
-                      <span className="studio-brand-analyzing-step-icon">
-                        {done ? (
-                          <StudioIcon name="check" size={10} />
-                        ) : activeStep ? (
-                          <Loader2 className="animate-spin" size={12} />
-                        ) : null}
-                      </span>
-                      <span>{label}</span>
-                    </div>
-                  );
-                })}
+              <div className="mt-7">
+                <TaskSteps
+                  steps={taskSteps}
+                  current={analysisStepIndex}
+                  label="Analyse-Fortschritt"
+                />
               </div>
               <p className="studio-faint studio-brand-analyzing-hint">
                 Dauert meist unter einer Minute — bitte Fenster offen lassen.

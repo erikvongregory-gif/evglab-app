@@ -1,12 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { Beer, Check, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import React, { useId, useState } from "react";
+import { useFormStatus } from "react-dom";
+
 import { EvglabMark } from "@/components/studio/evglab-mark";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { TERMS_ACCEPTANCE_FORM_FIELD } from "@/lib/auth/termsAcceptance";
 import { studioFontClassName } from "@/lib/fonts/studio-fonts";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
-import styles from "./auth-card.module.css";
+import { cn } from "@/lib/utils";
 
 export type AuthMode = "login" | "signup";
 export type OAuthProvider = "google" | "apple" | "linkedin";
@@ -15,7 +24,6 @@ export interface AuthCardProps {
   defaultMode?: AuthMode;
   mode?: AuthMode;
   onModeChange?: (mode: AuthMode) => void;
-
   onSubmit: (payload: {
     mode: AuthMode;
     email: string;
@@ -24,13 +32,10 @@ export interface AuthCardProps {
     stayLoggedIn?: boolean;
     acceptedTerms?: boolean;
   }) => Promise<void> | void;
-
   onOAuth: (provider: OAuthProvider) => void;
   onForgotPassword?: () => void;
   loading?: boolean;
   error?: string | null;
-
-  /** Production form POST (keeps existing /auth/signin + /auth/signup). */
   formAction?: string;
   nextPath?: string;
   inviteToken?: string;
@@ -45,44 +50,65 @@ export interface AuthCardProps {
   forgotPasswordHref?: string;
 }
 
-function passwordStrength(password: string): 0 | 1 | 2 | 3 | 4 {
-  if (!password) return 0;
-  let score = 0;
-  if (password.length >= 8) score += 1;
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-  return Math.max(1, Math.min(4, score)) as 0 | 1 | 2 | 3 | 4;
+function marketingLegalUrl(path: "agb" | "datenschutz") {
+  try {
+    const host = new URL(MARKETING_SITE_URL).hostname;
+    if (host === "localhost" || host === "127.0.0.1") return `https://brewai.de/${path}`;
+  } catch {
+    /* keep fallback */
+  }
+  return `${MARKETING_SITE_URL.replace(/\/$/, "")}/${path}`;
 }
-
-const STRENGTH_LABEL = ["", "SCHWACH", "OKAY", "GUT", "STARK"] as const;
-
-const GoogleG = () => (
-  <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden>
-    <path
-      fill="#4285F4"
-      d="M22.5 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.9a5 5 0 0 1-2.2 3.3v2.7h3.5c2-1.9 3.3-4.7 3.3-7.9z"
-    />
-    <path
-      fill="#34A853"
-      d="M12 23c3 0 5.5-1 7.3-2.7l-3.5-2.7c-1 .7-2.3 1.1-3.8 1.1-2.9 0-5.4-2-6.3-4.6H2v2.8A11 11 0 0 0 12 23z"
-    />
-    <path fill="#FBBC05" d="M5.7 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2a11 11 0 0 0 0 9.8l3.7-2.8z" />
-    <path
-      fill="#EA4335"
-      d="M12 5.4c1.6 0 3 .6 4.2 1.6l3.1-3.1A11 11 0 0 0 2 7.1l3.7 2.8C6.6 7.3 9.1 5.4 12 5.4z"
-    />
-  </svg>
-);
 
 function clearLegacySupabaseSessionCookies() {
   if (typeof document === "undefined") return;
-  const names = document.cookie.split(";").map((part) => part.slice(0, part.indexOf("=")).trim())
+  const names = document.cookie
+    .split(";")
+    .map((part) => part.slice(0, part.indexOf("=")).trim())
     .filter((name) => /^sb-[A-Za-z0-9_-]+-auth-token(?:\.\d+)?$/.test(name));
   for (const name of new Set(names)) {
     document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
     document.cookie = `${name}=; Path=/; Domain=.brewai.de; Max-Age=0; SameSite=Lax; Secure`;
   }
+}
+
+const GoogleG = () => (
+  <svg className="mr-2 size-4" viewBox="0 0 24 24" aria-hidden>
+    <path
+      fill="#4285F4"
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+    />
+  </svg>
+);
+
+function SubmitButton({ isSignup }: { isSignup: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" className="h-11 w-full" disabled={pending}>
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 size-4 animate-spin" />
+          {isSignup ? "Konto wird angelegt …" : "Anmeldung läuft …"}
+        </>
+      ) : isSignup ? (
+        "Konto anlegen"
+      ) : (
+        "Anmelden"
+      )}
+    </Button>
+  );
 }
 
 export function AuthCard({
@@ -102,24 +128,8 @@ export function AuthCard({
   feedbackNotice,
   inviteBlocked = false,
   inviteBlockedMessage = "Registrierung ist nur mit Einladung möglich. Bitte nutze deinen Einladungslink.",
-  termsHref = (() => {
-    try {
-      const host = new URL(MARKETING_SITE_URL).hostname;
-      if (host === "localhost" || host === "127.0.0.1") return "https://brewai.de/agb";
-    } catch {
-      /* keep fallback */
-    }
-    return `${MARKETING_SITE_URL.replace(/\/$/, "")}/agb`;
-  })(),
-  privacyHref = (() => {
-    try {
-      const host = new URL(MARKETING_SITE_URL).hostname;
-      if (host === "localhost" || host === "127.0.0.1") return "https://brewai.de/datenschutz";
-    } catch {
-      /* keep fallback */
-    }
-    return `${MARKETING_SITE_URL.replace(/\/$/, "")}/datenschutz`;
-  })(),
+  termsHref = marketingLegalUrl("agb"),
+  privacyHref = marketingLegalUrl("datenschutz"),
   showModeSwitch = true,
   forgotPasswordHref = "/passwort-vergessen",
 }: AuthCardProps) {
@@ -135,9 +145,9 @@ export function AuthCard({
   const [showPw, setShowPw] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const strength = passwordStrength(password);
   const displayError = localError ?? error;
-  const signupDisabled = isSignup && (inviteBlocked || !acceptedTerms);
+  const showGoogle = oauthProviders.includes("google");
+  const busy = loading;
 
   const setMode = (next: AuthMode) => {
     setLocalError(null);
@@ -148,7 +158,7 @@ export function AuthCard({
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     if (isSignup && !acceptedTerms) {
       event.preventDefault();
-      setLocalError("Bitte AGB und Datenschutz bestätigen");
+      setLocalError("Bitte AGB und Datenschutz bestätigen.");
       return;
     }
     if (isSignup && inviteBlocked) {
@@ -161,7 +171,6 @@ export function AuthCard({
 
     if (formAction) {
       clearLegacySupabaseSessionCookies();
-      // Native POST to existing auth routes — do not preventDefault.
       onSubmit({
         mode,
         email,
@@ -186,330 +195,295 @@ export function AuthCard({
     ? { action: formAction, method: "post" as const, onSubmit: handleSubmit }
     : { onSubmit: handleSubmit };
 
-  const panelFacts = isSignup
-    ? [
-        "Markenprofil, Sortiment und Mediathek an einem Ort",
-        "Team-Zugriff auf dieselbe Bibliothek",
-        "Weiterarbeiten dort, wo du aufgehört hast",
-      ]
-    : [
-        "300 Tokens Startguthaben nach Onboarding",
-        "Keine Kreditkarte für den Einstieg",
-        "Alle Rechte bleiben bei deiner Brauerei",
-      ];
+  const googleSignupHref =
+    isSignup && googleHref
+      ? `${googleHref}${googleHref.includes("?") ? "&" : "?"}terms_accepted=1`
+      : googleHref;
 
   return (
-    <div className={`${styles.page} ${studioFontClassName} evg-studio`}>
-      <div className={styles.pageGrid} aria-hidden />
-      <div className={styles.shell}>
-        <a href={MARKETING_SITE_URL} className={styles.brandAbove} aria-label="BrewAI Startseite">
-          <EvglabMark />
-          <span className={styles.brandName}>BrewAI</span>
-          <span className={styles.brandStudio}>STUDIO</span>
+    <div
+      className={cn(
+        "flex min-h-dvh w-full items-center justify-center bg-background p-4",
+        studioFontClassName,
+      )}
+    >
+      <div className="mx-auto w-full max-w-md">
+        <a
+          href={MARKETING_SITE_URL}
+          className="mb-6 flex items-center justify-center gap-2 text-foreground"
+          aria-label="BrewAI Startseite"
+        >
+          <EvglabMark size={22} />
+          <span className="font-semibold tracking-tight">BrewAI</span>
         </a>
 
-        <div className={styles.card}>
-        <section
-          className={`${styles.formPane} ${isSignup ? styles.formPaneSignup : styles.formPaneLogin}`}
-          aria-label={isSignup ? "Konto anlegen" : "Anmelden"}
-        >
-          <p className={styles.kicker}>{isSignup ? "Konto anlegen" : "Anmelden"}</p>
-          <h1 className={styles.formTitle}>{isSignup ? "Brauerei anlegen" : "Willkommen zurück"}</h1>
-          <p className={styles.formLead}>
-            {isSignup
-              ? "Drei Angaben, dann steht dein Markenprofil."
-              : "Deine Mediathek, dein Sortiment, dein Markenstil — alles liegt bereit."}
-          </p>
-
-          {inviteBlocked && isSignup ? (
-            <div className={`${styles.feedback} ${styles.feedbackError}`} role="status">
-              {inviteBlockedMessage}
-            </div>
-          ) : null}
-
-          {feedbackNotice ? (
-            <div className={`${styles.feedback} ${styles.feedbackNotice}`} role="status">
-              {feedbackNotice}
-            </div>
-          ) : null}
-
-          {displayError ? (
-            <div className={`${styles.feedback} ${styles.feedbackError}`} role="alert">
-              {displayError}
-            </div>
-          ) : null}
-
-          <form key={mode} className={styles.fields} {...formProps}>
-            <input type="hidden" name="next" value={nextPath} />
-            {inviteToken ? <input type="hidden" name="inviteToken" value={inviteToken} /> : null}
-
-            {isSignup ? (
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor={`${reactId}-brewery`}>
-                  Brauerei
-                </label>
-                <div className={styles.inputWrap}>
-                  <Beer className={styles.inputIcon} size={17} strokeWidth={1.75} aria-hidden />
-                  <input
-                    id={`${reactId}-brewery`}
-                    name="brewery"
-                    type="text"
-                    autoComplete="organization"
-                    placeholder="Name der Brauerei"
-                    className={styles.input}
-                    value={brewery}
-                    onChange={(e) => setBrewery(e.target.value)}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor={`${reactId}-email`}>
-                E-Mail
-              </label>
-              <div className={styles.inputWrap}>
-                <Mail className={styles.inputIcon} size={17} strokeWidth={1.75} aria-hidden />
-                <input
-                  id={`${reactId}-email`}
-                  name="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="name@beispiel.de"
-                  className={styles.input}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className={styles.field}>
-              <div className={styles.labelRow}>
-                <label className={styles.label} htmlFor={`${reactId}-password`}>
-                  Passwort
-                </label>
-                {!isSignup ? (
-                  onForgotPassword ? (
-                    <button type="button" className={styles.forgot} onClick={onForgotPassword}>
-                      Passwort vergessen?
-                    </button>
-                  ) : (
-                    <Link href={forgotPasswordHref} className={styles.forgot}>
-                      Passwort vergessen?
-                    </Link>
-                  )
-                ) : null}
-              </div>
-              <div className={styles.inputWrap}>
-                <Lock className={styles.inputIcon} size={17} strokeWidth={1.75} aria-hidden />
-                <input
-                  id={`${reactId}-password`}
-                  name="password"
-                  type={showPw ? "text" : "password"}
-                  required
-                  minLength={isSignup ? 8 : undefined}
-                  autoComplete={isSignup ? "new-password" : "current-password"}
-                  placeholder="••••••••"
-                  className={styles.input}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className={styles.pwToggle}
-                  onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? "Passwort ausblenden" : "Passwort anzeigen"}
-                >
-                  {showPw ? <EyeOff size={17} strokeWidth={1.8} /> : <Eye size={17} strokeWidth={1.8} />}
-                </button>
-              </div>
-            </div>
-
-            {isSignup && password ? (
-              <div className={styles.strength} aria-live="polite">
-                <div className={styles.strengthBars} aria-hidden>
-                  {[1, 2, 3, 4].map((n) => {
-                    const onClass =
-                      strength >= 1
-                        ? ([
-                            styles.strengthBarOn1,
-                            styles.strengthBarOn2,
-                            styles.strengthBarOn3,
-                            styles.strengthBarOn4,
-                          ][strength - 1] ?? styles.strengthBarOn1)
-                        : "";
-                    return (
-                      <span
-                        key={n}
-                        className={`${styles.strengthBar} ${strength >= n ? onClass : ""}`}
-                      />
-                    );
-                  })}
-                </div>
-                <span className={styles.strengthLabel}>{STRENGTH_LABEL[strength]}</span>
-              </div>
-            ) : null}
-
-            {isSignup ? (
-              <div className={styles.terms}>
-                <input
-                  id={`${reactId}-terms`}
-                  name="accepted_terms"
-                  type="checkbox"
-                  value="1"
-                  required
-                  checked={acceptedTerms}
-                  onChange={(e) => {
-                    setAcceptedTerms(e.target.checked);
-                    if (e.target.checked) setLocalError(null);
-                  }}
-                />
-                <label htmlFor={`${reactId}-terms`}>
-                  Ich akzeptiere die{" "}
-                  <a href={termsHref} target="_blank" rel="noopener noreferrer">
-                    AGB
-                  </a>{" "}
-                  und die{" "}
-                  <a href={privacyHref} target="_blank" rel="noopener noreferrer">
-                    Datenschutzerklärung
-                  </a>{" "}
-                  und bestätige die Widerrufsbelehrung.
-                </label>
-              </div>
-            ) : null}
-
-            <button type="submit" className={styles.submit} disabled={loading || signupDisabled}>
-              {loading
-                ? isSignup
-                  ? "Wird registriert …"
-                  : "Wird angemeldet …"
-                : isSignup
-                  ? "Konto anlegen"
-                  : "Anmelden"}
-            </button>
-          </form>
-
-          {oauthProviders.length > 0 ? (
-            <>
-              <div className={styles.or}>oder</div>
-              <div className={styles.oauthRow}>
-                {oauthProviders.includes("google") ? (
-                  googleHref ? (
-                    <a
-                      href={
-                        isSignup
-                          ? `${googleHref}${googleHref.includes("?") ? "&" : "?"}terms_accepted=1`
-                          : googleHref
-                      }
-                      onClick={(event) => {
-                        if (isSignup && !acceptedTerms) {
-                          event.preventDefault();
-                          setLocalError("Bitte AGB und Datenschutz bestätigen");
-                          return;
-                        }
-                        clearLegacySupabaseSessionCookies();
-                      }}
-                      className={`${styles.oauthBtn} ${styles.oauthIcon}`}
-                      rel="noopener"
-                      aria-label="Mit Google"
-                      title="Mit Google"
-                      aria-disabled={isSignup && !acceptedTerms}
-                    >
-                      <GoogleG />
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      className={`${styles.oauthBtn} ${styles.oauthIcon}`}
-                      disabled={loading || (isSignup && !acceptedTerms)}
-                      onClick={() => {
-                        if (isSignup && !acceptedTerms) {
-                          setLocalError("Bitte AGB und Datenschutz bestätigen");
-                          return;
-                        }
-                        onOAuth("google");
-                      }}
-                      aria-label="Mit Google"
-                      title="Mit Google"
-                    >
-                      <GoogleG />
-                    </button>
-                  )
-                ) : null}
-                <span className={styles.oauthHint}>Login über Anbieter</span>
-              </div>
-            </>
-          ) : null}
-
-          <p className={styles.footer}>
-            {isSignup ? (
-              <>
-                Schon dabei?{" "}
-                {showModeSwitch ? (
-                  <button type="button" className={styles.forgot} onClick={() => setMode("login")}>
-                    Zum Login
-                  </button>
-                ) : null}
-              </>
-            ) : (
-              <>
-                Neu hier?{" "}
-                {showModeSwitch ? (
-                  <button type="button" className={styles.forgot} onClick={() => setMode("signup")}>
-                    Brauerei anlegen
-                  </button>
-                ) : null}
-              </>
-            )}
-          </p>
-        </section>
-
-        <aside
-          className={`${styles.curve} ${isSignup ? styles.curveSignup : styles.curveLogin}`}
-          aria-hidden={false}
-        >
-          <div
-            className={`${styles.curveInner} ${isSignup ? styles.curveInnerSignup : styles.curveInnerLogin}`}
-          >
-            <p className={styles.kicker}>{isSignup ? "Schon dabei?" : "Neu hier?"}</p>
-            <h2 className={styles.panelTitle}>
-              {isSignup
-                ? "Weiter da, wo dein Sortiment aufgehört hat."
-                : "Motive, die nach deiner Brauerei aussehen."}
-            </h2>
-            <p className={styles.panelLead}>
-              {isSignup
-                ? "Melde dich an — Markenstil, Sorten und Anlässe sind hinterlegt und werden automatisch mitgegeben."
-                : "Markenprofil anlegen, Sortiment hinterlegen, in unter zwei Minuten das erste Motiv."}
-            </p>
-            <div className={styles.facts}>
-              {panelFacts.map((fact) => (
-                <div key={fact} className={styles.fact}>
-                  <span className={styles.factIcon} aria-hidden>
-                    <Check size={9} strokeWidth={2.5} />
-                  </span>
-                  <span>{fact}</span>
-                </div>
-              ))}
-            </div>
-            {showModeSwitch ? (
-              <button
-                type="button"
-                className={styles.panelCta}
-                onClick={() => setMode(isSignup ? "login" : "signup")}
+        <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/80 shadow-xl backdrop-blur-sm">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5" />
+          <div className="relative z-10">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={mode}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+                className="p-8"
               >
-                {isSignup ? "Zum Login" : "Brauerei anlegen"}
-              </button>
-            ) : null}
+                <div className="mb-8 text-center">
+                  <h1 className="text-3xl font-semibold text-foreground">
+                    {isSignup ? "Konto anlegen" : "Willkommen zurück"}
+                  </h1>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {isSignup
+                      ? "Markenprofil, Sortiment und Mediathek — in wenigen Schritten bereit."
+                      : "Melde dich an, um weiterzuarbeiten."}
+                  </p>
+                </div>
+
+                {inviteBlocked && isSignup ? (
+                  <div
+                    className="mb-6 rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
+                    role="status"
+                  >
+                    {inviteBlockedMessage}
+                  </div>
+                ) : null}
+
+                {feedbackNotice ? (
+                  <div
+                    className="mb-6 rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground"
+                    role="status"
+                  >
+                    {feedbackNotice}
+                  </div>
+                ) : null}
+
+                {displayError ? (
+                  <div
+                    className="mb-6 rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
+                    role="alert"
+                  >
+                    {displayError}
+                  </div>
+                ) : null}
+
+                <form key={mode} className="space-y-5" {...formProps}>
+                  <input type="hidden" name="next" value={nextPath} />
+                  {inviteToken ? <input type="hidden" name="inviteToken" value={inviteToken} /> : null}
+
+                  {isSignup ? (
+                    <div className="space-y-2">
+                      <Label htmlFor={`${reactId}-brewery`}>Brauerei</Label>
+                      <Input
+                        id={`${reactId}-brewery`}
+                        name="brewery"
+                        type="text"
+                        autoComplete="organization"
+                        placeholder="Name der Brauerei"
+                        disabled={busy}
+                        value={brewery}
+                        onChange={(e) => setBrewery(e.target.value)}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`${reactId}-email`}>E-Mail</Label>
+                    <Input
+                      id={`${reactId}-email`}
+                      name="email"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      placeholder="name@beispiel.de"
+                      disabled={busy}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor={`${reactId}-password`}>Passwort</Label>
+                      {!isSignup ? (
+                        onForgotPassword ? (
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="h-auto p-0 text-xs"
+                            onClick={onForgotPassword}
+                            disabled={busy}
+                          >
+                            Passwort vergessen?
+                          </Button>
+                        ) : (
+                          <Link
+                            href={forgotPasswordHref}
+                            className="text-xs text-primary underline-offset-4 hover:underline"
+                          >
+                            Passwort vergessen?
+                          </Link>
+                        )
+                      ) : null}
+                    </div>
+                    <div className="relative">
+                      <Input
+                        id={`${reactId}-password`}
+                        name="password"
+                        type={showPw ? "text" : "password"}
+                        required
+                        minLength={isSignup ? 8 : undefined}
+                        autoComplete={isSignup ? "new-password" : "current-password"}
+                        placeholder="••••••••"
+                        disabled={busy}
+                        className="pr-10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-0 right-0 h-full px-3"
+                        onClick={() => setShowPw((v) => !v)}
+                        disabled={busy}
+                        aria-label={showPw ? "Passwort verbergen" : "Passwort anzeigen"}
+                      >
+                        {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {isSignup ? (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id={`${reactId}-terms`}
+                          checked={acceptedTerms}
+                          onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                          disabled={busy || inviteBlocked}
+                        />
+                        <div className="space-y-1">
+                          <Label htmlFor={`${reactId}-terms`} className="text-sm leading-snug font-normal">
+                            Ich akzeptiere die{" "}
+                            <a
+                              href={termsHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline underline-offset-4"
+                            >
+                              AGB
+                            </a>{" "}
+                            und{" "}
+                            <a
+                              href={privacyHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline underline-offset-4"
+                            >
+                              Datenschutz
+                            </a>
+                            .
+                          </Label>
+                        </div>
+                      </div>
+                      {acceptedTerms ? (
+                        <input type="hidden" name={TERMS_ACCEPTANCE_FORM_FIELD} value="1" />
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <SubmitButton isSignup={isSignup} />
+                </form>
+
+                {showGoogle ? (
+                  <>
+                    <div className="relative mt-6">
+                      <div className="absolute inset-0 flex items-center">
+                        <Separator />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-card px-2 text-muted-foreground">Oder weiter mit</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6">
+                      {(() => {
+                        const googleDisabled =
+                          busy || (isSignup && (!acceptedTerms || inviteBlocked));
+                        if (googleHref && !googleDisabled) {
+                          return (
+                            <Button variant="outline" className="h-11 w-full bg-background/50" asChild>
+                              <a
+                                href={googleSignupHref}
+                                onClick={() => {
+                                  clearLegacySupabaseSessionCookies();
+                                  onOAuth("google");
+                                }}
+                              >
+                                <GoogleG />
+                                Mit Google
+                              </a>
+                            </Button>
+                          );
+                        }
+                        return (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-11 w-full bg-background/50"
+                            disabled={googleDisabled}
+                            onClick={() => {
+                              if (googleHref || googleDisabled) return;
+                              onOAuth("google");
+                            }}
+                          >
+                            <GoogleG />
+                            Mit Google
+                          </Button>
+                        );
+                      })()}
+                    </div>
+                  </>
+                ) : null}
+
+                {showModeSwitch ? (
+                  <p className="mt-8 text-center text-sm text-muted-foreground">
+                    {isSignup ? (
+                      <>
+                        Schon ein Konto?{" "}
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto p-0 text-sm"
+                          onClick={() => setMode("login")}
+                          disabled={busy}
+                        >
+                          Anmelden
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        Noch kein Konto?{" "}
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto p-0 text-sm"
+                          onClick={() => setMode("signup")}
+                          disabled={busy}
+                        >
+                          Registrieren
+                        </Button>
+                      </>
+                    )}
+                  </p>
+                ) : null}
+              </motion.div>
+            </AnimatePresence>
           </div>
-        </aside>
         </div>
 
-        <div className={styles.pageFoot}>
-          <span>app.brewai.de · Studio</span>
-          <span>Rechte bei deiner Brauerei</span>
-        </div>
+        <p className="mt-6 text-center text-muted-foreground text-xs">app.brewai.de · Studio</p>
       </div>
     </div>
   );

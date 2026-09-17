@@ -39,7 +39,7 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const returnTo = sanitizeReturnTo(searchParams.get("returnTo") ?? "/dashboard?tab=brand&openBrand=1&brandInput=instagram");
+  const returnTo = sanitizeReturnTo(searchParams.get("returnTo") ?? "/dashboard/brand?openBrand=1&brandInput=instagram");
   const appOrigin = getAppBaseUrlOrigin(new URL(req.url).origin);
   const oauthState = createInstagramOAuthState(user.id, returnTo);
   const redirect = NextResponse.redirect(buildInstagramOAuthUrl({ appOrigin, state: oauthState.state }));

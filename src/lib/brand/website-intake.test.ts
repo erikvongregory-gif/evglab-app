@@ -177,6 +177,15 @@ describe("extractRelevantInternalLinks", () => {
     expect(links).toHaveLength(1);
     expect(links[0]?.url).toContain("ber-uns");
   });
+
+  it("ranks lemonade and water catalog pages", () => {
+    const html = `<a href="/ueber-uns">Über uns</a><a href="/limonaden">Limonaden</a><a href="/mineralwasser">Mineralwasser</a><a href="/impressum">Impressum</a>`;
+    const links = extractRelevantInternalLinks(html, "https://brauerei.de/", 4);
+    const urls = links.map((l) => l.url);
+    expect(urls).toContain("https://brauerei.de/limonaden");
+    expect(urls).toContain("https://brauerei.de/mineralwasser");
+    expect(urls.every((u) => !u.includes("impressum"))).toBe(true);
+  });
 });
 
 describe("mergeParsedWebsitePages", () => {

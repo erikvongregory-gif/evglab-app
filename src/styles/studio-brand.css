@@ -6,8 +6,13 @@
   min-width: 0;
 }
 
-/* ── Page header ─────────────────────────────────────────── */
+/* ── Page header (StudioPageHeader) ──────────────────────── */
 
+.evg-studio .studio-brand-page > .evg-pagehead {
+  margin-bottom: var(--sp-8);
+}
+
+/* Legacy header hooks (mobile.css) */
 .evg-studio .studio-brand-header {
   display: flex;
   align-items: flex-end;
@@ -139,8 +144,62 @@
   color: var(--t3);
 }
 
-/* ── Quick start / Empty ───────────────────────────────────── */
+/* ── Quick start ───────────────────────────────────────────── */
 
+.evg-studio .studio-brand-quick {
+  margin-top: var(--sp-2);
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--acc);
+  background: var(--field);
+  padding: var(--sp-7) var(--sp-8);
+  display: grid;
+  gap: var(--sp-6);
+  max-width: 560px;
+}
+
+.evg-studio .studio-brand-quick__t {
+  font-size: var(--t-14);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.evg-studio .studio-brand-quick__s {
+  margin: 3px 0 0;
+  font-size: var(--t-13);
+  color: var(--fg-4);
+  line-height: 1.45;
+}
+
+.evg-studio .studio-brand-quick__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-4);
+  align-items: center;
+}
+
+.evg-studio .studio-brand-quick__alt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-5);
+}
+
+.evg-studio .studio-brand-quick__alt button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--t-12);
+  color: var(--fg-5);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.evg-studio .studio-brand-quick__alt button:hover {
+  color: var(--acc);
+}
+
+/* Legacy empty/quickstart hooks */
 .evg-studio .studio-brand-quickstart {
   display: flex;
   flex-direction: column;
@@ -150,301 +209,457 @@
 }
 
 .evg-studio .studio-brand-empty-card {
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: var(--s2);
-  padding: var(--sp-10) var(--sp-8);
-  text-align: center;
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--acc);
+  background: var(--field);
+  padding: var(--sp-8);
 }
 
-.evg-studio .studio-brand-empty-card__icon {
+/* ── 21st.dev components layout ────────────────────────────── */
+
+.evg-studio .studio-brand-21st {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: var(--sp-5);
+  margin-bottom: var(--sp-10);
+  align-items: stretch;
+}
+
+.evg-studio .studio-brand-21st > * {
+  min-width: 0;
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .evg-studio .studio-brand-21st {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Identity board (legacy / fallback) ────────────────────── */
+
+.evg-studio .studio-brand-id {
+  border: 1px solid var(--line-strong);
+  background: var(--s1);
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  margin-bottom: var(--sp-10);
+}
+
+.evg-studio .studio-brand-id__type {
+  position: relative;
+  padding: var(--sp-8) var(--sp-8) var(--sp-9);
+  border-right: 1px solid var(--line);
+  min-height: 168px;
+  overflow: hidden;
+}
+
+.evg-studio .studio-brand-id__meta {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin: 0 auto var(--sp-5);
-  border-radius: var(--r-md);
-  border: 1px dashed var(--line2);
-  color: var(--t3);
+  gap: var(--sp-4);
+  flex-wrap: wrap;
 }
 
-/* ── Profile grid ──────────────────────────────────────────── */
-
-.evg-studio .studio-brand-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
-  gap: var(--sp-5);
-  align-items: start;
-}
-
-.evg-studio .studio-brand-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-5);
-  min-width: 0;
-}
-
-.evg-studio .studio-brand-page .studio-card {
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: var(--s2);
-}
-
-.evg-studio .studio-brand-divider {
-  margin: var(--sp-6) 0;
-}
-
-.evg-studio .studio-brand-section-label {
+.evg-studio .studio-brand-id__eyebrow {
   font-family: var(--f-mono);
   font-size: var(--t-9);
   font-weight: 500;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--t3);
-  margin-bottom: var(--sp-4);
+  color: var(--fg-5);
 }
 
-.evg-studio .studio-brand-tones-label {
-  margin-top: var(--sp-6);
+.evg-studio .studio-brand-id__font {
+  margin: var(--sp-5) 0 0;
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--fg);
 }
 
-/* Website row */
-.evg-studio .studio-brand-website-head {
+.evg-studio .studio-brand-id__source {
+  margin: var(--sp-3) 0 0;
+  font-family: var(--f-mono);
+  font-size: var(--t-11);
+  color: var(--fg-5);
+  letter-spacing: 0.02em;
+}
+
+.evg-studio .studio-brand-id__specimen {
+  position: absolute;
+  right: var(--sp-7);
+  bottom: var(--sp-5);
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-5);
+  gap: 2px;
+  font-size: clamp(48px, 7vw, 72px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
 }
 
-.evg-studio .studio-brand-website-left {
+.evg-studio .studio-brand-id__specimen span:first-child {
+  color: var(--fg);
+}
+
+.evg-studio .studio-brand-id__specimen span:last-child {
+  color: var(--fg-6);
+  opacity: 0.55;
+}
+
+.evg-studio .studio-brand-id__palette {
   display: flex;
-  align-items: flex-start;
-  gap: var(--sp-5);
+  flex-direction: column;
   min-width: 0;
 }
 
-.evg-studio .studio-brand-website-icon {
-  flex: none;
-  width: 36px;
-  height: 36px;
+.evg-studio .studio-brand-id__swatches {
+  flex: 1;
+  min-height: 120px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.evg-studio .studio-brand-id__swatches .evg-swatch {
+  height: auto;
+  min-height: 120px;
+  border-right-color: rgba(24, 20, 15, 0.08);
+}
+
+.evg-studio .studio-brand-id__hexes {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-md);
-  border: 1px solid var(--line2);
-  background: var(--s3);
-  color: var(--t2);
+  padding: var(--sp-4) 0;
+  background: var(--field);
 }
 
-.evg-studio .studio-brand-website-icon.ok {
-  border-color: var(--ok-dim);
-  color: var(--ok);
+.evg-studio .studio-brand-id__hexes span {
+  flex: 1;
+  text-align: center;
+  font-family: var(--f-mono);
+  font-size: var(--t-9);
+  letter-spacing: 0.04em;
+  color: var(--fg-5);
 }
 
-.evg-studio .studio-brand-domain {
+.evg-studio .studio-brand-id__strength {
+  grid-column: 1 / -1;
+  padding: var(--sp-5) var(--sp-8);
+  border-top: 1px solid var(--line);
+  background: var(--s2);
+}
+
+.evg-studio .studio-brand-id__strength-top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  font-family: var(--f-mono);
+  font-size: var(--t-10);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-5);
+}
+
+.evg-studio .studio-brand-id__strength-bar {
+  height: 3px;
+  background: var(--line-strong);
+  margin-top: var(--sp-4);
+}
+
+.evg-studio .studio-brand-id__strength-bar i {
+  display: block;
+  height: 3px;
+  background: var(--acc-quiet);
+}
+
+/* ── Layout: main + lock ───────────────────────────────────── */
+
+.evg-studio .studio-brand-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: var(--sp-10);
+  align-items: start;
+}
+
+.evg-studio .studio-brand-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-10);
+}
+
+.evg-studio .studio-brand-aside {
+  border: 1px solid var(--line-strong);
+  background: var(--field);
+  padding: var(--sp-6) var(--sp-7);
+}
+
+.evg-studio .studio-brand-aside__desc {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--t-12);
+  line-height: 1.5;
+  color: var(--fg-4);
+}
+
+.evg-studio .studio-brand-aside .evg-choice {
+  width: 100%;
+  background: none;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.evg-studio .studio-brand-aside .evg-choice:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.evg-studio .studio-brand-aside .evg-choice:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+.evg-studio .studio-brand-sec__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-5);
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+
+.evg-studio .studio-brand-sec__head h2 {
   font-size: var(--t-15);
   font-weight: 600;
-  color: var(--t1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--fg);
 }
 
-.evg-studio .studio-brand-meta {
-  margin-top: 3px;
+.evg-studio .studio-brand-sec__note {
+  margin-left: auto;
   font-family: var(--f-mono);
   font-size: var(--t-11);
-  color: var(--t3);
+  color: var(--fg-5);
+  letter-spacing: 0.04em;
 }
 
-/* Colors */
-.evg-studio .studio-brand-swatch-row {
+/* Aliases for BrandCharactersSection */
+.evg-studio .studio-brand-section-label {
+  font-size: var(--t-15);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  margin: 0;
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.evg-studio .studio-brand-rules-sub {
+  font-size: var(--t-12);
+  line-height: 1.45;
+  color: var(--fg-5);
+}
+
+.evg-studio .studio-brand-page .evg-field {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.evg-studio .studio-brand-font-ctrl {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-font-ctrl__row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-3);
+  align-items: center;
+  gap: var(--sp-4);
 }
 
-.evg-studio .studio-brand-swatch-bar {
-  flex: 1;
-  min-width: 48px;
-  max-width: 80px;
-  height: 26px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--line2);
-}
-
-.evg-studio .studio-brand-font-name {
-  width: 100%;
-  border: 1px solid var(--line2);
-  border-radius: var(--r-md);
-  background: var(--s1);
-  color: var(--t1);
-  font: inherit;
-  font-size: var(--t-13);
-  padding: 10px 12px;
-}
-
-.evg-studio .studio-brand-font-upload {
-  display: inline-flex;
-}
-
-/* Tags */
 .evg-studio .studio-brand-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.evg-studio .studio-brand-tag {
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--line2);
-  background: var(--s3);
-  font-size: var(--t-12);
-  font-weight: 500;
-  color: var(--t1);
-}
-
-/* Bildregeln */
-.evg-studio .studio-brand-rules-title {
-  font-size: var(--t-15);
-  font-weight: 600;
-  color: var(--t1);
-}
-
-.evg-studio .studio-brand-rules-sub {
-  margin-top: 4px;
-  font-size: var(--t-12);
-  line-height: 1.45;
-  color: var(--t3);
-}
-
-.evg-studio .studio-brand-rules-head {
-  margin-bottom: var(--sp-5);
-}
-
 .evg-studio .studio-brand-rule-row {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  gap: var(--sp-4);
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: var(--sp-5);
+  padding: var(--sp-5) 0;
+  border-bottom: 1px solid var(--line-faint);
 }
 
-.evg-studio .studio-brand-rule-row:first-of-type {
-  border-top: 0;
-  padding-top: 0;
+.evg-studio .studio-brand-rule-row:last-child {
+  border-bottom: 0;
 }
 
 .evg-studio .studio-brand-rule-key {
   font-family: var(--f-mono);
   font-size: var(--t-11);
-  color: var(--t3);
+  letter-spacing: 0.04em;
+  color: var(--fg-5);
+  padding-top: 2px;
 }
 
 .evg-studio .studio-brand-rule-val {
-  font-size: var(--t-13);
-  line-height: 1.45;
-  color: var(--t2);
-}
-
-/* Brand-Lock */
-.evg-studio .studio-brand-lock-label {
-  font-size: var(--t-15);
-  font-weight: 600;
-  color: var(--t1);
-}
-
-.evg-studio .studio-brand-lock-desc {
-  margin: 6px 0 0;
-  font-size: var(--t-12);
-  line-height: 1.6;
-  color: var(--t2);
-}
-
-.evg-studio .studio-brand-lock-list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin-top: var(--sp-5);
-}
-
-.evg-studio .studio-brand-lock-opt {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--line);
-  background: transparent;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  transition:
-    border-color var(--dur-mid) var(--ease),
-    background var(--dur-mid) var(--ease);
-}
-
-.evg-studio .studio-brand-lock-opt:hover:not(:disabled) {
-  background: var(--s3);
-  border-color: var(--line2);
-}
-
-.evg-studio .studio-brand-lock-opt.on {
-  border-color: var(--ac-line);
-  background: var(--ac-tint);
-}
-
-.evg-studio .studio-brand-lock-opt:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.evg-studio .studio-brand-lock-opt:focus-visible {
-  outline: 2px solid var(--ac);
-  outline-offset: 2px;
-}
-
-.evg-studio .studio-brand-lock-radio {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  margin-top: 2px;
-  border-radius: 50%;
-  border: 1.5px solid var(--line2);
-  background: var(--s1);
-}
-
-.evg-studio .studio-brand-lock-opt.on .studio-brand-lock-radio {
-  border: 4px solid var(--ac);
-}
-
-.evg-studio .studio-brand-lock-name {
-  font-size: var(--t-13);
-  font-weight: 500;
-  color: var(--t1);
-}
-
-.evg-studio .studio-brand-lock-sub {
-  margin-top: 2px;
-  font-size: var(--t-11);
+  font-size: var(--t-14);
   line-height: 1.5;
-  color: var(--t3);
+  color: var(--fg-2);
 }
 
-.evg-studio .studio-brand-lock-opt:not(.on) .studio-brand-lock-name {
-  color: var(--t2);
+.evg-studio .studio-brand-danger {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-6) 0;
+  border-top: 1px solid var(--line-strong);
+}
+
+.evg-studio .studio-brand-danger__t {
+  font-size: var(--t-14);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.evg-studio .studio-brand-danger__s {
+  margin: 3px 0 0;
+  font-size: var(--t-12);
+  color: var(--fg-5);
+  line-height: 1.45;
+  max-width: 48ch;
+}
+
+.evg-studio .studio-brand-danger .evg-btn {
+  margin-left: auto;
+  flex: none;
 }
 
 /* Referenzen */
 .evg-studio .studio-brand-refs-section {
   margin-top: var(--sp-8);
+}
+
+.evg-studio .studio-brand-chars-section {
+  margin-top: var(--sp-2);
+}
+
+.evg-studio .studio-brand-chars-list {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.evg-studio .studio-brand-char-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  align-items: center;
+  border: 1px solid var(--line);
+  background: var(--s1);
+  border-radius: 0;
+}
+
+.evg-studio .studio-brand-char-card__thumbs {
+  display: flex;
+  gap: 4px;
+}
+
+.evg-studio .studio-brand-char-card__thumbs img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+}
+
+.evg-studio .studio-brand-char-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.evg-studio .studio-brand-char-card__meta strong {
+  font-size: 0.95rem;
+  color: var(--t1);
+}
+
+.evg-studio .studio-brand-char-card__meta small {
+  color: var(--t2);
+  font-size: 0.8rem;
+}
+
+.evg-studio .studio-brand-char-create {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.evg-studio .studio-brand-char-field {
+  display: grid;
+  gap: 6px;
+}
+
+.evg-studio .studio-brand-char-field > span {
+  font-size: 0.78rem;
+  color: var(--t2);
+  letter-spacing: 0.02em;
+}
+
+.evg-studio .studio-brand-char-field input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--s1);
+  color: var(--t1);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.evg-studio .studio-brand-char-draft-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evg-studio .studio-brand-char-draft-thumb,
+.evg-studio .studio-brand-char-add-photo {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  padding: 0;
+  overflow: hidden;
+  background: var(--s2);
+  cursor: pointer;
+  color: var(--t2);
+  font-size: 0.75rem;
+}
+
+.evg-studio .studio-brand-char-draft-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.evg-studio .studio-brand-char-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evg-studio .studio-brand-inline-error {
+  color: var(--warn);
+  font-size: 0.85rem;
+  margin: 8px 0 0;
 }
 
 .evg-studio .studio-brand-refs-grid {
@@ -458,7 +673,8 @@
   aspect-ratio: 1;
   overflow: hidden;
   padding: 0;
-  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--s2);
 }
 
 .evg-studio .studio-brand-ref-tile img {
@@ -468,40 +684,31 @@
   object-fit: cover;
 }
 
-.evg-studio .studio-brand-reset-card {
-  border-color: var(--line);
-}
-
 /* ── Loading skeleton ──────────────────────────────────────── */
 
 .evg-studio .studio-brand-skeleton {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
-  gap: var(--sp-5);
+  gap: var(--sp-8);
 }
 
-.evg-studio .studio-brand-skeleton__block {
+.evg-studio .studio-brand-skeleton__board {
+  height: 200px;
   border: 1px solid var(--line);
-  border-radius: var(--r-lg);
   background: var(--s2);
-  padding: var(--sp-8);
+}
+
+.evg-studio .studio-brand-skeleton__rows {
+  display: grid;
+  gap: var(--sp-4);
 }
 
 .evg-studio .studio-brand-skeleton__line {
-  height: 10px;
-  border-radius: 5px;
+  height: 12px;
   background: var(--s3);
 }
 
 .evg-studio .studio-brand-skeleton__line--short {
   width: 45%;
-  margin-top: var(--sp-4);
-}
-
-.evg-studio .studio-brand-skeleton__line--title {
-  width: 70%;
-  height: 14px;
-  margin-bottom: var(--sp-6);
 }
 
 .evg-studio .studio-brand-skeleton__shimmer {
@@ -832,6 +1039,52 @@
   border: 1px solid var(--line2);
 }
 
+.evg-studio .studio-brand-review-beers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evg-studio .studio-brand-review-beer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.evg-studio .studio-brand-review-beer-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.evg-studio .studio-brand-review-beer-remove {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line2);
+  border-radius: 50%;
+  background: var(--s2);
+  color: var(--t3);
+  cursor: pointer;
+}
+
+.evg-studio .studio-brand-review-beer-remove:hover:not(:disabled) {
+  color: var(--t1);
+  background: var(--s3);
+}
+
+.evg-studio .studio-brand-review-beer-remove:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .evg-studio .studio-brand-review-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1054,12 +1307,20 @@
 /* ── Responsive ────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
-  .evg-studio .studio-brand-grid,
-  .evg-studio .studio-brand-skeleton {
+  .evg-studio .studio-brand-id {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .evg-studio .studio-brand-lock-card {
+  .evg-studio .studio-brand-id__type {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .evg-studio .studio-brand-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evg-studio .studio-brand-aside {
     order: -1;
   }
 
@@ -1069,13 +1330,21 @@
 }
 
 @media (max-width: 768px) {
-  .evg-studio .studio-brand-header {
+  .evg-studio .studio-brand-quick__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evg-studio .studio-brand-danger {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .evg-studio .studio-brand-quickstart {
-    max-width: none;
+  .evg-studio .studio-brand-danger .evg-btn {
+    margin-left: 0;
+  }
+
+  .evg-studio .studio-brand-id__specimen {
+    font-size: 52px;
   }
 
   .evg-studio .studio-modal-foot,

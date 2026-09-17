@@ -97,10 +97,13 @@
   --t-13: 13px;   --t-14: 14px;   --t-15: 15px;   --t-19: 19px;
   --t-page: 26px; --t-greet: 19px; --t-login: 26px; --t-kpi: 30px;
 
-  /* MOTION — short, purposeful */
+  /* MOTION — hover/press 100–150 · popover 140–180 · dialog 180–240; close faster */
   --dur: 120ms;
+  --dur-out: 100ms;
   --dur-mid: 160ms;
+  --dur-mid-out: 120ms;
   --dur-page: 220ms;
+  --dur-page-out: 160ms;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   /* Shadows */
@@ -381,7 +384,7 @@
   color: var(--t2); font-size: var(--t-14); font-weight: 500;
   cursor: pointer; border: 0; background: transparent; width: 100%; text-align: left;
   text-decoration: none;
-  transition: background 0.16s cubic-bezier(0.4, 0, 0.2, 1), color 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .evg-nav__item .evg-rail__icon,
 .evg-nav__item .evg-rail__icon .evg-ico {
@@ -389,6 +392,7 @@
   transition: stroke 0.18s ease, color 0.18s ease;
 }
 .evg-nav__item:hover { color: var(--t1); background: var(--s2); }
+.evg-nav__item:active { background: var(--s3); }
 .evg-nav__item:hover .evg-rail__icon {
   color: var(--ac);
 }
@@ -914,7 +918,7 @@
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
-  transition: color 0.16s ease, background 0.16s ease;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 .evg-bottom-nav__item > .evg-ico {
   transform-origin: center;

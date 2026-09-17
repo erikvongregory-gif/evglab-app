@@ -155,9 +155,40 @@
   background: var(--s3);
 }
 
-.evg-studio .studio-media-card:focus-visible {
-  outline: 2px solid var(--ac);
-  outline-offset: 2px;
+.evg-studio .studio-media-card--live {
+  border-color: var(--ac);
+}
+
+.evg-studio .studio-media-card--job {
+  cursor: default;
+}
+
+.evg-studio .studio-media-card__pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  text-align: center;
+  font-size: var(--t-13);
+  color: var(--t3);
+}
+
+.evg-studio .studio-media-card__recheck {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ac);
+  font: inherit;
+  font-size: var(--t-12);
+  cursor: pointer;
+  text-align: left;
+}
+
+.evg-studio .studio-media-card__recheck:hover {
+  text-decoration: underline;
 }
 
 .evg-studio .studio-media-card__frame {

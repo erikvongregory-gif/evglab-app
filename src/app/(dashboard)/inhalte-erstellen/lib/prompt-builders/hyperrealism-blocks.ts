@@ -1,5 +1,6 @@
 import { FLASCHEN_TYPEN, GLAS_TYPEN, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
+import { sanitizeProduktKategorie, type ProduktKategorie } from "@/lib/dashboard/metadata";
 
 type BeerPhysicsProfile = {
   srm: string;
@@ -191,6 +192,102 @@ export function buildBeerPhysicsFragment(bierstil: string, behaelter: NonNullabl
   ].join(" ");
 }
 
+export function inputProduktKategorie(input: Pick<HyperrealisticInput, "produktKategorie">): ProduktKategorie {
+  return sanitizeProduktKategorie(input.produktKategorie);
+}
+
+export function beverageDrinkNoun(input: Pick<HyperrealisticInput, "produktKategorie">): string {
+  switch (inputProduktKategorie(input)) {
+    case "limonade":
+      return "lemonade";
+    case "tafelwasser":
+      return "still table water";
+    case "mineralwasser":
+      return "mineral water";
+    default:
+      return "beer";
+  }
+}
+
+export function beverageContainerNoun(input: Pick<HyperrealisticInput, "produktKategorie" | "flaschenTyp">): string {
+  if (isDoseTyp(input.flaschenTyp)) return "beverage can";
+  switch (inputProduktKategorie(input)) {
+    case "limonade":
+      return "lemonade bottle";
+    case "tafelwasser":
+      return "still table-water bottle";
+    case "mineralwasser":
+      return "mineral-water bottle";
+    default:
+      return "beer bottle";
+  }
+}
+
+export function withoutBeerFoam(text: string): string {
+  return text
+    .replace(/modest white foam cap/gi, "no beer foam")
+    .replace(/fine white foam[^,—.]*/gi, "no beer foam")
+    .replace(/thick foam crown[^,.]*/gi, "no beer foam")
+    .replace(/modest foam/gi, "no beer foam")
+    .replace(/glass beer mug/gi, "glass mug")
+    .replace(/wheat-beer tumbler/gi, "tumbler");
+}
+
+export function bottleGeometryPrompt(
+  input: Pick<HyperrealisticInput, "produktKategorie" | "flaschenTyp">,
+  promptDescription: string,
+): string {
+  if (inputProduktKategorie(input) === "bier") return promptDescription;
+  return promptDescription.replace(/beer bottle/gi, beverageContainerNoun(input));
+}
+
+function lemonadeColorFromName(bierstil: string): string {
+  const key = bierstil.trim().toLowerCase();
+  if (/\bspezi\b/.test(key)) return "cola-orange Spezi color matching the product label/photo";
+  if (/\bcola\b/.test(key)) return "dark cola-brown matching the product label/photo";
+  if (/orange/.test(key)) return "orange lemonade color matching the product label/photo";
+  if (/zitrone|lemon/.test(key)) return "pale lemon lemonade color matching the product label/photo";
+  return "lemonade color taken only from the product label/photo — do not invent beer amber or hops";
+}
+
+function waterCarbonationFromName(input: HyperrealisticInput): string {
+  const key = `${input.bierstil} ${input.beerName ?? ""}`.toLowerCase();
+  if (/\b(?:still|naturell|ohne kohlensaeure|ohne kohlensäure)\b/.test(key)) {
+    return "still water, no bubbles, no foam";
+  }
+  if (/\b(?:medium|classic|sprudel|sparkling|kohlensaeure|kohlensäure)\b/.test(key)) {
+    return "fine mineral-water carbonation bubbles only if consistent with the product photo; no beer foam, no hop haze";
+  }
+  return "no beer foam and no invented carbonation — bubbles only if clearly visible in the product photo";
+}
+
+export function buildLiquidPhysicsFragment(input: HyperrealisticInput, behaelter: NonNullable<HyperrealisticInput["behaelter"]>): string {
+  const kategorie = inputProduktKategorie(input);
+  if (kategorie === "bier") return buildBeerPhysicsFragment(input.bierstil, behaelter);
+  const drink = beverageDrinkNoun(input);
+  const vessel =
+    behaelter === "G"
+      ? `poured ${drink} in glass`
+      : behaelter === "F"
+        ? `visible ${drink} through bottle glass where applicable`
+        : `poured ${drink} in glass and bottle liquid consistency`;
+  if (kategorie === "limonade") {
+    return [
+      `LIQUID PHYSICS (${vessel}):`,
+      `Color: ${lemonadeColorFromName(input.bierstil)}.`,
+      "No beer color, no hops, no beer foam head.",
+      "Carbonation only if the product name or photo shows a carbonated lemonade (Cola/Spezi/Brause); otherwise no invented fizz.",
+      "Glass: ordinary real glass. Highlights from this room, not a studio HDRI. Condensation only if the drink is cold — sparse, irregular.",
+    ].join(" ");
+  }
+  return [
+    `LIQUID PHYSICS (${vessel}):`,
+    "Water is colorless and crystal-clear — no beer color, no hops, no beer foam.",
+    `Carbonation: ${waterCarbonationFromName(input)}.`,
+    "Glass: ordinary real glass. Highlights from this room, not a studio HDRI. Condensation only if the drink is cold — sparse, irregular.",
+  ].join(" ");
+}
+
 /**
  * gpt-image-2 liefert nur 3 reale Formate (1024x1024 / 1024x1536 / 1536x1024).
  * Wir versprechen dem Modell daher das tatsächlich gerenderte Format, nicht das
@@ -238,6 +335,12 @@ const FLASCHENFARBE_TEXT: Record<HyperrealisticInput["flaschenfarbe"], string> =
   klar: "clear flint glass",
 };
 
+/** Eingeschenktes Glas neben Flasche/Dose — der Verschluss darf dann nicht mehr drauf sein. */
+export function isPouredGlassServing(input: HyperrealisticInput): boolean {
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  return behaelter === "B";
+}
+
 /**
  * Erzwingt exakt den vom Nutzer gewählten Flaschentyp (Form + Volumen) und
  * verbietet typische Verwechslungen (z. B. NRW-0,5-l vs. Stubbi-0,33-l).
@@ -253,14 +356,25 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
   const noun = istDose ? "aluminium beverage can" : "bottle";
   const nounCap = istDose ? "Can" : "Bottle";
   const colorClause = istDose ? "" : `, made of ${FLASCHENFARBE_TEXT[input.flaschenfarbe]}`;
+  const poured = isPouredGlassServing(input);
+  const drink = beverageDrinkNoun(input);
+  const isBeer = inputProduktKategorie(input) === "bier";
+  const openServing = poured
+    ? istDose
+      ? `OPEN SERVING (overrides any catalog 'sealed' wording): ${isBeer ? "beer" : drink} is already poured, so the can MUST be opened with the stay-tab pulled — never an unopened sealed can next to a full glass.`
+      : `OPEN SERVING (overrides any catalog 'sealed with crown cap' wording): ${isBeer ? "beer" : drink} is already poured into a glass, so the bottle mouth MUST be uncapped — no crown cap, no cork, no foil on the mouth. The crown cap may rest on the table, never on the bottle.`
+    : "";
   return [
     `${BOTTLE_SHAPE_LOCK_MARKER}:`,
-    `The ${noun} MUST be ${flasche.promptDescription}${colorClause}.`,
+    `The ${noun} MUST be ${bottleGeometryPrompt(input, flasche.promptDescription)}${colorClause}.`,
     `${nounCap} shape and size are defined by this specification — ${flasche.forbidden}.`,
+    openServing,
     `If a bottle-shape reference photo is attached, copy that silhouette, neck length, shoulder and proportions exactly.`,
     `Label/artwork photos only supply printed graphics to apply onto this ${noun} — they must not replace the ${noun} with a different type.`,
     `Render the ${noun} at physically correct real-world scale so its size class (0.33 L vs 0.5 L) is unmistakable.`,
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 const GLASS_FORBIDDEN: Record<NonNullable<HyperrealisticInput["glasTyp"]>, string> = {
@@ -287,7 +401,9 @@ export function buildLabelLockFragment(input: HyperrealisticInput): string {
     `Copy the printed ${noun} artwork 1:1 — same logo, same crest, same typography, same colors, same layout, same words.`,
     "Do not redesign, restyle, recolor, translate, abbreviate, or invent a variant (no new names, no extra badges, no swapped colorways).",
     "Every letter that is readable on the reference must appear the same on the generated label.",
-    "The result is a new photograph of that same physical product in a new scene — not a collage and not a different beer.",
+    inputProduktKategorie(input) === "bier"
+      ? "The result is a new photograph of that same physical product in a new scene — not a collage and not a different beer."
+      : "The result is a new photograph of that same physical product in a new scene — not a collage and not a different drink.",
   ].join(" ");
 }
 export const GLASS_SHAPE_LOCK_MARKER = "GLASS SHAPE LOCK (MANDATORY)";
@@ -300,13 +416,17 @@ export function buildGlassShapeLockFragment(input: HyperrealisticInput): string 
   const fillMl = pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter);
   const pour = glassPourPromptDescription(input.glasTyp, fillMl);
   const bottleMl = flascheVolumeMl(input.flaschenTyp);
+  const isBeer = inputProduktKategorie(input) === "bier";
+  const drink = beverageDrinkNoun(input);
   const volumeLock =
     behaelter === "B"
       ? `POUR VOLUME: the glass is a single pour from this ${bottleMl / 1000} L bottle/can (${fillMl} ml). It must look like it was filled from that one container — never a larger mug.`
       : "";
   return [
     `${GLASS_SHAPE_LOCK_MARKER}:`,
-    `Every beer glass in frame MUST be ${pour}.`,
+    isBeer
+      ? `Every beer glass in frame MUST be ${pour}.`
+      : `Every glass in frame MUST be ${withoutBeerFoam(pour)}. Liquid is ${drink}; do not render beer foam or hop haze.`,
     `${GLASS_FORBIDDEN[input.glasTyp]}.`,
     volumeLock,
     "Do not substitute a different glass type.",
@@ -348,8 +468,16 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
 
   // Glas eingeschenkt + Flasche → Gebinde wurde bereits geöffnet.
   if (behaelter === "B") {
+    const drink = beverageDrinkNoun(input);
+    const isBeer = inputProduktKategorie(input) === "bier";
     lines.push(
-      `The adjacent beer glass is already poured, therefore the ${noun} MUST be shown ALREADY OPENED with ${openState} (someone has clearly opened it to pour). Never show a sealed ${noun} (${closureWord}) standing next to a full poured glass.`,
+      isBeer
+        ? `The adjacent beer glass is already poured, therefore the ${noun} MUST be shown ALREADY OPENED with ${openState}.`
+        : `The adjacent glass is already poured, therefore the ${noun} MUST be shown ALREADY OPENED with ${openState}.`,
+      isBeer
+        ? `HARD RULE: once beer has been poured into a glass, a crown cap must NEVER sit on the bottle mouth — not even copied from a sealed product photo. The metal crown cap may lie on the table beside the bottle; the bottle lip is open and empty.`
+        : `HARD RULE: once ${drink} has been poured into a glass, a crown cap must NEVER sit on the bottle mouth — not even copied from a sealed product photo. The metal crown cap may lie on the table beside the bottle; the bottle lip is open and empty.`,
+      `Never show a sealed ${noun} (${closureWord}) standing next to a full poured glass.`,
     );
   }
 
@@ -366,6 +494,14 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
   );
 
   return lines.join(" ");
+}
+
+/** Vorn anhängen — Prompt-Kürzung am Ende darf die Einschenk-Regel nicht streichen. */
+export function ensureClosureLogic(prompt: string, input: HyperrealisticInput): string {
+  const closure = buildClosureLogicFragment(input);
+  if (!closure) return prompt;
+  if (prompt.includes(CLOSURE_LOGIC_MARKER)) return prompt;
+  return `${closure} ${prompt}`;
 }
 
 export function buildHyperrealismLockFragment(): string {
@@ -424,7 +560,7 @@ export function ensureHyperrealismDirectives(prompt: string, input: Hyperrealist
 
   if (!/liquid physics|srm \d|approx\. hex/i.test(lower)) {
     const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
-    next = `${next}\n\n${buildBeerPhysicsFragment(input.bierstil, behaelter)}`;
+    next = `${next}\n\n${buildLiquidPhysicsFragment(input, behaelter)}`;
   }
 
   if (!/scene texture anchors|micro-realism/i.test(lower)) {

@@ -1,0 +1,242 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { useShallow } from "zustand/react/shallow";
+import { EvglabMark } from "@/components/studio/evglab-mark";
+import { AccountSwitcher } from "@/components/dashboard-shell/header/account-switcher";
+import { LayoutControls } from "@/components/dashboard-shell/header/layout-controls";
+import { SearchDialog } from "@/components/dashboard-shell/header/search-dialog";
+import { ThemeSwitcher } from "@/components/dashboard-shell/header/theme-switcher";
+import { NavMain } from "@/components/dashboard-shell/sidebar/nav-main";
+import { NavUser } from "@/components/dashboard-shell/sidebar/nav-user";
+import { SupportCard } from "@/components/dashboard-shell/sidebar/support-card";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { APP_CONFIG } from "@/config/app-config";
+import { runBillingBootstrap } from "@/lib/billing/clientBootstrap";
+import { cn } from "@/lib/utils";
+import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
+import { createClient } from "@/lib/supabase/client";
+import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
+
+type StudioShellContextValue = {
+  setBrandProfileActive: (active: boolean) => void;
+  setContentPadding: (padding: string | undefined) => void;
+  setContentPending: (pending: boolean) => void;
+  setFullBleed: (fullBleed: boolean) => void;
+};
+
+const StudioShellContext = createContext<StudioShellContextValue | null>(null);
+
+export function useStudioShell(): StudioShellContextValue {
+  const ctx = useContext(StudioShellContext);
+  if (!ctx) {
+    return {
+      setBrandProfileActive: () => undefined,
+      setContentPadding: () => undefined,
+      setContentPending: () => undefined,
+      setFullBleed: () => undefined,
+    };
+  }
+  return ctx;
+}
+
+function BrewAiSidebar({
+  user,
+  variant,
+}: {
+  user: { name: string; email: string; avatar: string };
+  variant?: React.ComponentProps<typeof Sidebar>["variant"];
+}) {
+  const { sidebarVariant, isSynced } = usePreferencesStore(
+    useShallow((s) => ({
+      sidebarVariant: s.values.sidebar_variant,
+      isSynced: s.isSynced,
+    })),
+  );
+
+  const resolvedVariant = isSynced ? sidebarVariant : variant;
+
+  return (
+    <Sidebar variant={resolvedVariant} collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link prefetch={false} href="/dashboard">
+                <EvglabMark size={18} />
+                <span className="font-semibold text-base">{APP_CONFIG.name}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <NavMain items={sidebarItems} />
+      </SidebarContent>
+      <SidebarFooter>
+        <SupportCard />
+        <NavUser user={user} />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
+export function BrewAiAdminShell({
+  children,
+  userEmail,
+  initialProfileName,
+  initialBreweryName,
+  defaultSidebarOpen = true,
+  sidebarVariant = "sidebar",
+  sidebarCollapsible: _sidebarCollapsible = "icon",
+}: {
+  children: ReactNode;
+  userEmail?: string;
+  initialProfileName?: string;
+  initialBreweryName?: string;
+  defaultSidebarOpen?: boolean;
+  sidebarVariant?: React.ComponentProps<typeof Sidebar>["variant"];
+  /** Ignored: collapse is always icon-rail, matching the template default. */
+  sidebarCollapsible?: React.ComponentProps<typeof Sidebar>["collapsible"];
+}) {
+  void _sidebarCollapsible;
+  const router = useRouter();
+  const [contentPadding, setContentPadding] = useState<string | undefined>(undefined);
+  const [fullBleed, setFullBleed] = useState(false);
+  const shellApi = useMemo<StudioShellContextValue>(
+    () => ({
+      setBrandProfileActive: () => undefined,
+      setContentPadding,
+      setContentPending: () => undefined,
+      setFullBleed,
+    }),
+    [],
+  );
+
+  const displayName = (initialProfileName || initialBreweryName || userEmail || "BrewAI").trim();
+  const accountUsers = [
+    {
+      id: "session",
+      name: displayName,
+      email: userEmail || "",
+      avatar: "",
+      role: initialBreweryName || "Studio",
+    },
+  ];
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        await runBillingBootstrap();
+      } catch {
+        // Billing-Bootstrap darf die Shell nicht blockieren.
+      }
+    })();
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace("/anmelden");
+    router.refresh();
+  }, [router]);
+
+  return (
+    <TooltipProvider>
+      <StudioShellContext.Provider value={shellApi}>
+        <div className="brewai-admin">
+          <SidebarProvider
+            defaultOpen={defaultSidebarOpen}
+            style={
+              {
+                "--sidebar-width": "calc(var(--spacing) * 68)",
+              } as React.CSSProperties
+            }
+          >
+            <BrewAiSidebar
+              user={{ name: displayName, email: userEmail || "", avatar: "" }}
+              variant={sidebarVariant}
+            />
+            <SidebarInset
+              className={cn(
+                "[html[data-content-layout=centered]_&>*]:mx-auto",
+                "[html[data-content-layout=centered]_&>*]:w-full",
+                "[html[data-content-layout=centered]_&>*]:max-w-screen-2xl",
+                "[--dashboard-header-height:--spacing(12)]",
+                "min-w-0 overflow-x-clip",
+                fullBleed &&
+                  "md:peer-data-[variant=inset]:m-0 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:border-0 md:peer-data-[variant=inset]:shadow-none md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-0 [html[data-content-layout=centered]_&>*]:mx-0 [html[data-content-layout=centered]_&>*]:max-w-none",
+              )}
+            >
+              <header
+                className={cn(
+                  "flex h-12 shrink-0 items-center gap-2 border-b border-border transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
+                  "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
+                )}
+              >
+                <div className="flex w-full items-center justify-between px-4 lg:px-6">
+                  <div className="flex items-center gap-1 lg:gap-2">
+                    <SidebarTrigger className="-ml-1" />
+                    <Separator
+                      orientation="vertical"
+                      className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
+                    />
+                    <SearchDialog />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <LayoutControls />
+                    <ThemeSwitcher />
+                    <AccountSwitcher users={accountUsers} onLogout={() => void handleLogout()} />
+                  </div>
+                </div>
+              </header>
+              <div
+                className={cn(
+                  "min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0",
+                  fullBleed && "relative flex flex-col overflow-hidden p-0 md:p-0",
+                )}
+                style={contentPadding ? { padding: contentPadding } : undefined}
+                data-content-padding={fullBleed ? "false" : undefined}
+              >
+                {children}
+              </div>
+            </SidebarInset>
+          </SidebarProvider>
+          <Toaster />
+        </div>
+      </StudioShellContext.Provider>
+    </TooltipProvider>
+  );
+}
+
+export function BrewAiAdminLayoutFallback() {
+  return (
+    <div className="brewai-admin flex min-h-[100dvh] items-center justify-center text-sm text-muted-foreground">
+      Studio wird geladen …
+    </div>
+  );
+}
