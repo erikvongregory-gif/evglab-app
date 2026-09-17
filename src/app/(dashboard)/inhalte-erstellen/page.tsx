@@ -79,5 +79,10 @@ export default async function InhalteErstellenPage() {
     }
   }
 
-  return <InhalteErstellenMoonChatPage />;
+  return (
+    <>
+      <link rel="preload" href="/studio/moon-bg.webp" as="image" type="image/webp" />
+      <InhalteErstellenMoonChatPage />
+    </>
+  );
 }

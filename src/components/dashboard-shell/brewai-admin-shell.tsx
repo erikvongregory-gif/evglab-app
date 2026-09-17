@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -125,17 +125,25 @@ export function BrewAiAdminShell({
 }) {
   void _sidebarCollapsible;
   const router = useRouter();
+  const pathname = usePathname();
+  const pathFullBleed = pathname === "/inhalte-erstellen" || pathname.startsWith("/inhalte-erstellen/");
   const [contentPadding, setContentPadding] = useState<string | undefined>(undefined);
-  const [fullBleed, setFullBleed] = useState(false);
+  const [fullBleedOverride, setFullBleedOverride] = useState<boolean | null>(null);
+  const fullBleed = fullBleedOverride ?? pathFullBleed;
   const shellApi = useMemo<StudioShellContextValue>(
     () => ({
       setBrandProfileActive: () => undefined,
       setContentPadding,
       setContentPending: () => undefined,
-      setFullBleed,
+      setFullBleed: (next) => setFullBleedOverride(next ? true : null),
     }),
     [],
   );
+
+  useEffect(() => {
+    setFullBleedOverride(null);
+    setContentPadding(undefined);
+  }, [pathname]);
 
   const displayName = (initialProfileName || initialBreweryName || userEmail || "BrewAI").trim();
   const accountUsers = [

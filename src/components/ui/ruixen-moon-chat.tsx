@@ -32,8 +32,8 @@ import {
   type Aspect,
 } from "@/lib/inhalte-erstellen/studio-config";
 
-const MOON_BG =
-  "url('https://cdn.21st.dev/assets/mirror/c3/c333918af688a4a8a3d004652e6c0ee219457a9d84d380eeb31f513d4b59a09f.png')";
+const MOON_BG = "url('/studio/moon-bg.webp')";
+const MOON_BG_SRC = "/studio/moon-bg.webp";
 
 const PLACEHOLDER_ETIKETT = "https://example.com/placeholder.png";
 
@@ -310,6 +310,16 @@ export default function RuixenMoonChat() {
 
   return (
     <div className="relative isolate flex h-full min-h-0 w-full flex-1 flex-col items-center bg-background dark:bg-black">
+      {/* Preload decode — same asset as CSS bg so the moon is ready with first paint */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={MOON_BG_SRC}
+        alt=""
+        aria-hidden
+        fetchPriority="high"
+        decoding="sync"
+        className="pointer-events-none absolute -z-10 h-px w-px opacity-0"
+      />
       {/* Dark moon — BrewAI Accent #C7691E / Logo-Braun */}
       <div
         aria-hidden
