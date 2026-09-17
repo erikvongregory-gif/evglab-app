@@ -375,11 +375,6 @@ export default function RuixenMoonChat() {
               {genError}
             </p>
           ) : null}
-          {genBusy ? (
-            <p className="text-center text-sm text-muted-foreground" aria-live="polite">
-              Weiter zur Mediathek …
-            </p>
-          ) : null}
 
           <div
             className={cn(
@@ -743,7 +738,7 @@ export default function RuixenMoonChat() {
                     "disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-[#C7691E] disabled:text-white",
                   )}
                 >
-                  {genBusy ? "Weiter …" : "Generieren"}
+                  Generieren
                   <span className="font-normal opacity-90">
                     · {generationTokenCost.toLocaleString("de-DE")} Tokens
                   </span>
