@@ -57,14 +57,10 @@ export function SecurityCodeCard({
   const [backupCode, setBackupCode] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>("idle");
-  const [localError, setLocalError] = useState<string | undefined>(error);
+  const [submitError, setSubmitError] = useState<string | undefined>();
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const complete = code.length === DIGIT_COUNT || (ownerHasBackupCode && backupCode.trim().length >= 6);
-
-  useEffect(() => {
-    setLocalError(error);
-  }, [error]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -105,7 +101,7 @@ export function SecurityCodeCard({
 
   const onVerify = async () => {
     if (verifyBusy || outcome !== "idle" || !complete) return;
-    setLocalError(undefined);
+    setSubmitError(undefined);
     setVerifyBusy(true);
     try {
       const result = await submitCode();
@@ -116,18 +112,18 @@ export function SecurityCodeCard({
         }, 900);
         return;
       }
-      setLocalError(result.error);
+      setSubmitError(result.error);
       setOutcome("fail");
       window.setTimeout(resetAfterFail, 1400);
     } catch {
-      setLocalError("admin_2fa_invalid");
+      setSubmitError("admin_2fa_invalid");
       setOutcome("fail");
       window.setTimeout(resetAfterFail, 1400);
     }
   };
 
   const canEnterCode = hasPendingCode || ownerHasBackupCode;
-  const bannerError = errorMessage(localError);
+  const bannerError = errorMessage(submitError ?? error);
   const title = useMemo(() => {
     if (outcome === "ok") return "Verifiziert";
     if (outcome === "fail") return "Code ungültig";

@@ -137,11 +137,14 @@ export function BorderBeamPanel({
   const speedRef = React.useRef(new Spring(idleSpeed, 30, 11));
   const angleRef = React.useRef(startAngle);
   const liveRef = React.useRef({ idleSpeed, hoverSpeed });
-  liveRef.current = { idleSpeed, hoverSpeed };
 
   const paint = React.useCallback((angle: number) => {
     rootRef.current?.style.setProperty("--mk-beam-a", `${(((angle % 360) + 360) % 360).toFixed(2)}deg`);
   }, []);
+
+  React.useEffect(() => {
+    liveRef.current = { idleSpeed, hoverSpeed };
+  }, [idleSpeed, hoverSpeed]);
 
   React.useEffect(() => {
     if (!animate) return;

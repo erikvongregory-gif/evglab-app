@@ -45,12 +45,15 @@ export function SegmentedControl({
 
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const emit = useRef(onValueChange);
-  emit.current = onValueChange;
 
   const reduced = useReducedMotion();
   const pos = useMotionValue(index);
   const thumbX = useTransform(pos, (v) => `${v * 100}%`);
   const maskX = useTransform(pos, (v) => `${v * -100}%`);
+
+  useEffect(() => {
+    emit.current = onValueChange;
+  }, [onValueChange]);
 
   useEffect(() => {
     if (reduced) {

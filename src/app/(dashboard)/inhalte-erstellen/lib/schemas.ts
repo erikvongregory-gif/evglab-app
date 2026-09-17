@@ -249,7 +249,13 @@ export const campaignTextSchema = z.object({
   quality: imageQualitySchema,
 });
 
-export type HyperrealisticInput = z.infer<typeof hyperrealisticSchema>;
+/** Parsed output always has produktKategorie; in-memory fixtures may omit it (sanitize → bier). */
+export type HyperrealisticInput = Omit<
+  z.infer<typeof hyperrealisticSchema>,
+  "produktKategorie"
+> & {
+  produktKategorie?: z.infer<typeof produktKategorieSchema>;
+};
 export type SocialPostInput = z.infer<typeof socialPostSchema>;
 export type ProductIsolateInput = z.infer<typeof productIsolateSchema>;
 export type ProductStudioInput = z.infer<typeof productStudioSchema>;
