@@ -546,7 +546,7 @@ export function StudioMediaLibrary({
               {Array.from({ length: 5 }, (_, i) => (
                 <Card
                   key={i}
-                  className="mb-3 break-inside-avoid gap-0 overflow-hidden py-0 shadow-none ring-1 ring-border/50"
+                  className="mb-3 break-inside-avoid gap-0 overflow-hidden py-0 shadow-sm"
                 >
                   <Skeleton className="aspect-[4/5] w-full rounded-none" />
                   <CardContent className="space-y-2 p-3">
@@ -603,7 +603,7 @@ export function StudioMediaLibrary({
                   <Card
                     key={`job-${job.jobId}`}
                     className={cn(
-                      "mb-3 break-inside-avoid gap-0 overflow-hidden py-0 shadow-none ring-1 ring-border/50",
+                      "mb-3 break-inside-avoid gap-0 overflow-hidden py-0 shadow-sm",
                       job.highlighted && "ring-2 ring-primary",
                     )}
                     aria-busy={job.status === "reserved" || undefined}
@@ -634,7 +634,7 @@ export function StudioMediaLibrary({
                   key={it.id}
                   type="button"
                   className={cn(
-                    "mb-3 w-full break-inside-avoid overflow-hidden rounded-xl bg-card text-left shadow-none ring-1 ring-border/50 transition-colors hover:bg-muted/40 hover:ring-border",
+                    "mb-3 w-full break-inside-avoid overflow-hidden rounded-xl bg-card text-left shadow-sm transition-colors hover:bg-muted/40",
                     focusedJobId && it.id.startsWith(`gen-${focusedJobId}-`) && "ring-2 ring-primary",
                   )}
                   onClick={() => openMediaItem(it)}
@@ -681,7 +681,7 @@ export function StudioMediaLibrary({
                   exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
                   transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: STUDIO_EASE }}
                   className={cn(
-                    "flex max-h-[90dvh] w-full overflow-hidden rounded-xl bg-card shadow-lg ring-1 ring-border/50",
+                    "flex max-h-[90dvh] w-full overflow-hidden rounded-xl bg-card shadow-lg",
                     isLandscapeAspect(selectedItem.aspectRatio)
                       ? "max-w-5xl flex-col md:flex-row"
                       : "max-w-3xl flex-col md:flex-row",

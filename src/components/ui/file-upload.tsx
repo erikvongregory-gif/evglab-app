@@ -181,14 +181,14 @@ export default function FileUpload({
         onClick={() => inputRef.current?.click()}
         initial={false}
         animate={{
-          borderColor: isDragging ? "#3b82f6" : "#ffffff10",
+          borderColor: isDragging ? "#3b82f6" : "transparent",
           scale: isDragging ? 1.02 : 1,
         }}
         whileHover={{ scale: 1.01 }}
         transition={{ duration: 0.2 }}
         className={clsx(
-          "relative rounded-2xl p-8 md:p-10 text-center cursor-pointer bg-secondary/50 border border-primary/10 shadow-sm hover:shadow-md backdrop-blur group",
-          isDragging && "ring-4 ring-blue-400/30 border-blue-500",
+          "relative rounded-2xl p-8 md:p-10 text-center cursor-pointer bg-secondary/50 shadow-sm hover:shadow-md backdrop-blur group",
+          isDragging && "ring-4 ring-blue-400/30",
         )}
       >
         <div className="flex flex-col items-center gap-5">

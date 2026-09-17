@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useEffect, useId, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { BrandingCard } from "@/components/ui/branding-card";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { ColorPaletteCard } from "@/components/ui/color-palette-card";
 import FileUpload from "@/components/ui/file-upload";
+import { GradientCard } from "@/components/ui/gradient-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ProgressBar } from "@/components/ui/progress-bar";
+import { ProfileStrengthProgress } from "@/components/ui/profile-strength-progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { ToneFilterChips } from "@/components/ui/tone-filter-chips";
 import { StudioIcon } from "@/components/studio/icons";
 import { StudioButton, StudioPageHeader } from "@/components/studio/ui";
 import {
@@ -336,193 +336,168 @@ export function BrandProfileView({
         }
       />
 
-      {/* 21st Branding Card + Color Palette Card */}
-      <div className="studio-brand-21st">
-        <BrandingCard
-          category="Branding"
-          title="Typography"
-          subtitle={fontName}
-          displayElement={
-            <span>
-              Aa<span className="text-white/40">Bb</span>
-            </span>
-          }
-          colors={swatches}
-          className="border-neutral-800 bg-[#1c1c1c] text-white shadow-none hover:shadow-xl [&_.text-muted-foreground]:text-neutral-400"
-        />
-        <ColorPaletteCard
-          colors={hexOnly}
-          statsText={`${domain} · ${analyzedLabel}`}
-          className="border border-[var(--line)] bg-[var(--s1)] shadow-sm"
-          icon={
-            value.brandWebsiteUrl ? (
-              <span className="text-xs font-medium uppercase tracking-wider text-[var(--ok)]">Verbunden</span>
-            ) : undefined
-          }
-        />
+      {/* Typografie + Upload | Farben spannt beide Zeilen · Schriftname darunter links */}
+      <div className="mb-10 flex flex-col gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:grid-rows-[auto_auto]">
+          <BrandingCard
+            category="Branding"
+            title="Typography"
+            subtitle={fontName}
+            displayElement={
+              <span
+                style={
+                  fontReady
+                    ? { fontFamily: `"${BRAND_FONT_FAMILY}", var(--font-sans, system-ui)` }
+                    : undefined
+                }
+              >
+                Aa<span className="text-white/40">Bb</span>
+              </span>
+            }
+            className="!h-auto border-neutral-800 bg-[#1c1c1c] text-white shadow-none hover:shadow-xl [&_.text-muted-foreground]:text-neutral-400"
+          />
+
+          <ColorPaletteCard
+            colors={hexOnly}
+            statsText={`${domain} · ${analyzedLabel}`}
+            className="h-full min-h-0 bg-[var(--s1)] shadow-sm md:row-span-2"
+            icon={
+              value.brandWebsiteUrl ? (
+                <span className="text-xs font-medium uppercase tracking-wider text-[var(--ok)]">Verbunden</span>
+              ) : undefined
+            }
+          />
+
+          <div className="min-w-0">
+            <FileUpload
+              multiple={false}
+              maxFiles={1}
+              accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
+              titleIdle="Schrift hochladen"
+              titleDragging="Schrift hier ablegen"
+              titleHasFiles="Andere Schrift wählen"
+              hint="Loslassen zum Hochladen"
+              supportHint=".woff2, .woff, .ttf, .otf · max. 2 MB"
+              uploadedLabel="Schriftdatei"
+              clearAllLabel="Entfernen"
+              onUpload={async (file) => {
+                await uploadFont(file);
+              }}
+              onRemove={() => void clearFont()}
+              onClearAll={() => void clearFont()}
+            />
+            {fontUploadError ? (
+              <p className="studio-brand-inline-error mt-2" role="alert">
+                {fontUploadError}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="space-y-2 md:w-[calc(50%-0.75rem)]">
+          <Label htmlFor={fontFieldId} className="text-xs text-[var(--t3)]">
+            Schriftname
+          </Label>
+          <Input
+            id={fontFieldId}
+            placeholder="z. B. Work Sans"
+            value={value.brandHeadlineFontName ?? ""}
+            onChange={(e) => onChange({ brandHeadlineFontName: e.target.value })}
+            onBlur={() => void onSave({ brandHeadlineFontName: value.brandHeadlineFontName })}
+            className="h-11 text-[15px]"
+          />
+          <p className="text-xs text-[var(--t3)]">
+            {value.brandFontFileUrl
+              ? fontReady
+                ? "Eigene Datei aktiv für Bildexporte"
+                : "Schrift wird vorbereitet …"
+              : "Noch System-Fallback (Work Sans)"}
+          </p>
+        </div>
       </div>
 
-      <div className="mb-8 max-w-md">
-        <ProgressBar
+      <div className="mb-10 max-w-md">
+        <ProfileStrengthProgress
           value={strength.percent}
-          label={`Profilstärke · ${strength.label}`}
-          completeLabel="Sehr stark"
+          statusLabel={strength.label}
         />
       </div>
 
-      <div className="studio-brand-layout">
-        <div className="studio-brand-main">
-          <section className="studio-brand-sec space-y-5">
+      <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(240px,280px)]">
+        <div className="flex min-w-0 flex-col gap-10">
+          <section className="flex flex-col gap-6">
             <div className="studio-brand-sec__head">
               <h2>Vorgaben</h2>
             </div>
 
-            <div className="relative w-full rounded-[14px] border border-[var(--line)] bg-[var(--s1)] p-5">
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--t3)]">
-                      Marken-Schrift
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--t3)]">Live-Vorschau für Bildexporte</p>
-                  </div>
-                  {value.brandFontFileUrl ? (
-                    <Badge variant="outline" className="border-[var(--ok)] text-[var(--ok)]">
-                      Aktiv
-                    </Badge>
-                  ) : null}
-                </div>
-
-                <div
-                  className="rounded-xl border border-[var(--line)] bg-[var(--s2)] px-5 py-6"
-                  style={
-                    fontReady
-                      ? { fontFamily: `"${BRAND_FONT_FAMILY}", var(--font-sans, system-ui)` }
-                      : undefined
-                  }
-                >
-                  <div className="flex items-end justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--t3)]">
-                        Typography
-                      </p>
-                      <p className="mt-1 truncate text-lg font-semibold text-[var(--t1)]">{fontName}</p>
-                      <p className="mt-1 text-sm text-[var(--t3)]">
-                        {value.brandFontFileUrl
-                          ? fontReady
-                            ? "Eigene Datei geladen"
-                            : "Schrift wird vorbereitet …"
-                          : "Noch System-Fallback (Work Sans)"}
-                      </p>
-                    </div>
-                    <span
-                      className="shrink-0 text-5xl font-bold tracking-tighter text-[var(--t1)]"
-                      aria-hidden
-                    >
-                      Aa
-                      <span className="text-[var(--t3)]">Bb</span>
-                    </span>
-                  </div>
-                  <p className="mt-5 text-[1.35rem] leading-snug tracking-tight text-[var(--t1)]">
-                    Die Brauerei braut Charakter.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={fontFieldId} className="text-xs text-[var(--t3)]">
-                    Schriftname
-                  </Label>
-                  <Input
-                    id={fontFieldId}
-                    placeholder="z. B. Work Sans"
-                    value={value.brandHeadlineFontName ?? ""}
-                    onChange={(e) => onChange({ brandHeadlineFontName: e.target.value })}
-                    onBlur={() => void onSave({ brandHeadlineFontName: value.brandHeadlineFontName })}
-                    className="h-11 text-[15px]"
-                  />
-                </div>
-
-                <FileUpload
-                  multiple={false}
-                  maxFiles={1}
-                  accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf"
-                  titleIdle="Schrift hochladen"
-                  titleDragging="Schrift hier ablegen"
-                  titleHasFiles="Andere Schrift wählen"
-                  hint="Loslassen zum Hochladen"
-                  supportHint=".woff2, .woff, .ttf, .otf · max. 2 MB"
-                  uploadedLabel="Schriftdatei"
-                  clearAllLabel="Entfernen"
-                  onUpload={async (file) => {
-                    await uploadFont(file);
+            <div className="rounded-2xl bg-[var(--s1)] p-5 shadow-sm sm:p-6">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--t3)]">Tonalität</p>
+              <div className="mt-4">
+                <ToneFilterChips
+                  tags={tags}
+                  onChange={(next) => {
+                    const brandTone = next.join(", ");
+                    onChange({ brandTone });
+                    void onSave({ brandTone });
                   }}
-                  onRemove={() => void clearFont()}
-                  onClearAll={() => void clearFont()}
                 />
-                {fontUploadError ? (
-                  <p className="studio-brand-inline-error" role="alert">
-                    {fontUploadError}
-                  </p>
-                ) : null}
               </div>
             </div>
-
-            <Card size="sm" className="border-[var(--line)] bg-[var(--s1)] shadow-none ring-0">
-              <CardHeader className="gap-1">
-                <CardDescription className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--t3)]">
-                  Tonalität
-                </CardDescription>
-                <p className="text-sm text-[var(--t3)]">Stimme der Marke</p>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {(tags.length > 0 ? tags : [value.brandTone || "—"]).map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="outline"
-                      className="h-auto rounded-full border-[var(--line2)] bg-[var(--s2)] px-3.5 py-1.5 text-sm font-medium text-[var(--t1)]"
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </section>
 
-          <section className="studio-brand-sec space-y-4">
+          <section className="flex flex-col gap-6">
             <div className="studio-brand-sec__head">
               <h2>Bildregeln</h2>
               <span className="studio-brand-sec__note">Abgeleitet · anpassbar</span>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {(
                 [
-                  { key: "Bildlicht", val: rules.bildlicht },
-                  { key: "Komposition", val: rules.komposition },
-                  { key: "Tabu", val: rules.tabu },
+                  {
+                    key: "Bildlicht",
+                    val: rules.bildlicht,
+                    badgeText: "Licht",
+                    badgeColor: "#C7691E",
+                    gradient: "orange" as const,
+                    imageUrl:
+                      "https://images.unsplash.com/photo-1566633806327-68e152aaf26d?auto=format&fit=crop&w=640&h=640&q=80",
+                  },
+                  {
+                    key: "Komposition",
+                    val: rules.komposition,
+                    badgeText: "Szene",
+                    badgeColor: "#0F766E",
+                    gradient: "green" as const,
+                    imageUrl:
+                      "https://images.unsplash.com/photo-1600788886242-5c96aabe3757?auto=format&fit=crop&w=640&h=640&q=80",
+                  },
+                  {
+                    key: "Tabu",
+                    val: rules.tabu,
+                    badgeText: "Vermeiden",
+                    badgeColor: "#64748B",
+                    gradient: "gray" as const,
+                    imageUrl:
+                      "https://images.unsplash.com/photo-1608270586620-248524c67de9?auto=format&fit=crop&w=640&h=640&q=80",
+                  },
                 ] as const
               ).map((rule) => (
-                <Card
+                <GradientCard
                   key={rule.key}
-                  size="sm"
-                  className="origin-center border-[var(--line)] bg-[var(--s1)] shadow-none ring-1 ring-foreground/10 transition-[transform,box-shadow,ring-color] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.02] hover:shadow-sm hover:ring-foreground/15 motion-reduce:transition-none motion-reduce:hover:scale-100"
-                >
-                  <CardHeader className="gap-0 pb-0">
-                    <CardDescription className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--ac)]">
-                      {rule.key}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-[14px] leading-relaxed text-[var(--t2)]">{rule.val}</p>
-                  </CardContent>
-                </Card>
+                  badgeText={rule.badgeText}
+                  badgeColor={rule.badgeColor}
+                  title={rule.key}
+                  description={rule.val}
+                  imageUrl={rule.imageUrl}
+                  gradient={rule.gradient}
+                  className="min-h-[260px]"
+                />
               ))}
             </div>
           </section>
 
           {value.brandReferenceImageUrls.length > 0 ? (
-            <section className="studio-brand-sec">
+            <section className="flex flex-col gap-6">
               <div className="studio-brand-sec__head">
                 <h2>Referenzbilder</h2>
               </div>
@@ -539,10 +514,10 @@ export function BrandProfileView({
 
           <BrandCharactersSection />
 
-          <div className="studio-brand-danger">
-            <div>
-              <div className="studio-brand-danger__t">Generisch weitermachen</div>
-              <p className="studio-brand-danger__s">
+          <div className="flex flex-col gap-4 rounded-2xl bg-[var(--s1)] p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-[var(--t1)]">Generisch weitermachen</div>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--t3)]">
                 Profil deaktivieren und Stil-Vorgaben entfernen. Neue Bilder ohne festes Markenprofil.
               </p>
             </div>
@@ -551,7 +526,7 @@ export function BrandProfileView({
               variant="ghost"
               size="sm"
               disabled={resetting || saving}
-              className="evg-btn--danger"
+              className="evg-btn--danger shrink-0"
               onClick={() => {
                 const confirmed = window.confirm(
                   "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Farben, Tonalität und Bildregeln werden entfernt.",
@@ -571,13 +546,14 @@ export function BrandProfileView({
           </div>
         </div>
 
-        {/* 21st OriginUI segmented radio cards */}
-        <aside className="studio-brand-aside">
-          <fieldset className="space-y-4">
-            <legend className="text-sm font-medium leading-none">Brand-Lock</legend>
-            <p className="studio-brand-aside__desc">Wie streng BrewAI sich an dein Markenprofil hält.</p>
+        <aside className="rounded-2xl bg-[var(--s1)] p-5 shadow-sm lg:sticky lg:top-6">
+          <fieldset className="flex flex-col gap-4">
+            <legend className="text-sm font-medium leading-none text-[var(--t1)]">Brand-Lock</legend>
+            <p className="text-xs leading-relaxed text-[var(--t3)]">
+              Wie streng BrewAI sich an dein Markenprofil hält.
+            </p>
             <RadioGroup
-              className="flex flex-col gap-2"
+              className="flex flex-col gap-3"
               value={value.brandLockLevel}
               onValueChange={(v) => void selectLock(v as BrandSettings["brandLockLevel"])}
               disabled={saving}
@@ -585,7 +561,7 @@ export function BrandProfileView({
               {LOCK_OPTIONS.map((opt) => (
                 <div
                   key={opt.id}
-                  className="relative flex flex-col gap-1 rounded-lg border border-input p-3 shadow-sm shadow-black/5 has-[[data-state=checked]]:border-ring"
+                  className="relative flex flex-col gap-1 rounded-xl bg-[var(--s2)] p-3 has-[[data-state=checked]]:ring-1 has-[[data-state=checked]]:ring-ring"
                 >
                   <div className="flex items-center gap-2">
                     <RadioGroupItem

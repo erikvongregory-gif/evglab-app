@@ -73,8 +73,8 @@ export default async function OnboardingPage() {
   return (
     <Suspense
       fallback={
-        <div className="grid min-h-dvh place-items-center bg-zinc-950 text-zinc-400">
-          <p className="text-[13px]">Einrichtung wird geladen …</p>
+        <div className="brewai-admin grid min-h-dvh place-items-center bg-background text-muted-foreground">
+          <p className="text-sm" role="status">Einrichtung wird geladen …</p>
         </div>
       }
     >

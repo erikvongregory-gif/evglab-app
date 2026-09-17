@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleUser, CreditCard, EllipsisVertical, LogOut, Settings2 } from "lucide-react";
+import { useState } from "react";
+import { CircleUser, CreditCard, EllipsisVertical, Loader2, LogOut, RotateCcw, Settings2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -29,12 +31,42 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
+  const [restartingOnboarding, setRestartingOnboarding] = useState(false);
 
   async function logout() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace("/anmelden");
     router.refresh();
+  }
+
+  async function restartOnboarding() {
+    if (restartingOnboarding) return;
+    setRestartingOnboarding(true);
+    try {
+      const response = await fetch("/api/dashboard/onboarding", {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          flowVersion: 2,
+          completedAt: null,
+          tourVersion: null,
+          welcome: false,
+          checklistDismissed: false,
+          celebrated: false,
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || "Onboarding konnte nicht neu gestartet werden.");
+      }
+      router.push("/onboarding");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Onboarding konnte nicht neu gestartet werden.");
+      setRestartingOnboarding(false);
+    }
   }
 
   return (
@@ -94,6 +126,16 @@ export function NavUser({
                   <Settings2 />
                   Einstellungen
                 </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={restartingOnboarding}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  void restartOnboarding();
+                }}
+              >
+                {restartingOnboarding ? <Loader2 className="animate-spin" /> : <RotateCcw />}
+                {restartingOnboarding ? "Onboarding wird gestartet …" : "Onboarding neu starten"}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

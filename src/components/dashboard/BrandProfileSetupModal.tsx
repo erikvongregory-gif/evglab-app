@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { BrandReviewPanel } from "@/components/dashboard/BrandReviewPanel";
-import { StudioButton } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TaskSteps, type TaskStep } from "@/components/ui/task-steps";
 import { fetchWithRetry, isTransientFetchError } from "@/lib/http/fetchWithRetry";
 import { BRAND_SETTINGS_LIMITS, clampBrandSettingsFields } from "@/lib/dashboard/settingsPayload";
@@ -734,9 +736,10 @@ export function BrandProfileSetupModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
+        showCloseButton={false}
         className={cn(
-          "evg-studio studio-brand-modal studio-modal-mobile fixed left-1/2 top-1/2 z-[130] max-h-[min(92vh,720px)] w-[min(100%,560px)] -translate-x-1/2 -translate-y-1/2 gap-0 overflow-hidden border-[var(--line2)] bg-[var(--s2)] p-0 text-[var(--t1)] shadow-[var(--sh-modal)] sm:max-w-[560px] [&>button.group]:hidden",
-          step === "review" && "flex flex-col",
+          "evg-studio studio-brand-modal fixed left-1/2 top-1/2 z-[130] flex max-h-[min(92vh,820px)] w-[min(100%,36rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-3xl border border-neutral-200 bg-white p-0 text-neutral-900 shadow-2xl sm:max-w-xl dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100",
+          step === "review" && "max-w-2xl sm:max-w-2xl",
         )}
         onPointerDownOutside={(e) => {
           if (busy) e.preventDefault();
@@ -757,9 +760,11 @@ export function BrandProfileSetupModal({
         </DialogDescription>
 
         <DialogClose asChild>
-          <button
+          <Button
             type="button"
-            className="studio-modal-close"
+            variant="ghost"
+            size="icon"
+            className="absolute right-3 top-3 z-20 size-9 shrink-0 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200"
             aria-label="Schließen"
             disabled={busy}
             onClick={(event) => {
@@ -770,266 +775,338 @@ export function BrandProfileSetupModal({
               handleOpenChange(false);
             }}
           >
-            <StudioIcon name="x" size={16} />
-          </button>
+            <StudioIcon name="x" size={18} />
+          </Button>
         </DialogClose>
 
         {step === "review" ? (
-          <>
-            <BrandReviewPanel
-              review={review}
-              sourceMeta={sourceMeta}
-              busy={busy}
-              error={error}
-              onChange={(patch) => setReview((prev) => ({ ...prev, ...patch }))}
-              onBack={() => {
-                setStep("input");
-                setError("");
-              }}
-              onActivate={() => void saveReview()}
-            />
-          </>
+          <BrandReviewPanel
+            review={review}
+            sourceMeta={sourceMeta}
+            busy={busy}
+            error={error}
+            onChange={(patch) => setReview((prev) => ({ ...prev, ...patch }))}
+            onBack={() => {
+              setStep("input");
+              setError("");
+            }}
+            onActivate={() => void saveReview()}
+          />
         ) : (
-        <div className="relative max-h-[min(92vh,720px)] overflow-y-auto px-6 pb-6 pt-6">
-
-          {step === "input" ? (
-            <>
-              <div className="studio-modal-eyebrow">
-                <span className="dot" aria-hidden="true" />
-                Markenprofil
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <div className="mb-6 flex items-start gap-3 pr-10 sm:gap-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-neutral-800 text-white dark:bg-neutral-700 sm:size-12">
+                <StudioIcon name="brand" size={22} />
               </div>
-              <h2 className="studio-modal-title">{modalTitle}</h2>
-              <p className="studio-modal-sub">
-                Ein Link genügt — BrewAI liest deine Website samt Unterseiten und erkennt Tonalität, Farben und Bildsprache.
-              </p>
+              <div className="min-w-0 flex-1">
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-[0.08em] text-neutral-500">
+                  Markenprofil
+                </p>
+                <h2 className="mb-2 text-base font-semibold text-neutral-900 dark:text-neutral-100 sm:text-lg">
+                  {modalTitle}
+                </h2>
+                <p className="text-sm font-normal leading-relaxed text-neutral-600 dark:text-neutral-400">
+                  Ein Link genügt — BrewAI liest deine Website samt Unterseiten und erkennt Tonalität, Farben und
+                  Bildsprache.
+                </p>
+              </div>
+            </div>
 
-              <div className="mt-6">
-                <SegmentedControl
-                  label="Quelle"
-                  className="w-full"
+            {step === "input" ? (
+              <>
+                <Tabs
                   value={inputTab}
                   onValueChange={(v) => setInputTab(v as InputTab)}
-                  options={[
-                    { value: "url", label: "Website" },
-                    { value: "instagram", label: "Instagram" },
-                    { value: "manual", label: "Screenshots" },
-                  ]}
-                />
-              </div>
-
-              {inputTab === "url" ? (
-                <div style={{ marginTop: 20 }}>
-                  <span className="studio-field-label">Website deiner Marke</span>
-                  <div className="studio-field-with-icon" style={{ marginTop: 8 }}>
-                    <span className="studio-field-icon">
-                      <StudioIcon name="globe" size={16} />
-                    </span>
-                    <input
-                      className="studio-field"
-                      value={websiteUrl}
-                      onChange={(e) => setWebsiteUrl(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && websiteUrl.trim() && !busy) void runUrlAnalysis(websiteUrl);
-                      }}
-                      disabled={busy}
-                      placeholder="www.deine-brauerei.de"
-                      aria-label="Website deiner Marke"
-                      inputMode="url"
-                      autoComplete="url"
-                    />
-                  </div>
-                  <p className="studio-faint" style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.45 }}>
-                    Analysiert öffentliche Texte und Bilder deiner Website — inklusive relevanter Unterseiten wie „Über uns“ und Sortiment.
-                  </p>
-                </div>
-              ) : inputTab === "instagram" ? (
-                <div style={{ marginTop: 20 }}>
-                  {!instagramStatus.configured ? (
-                    <>
-                      <p className="studio-faint" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-                        Instagram-Verbindung ist auf diesem Server noch nicht eingerichtet (META_APP_ID / META_APP_SECRET).
-                      </p>
-                    </>
-                  ) : instagramStatusLoading ? (
-                    <p className="studio-faint" style={{ fontSize: 12.5 }}>Verbindungsstatus wird geladen…</p>
-                  ) : instagramStatus.connected && !instagramStatus.expired ? (
-                    <>
-                      <div className="studio-card" style={{ padding: "14px 16px" }}>
-                        <p style={{ fontSize: 13, fontWeight: 600 }}>
-                          @{instagramStatus.username ?? "instagram"}
-                        </p>
-                        <p className="studio-faint" style={{ marginTop: 6, fontSize: 11.5, lineHeight: 1.45 }}>
-                          Verbunden — BrewAI liest deine letzten Posts über die Meta Graph API aus.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="studio-faint"
-                        style={{ marginTop: 12, fontSize: 11.5, textDecoration: "underline" }}
-                        disabled={busy}
-                        onClick={() => void disconnectInstagram()}
-                      >
-                        Verbindung trennen
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="studio-faint" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-                        Verbinde dein Instagram Business- oder Creator-Konto (an eine Facebook-Seite gekoppelt). Danach
-                        analysieren wir automatisch deine letzten Posts.
-                      </p>
-                      {instagramStatus.expired ? (
-                        <p style={{ marginTop: 10, fontSize: 12, color: "var(--warn)" }}>
-                          Deine Verbindung ist abgelaufen — bitte erneut verbinden.
-                        </p>
-                      ) : null}
-                    </>
-                  )}
-                  {instagramNotice ? (
-                    <p style={{ marginTop: 12, fontSize: 12.5, color: "var(--ok, #3d9a6a)" }}>{instagramNotice}</p>
-                  ) : null}
-                </div>
-              ) : (
-                <div style={{ marginTop: 20 }}>
-                  <span className="studio-field-label">Instagram-Posts (1–5 Screenshots)</span>
-                  <div className="studio-modal-ref-grid" style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8 }}>
-                    {slots.map((slot, i) => (
-                      <label
-                        key={i}
-                        className="studio-card"
-                        style={{
-                          aspectRatio: "1",
-                          display: "grid",
-                          placeItems: "center",
-                          cursor: "pointer",
-                          overflow: "hidden",
-                          borderStyle: slot.file ? "solid" : "dashed",
-                        }}
-                      >
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="sr-only"
-                          disabled={busy}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0] ?? null;
-                            e.target.value = "";
-                            setSlotFile(i, f);
-                          }}
-                        />
-                        {slot.preview ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={slot.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        ) : (
-                          <span className="studio-faint" style={{ fontSize: 10 }}>
-                            {i + 1}
-                          </span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                  <p className="studio-faint" style={{ marginTop: 8, fontSize: 11 }}>
-                    {filledCount} / 5 Bilder{filledCount > 0 && filledCount < 3 ? " — mehr Bilder = präziseres Profil" : ""}
-                  </p>
-                  <div style={{ marginTop: 14 }}>
-                    <span className="studio-field-label">Instagram-Profil (optional)</span>
-                    <input
-                      className="studio-field"
-                      style={{ marginTop: 8 }}
-                      value={instagramUrl}
-                      onChange={(e) => setInstagramUrl(e.target.value)}
-                      disabled={busy}
-                      placeholder="https://www.instagram.com/deinemarke/"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div style={{ marginTop: 22, textAlign: "center" }}>
-                <button
-                  type="button"
-                  className="studio-faint"
-                  style={{ fontSize: 12, textDecoration: "underline", textUnderlineOffset: 3 }}
-                  disabled={busy}
-                  onClick={startManualTemplate}
+                  className="mb-6 gap-0 sm:mb-8"
                 >
-                  Ohne Analyse starten — Profil mit Vorlage selbst ausfüllen
-                </button>
-              </div>
-            </>
-          ) : null}
+                  <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
+                    <TabsTrigger
+                      value="url"
+                      className="gap-1.5 rounded-lg px-2 py-2.5 text-xs font-medium data-active:bg-white data-active:text-neutral-900 data-active:shadow-sm sm:text-sm dark:data-active:bg-neutral-700 dark:data-active:text-neutral-100"
+                    >
+                      <StudioIcon name="globe" size={15} />
+                      <span className="hidden sm:inline">Website</span>
+                      <span className="sm:hidden">Web</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="instagram"
+                      className="gap-1.5 rounded-lg px-2 py-2.5 text-xs font-medium data-active:bg-white data-active:text-neutral-900 data-active:shadow-sm sm:text-sm dark:data-active:bg-neutral-700 dark:data-active:text-neutral-100"
+                    >
+                      <StudioIcon name="media" size={15} />
+                      <span>Instagram</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="manual"
+                      className="gap-1.5 rounded-lg px-2 py-2.5 text-xs font-medium data-active:bg-white data-active:text-neutral-900 data-active:shadow-sm sm:text-sm dark:data-active:bg-neutral-700 dark:data-active:text-neutral-100"
+                    >
+                      <StudioIcon name="image" size={15} />
+                      <span className="hidden sm:inline">Screenshots</span>
+                      <span className="sm:hidden">Upload</span>
+                    </TabsTrigger>
+                  </TabsList>
 
-          {step === "analyzing" ? (
-            <div className="studio-brand-analyzing">
-              <div className="studio-brand-analyzing-domain">
-                <StudioIcon name={inputTab === "url" ? "globe" : "media"} size={13} />
-                <span>{analysisTargetLabel}</span>
-              </div>
-              <div className="mt-7">
-                <TaskSteps
-                  steps={taskSteps}
-                  current={analysisStepIndex}
-                  label="Analyse-Fortschritt"
-                />
-              </div>
-              <p className="studio-faint studio-brand-analyzing-hint">
-                Dauert meist unter einer Minute — bitte Fenster offen lassen.
-              </p>
-            </div>
-          ) : null}
+                  <TabsContent value="url" className="mt-6 space-y-4">
+                    <div>
+                      <Label htmlFor="brand-website-url" className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                        Website deiner Marke
+                      </Label>
+                      <div className="relative mt-2">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">
+                          <StudioIcon name="globe" size={16} />
+                        </span>
+                        <Input
+                          id="brand-website-url"
+                          type="url"
+                          inputMode="url"
+                          autoComplete="url"
+                          value={websiteUrl}
+                          onChange={(e) => setWebsiteUrl(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && websiteUrl.trim() && !busy) void runUrlAnalysis(websiteUrl);
+                          }}
+                          disabled={busy}
+                          placeholder="www.deine-brauerei.de"
+                          className="h-12 rounded-xl border-neutral-300 bg-white pl-10 dark:border-neutral-700 dark:bg-neutral-900"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {[
+                        { icon: "globe" as const, label: "Über uns" },
+                        { icon: "media" as const, label: "Sortiment" },
+                        { icon: "brand" as const, label: "Farben & Ton" },
+                      ].map((chip) => (
+                        <div
+                          key={chip.label}
+                          className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900/50"
+                        >
+                          <span className="text-neutral-500">
+                            <StudioIcon name={chip.icon} size={14} />
+                          </span>
+                          <span className="text-xs text-neutral-600 dark:text-neutral-400">{chip.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {websiteUrl.trim() ? (
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-8 items-center justify-center rounded-lg bg-neutral-200 dark:bg-neutral-800">
+                            <StudioIcon name="link" size={14} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                              Bereit zur Analyse
+                            </p>
+                            <p className="truncate text-xs text-neutral-600 dark:text-neutral-400">{websiteUrl}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                    <p className="text-xs leading-relaxed text-neutral-500">
+                      Analysiert öffentliche Texte und Bilder — inklusive relevanter Unterseiten.
+                    </p>
+                  </TabsContent>
 
-          {error ? <p style={{ marginTop: 12, fontSize: 13, color: "var(--warn)" }}>{error}</p> : null}
-        </div>
-        )}
+                  <TabsContent value="instagram" className="mt-6 space-y-4">
+                    {!instagramStatus.configured ? (
+                      <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
+                        Instagram-Verbindung ist auf diesem Server noch nicht eingerichtet (META_APP_ID /
+                        META_APP_SECRET).
+                      </p>
+                    ) : instagramStatusLoading ? (
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400">Verbindungsstatus wird geladen…</p>
+                    ) : instagramStatus.connected && !instagramStatus.expired ? (
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+                          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                            @{instagramStatus.username ?? "instagram"}
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-neutral-600 dark:text-neutral-400">
+                            Verbunden — BrewAI liest deine letzten Posts über die Meta Graph API aus.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-xs text-neutral-500 underline underline-offset-3 hover:text-neutral-700 disabled:opacity-50"
+                          disabled={busy}
+                          onClick={() => void disconnectInstagram()}
+                        >
+                          Verbindung trennen
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-6 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
+                        <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                          <StudioIcon name="media" size={22} />
+                        </div>
+                        <h3 className="mb-2 text-base font-medium text-neutral-900 dark:text-neutral-100">
+                          Instagram verbinden
+                        </h3>
+                        <p className="mx-auto mb-4 max-w-sm text-sm text-neutral-600 dark:text-neutral-400">
+                          Business- oder Creator-Konto (an eine Facebook-Seite gekoppelt). Danach analysieren wir
+                          automatisch deine letzten Posts.
+                        </p>
+                        {instagramStatus.expired ? (
+                          <p className="mb-3 text-xs text-amber-600 dark:text-amber-400">
+                            Deine Verbindung ist abgelaufen — bitte erneut verbinden.
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
+                    {instagramNotice ? (
+                      <p className="text-sm text-emerald-700 dark:text-emerald-400">{instagramNotice}</p>
+                    ) : null}
+                  </TabsContent>
 
-        {step !== "analyzing" && step !== "review" ? (
-          <div className="studio-modal-foot">
-            <StudioButton type="button" variant="ghost" size="sm" disabled={busy} onClick={() => handleOpenChange(false)}>
-              Abbrechen
-            </StudioButton>
-            <StudioButton
-              type="button"
-              variant="primary"
-              size="sm"
-              disabled={
-                busy ||
-                (inputTab === "manual" && filledCount < 1) ||
-                (inputTab === "url" && !websiteUrl.trim()) ||
-                (inputTab === "instagram" && (!instagramStatus.configured || instagramStatusLoading))
-              }
-              onClick={() => {
-                if (inputTab === "url") void runUrlAnalysis(websiteUrl);
-                else if (inputTab === "instagram") {
-                  if (instagramNeedsConnect) connectInstagram();
-                  else void runInstagramScan();
-                } else void runManualScan();
-              }}
-            >
-              {busy ? (
-                "KI analysiert…"
-              ) : inputTab === "url" ? (
-                <>
-                  <StudioIcon name="spark" size={15} />
-                  Website analysieren
-                </>
-              ) : inputTab === "instagram" ? (
-                instagramNeedsConnect ? (
-                  <>
-                    <StudioIcon name="media" size={15} />
-                    Instagram verbinden
-                  </>
-                ) : (
-                  <>
-                    <StudioIcon name="spark" size={15} />
-                    Posts analysieren
-                  </>
-                )
-              ) : (
-                "Auswerten"
-              )}
-            </StudioButton>
+                  <TabsContent value="manual" className="mt-6 space-y-4">
+                    <div className="rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 p-6 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
+                      <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                        <StudioIcon name="image" size={22} />
+                      </div>
+                      <h3 className="mb-2 text-base font-medium text-neutral-900 dark:text-neutral-100">
+                        Screenshots ablegen
+                      </h3>
+                      <p className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
+                        1–5 Instagram-Posts als JPEG, PNG oder WebP
+                      </p>
+                      <div className="mx-auto grid max-w-sm grid-cols-5 gap-2">
+                        {slots.map((slot, i) => (
+                          <label
+                            key={i}
+                            className={cn(
+                              "relative grid aspect-square cursor-pointer place-items-center overflow-hidden rounded-lg border bg-white dark:bg-neutral-900",
+                              slot.file
+                                ? "border-solid border-neutral-300 dark:border-neutral-600"
+                                : "border-dashed border-neutral-300 dark:border-neutral-700",
+                            )}
+                          >
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="sr-only"
+                              disabled={busy}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0] ?? null;
+                                e.target.value = "";
+                                setSlotFile(i, f);
+                              }}
+                            />
+                            {slot.preview ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={slot.preview} alt="" className="size-full object-cover" />
+                            ) : (
+                              <span className="text-[10px] text-neutral-400">{i + 1}</span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-xs text-neutral-500">
+                        {filledCount} / 5 Bilder
+                        {filledCount > 0 && filledCount < 3 ? " — mehr Bilder = präziseres Profil" : ""}
+                      </p>
+                    </div>
+                    <div>
+                      <Label
+                        htmlFor="brand-instagram-url"
+                        className="text-sm font-medium text-neutral-900 dark:text-neutral-100"
+                      >
+                        Instagram-Profil (optional)
+                      </Label>
+                      <Input
+                        id="brand-instagram-url"
+                        value={instagramUrl}
+                        onChange={(e) => setInstagramUrl(e.target.value)}
+                        disabled={busy}
+                        placeholder="https://www.instagram.com/deinemarke/"
+                        className="mt-2 h-12 rounded-xl border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900"
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="mb-2 text-center">
+                  <button
+                    type="button"
+                    className="text-xs text-neutral-500 underline underline-offset-3 hover:text-neutral-700 disabled:opacity-50 dark:hover:text-neutral-300"
+                    disabled={busy}
+                    onClick={startManualTemplate}
+                  >
+                    Ohne Analyse starten — Profil mit Vorlage selbst ausfüllen
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {step === "analyzing" ? (
+              <div className="py-4">
+                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+                  <StudioIcon name={inputTab === "url" ? "globe" : "media"} size={13} />
+                  <span>{analysisTargetLabel}</span>
+                </div>
+                <TaskSteps steps={taskSteps} current={analysisStepIndex} label="Analyse-Fortschritt" />
+                <p className="mt-6 text-sm text-neutral-500">
+                  Dauert meist unter einer Minute — bitte Fenster offen lassen.
+                </p>
+              </div>
+            ) : null}
+
+            {error ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+
+            {step !== "analyzing" ? (
+              <div className="mt-8 flex flex-col-reverse gap-3 border-t border-neutral-200 pt-6 sm:flex-row sm:justify-end sm:gap-4 dark:border-neutral-800">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => handleOpenChange(false)}
+                  className="h-12 rounded-xl border-neutral-300 bg-transparent px-6 text-sm dark:border-neutral-700"
+                >
+                  Abbrechen
+                </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    busy ||
+                    (inputTab === "manual" && filledCount < 1) ||
+                    (inputTab === "url" && !websiteUrl.trim()) ||
+                    (inputTab === "instagram" && (!instagramStatus.configured || instagramStatusLoading))
+                  }
+                  onClick={() => {
+                    if (inputTab === "url") void runUrlAnalysis(websiteUrl);
+                    else if (inputTab === "instagram") {
+                      if (instagramNeedsConnect) connectInstagram();
+                      else void runInstagramScan();
+                    } else void runManualScan();
+                  }}
+                  className="h-12 rounded-xl bg-neutral-900 px-8 font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+                >
+                  {busy ? (
+                    "KI analysiert…"
+                  ) : inputTab === "url" ? (
+                    <>
+                      <StudioIcon name="spark" size={15} />
+                      Website analysieren
+                    </>
+                  ) : inputTab === "instagram" ? (
+                    instagramNeedsConnect ? (
+                      <>
+                        <StudioIcon name="media" size={15} />
+                        Instagram verbinden
+                      </>
+                    ) : (
+                      <>
+                        <StudioIcon name="spark" size={15} />
+                        Posts analysieren
+                      </>
+                    )
+                  ) : (
+                    "Auswerten"
+                  )}
+                </Button>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -154,11 +154,11 @@ export function BrandCharactersSection() {
   }
 
   return (
-    <div className="studio-brand-chars-section">
+    <div className="flex flex-col gap-6">
       <div className="studio-brand-sec__head">
         <h2>Charaktere</h2>
       </div>
-      <p className="studio-brand-rules-sub" style={{ marginTop: 6, marginBottom: 14 }}>
+      <p className="text-sm leading-relaxed text-[var(--t3)]">
         Optional. Mehrere Personen anlegen (z.&nbsp;B. Braumeister) — dann beim Bildgenerieren denselben Charakter
         wiederverwenden, ohne dass jemand beim Shooting dabei sein muss.
       </p>

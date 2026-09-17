@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { StudioButton, StudioEyebrow, StudioFieldLabel } from "@/components/studio/ui";
 import { StudioIcon } from "@/components/studio/icons";
+import { ArchGallery } from "@/components/ui/arch-gallery";
 import { ColorPaletteCard } from "@/components/ui/color-palette-card";
-import { ProgressBar } from "@/components/ui/progress-bar";
+import { ProfileStrengthProgress } from "@/components/ui/profile-strength-progress";
 import { RemovableBadges } from "@/components/ui/removable-badges";
 import {
   computeProfileStrength,
@@ -104,10 +105,10 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
         ) : null}
 
         <div className="mt-5">
-          <ProgressBar
+          <ProfileStrengthProgress
             value={strength.percent}
-            label={`Profil-Stärke · ${strength.label}`}
-            completeLabel="Sehr stark"
+            statusLabel={strength.label}
+            label="Profil-Stärke"
           />
         </div>
       </div>
@@ -119,21 +120,27 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
           <StudioFieldLabel className="studio-brand-review-label">Referenzbilder</StudioFieldLabel>
           {refs.length > 0 ? (
             <>
-              <div className="studio-brand-review-refs">
-                {refs.slice(0, 6).map((url, index) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={`${url.slice(0, 48)}-${index}`} src={url} alt="" className="studio-brand-review-ref" />
-                ))}
-              </div>
+              <ArchGallery
+                items={refs.slice(0, 7).map((src, index) => ({
+                  image: { src, alt: `Referenzbild ${index + 1}` },
+                }))}
+                cardWidth={148}
+                cardHeight={188}
+                cornerRadius={14}
+                className="py-3"
+                label="Referenzbilder"
+              />
               {refs.length < 2 ? (
                 <p className="studio-modal-sub" style={{ marginTop: 8 }}>
-                  Wenige passende Motive von der Website — optional manuell ergänzen oder mit einer Sortiment-/Über-uns-URL erneut scannen.
+                  Wenige passende Motive von der Website — optional manuell ergänzen oder mit einer
+                  Sortiment-/Über-uns-URL erneut scannen.
                 </p>
               ) : null}
             </>
           ) : (
             <p className="studio-modal-sub" style={{ marginTop: 8 }}>
-              Keine brauchbaren Szenen gefunden — Logos und Gate-Bilder werden ignoriert. Du kannst Referenzbilder später im Markenprofil hochladen.
+              Keine brauchbaren Szenen gefunden — Logos und Gate-Bilder werden ignoriert. Du kannst
+              Referenzbilder später im Markenprofil hochladen.
             </p>
           )}
         </div>
@@ -257,7 +264,7 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
             <ColorPaletteCard
               colors={colors.map((c) => c.replace(/^#/, ""))}
               statsText={`${colors.length} Farben · tippen zum Hex`}
-              className="h-[160px] border border-[var(--line)] shadow-sm"
+              className="h-[160px] shadow-sm"
             />
           </div>
           <div className="studio-brand-review-colors mt-3">

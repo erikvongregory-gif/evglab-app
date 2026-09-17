@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MailCheck } from "lucide-react";
 
 import { EvglabMark } from "@/components/studio/evglab-mark";
@@ -15,6 +15,8 @@ import { Separator } from "@/components/ui/separator";
 import { studioFontClassName } from "@/lib/fonts/studio-fonts";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { cn } from "@/lib/utils";
+
+import styles from "./security-code-card.module.css";
 
 const DIGIT_COUNT = 6;
 
@@ -54,11 +56,16 @@ export function SecurityCodeCard({
   error,
 }: SecurityCodeCardProps) {
   const [code, setCode] = useState("");
+  const [displayCode, setDisplayCode] = useState("");
+  const [rattling, setRattling] = useState<boolean[]>(() => Array(DIGIT_COUNT).fill(false));
   const [backupCode, setBackupCode] = useState("");
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>("idle");
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [resendCooldown, setResendCooldown] = useState(0);
+  const timersRef = useRef<number[]>([]);
+  const codeRef = useRef(code);
+  codeRef.current = code;
 
   const complete = code.length === DIGIT_COUNT || (ownerHasBackupCode && backupCode.trim().length >= 6);
 
@@ -68,17 +75,32 @@ export function SecurityCodeCard({
     return () => window.clearTimeout(t);
   }, [resendCooldown]);
 
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((id) => window.clearInterval(id));
+      timersRef.current = [];
+    };
+  }, []);
+
+  const clearTimers = () => {
+    timersRef.current.forEach((id) => window.clearInterval(id));
+    timersRef.current = [];
+  };
+
   const resetAfterFail = useCallback(() => {
     setOutcome("idle");
     setVerifyBusy(false);
     setCode("");
+    setDisplayCode("");
+    setRattling(Array(DIGIT_COUNT).fill(false));
     setBackupCode("");
   }, []);
 
   const submitCode = useCallback(async (): Promise<
     { ok: true; next: string } | { ok: false; error: string }
   > => {
-    const value = code.length === DIGIT_COUNT ? code : backupCode.trim();
+    const value =
+      codeRef.current.length === DIGIT_COUNT ? codeRef.current : backupCode.trim();
     const body = new FormData();
     body.set("next", nextPath);
     body.set("code", value);
@@ -97,12 +119,9 @@ export function SecurityCodeCard({
     }
     if (res.ok && data?.ok && data.next) return { ok: true, next: data.next };
     return { ok: false, error: data?.error || "admin_2fa_invalid" };
-  }, [backupCode, code, nextPath]);
+  }, [backupCode, nextPath]);
 
-  const onVerify = async () => {
-    if (verifyBusy || outcome !== "idle" || !complete) return;
-    setSubmitError(undefined);
-    setVerifyBusy(true);
+  const finishWithOutcome = useCallback(async () => {
     try {
       const result = await submitCode();
       if (result.ok) {
@@ -120,13 +139,66 @@ export function SecurityCodeCard({
       setOutcome("fail");
       window.setTimeout(resetAfterFail, 1400);
     }
+  }, [resetAfterFail, submitCode]);
+
+  const runVerifyAnimationThenSubmit = () => {
+    if (verifyBusy || outcome !== "idle" || !complete) return;
+
+    const usingBackup =
+      ownerHasBackupCode &&
+      backupCode.trim().length >= 6 &&
+      code.length !== DIGIT_COUNT;
+
+    setSubmitError(undefined);
+    setVerifyBusy(true);
+
+    if (usingBackup || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      void finishWithOutcome();
+      return;
+    }
+
+    clearTimers();
+    const finalDigits = code.split("");
+    setRattling(finalDigits.map(() => true));
+    setDisplayCode(code);
+
+    finalDigits.forEach((digit, i) => {
+      const iv = window.setInterval(() => {
+        setDisplayCode((prev) => {
+          const chars = prev.padEnd(DIGIT_COUNT, "0").split("");
+          chars[i] = String(Math.floor(Math.random() * 10));
+          return chars.join("").slice(0, DIGIT_COUNT);
+        });
+      }, 45);
+      timersRef.current.push(iv);
+
+      window.setTimeout(() => {
+        window.clearInterval(iv);
+        setDisplayCode((prev) => {
+          const chars = prev.padEnd(DIGIT_COUNT, "0").split("");
+          chars[i] = digit;
+          return chars.join("").slice(0, DIGIT_COUNT);
+        });
+        setRattling((prev) => {
+          const next = [...prev];
+          next[i] = false;
+          return next;
+        });
+        if (i === finalDigits.length - 1) {
+          window.setTimeout(() => {
+            void finishWithOutcome();
+          }, 280);
+        }
+      }, 420 + i * 220);
+    });
   };
 
   const canEnterCode = hasPendingCode || ownerHasBackupCode;
   const bannerError = errorMessage(submitError ?? error);
+  const otpValue = verifyBusy && displayCode ? displayCode : code;
   const title = useMemo(() => {
     if (outcome === "ok") return "Verifiziert";
-    if (outcome === "fail") return "Code ungültig";
+    if (outcome === "fail") return "Falsch";
     return "Sicherheitscode";
   }, [outcome]);
 
@@ -183,7 +255,7 @@ export function SecurityCodeCard({
                 Neuer Code wurde gesendet.
               </p>
             ) : null}
-            {bannerError ? (
+            {bannerError && outcome === "idle" ? (
               <p
                 className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-center text-destructive text-sm"
                 role="alert"
@@ -192,19 +264,16 @@ export function SecurityCodeCard({
               </p>
             ) : null}
 
-            {outcome === "ok" ? (
-              <p className="text-center text-sm text-muted-foreground" role="status">
-                Dieses Gerät wird 30 Tage vertraut. Weiterleitung …
-              </p>
-            ) : null}
-
             {canEnterCode && outcome === "idle" ? (
               <div className="space-y-5">
                 <div className="flex justify-center">
                   <InputOTP
                     maxLength={DIGIT_COUNT}
-                    value={code}
-                    onChange={setCode}
+                    value={otpValue}
+                    onChange={(value) => {
+                      if (verifyBusy) return;
+                      setCode(value);
+                    }}
                     disabled={verifyBusy}
                     autoFocus={hasPendingCode}
                   >
@@ -213,7 +282,10 @@ export function SecurityCodeCard({
                         <InputOTPSlot
                           key={i}
                           index={i}
-                          className="size-12 rounded-md border text-lg md:size-14"
+                          className={cn(
+                            "size-12 rounded-md border text-lg md:size-14",
+                            rattling[i] && styles.rattling,
+                          )}
                         />
                       ))}
                     </InputOTPGroup>
@@ -235,7 +307,7 @@ export function SecurityCodeCard({
                   type="button"
                   className="h-11 w-full"
                   disabled={verifyBusy || !complete}
-                  onClick={() => void onVerify()}
+                  onClick={runVerifyAnimationThenSubmit}
                 >
                   {verifyBusy ? (
                     <>
@@ -284,6 +356,50 @@ export function SecurityCodeCard({
               </>
             ) : null}
           </div>
+
+          {outcome === "ok" ? (
+            <div className={styles.verified} role="status" aria-live="polite">
+              <div className={styles.checkRing}>
+                <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden>
+                  <path
+                    className={styles.checkPath}
+                    d="M5 12.5l4.5 4.5L19 7.5"
+                    fill="none"
+                    stroke="#6FA96F"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <div className={styles.verifiedTitle}>Verifiziert</div>
+              <div className={styles.verifiedLead}>
+                Dieses Gerät wird für 30 Tage vertraut. Du wirst weitergeleitet …
+              </div>
+            </div>
+          ) : null}
+
+          {outcome === "fail" ? (
+            <div className={`${styles.verified} ${styles.failed}`} role="alert" aria-live="assertive">
+              <div className={styles.failRing}>
+                <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden>
+                  <path
+                    className={styles.failPath}
+                    d="M7 7l10 10M17 7L7 17"
+                    fill="none"
+                    stroke="#E07070"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <div className={styles.verifiedTitle}>Falsch</div>
+              <div className={styles.verifiedLead}>
+                Code ungültig oder abgelaufen. Versuch es erneut.
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

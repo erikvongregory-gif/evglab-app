@@ -218,11 +218,11 @@ export function AdminTeamView({
         </CardHeader>
         <CardContent>
           {members.length === 0 ? (
-            <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground text-sm">
+            <p className="rounded-lg bg-muted/40 p-8 text-center text-muted-foreground text-sm">
               Noch keine Teammitglieder.
             </p>
           ) : (
-            <div className="overflow-hidden rounded-lg border">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

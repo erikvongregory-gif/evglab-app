@@ -334,7 +334,7 @@ function BrewAiActivityOverview({
         {!summaryLoaded ? (
           <Skeleton className="h-80 w-full rounded-lg" />
         ) : !hasData ? (
-          <div className="flex h-80 w-full items-center justify-center rounded-lg border border-dashed">
+          <div className="flex h-80 w-full items-center justify-center rounded-lg bg-muted/40">
             <p className="text-muted-foreground text-sm">
               Noch keine Token-Nutzung in diesem Zeitraum vorhanden.
             </p>
@@ -460,7 +460,7 @@ function BrewAiAssetsOverview({
             ))}
           </div>
         ) : mediaError ? (
-          <div className="flex h-40 flex-col items-center justify-center gap-3 rounded-lg border border-dashed">
+          <div className="flex h-40 flex-col items-center justify-center gap-3 rounded-lg bg-muted/40">
             <p className="text-destructive text-sm">{mediaError}</p>
             {onRetryMedia ? (
               <Button variant="outline" size="sm" onClick={onRetryMedia}>
@@ -469,7 +469,7 @@ function BrewAiAssetsOverview({
             ) : null}
           </div>
         ) : rows.length === 0 ? (
-          <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-lg border border-dashed">
+          <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-lg bg-muted/40">
             <ImageIcon className="size-5 text-muted-foreground" />
             <p className="text-muted-foreground text-sm">
               {media.length === 0 ? "Noch keine Assets vorhanden." : "Keine Assets passen zur Suche."}

@@ -10,7 +10,8 @@ export type BrandingCardProps = {
   title: string;
   subtitle: string;
   displayElement: React.ReactNode;
-  colors: string[];
+  /** Optional — weglassen, wenn Farben separat (z. B. ColorPaletteCard) gezeigt werden. */
+  colors?: string[];
   className?: string;
 };
 
@@ -48,10 +49,12 @@ export function BrandingCard({
   displayElement,
   colors,
 }: BrandingCardProps) {
+  const hasColors = Boolean(colors?.length);
+
   return (
     <motion.div
       className={cn(
-        "w-full overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-shadow duration-300 hover:shadow-lg",
+        "flex h-full w-full flex-col overflow-hidden rounded-xl bg-card text-card-foreground shadow-sm transition-shadow duration-300 hover:shadow-lg",
         className,
       )}
       variants={cardVariants}
@@ -61,30 +64,32 @@ export function BrandingCard({
       aria-label={`${category}: ${title}`}
       role="group"
     >
-      <div className="p-6">
-        <p className="mb-4 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+      <div className={cn("flex flex-1 flex-col justify-between p-5 md:p-6", !hasColors && "min-h-[160px]")}>
+        <p className="mb-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">
           {category}
         </p>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <h3 className="text-xl font-semibold tracking-tight">{title}</h3>
-            <p className="text-lg text-muted-foreground">{subtitle}</p>
+            <h3 className="text-lg font-semibold tracking-tight md:text-xl">{title}</h3>
+            <p className="truncate text-base text-muted-foreground md:text-lg">{subtitle}</p>
           </div>
-          <div className="shrink-0 text-5xl font-bold tracking-tighter">{displayElement}</div>
+          <div className="shrink-0 text-4xl font-bold tracking-tighter md:text-5xl">{displayElement}</div>
         </div>
       </div>
 
-      <div className="flex h-24 w-full">
-        {colors.map((color, index) => (
-          <motion.div
-            key={`${color}-${index}`}
-            className="h-full flex-1"
-            style={{ backgroundColor: color }}
-            variants={swatchVariants}
-            aria-label={`Color swatch ${index + 1}: ${color}`}
-          />
-        ))}
-      </div>
+      {hasColors ? (
+        <div className="flex h-16 w-full md:h-20">
+          {colors!.map((color, index) => (
+            <motion.div
+              key={`${color}-${index}`}
+              className="h-full flex-1"
+              style={{ backgroundColor: color }}
+              variants={swatchVariants}
+              aria-label={`Color swatch ${index + 1}: ${color}`}
+            />
+          ))}
+        </div>
+      ) : null}
     </motion.div>
   );
 }
