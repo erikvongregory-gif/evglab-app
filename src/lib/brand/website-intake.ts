@@ -1,6 +1,7 @@
 import { publicFetch } from "@/lib/security/public-fetch";
 import { createHash } from "node:crypto";
 import sharp from "sharp";
+import { matchingReferenceFingerprints, referenceImageFingerprint } from "./reference-image-similarity";
 import {
   assertSafePublicUrl,
   BROWSER_USER_AGENT,
@@ -330,6 +331,7 @@ export type DownloadedImage = {
   mediaType: "image/jpeg" | "image/png" | "image/webp";
   mime: string;
   sizeBytes: number;
+  visualFingerprint?: string;
 };
 
 function decodeHtmlEntities(input: string): string {
@@ -800,6 +802,7 @@ async function downloadImage(candidate: ImageCandidate): Promise<DownloadedImage
       mediaType: "image/jpeg",
       mime: "image/jpeg",
       sizeBytes: compressed.byteLength,
+      visualFingerprint: await referenceImageFingerprint(compressed),
     };
   } catch {
     return null;
@@ -846,7 +849,9 @@ async function downloadImagesWithConcurrency(
     const batch = candidates.slice(offset, offset + IMAGE_DOWNLOAD_CONCURRENCY);
     const results = await Promise.all(batch.map((candidate) => downloadImage(candidate)));
     for (const image of results) {
-      if (image && downloadedImages.length < maxCount) downloadedImages.push(image);
+      if (image && downloadedImages.length < maxCount && !downloadedImages.some((existing) => sameReferenceImage(existing, image))) {
+        downloadedImages.push(image);
+      }
     }
   }
 
@@ -1003,12 +1008,15 @@ export function pickBrandReferenceImages(
 ): DownloadedImage[] {
   const minScore = opts?.minScore ?? 20;
   const seenKeys = new Set<string>();
+  const uniqueImages: DownloadedImage[] = [];
   const eligible = images.filter((image) => {
     if (image.score < minScore) return false;
     if (isHardReferenceNoiseCandidate(image.url, image.alt)) return false;
     const dedupeKey = normalizeImageUrlKey(image.url);
     if (seenKeys.has(dedupeKey)) return false;
+    if (uniqueImages.some((existing) => sameReferenceImage(existing, image))) return false;
     seenKeys.add(dedupeKey);
+    uniqueImages.push(image);
     return true;
   });
 
@@ -1038,4 +1046,13 @@ export function pickBrandReferenceImages(
     picked.push(...packshotPool.slice(0, Math.min(MAX_REFERENCE_IMAGES - picked.length, packshotBudget)));
   }
   return picked;
+}
+
+function sameReferenceImage(a: DownloadedImage, b: DownloadedImage): boolean {
+  if (a.base64 && b.base64 && imageContentHash(a.base64) === imageContentHash(b.base64)) return true;
+  // Small label differences distinguish products; don't perceptually merge packshots.
+  return !a.isPackshot && !b.isPackshot && Boolean(
+    a.visualFingerprint && b.visualFingerprint &&
+    matchingReferenceFingerprints(a.visualFingerprint, b.visualFingerprint),
+  );
 }

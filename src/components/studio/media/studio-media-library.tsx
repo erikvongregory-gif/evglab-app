@@ -602,10 +602,7 @@ export function StudioMediaLibrary({
                 return (
                   <Card
                     key={`job-${job.jobId}`}
-                    className={cn(
-                      "mb-3 break-inside-avoid gap-0 overflow-hidden py-0 shadow-sm",
-                      job.highlighted && "ring-2 ring-primary",
-                    )}
+                    className="mb-3 break-inside-avoid gap-0 overflow-hidden border-0 py-0 shadow-sm"
                     aria-busy={job.status === "reserved" || undefined}
                     aria-label={message}
                   >

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useId, useState } from "react";
+import { BrandReferenceGallery } from "@/components/dashboard/BrandReferenceGallery";
+import { BrandProfileEmptyState } from "@/components/dashboard/BrandProfileEmptyState";
 import { BrandingCard } from "@/components/ui/branding-card";
 import { ColorPaletteCard } from "@/components/ui/color-palette-card";
 import FileUpload from "@/components/ui/file-upload";
@@ -62,68 +64,6 @@ const LOCK_OPTIONS: Array<{ id: BrandSettings["brandLockLevel"]; label: string; 
   { id: "balanced", label: "Balanced", sub: "Stil + kreativer Spielraum" },
   { id: "loose", label: "Frei", sub: "Profil als lose Inspiration" },
 ];
-
-function BrandQuickStart({
-  onQuickAnalyze,
-  onOpenBrandSetup,
-  onSkipBrandProfile,
-}: {
-  onQuickAnalyze?: (url: string) => void;
-  onOpenBrandSetup: () => void;
-  onSkipBrandProfile?: () => void;
-}) {
-  const [url, setUrl] = useState("");
-  const inputId = useId();
-
-  const submit = () => {
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    if (onQuickAnalyze) onQuickAnalyze(trimmed);
-    else onOpenBrandSetup();
-  };
-
-  return (
-    <div className="studio-brand-quick">
-      <div className="studio-brand-quick__copy">
-        <div className="studio-brand-quick__t">Website einlesen</div>
-        <p className="studio-brand-quick__s">
-          Ein Link genügt — BrewAI erstellt daraus Farben, Tonalität und Bildregeln.
-        </p>
-      </div>
-      <form
-        className="studio-brand-quick__form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <Input
-          id={inputId}
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="www.deine-brauerei.de"
-          inputMode="url"
-          autoComplete="url"
-          aria-label="Website deiner Marke"
-          className="h-11"
-        />
-        <StudioButton type="submit" variant="primary" disabled={!url.trim()}>
-          Profil erstellen
-        </StudioButton>
-      </form>
-      <div className="studio-brand-quick__alt">
-        <button type="button" onClick={onOpenBrandSetup}>
-          Instagram oder Screenshots
-        </button>
-        {onSkipBrandProfile ? (
-          <button type="button" onClick={onSkipBrandProfile}>
-            Ohne Profil fortfahren
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 export function BrandProfileView({
   value,
@@ -280,27 +220,13 @@ export function BrandProfileView({
 
   if (skipped || !active) {
     return (
-      <div className="studio-brand-page">
-        <StudioPageHeader
-          eyebrow={skipped ? "Markenprofil · deaktiviert" : "Markenprofil · ausstehend"}
-          title="Markenprofil"
-          subtitle={
-            skipped
-              ? "Du generierst ohne festes Markenprofil. Du kannst jederzeit eine Website einlesen lassen."
-              : "Die Grundlage jeder Generierung — einmal sauber gepflegt, dauerhaft konsistente Motive."
-          }
-          action={
-            <StudioButton type="button" variant="primary" size="sm" onClick={onOpenBrandSetup}>
-              Marke einlesen
-            </StudioButton>
-          }
-        />
-        <BrandQuickStart
-          onQuickAnalyze={onQuickAnalyze}
-          onOpenBrandSetup={onOpenBrandSetup}
-          onSkipBrandProfile={skipped ? undefined : onSkipBrandProfile}
-        />
-      </div>
+      <BrandProfileEmptyState
+        skipped={skipped}
+        initialWebsiteUrl={value.brandWebsiteUrl}
+        onQuickAnalyze={onQuickAnalyze}
+        onOpenBrandSetup={onOpenBrandSetup}
+        onSkipBrandProfile={onSkipBrandProfile}
+      />
     );
   }
 
@@ -496,21 +422,7 @@ export function BrandProfileView({
             </div>
           </section>
 
-          {value.brandReferenceImageUrls.length > 0 ? (
-            <section className="flex flex-col gap-6">
-              <div className="studio-brand-sec__head">
-                <h2>Referenzbilder</h2>
-              </div>
-              <div className="studio-brand-refs-grid">
-                {value.brandReferenceImageUrls.map((url) => (
-                  <div key={url} className="studio-brand-ref-tile">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" />
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
+          <BrandReferenceGallery urls={value.brandReferenceImageUrls} />
 
           <BrandCharactersSection />
 

@@ -11,7 +11,7 @@ export {
 
 export function reviewReferencePreviews(review: BrandScanSuggestion): string[] {
   if (review.referenceImagePayloads?.length) {
-    return review.referenceImagePayloads.map((image: BrandReferenceImagePayload) => `data:${image.mime};base64,${image.base64}`);
+    return [...new Set(review.referenceImagePayloads.map((image: BrandReferenceImagePayload) => `data:${image.mime};base64,${image.base64}`))];
   }
-  return review.referenceImageUrls;
+  return [...new Set(review.referenceImageUrls.map((url) => url.trim()).filter(Boolean))];
 }
