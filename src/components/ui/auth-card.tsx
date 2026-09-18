@@ -447,8 +447,10 @@ export function AuthCard({
                               <a
                                 href={googleSignupHref}
                                 onClick={() => {
+                                  // Nur Legacy-Cookies räumen — Navigation ausschließlich über href
+                                  // (inkl. terms_accepted=1 im Signup). Kein onOAuth-Redirect hier,
+                                  // sonst doppelter OAuth-Start und kaputter PKCE-Verifier.
                                   clearLegacySupabaseSessionCookies();
-                                  onOAuth("google");
                                 }}
                               >
                                 <GoogleG />
@@ -465,6 +467,7 @@ export function AuthCard({
                             disabled={googleDisabled}
                             onClick={() => {
                               if (googleHref || googleDisabled) return;
+                              clearLegacySupabaseSessionCookies();
                               onOAuth("google");
                             }}
                           >

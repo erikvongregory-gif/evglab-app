@@ -509,10 +509,11 @@ export const SignInPage: React.FC<SignInPageProps> = ({
         /* When formAction is set, native POST to /auth/signin|/auth/signup runs. */
       }}
       onOAuth={(provider) => {
-        if (provider === "google") {
-          if (onGoogleSignIn) onGoogleSignIn();
-          else if (typeof window !== "undefined") window.location.assign(googleHref);
-        }
+        if (provider !== "google") return;
+        // Nur Custom-Handler — Navigation läuft über AuthCard `href={googleSignupHref}`.
+        // location.assign(googleHref) ohne terms_accepted race’t sonst mit dem <a>-Link
+        // und zerstört den PKCE-Verifier (oauth_state bei Google-Registrierung).
+        if (onGoogleSignIn) onGoogleSignIn();
       }}
       onForgotPassword={onResetPassword}
       error={errorText}

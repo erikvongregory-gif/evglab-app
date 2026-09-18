@@ -48,7 +48,8 @@ export async function updateSession(request: NextRequest) {
 
   if (AUTH_COOKIE_SWEEP_PATHS.has(pathname)) {
     clearIncomingSupabaseAuthCookies(request, supabaseResponse, {
-      preserveCodeVerifier: pathname === "/auth/callback",
+      // /anmelden oft parallel offen während Google-Consent — Verifier nicht killen.
+      preserveCodeVerifier: pathname === "/auth/callback" || pathname === "/anmelden",
       allSupabase: pathname === "/auth/clear-session",
     });
   }
