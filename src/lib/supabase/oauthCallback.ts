@@ -33,10 +33,18 @@ import {
   buildPasswordRecoveryToken,
   getPasswordRecoveryCookieName,
   PASSWORD_RECOVERY_TTL_SECONDS,
-  sessionHasRecoveryAmr,
+  sessionProvesRecoveryForUser,
 } from "@/lib/auth/passwordRecoveryGate";
 import { parseCookieHeader } from "@supabase/ssr";
 import { PASSWORD_RESET_NEXT } from "@/lib/auth/passwordResetPaths";
+
+type RecoverySessionClient = {
+  auth: {
+    getClaims: (jwt?: string) => Promise<{
+      data?: { claims?: { sub?: string; amr?: unknown } | null } | null;
+    }>;
+  };
+};
 
 function authErrorParam(code?: string) {
   if (code === "flow_state_not_found" || code === "pkce_code_verifier_not_found") {
@@ -114,13 +122,28 @@ function sessionPollerResponse(
   );
 }
 
-async function hasServerRecoveryProof(
-  redirectResponse: NextResponse,
-  verifiedRecoveryOtp: boolean,
-): Promise<boolean> {
-  if (verifiedRecoveryOtp) return true;
-  const supabase = await createAuthRouteHandlerClient(redirectResponse);
-  return sessionHasRecoveryAmr(supabase);
+async function hasServerRecoveryProof(opts: {
+  userId: string;
+  verifiedRecoveryOtp: boolean;
+  /** Frisch verifizierte Session (Exchange/OTP) — nie eingehende Request-Cookies. */
+  sessionClient?: RecoverySessionClient;
+  /** Bereits an bridged.userId gebunden. */
+  bridgedRecoveryGranted?: boolean;
+}): Promise<boolean> {
+  if (!opts.userId) return false;
+  if (opts.bridgedRecoveryGranted === true) return true;
+  if (!opts.sessionClient) return false;
+
+  if (opts.verifiedRecoveryOtp) {
+    try {
+      const { data } = await opts.sessionClient.auth.getClaims();
+      return data?.claims?.sub === opts.userId;
+    } catch {
+      return false;
+    }
+  }
+
+  return sessionProvesRecoveryForUser(opts.sessionClient, opts.userId);
 }
 
 function resolvePostAuthNext(safeNext: string, grantedRecovery: boolean) {
@@ -137,6 +160,8 @@ async function redirectAfterOAuthSuccess(
     appOrigin: string;
     safeNext: string;
     verifiedRecoveryOtp?: boolean;
+    sessionClient?: RecoverySessionClient;
+    bridgedRecoveryGranted?: boolean;
     redirectResponse: NextResponse;
     startedAt: number;
     user: User | null | undefined;
@@ -146,16 +171,22 @@ async function redirectAfterOAuthSuccess(
 ) {
   const { requestId, appOrigin, redirectResponse, startedAt, user } = opts;
 
+  const grantedRecovery = user?.id
+    ? await hasServerRecoveryProof({
+        userId: user.id,
+        verifiedRecoveryOtp: opts.verifiedRecoveryOtp === true,
+        sessionClient: opts.sessionClient,
+        bridgedRecoveryGranted: opts.bridgedRecoveryGranted,
+      })
+    : false;
+
   if (opts.oauthCode && user?.id) {
     const pkceHash = pkceVerifierHashFromRequest(request);
     if (pkceHash) {
-      bridgeOAuthSession(opts.oauthCode, redirectResponse, user.id, pkceHash);
+      bridgeOAuthSession(opts.oauthCode, redirectResponse, user.id, pkceHash, grantedRecovery);
     }
   }
 
-  const grantedRecovery =
-    Boolean(user?.id) &&
-    (await hasServerRecoveryProof(redirectResponse, opts.verifiedRecoveryOtp === true));
   const postAuthNext = resolvePostAuthNext(opts.safeNext, grantedRecovery);
 
   if (grantedRecovery && user?.id) {
@@ -219,7 +250,7 @@ async function finishFromBridge(
   if (!bridged) return null;
 
   const redirectResponse = createNoStoreRedirect(
-    `${opts.appOrigin}${resolvePostAuthNext(opts.safeNext, false)}`,
+    `${opts.appOrigin}${resolvePostAuthNext(opts.safeNext, bridged.recoveryGranted)}`,
     opts.requestId,
   );
   clearIncomingSupabaseAuthCookies(request, redirectResponse, { preserveCodeVerifier: true });
@@ -228,6 +259,7 @@ async function finishFromBridge(
     requestId: opts.requestId,
     appOrigin: opts.appOrigin,
     safeNext: opts.safeNext,
+    bridgedRecoveryGranted: bridged.recoveryGranted,
     redirectResponse,
     startedAt: opts.startedAt,
     user: { id: bridged.userId } as User,
@@ -274,6 +306,7 @@ export async function handleAuthCallbackGet(request: Request) {
         appOrigin,
         safeNext,
         verifiedRecoveryOtp: type === "recovery",
+        sessionClient: supabase,
         redirectResponse,
         startedAt,
         user,
@@ -349,7 +382,8 @@ export async function handleAuthCallbackGet(request: Request) {
         requestId,
         appOrigin,
         safeNext,
-        // type=recovery in der URL allein reicht nicht — nur JWT-AMR nach Exchange.
+        // Nur Claims der frischen Exchange-Session — nicht Request-Cookies / type= URL.
+        sessionClient: supabase,
         redirectResponse,
         startedAt,
         user,

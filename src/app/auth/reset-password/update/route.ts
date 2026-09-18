@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   const recoveryCookie = readNamedCookie(request, getPasswordRecoveryCookieName());
   const hasRecoveryCookie = isValidPasswordRecoveryToken(recoveryCookie, user.id);
-  const hasRecoveryAmr = await sessionHasRecoveryAmr(supabase);
+  const hasRecoveryAmr = await sessionHasRecoveryAmr(supabase, user.id);
   if (!hasRecoveryCookie && !hasRecoveryAmr) {
     logAuthEvent({
       event: "reset_password_update_denied",

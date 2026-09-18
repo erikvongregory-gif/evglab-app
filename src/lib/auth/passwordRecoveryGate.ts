@@ -89,14 +89,37 @@ function amrIncludesRecovery(amr: unknown): boolean {
   });
 }
 
-/** JWT-AMR enthält „recovery“ (Hash-/Magic-Link ohne unser Recovery-Cookie). */
-export async function sessionHasRecoveryAmr(
-  supabase: { auth: { getClaims: (jwt?: string) => Promise<{ data?: { claims?: { amr?: unknown } } | null }> } },
+type ClaimsClient = {
+  auth: {
+    getClaims: (jwt?: string) => Promise<{
+      data?: { claims?: { sub?: string; amr?: unknown } | null } | null;
+    }>;
+  };
+};
+
+/**
+ * Recovery nur aus derselben Session: claims.sub muss userId sein und AMR
+ * „recovery“ enthalten. Verhindert Cross-Account-Übernahme alter Cookies.
+ */
+export async function sessionProvesRecoveryForUser(
+  supabase: ClaimsClient,
+  userId: string,
 ): Promise<boolean> {
+  if (!userId) return false;
   try {
     const { data } = await supabase.auth.getClaims();
-    return amrIncludesRecovery(data?.claims?.amr);
+    const claims = data?.claims;
+    if (!claims || claims.sub !== userId) return false;
+    return amrIncludesRecovery(claims.amr);
   } catch {
     return false;
   }
+}
+
+/** Alias — immer mit Ziel-Nutzer-ID aufrufen. */
+export async function sessionHasRecoveryAmr(
+  supabase: ClaimsClient,
+  userId: string,
+): Promise<boolean> {
+  return sessionProvesRecoveryForUser(supabase, userId);
 }

@@ -8,6 +8,8 @@ export type BridgedOAuthSession = {
   at: number;
   /** SHA-256 über die PKCE-Verifier-Cookies — Bridge nur für denselben Browser. */
   pkceVerifierHash: string;
+  /** Bereits an userId gebunden beim ersten Exchange — nicht erneut aus Request-Cookies lesen. */
+  recoveryGranted: boolean;
 };
 
 const bridged = new Map<string, BridgedOAuthSession>();
@@ -37,6 +39,7 @@ export function bridgeOAuthSession(
   response: NextResponse,
   userId: string,
   pkceVerifierHash: string,
+  recoveryGranted = false,
 ) {
   prune();
   bridged.set(code, {
@@ -47,6 +50,7 @@ export function bridgeOAuthSession(
     userId,
     at: Date.now(),
     pkceVerifierHash,
+    recoveryGranted,
   });
 }
 
