@@ -84,8 +84,9 @@ export function TokenAvatarRing({ children, className, size = 36 }: TokenAvatarR
       aria-label={label}
     >
       <svg
-        className="pointer-events-none absolute inset-0 -rotate-90 overflow-visible"
+        className="pointer-events-none absolute inset-0 size-full! max-h-none! max-w-none! -rotate-90 overflow-visible transition-none!"
         viewBox={`0 0 ${vb} ${vb}`}
+        preserveAspectRatio="xMidYMid meet"
         aria-hidden
       >
         <circle
