@@ -273,7 +273,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
       const form = event.currentTarget;
       const password = String(new FormData(form).get("password") ?? "");
       const passwordConfirm = String(new FormData(form).get("passwordConfirm") ?? "");
-      if (passwordConfirm && password !== passwordConfirm) {
+      if (!passwordConfirm || password !== passwordConfirm) {
         event.preventDefault();
         setLocalError("Passwörter stimmen nicht überein.");
         return;

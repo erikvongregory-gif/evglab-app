@@ -66,6 +66,8 @@ function messageForError(
       return detailHint
         ? `Passwort zu schwach${detailHint}. Mindestens 8 Zeichen.`
         : "Passwort zu schwach. Bitte mindestens 8 Zeichen wählen.";
+    case "password_mismatch":
+      return "Passwörter stimmen nicht überein. Bitte beide Felder gleich ausfüllen.";
     case "invalid_email":
       return "Diese E-Mail-Adresse ist ungültig.";
     case "signup_disabled":

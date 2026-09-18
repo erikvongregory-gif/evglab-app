@@ -147,9 +147,11 @@ export function AuthCard({
 
   const [email, setEmail] = useState(defaultEmail);
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [brewery, setBrewery] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -169,6 +171,7 @@ export function AuthCard({
 
   const setMode = (next: AuthMode) => {
     setLocalError(null);
+    setPasswordConfirm("");
     if (controlledMode === undefined) setUncontrolledMode(next);
     onModeChange?.(next);
   };
@@ -182,6 +185,11 @@ export function AuthCard({
     if (isSignup && inviteBlocked) {
       event.preventDefault();
       setLocalError(inviteBlockedMessage);
+      return;
+    }
+    if (isSignup && password !== passwordConfirm) {
+      event.preventDefault();
+      setLocalError("Passwörter stimmen nicht überein.");
       return;
     }
 
@@ -383,6 +391,38 @@ export function AuthCard({
                       </Button>
                     </div>
                   </div>
+
+                  {isSignup ? (
+                    <div className="space-y-2">
+                      <Label htmlFor={`${reactId}-password-confirm`}>Passwort bestätigen</Label>
+                      <div className="relative">
+                        <Input
+                          id={`${reactId}-password-confirm`}
+                          name="passwordConfirm"
+                          type={showPwConfirm ? "text" : "password"}
+                          required
+                          minLength={8}
+                          autoComplete="new-password"
+                          placeholder="••••••••"
+                          disabled={busy}
+                          className="pr-10"
+                          value={passwordConfirm}
+                          onChange={(e) => setPasswordConfirm(e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-0 right-0 h-full px-3"
+                          onClick={() => setShowPwConfirm((v) => !v)}
+                          disabled={busy}
+                          aria-label={showPwConfirm ? "Passwort verbergen" : "Passwort anzeigen"}
+                        >
+                          {showPwConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {isSignup ? (
                     <div className="space-y-2">

@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
   const breweryName = String(formData.get("brewery") ?? "").trim();
   const inviteToken = String(formData.get("inviteToken") ?? "").trim();
   const next = normalizeNextPath(String(formData.get("next") ?? "/dashboard"));
@@ -67,12 +68,16 @@ export async function POST(request: Request) {
     return fail("mode=register&error=terms");
   }
 
-  if (!email || !password) {
+  if (!email || !password || !passwordConfirm) {
     return fail("mode=register&error=missing");
   }
 
   if (password.length < 8) {
     return fail("mode=register&error=weak_password");
+  }
+
+  if (password !== passwordConfirm) {
+    return fail("mode=register&error=password_mismatch");
   }
 
   if (isInviteOnlyEnabled() && !inviteToken && !teamInviteFlow) {
