@@ -92,6 +92,10 @@ export async function startStudioGeneration(args: {
       aspectRatio: outcome.aspectRatio,
       variantCount: outcome.expectedVariants,
     });
+    // Tokens sind bei Reserve schon abgebucht — Avatar-Ring sofort aktualisieren.
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
+    }
   }
   return outcome;
 }

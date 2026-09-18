@@ -93,8 +93,12 @@ declare b billing_subscriptions; lot token_lots; left_to_debit integer:=p_amount
 begin
   perform billing_refresh_monthly(p_user_id);
   select * into b from billing_subscriptions where user_id=p_user_id for update;
-  if p_amount<0 or b.plan is null or b.subscription_status not in ('active','trialing') then raise exception 'Kein aktives Abo.'; end if;
-  if b.token_next_at is not null and b.current_period_end<=now() then raise exception 'Aboperiode nicht bestätigt.'; end if;
+  if p_amount<0 then raise exception 'Invalid amount'; end if;
+  -- Stripe-Abo: Status + Periode. Bonus-only (kein Stripe): Lots entscheiden.
+  if b.stripe_subscription_id is not null then
+    if b.subscription_status not in ('active','trialing') then raise exception 'Kein aktives Abo.'; end if;
+    if b.token_next_at is not null and b.current_period_end<=now() then raise exception 'Aboperiode nicht bestätigt.'; end if;
+  end if;
   for lot in select * from token_lots where user_id=p_user_id and remaining>0 and (expires_at is null or expires_at>now())
     order by expires_at nulls last,id for update loop
     take:=least(left_to_debit,lot.remaining);

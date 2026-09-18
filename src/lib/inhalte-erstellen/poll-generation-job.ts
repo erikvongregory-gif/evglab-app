@@ -96,8 +96,18 @@ export async function pollGenerationJob(args: {
     const next: PolledJobResult = { ...result, jobId: args.jobId, status };
     args.onProgress?.(jobProgressMessage({ phase, status, completed, expected }), next);
     if (result.images?.length) lastPartial = next;
-    if (status === "completed" && result.images?.length) return next;
-    if (status === "failed") return { ...next, error: result.error || "Auftrag fehlgeschlagen." };
+    if (status === "completed" && result.images?.length) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
+      }
+      return next;
+    }
+    if (status === "failed") {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
+      }
+      return { ...next, error: result.error || "Auftrag fehlgeschlagen." };
+    }
     if (now() >= deadline) {
       if (lastPartial?.images?.length) {
         return { ...lastPartial, partial: true, pending: true, jobId: args.jobId };
