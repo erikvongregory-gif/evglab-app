@@ -29,6 +29,28 @@ export const metadata: Metadata = {
   },
   description: SITE.defaultDescription,
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
+  openGraph: {
+    type: "website",
+    locale: SITE.locale,
+    url: SITE.baseUrl,
+    siteName: SITE.name,
+    title: SITE.defaultTitle,
+    description: SITE.defaultDescription,
+    images: [
+      {
+        url: SITE.ogImage,
+        width: 1200,
+        height: 630,
+        alt: SITE.ogImageAlt,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE.defaultTitle,
+    description: SITE.defaultDescription,
+    images: [SITE.ogImage],
+  },
   icons: {
     icon: [
       { url: "/favicon.ico?v=20260917", sizes: "any" },

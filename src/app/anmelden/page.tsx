@@ -15,8 +15,28 @@ export const metadata: Metadata = {
   title: {
     absolute: "BrewAI · Anmelden",
   },
+  description: SITE.defaultDescription,
   alternates: {
     canonical: `${SITE.baseUrl}/anmelden`,
+  },
+  openGraph: {
+    title: "BrewAI · Anmelden",
+    description: SITE.defaultDescription,
+    url: `${SITE.baseUrl}/anmelden`,
+    images: [
+      {
+        url: SITE.ogImage,
+        width: 1200,
+        height: 630,
+        alt: SITE.ogImageAlt,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BrewAI · Anmelden",
+    description: SITE.defaultDescription,
+    images: [SITE.ogImage],
   },
   robots: {
     index: false,

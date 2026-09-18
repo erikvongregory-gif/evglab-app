@@ -38,11 +38,13 @@ export const SITE = {
   productName,
   baseUrl: appBaseUrl,
   marketingUrl: MARKETING_SITE_URL,
-  defaultTitle: `${productName} App`,
-  defaultDescription: `Dashboard und KI-Studio für ${productName}.`,
-  keywords: [productName, "Dashboard", "Brauerei", "KI"],
+  defaultTitle: `${productName} · KI-Studio für Brauereien`,
+  defaultDescription:
+    "Deine Brauerei. Dein Content. Mit KI Motive erzeugen, Marke steuern und Mediathek verwalten.",
+  keywords: [productName, "Dashboard", "Brauerei", "KI", "Mediathek"],
   locale: "de_DE" as const,
-  ogImage: "/og/evglab-og.jpg",
+  ogImage: "/og/brewai-studio-v1.png",
+  ogImageAlt: `${productName} Studio — Mediathek mit KI-Motiven für Brauereien`,
   contactEmail: "kontakt@brewai.de",
   googleSiteVerification: "",
 } as const;
