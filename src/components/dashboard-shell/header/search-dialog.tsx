@@ -77,10 +77,27 @@ function groupBy(items: SearchItem[]) {
   }));
 }
 
+/** ⌘-Hinweis nur auf Mac-Desktop — nicht Mobile, Windows, Linux, iPadOS. */
+function canShowAppleShortcutHint() {
+  if (typeof navigator === "undefined") return false;
+  const platform = navigator.platform ?? "";
+  const ua = navigator.userAgent ?? "";
+  if (/Android|iPhone|iPod|iPad/i.test(ua)) return false;
+  // iPadOS meldet sich oft als Mac + Touch
+  if (navigator.maxTouchPoints > 1 && /Mac/i.test(platform)) return false;
+  if (!window.matchMedia("(pointer: fine)").matches) return false;
+  return /Mac/i.test(platform) || /Mac OS X/i.test(ua);
+}
+
 export function SearchDialog() {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
+  const [showAppleShortcut, setShowAppleShortcut] = React.useState(false);
   const router = useRouter();
+
+  React.useEffect(() => {
+    setShowAppleShortcut(canShowAppleShortcutHint());
+  }, []);
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -139,9 +156,11 @@ export function SearchDialog() {
       >
         <Search data-icon="inline-start" />
         Search
-        <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
-          <span className="text-xs">⌘</span>J
-        </kbd>
+        {showAppleShortcut ? (
+          <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
+            <span className="text-xs">⌘</span>J
+          </kbd>
+        ) : null}
       </Button>
       <CommandDialog open={open} onOpenChange={handleOpenChange}>
         <Command>

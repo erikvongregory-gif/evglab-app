@@ -7,7 +7,7 @@ import RuixenMoonChat from "@/components/ui/ruixen-moon-chat";
  */
 export function InhalteErstellenMoonChatPage() {
   return (
-    <div className="absolute inset-0 flex min-h-0 w-full flex-col">
+    <div className="absolute inset-0 flex min-h-0 w-full flex-col pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] md:pb-0">
       <RuixenMoonChat />
     </div>
   );

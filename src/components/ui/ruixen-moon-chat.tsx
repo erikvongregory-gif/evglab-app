@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { GlowButton } from "@/components/ui/glow-button";
+import { Switch } from "@/components/ui/switch";
 import {
   Popover,
   PopoverContent,
@@ -125,6 +126,8 @@ export default function RuixenMoonChat() {
   const [charactersError, setCharactersError] = useState<string | null>(null);
   const [genBusy, setGenBusy] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [hyperreal, setHyperreal] = useState(false);
+  const [aiWatermark, setAiWatermark] = useState(false);
   const router = useRouter();
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 48,
@@ -271,7 +274,8 @@ export default function RuixenMoonChat() {
       etikettModus: usesProductPhoto ? ("marke" as const) : ("generisch" as const),
       stiltreue: usesProductPhoto ? ("hoch" as const) : ("frei" as const),
       keepLabel: usesProductPhoto,
-      hyperreal: true,
+      hyperreal,
+      aiWatermark,
       beerName: selectedBeer?.name?.trim() || undefined,
       zusatzWunsch: intentParts.join(". ").slice(0, 800),
       characterName: selectedCharacter?.name?.trim() || undefined,
@@ -300,8 +304,10 @@ export default function RuixenMoonChat() {
     }
   }, [
     activePreset,
+    aiWatermark,
     aspectRatio,
     genBusy,
+    hyperreal,
     message,
     router,
     selectedBeer,
@@ -327,7 +333,7 @@ export default function RuixenMoonChat() {
           </div>
         </div>
 
-        <div className="mb-[clamp(1rem,5vh,3.5rem)] flex w-full max-w-3xl shrink-0 flex-col gap-3 px-4 2xl:max-w-4xl">
+        <div className="mb-3 flex w-full max-w-3xl shrink-0 flex-col gap-3 px-4 md:mb-[clamp(1rem,5vh,3.5rem)] 2xl:max-w-4xl">
           {genError ? (
             <p className="text-center text-sm text-destructive" role="alert">
               {genError}
@@ -823,9 +829,71 @@ export default function RuixenMoonChat() {
               </Popover>
               </div>
 
-              <div className="flex w-full shrink-0 items-center sm:w-auto sm:justify-end">
+              <div className="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:min-w-[13.5rem] sm:items-stretch">
+                <div className="flex w-full items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground dark:text-white">
+                      <Switch
+                        checked={hyperreal}
+                        onCheckedChange={setHyperreal}
+                        aria-label="Hyperreal"
+                        className="data-[state=checked]:!bg-emerald-600 dark:data-[state=checked]:!bg-emerald-600"
+                      />
+                      <span>Hyperreal</span>
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Was ist Hyperreal?"
+                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-semibold leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          !
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        side="top"
+                        align="start"
+                        className="w-64 p-3 text-xs leading-relaxed text-muted-foreground"
+                      >
+                        Verstärkt echte Kameraanmutung, plausibles Licht und Materialien sowie natürliche
+                        Unperfektheit — ohne CGI-Look.
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground dark:text-white">
+                      <span>AI-Label</span>
+                      <Switch
+                        checked={aiWatermark}
+                        onCheckedChange={setAiWatermark}
+                        aria-label="AI-Label"
+                        className="data-[state=checked]:!bg-emerald-600 dark:data-[state=checked]:!bg-emerald-600"
+                      />
+                    </label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Was ist AI-Label?"
+                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-semibold leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          !
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        side="top"
+                        align="end"
+                        className="w-64 p-3 text-xs leading-relaxed text-muted-foreground"
+                      >
+                        Dezentes „AI“-Label unten rechts — erkennbar für veröffentlichte Inhalte (EU AI Act,
+                        Art. 50).
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
                 <GlowButton
-                  className="w-full sm:w-auto"
+                  className="w-full"
                   disabled={!canGenerate}
                   onClick={() => void handleGenerate()}
                   showIcon={false}
