@@ -10,7 +10,6 @@ import { isOwnerUser } from "@/lib/auth/owner";
 import { ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { hasActiveSubscription } from "@/lib/billing/access";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
-import { CreateContentLockedView } from "@/components/studio/create-content-locked-view";
 import { InhalteErstellenMoonChatPage } from "@/components/ui/inhalte-erstellen-moon-chat-page";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +74,7 @@ export default async function InhalteErstellenPage() {
     }
 
     if (!hasActiveSubscription(billing)) {
-      return <CreateContentLockedView />;
+      redirect("/dashboard/pricing");
     }
   }
 

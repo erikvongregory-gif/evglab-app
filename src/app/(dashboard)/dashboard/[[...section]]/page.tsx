@@ -95,20 +95,24 @@ export default async function DashboardPage({
     redirect("/onboarding");
   }
 
-  const dashboard = getDashboardMetadata(resourceUser.user_metadata);
-  const settings = dashboard.settings as Record<string, unknown> | undefined;
+  const actorDashboard = getDashboardMetadata(user.user_metadata);
+  const actorSettings = actorDashboard.settings as Record<string, unknown> | undefined;
+  const workspaceDashboard = getDashboardMetadata(resourceUser.user_metadata);
+  const workspaceSettings = workspaceDashboard.settings as Record<string, unknown> | undefined;
   const profileName =
-    typeof settings?.profileName === "string"
-      ? settings.profileName
-      : typeof resourceUser.user_metadata?.full_name === "string"
-        ? resourceUser.user_metadata.full_name
+    typeof actorSettings?.profileName === "string"
+      ? actorSettings.profileName
+      : typeof user.user_metadata?.full_name === "string"
+        ? user.user_metadata.full_name
         : undefined;
   const breweryName =
-    typeof settings?.breweryName === "string"
-      ? settings.breweryName
+    typeof workspaceSettings?.breweryName === "string"
+      ? workspaceSettings.breweryName
       : typeof resourceUser.user_metadata?.brewery === "string"
         ? resourceUser.user_metadata.brewery
-        : undefined;
+        : typeof resourceUser.user_metadata?.brewery_name === "string"
+          ? resourceUser.user_metadata.brewery_name
+          : undefined;
   const userRole =
     typeof user.app_metadata?.role === "string"
       ? String(user.app_metadata.role).toLowerCase()

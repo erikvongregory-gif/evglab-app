@@ -21,6 +21,7 @@ import { ThemeSwitcher } from "@/components/dashboard-shell/header/theme-switche
 import { NavMain } from "@/components/dashboard-shell/sidebar/nav-main";
 import { NavUser } from "@/components/dashboard-shell/sidebar/nav-user";
 import { SupportCard } from "@/components/dashboard-shell/sidebar/support-card";
+import LumaBar from "@/components/ui/futuristic-nav";
 import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
@@ -226,8 +227,10 @@ export function BrewAiAdminShell({
               </header>
               <div
                 className={cn(
-                  "min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0",
-                  fullBleed && "relative flex flex-col overflow-hidden p-0 md:p-0",
+                  "min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 pb-24 md:p-6",
+                  "has-data-[content-padding=false]:px-0 has-data-[content-padding=false]:pt-0 has-data-[content-padding=false]:pb-24",
+                  "md:has-data-[content-padding=false]:p-0",
+                  fullBleed && "relative flex flex-col overflow-hidden px-0 pt-0 pb-24 md:p-0",
                 )}
                 style={contentPadding ? { padding: contentPadding } : undefined}
                 data-content-padding={fullBleed ? "false" : undefined}
@@ -235,6 +238,7 @@ export function BrewAiAdminShell({
                 {children}
               </div>
             </SidebarInset>
+            <LumaBar />
           </SidebarProvider>
           <Toaster />
         </div>

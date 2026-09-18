@@ -9,7 +9,9 @@ import {
 import { hasAdminAccess, isOwnerUser } from "@/lib/auth/owner";
 import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { getFreshUserDashboardMetadata } from "@/lib/dashboard/freshMetadata";
+import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
+import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -50,12 +52,27 @@ export default async function StudioDashboardLayout({ children }: { children: Re
       : typeof user.user_metadata?.full_name === "string"
         ? user.user_metadata.full_name
         : undefined;
-  const breweryName =
+
+  let breweryName =
     typeof settings?.breweryName === "string"
       ? settings.breweryName
       : typeof user.user_metadata?.brewery === "string"
         ? user.user_metadata.brewery
         : undefined;
+  try {
+    const resourceUser = await workspaceResourceUser(user);
+    if (resourceUser.id !== user.id) {
+      const workspaceSettings = getDashboardMetadata(resourceUser.user_metadata).settings;
+      breweryName =
+        (typeof workspaceSettings?.breweryName === "string" && workspaceSettings.breweryName) ||
+        (typeof resourceUser.user_metadata?.brewery === "string" && resourceUser.user_metadata.brewery) ||
+        (typeof resourceUser.user_metadata?.brewery_name === "string" &&
+          resourceUser.user_metadata.brewery_name) ||
+        breweryName;
+    }
+  } catch {
+    /* Actor-Brewery beibehalten */
+  }
 
   void hasAdminAccess(user);
   void isOwnerUser(user);

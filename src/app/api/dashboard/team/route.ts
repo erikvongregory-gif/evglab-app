@@ -33,9 +33,21 @@ async function members(ownerId: string) {
   const rows = await Promise.all((active.data ?? []).map(async row => {
     const member = await admin.auth.admin.getUserById(row.user_id);
     if (member.error) throw new Error("Teammitglied konnte nicht geladen werden.");
-    return { id:row.user_id,email:member.data.user.email,name:member.data.user.user_metadata?.full_name ?? member.data.user.email,role:row.role,status:"active",invitedAt:row.created_at };
+    const meta = member.data.user.user_metadata as Record<string, unknown> | undefined;
+    const dash = meta?.dashboard as { settings?: { profileName?: string } } | undefined;
+    const name =
+      (typeof dash?.settings?.profileName === "string" && dash.settings.profileName.trim()) ||
+      (typeof meta?.full_name === "string" && meta.full_name.trim()) ||
+      member.data.user.email;
+    return { id:row.user_id,email:member.data.user.email,name,role:row.role,status:"active",invitedAt:row.created_at };
   }));
-  return [{ id:ownerId,email:owner.data.user?.email,name:"Inhaber",role:"owner",status:"active",invitedAt:owner.data.user?.created_at },...rows,
+  const ownerMeta = owner.data.user?.user_metadata as Record<string, unknown> | undefined;
+  const ownerDash = ownerMeta?.dashboard as { settings?: { profileName?: string } } | undefined;
+  const ownerName =
+    (typeof ownerDash?.settings?.profileName === "string" && ownerDash.settings.profileName.trim()) ||
+    (typeof ownerMeta?.full_name === "string" && ownerMeta.full_name.trim()) ||
+    "Inhaber";
+  return [{ id:ownerId,email:owner.data.user?.email,name:ownerName,role:"owner",status:"active",invitedAt:owner.data.user?.created_at },...rows,
     ...(invites.data ?? []).map(row=>({ ...row,status:"invited",invitedAt:row.created_at }))];
 }
 export async function GET(req: Request) {

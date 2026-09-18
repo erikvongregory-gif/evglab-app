@@ -10,7 +10,6 @@ import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
 import { isVideosCreateEnabled } from "@/lib/featureFlags";
-import { CreateContentLockedView } from "@/components/studio/create-content-locked-view";
 import { CreateVideosComingSoonView } from "@/components/studio/create-videos-coming-soon-view";
 import { CreateVideosView } from "@/components/studio/create-videos-view";
 import { workspaceResourceUser } from "@/lib/dashboard/workspace";
@@ -82,7 +81,7 @@ export default async function VideosErstellenPage() {
     }
 
     if (!hasActiveSubscription(billing)) {
-      return <CreateContentLockedView feature="videos" />;
+      redirect("/dashboard/pricing");
     }
   }
 

@@ -745,53 +745,6 @@
     width: calc(100vw - 20px);
   }
 
-  .evg-studio .evg-locked {
-    padding: 6px 0 18px;
-  }
-
-  .evg-studio .evg-locked__glow {
-    display: none;
-  }
-
-  .evg-studio .evg-locked__icon {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 16px;
-  }
-
-  .evg-studio .evg-locked__title {
-    font-size: 28px;
-  }
-
-  .evg-studio .evg-locked__sub {
-    line-height: 1.5;
-  }
-
-  .evg-studio .evg-locked__card {
-    margin-top: 16px;
-    padding: 16px;
-  }
-
-  .evg-studio .evg-locked__benefits {
-    margin-top: 14px;
-    gap: 8px;
-  }
-
-  .evg-studio .evg-locked__actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 18px;
-  }
-
-  .evg-studio :is(.evg-locked__cta, .evg-locked__ghost) {
-    min-width: 0;
-    min-height: 48px;
-    height: auto;
-    padding: 0 12px;
-    justify-content: center;
-    text-align: center;
-  }
-
   .evg-studio .evg-video-create {
     width: 100%;
     max-width: none !important;
@@ -944,10 +897,6 @@
   .evg-studio .studio-create-mobile-nav button {
     gap: 4px;
     padding-inline: 4px;
-  }
-
-  .evg-studio .evg-locked__actions {
-    grid-template-columns: minmax(0, 1fr);
   }
 
 }
