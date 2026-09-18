@@ -176,7 +176,8 @@ function BrewAiMetricCards({
   const hasPlan =
     unlimited ||
     (!summary?.degradedBilling &&
-      hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
+      (hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus) ||
+        (summary?.tokens.remaining ?? 0) > 0));
   const brandLabel = settingsLoaded
     ? brandStatusLabel(brandProfileComplete, settings)
     : "—";

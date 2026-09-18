@@ -313,13 +313,13 @@ export default function RuixenMoonChat() {
   return (
     <div className="relative isolate flex h-full min-h-0 w-full flex-1 flex-col items-center bg-white dark:bg-black">
       <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-col items-center">
-        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center px-4">
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center px-4 py-6 sm:py-8">
           <div className="text-center">
             <h1 className="sr-only">BrewAI</h1>
             <MagneticText
               text="BrewAI"
               hoverText="BrewAI"
-              textClassName="text-4xl font-semibold tracking-normal drop-shadow-sm"
+              textClassName="text-4xl font-semibold tracking-normal drop-shadow-sm 2xl:text-5xl"
             />
             <p className="mt-2 text-neutral-600 dark:text-neutral-200">
               Ideen brauen. Bilder zapfen.
@@ -327,7 +327,7 @@ export default function RuixenMoonChat() {
           </div>
         </div>
 
-        <div className="mb-[10vh] flex w-full max-w-3xl shrink-0 flex-col gap-3 px-4">
+        <div className="mb-[clamp(1rem,5vh,3.5rem)] flex w-full max-w-3xl shrink-0 flex-col gap-3 px-4 2xl:max-w-4xl">
           {genError ? (
             <p className="text-center text-sm text-destructive" role="alert">
               {genError}

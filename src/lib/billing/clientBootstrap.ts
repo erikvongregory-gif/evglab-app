@@ -6,6 +6,7 @@ export type ClientBillingState = {
   usedTokens: number;
   remainingTokens: number;
   status: string;
+  unlimited?: boolean;
 };
 
 export type BillingBootstrapResult = {

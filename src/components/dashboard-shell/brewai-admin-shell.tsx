@@ -91,6 +91,7 @@ function BrewAiSidebar({
               <Link prefetch={false} href="/dashboard">
                 <EvglabMark size={18} />
                 <span className="font-semibold text-base">{APP_CONFIG.name}</span>
+                <span className="font-bold text-xs tracking-wide text-muted-foreground">Beta</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -196,10 +197,14 @@ export function BrewAiAdminShell({
                 "[html[data-content-layout=centered]_&>*]:mx-auto",
                 "[html[data-content-layout=centered]_&>*]:w-full",
                 "[html[data-content-layout=centered]_&>*]:max-w-screen-2xl",
+                /* Full-Width: Soft-Cap gegen Ultrawide/4K-Dehnung */
+                "[html[data-content-layout=full-width]_&>*]:mx-auto",
+                "[html[data-content-layout=full-width]_&>*]:w-full",
+                "[html[data-content-layout=full-width]_&>*]:max-w-[100rem]",
                 "[--dashboard-header-height:--spacing(12)]",
                 "min-w-0 overflow-x-clip",
                 fullBleed &&
-                  "md:peer-data-[variant=inset]:m-0 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:border-0 md:peer-data-[variant=inset]:shadow-none md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-0 [html[data-content-layout=centered]_&>*]:mx-0 [html[data-content-layout=centered]_&>*]:max-w-none",
+                  "md:peer-data-[variant=inset]:m-0 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:border-0 md:peer-data-[variant=inset]:shadow-none md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-0 [html[data-content-layout=centered]_&>*]:mx-0 [html[data-content-layout=centered]_&>*]:max-w-none [html[data-content-layout=full-width]_&>*]:mx-0 [html[data-content-layout=full-width]_&>*]:max-w-none",
               )}
             >
               <header
@@ -208,7 +213,7 @@ export function BrewAiAdminShell({
                   "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
                 )}
               >
-                <div className="flex w-full items-center justify-between px-4 lg:px-6">
+                <div className="flex w-full items-center justify-between px-4 lg:px-6 xl:px-8 2xl:px-10">
                   <div className="flex items-center gap-1 lg:gap-2">
                     <SidebarTrigger className="-ml-1" />
                     <Separator
@@ -227,7 +232,7 @@ export function BrewAiAdminShell({
               </header>
               <div
                 className={cn(
-                  "min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 pb-24 md:p-6",
+                  "min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 pb-24 md:p-6 xl:px-8 xl:pt-7 2xl:px-10 2xl:pt-8",
                   "has-data-[content-padding=false]:px-0 has-data-[content-padding=false]:pt-0 has-data-[content-padding=false]:pb-24",
                   "md:has-data-[content-padding=false]:p-0",
                   fullBleed && "relative flex flex-col overflow-hidden px-0 pt-0 pb-24 md:p-0",

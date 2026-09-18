@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { isOwnerUser } from "@/lib/auth/owner";
+import { hasPaidSubscription, paidPlanFromBilling } from "@/lib/billing/access";
 import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
@@ -34,7 +35,7 @@ export async function GET() {
       await ensureBillingRow(user.id);
       billing = await getBillingRow(user.id);
     }
-    if (!isOwner && (!billing?.plan || billing.subscription_status === "none" || billing.subscription_status === "canceled")) {
+    if (!isOwner && !hasPaidSubscription(billing)) {
       try {
         const syncResult = await syncBillingFromStripe({
           userId: user.id,
@@ -135,8 +136,13 @@ export async function GET() {
       chargesTotal,
       teamMembers: activeMemberCount,
       openInvites: invitedCount,
-      billingStatus: billing?.subscription_status ?? "none",
-      plan: billing?.plan ?? null,
+      billingStatus: isOwner
+        ? (billing?.subscription_status ?? "active")
+        : hasPaidSubscription(billing)
+          ? (billing?.subscription_status ?? "none")
+          : "none",
+      // Nur Stripe-Abo (oder Owner) — Willkommensbonus nicht als „Aktueller Plan“
+      plan: isOwner ? (billing?.plan ?? null) : paidPlanFromBilling(billing),
       degradedBilling,
       degradedUsage,
       tokenUsageByDay,

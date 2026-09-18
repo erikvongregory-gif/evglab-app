@@ -169,8 +169,8 @@ begin
   select * into b from billing_subscriptions where user_id=p_user_id for update;
   if not found or p_amount<=0 then raise exception 'Invalid bonus'; end if;
   if b.onboarding_bonus_granted or b.stripe_subscription_id is not null then return false; end if;
-  insert into token_lots(user_id,source,remaining,expires_at,grant_key) values(p_user_id,'monthly',p_amount,now()+interval '30 days','bonus');
-  update billing_subscriptions set plan='start',monthly_allowance=p_amount,token_period_granted=p_amount,subscription_status='active',onboarding_bonus_granted=true where user_id=p_user_id;
+  insert into token_lots(user_id,source,remaining,expires_at,grant_key) values(p_user_id,'monthly',p_amount,now()+interval '30 days','bonus:'||p_user_id::text);
+  update billing_subscriptions set monthly_allowance=greatest(coalesce(monthly_allowance,0),p_amount),token_period_granted=p_amount,onboarding_bonus_granted=true where user_id=p_user_id;
   return true;
 end $$;
 

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CircleUser, CreditCard, EllipsisVertical, Loader2, LogOut, RotateCcw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { TokenAvatarRing } from "@/components/dashboard-shell/token-avatar-ring";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -76,12 +77,14 @@ export function NavUser({
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="overflow-visible data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage src={user.avatar || undefined} alt={user.name} />
-                <AvatarFallback className="rounded-lg">{getInitials(user.name)}</AvatarFallback>
-              </Avatar>
+              <TokenAvatarRing size={36}>
+                <Avatar className="size-full rounded-full grayscale after:hidden">
+                  <AvatarImage src={user.avatar || undefined} alt={user.name} />
+                  <AvatarFallback className="rounded-full text-xs">{getInitials(user.name)}</AvatarFallback>
+                </Avatar>
+              </TokenAvatarRing>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
                 <span className="truncate text-muted-foreground text-xs">{user.email}</span>

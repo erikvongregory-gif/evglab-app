@@ -314,7 +314,10 @@ export function InhalteErstellenStudio({
           setTokensRemaining(json.summary.tokens.remaining);
         }
         const status = json.summary?.billingStatus ?? "none";
-        setHasActiveSubscription(Boolean(json.summary?.plan) && status !== "none" && status !== "canceled");
+        const remaining = json.summary?.tokens?.remaining ?? 0;
+        const paid =
+          Boolean(json.summary?.plan) && status !== "none" && status !== "canceled";
+        setHasActiveSubscription(paid || remaining > 0);
       } else {
         failed += 1;
       }

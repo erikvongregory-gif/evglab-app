@@ -159,9 +159,18 @@ begin
   if p_amount is null or p_amount <= 0 then raise exception 'Amount must be positive'; end if;
   select * into b from public.billing_subscriptions where user_id = p_user_id for update;
   if not found then raise exception 'Kein Billing-Profil vorhanden.'; end if;
-  if b.onboarding_bonus_granted or (b.plan is not null and b.subscription_status not in ('none', 'canceled')) then return false; end if;
-  update public.billing_subscriptions set plan = 'start', monthly_allowance = p_amount,
-    subscription_status = 'active', onboarding_bonus_granted = true where user_id = p_user_id;
+  if b.onboarding_bonus_granted or b.stripe_subscription_id is not null then return false; end if;
+  update public.billing_subscriptions set onboarding_bonus_granted = true,
+    monthly_allowance = greatest(coalesce(monthly_allowance, 0), p_amount)
+    where user_id = p_user_id;
+  -- Legacy balance columns when present — never set plan/status (Stripe only)
+  begin
+    update public.billing_subscriptions
+      set monthly_tokens = greatest(0, coalesce(monthly_tokens, 0) - coalesce(used_tokens, 0)) + p_amount,
+          used_tokens = 0
+      where user_id = p_user_id;
+  exception when undefined_column then null;
+  end;
   return true;
 end;
 $$;

@@ -223,7 +223,13 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
   async function finish() {
     if (!activated.current) await activateProfile();
     const bonusRes = await fetch("/api/billing/onboarding-bonus", { method: "POST", credentials: "include" });
-    if (!bonusRes.ok) throw new Error("Dein Profil ist gespeichert. Der Willkommensbonus konnte noch nicht gutgeschrieben werden. Bitte versuche es erneut.");
+    if (!bonusRes.ok) {
+      const payload = (await bonusRes.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(
+        payload?.error ||
+          "Dein Profil ist gespeichert. Der Willkommensbonus konnte noch nicht gutgeschrieben werden. Bitte versuche es erneut.",
+      );
+    }
     const data = (await bonusRes.json()) as { state?: { remainingTokens?: number } };
     if (typeof data.state?.remainingTokens === "number") setTokens(data.state.remainingTokens);
     await patchOnboarding({

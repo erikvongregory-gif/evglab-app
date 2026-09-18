@@ -398,12 +398,12 @@ export function DashboardRedesignShell(props: {
     homepageCheckoutStartedRef.current = true;
     setShowBrandProfileChoice(false);
 
-    const hasActivePlan =
+    const hasPaidPlan =
       Boolean(summary?.unlimited || summary?.tokens.unlimited) ||
       (!summaryError &&
         !summary?.degradedBilling &&
         hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
-    if (hasActivePlan) {
+    if (hasPaidPlan) {
       clearHomepageCheckoutParams(params);
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -622,11 +622,13 @@ export function DashboardRedesignShell(props: {
   // Stattdessen wird der User ueber die Banner (Dashboard-Overview + Inhalte-erstellen)
   // sanft erinnert und kann selbst entscheiden, wann er das Markenprofil anlegt.
 
+  // Bezahltes Abo ODER noch Bonus-Tokens → Studio nutzbar; Checkout nur bei Paid überspringen (oben).
   const hasActivePlan =
     Boolean(summary?.unlimited || summary?.tokens.unlimited) ||
     (!summaryError &&
       !summary?.degradedBilling &&
-      hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
+      (hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus) ||
+        (summary?.tokens.remaining ?? 0) > 0));
 
   return (
     <>

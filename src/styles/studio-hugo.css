@@ -550,7 +550,7 @@
   position: relative;
   inset: auto;
   width: 100%;
-  max-width: 880px;
+  max-width: clamp(40rem, 52vw, 68rem);
   margin: 0 auto;
   height: 100%;
   max-height: none;

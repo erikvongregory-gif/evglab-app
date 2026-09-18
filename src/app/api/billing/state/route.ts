@@ -1,6 +1,7 @@
 import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
+import { hasPaidSubscription, paidPlanFromBilling } from "@/lib/billing/access";
 import { isOwnerUser } from "@/lib/auth/owner";
 import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { createClient } from "@/lib/supabase/server";
@@ -53,8 +54,8 @@ export async function GET() {
   await ensureBillingRow(user.id);
   let row = await getBillingRow(user.id);
 
-  // Hard fallback: wenn lokal kein aktiver Plan steht, auf jedem State-Call direkt mit Stripe synchronisieren.
-  if (!row?.plan || row.subscription_status === "none" || row.subscription_status === "canceled") {
+  // Hard fallback: wenn lokal kein bezahltes Abo steht, mit Stripe synchronisieren.
+  if (!hasPaidSubscription(row)) {
     try {
       const syncResult = await syncBillingFromStripe({
         userId: user.id,
@@ -71,11 +72,11 @@ export async function GET() {
 
   const state = row
     ? {
-        plan: row.plan,
+        plan: paidPlanFromBilling(row),
         monthlyTokens: row.monthly_tokens,
         usedTokens: row.used_tokens,
         remainingTokens: Math.max(row.monthly_tokens - row.used_tokens, 0),
-        status: row.subscription_status,
+        status: hasPaidSubscription(row) ? row.subscription_status : "none",
         unlimited: false,
         freeTrialImageUsed,
         onboardingBonusClaimed,

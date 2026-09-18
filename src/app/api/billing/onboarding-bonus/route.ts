@@ -5,15 +5,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isOwnerUser } from "@/lib/auth/owner";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { enforceRateLimit, enforceSameOrigin } from "@/lib/security/requestGuards";
+import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
+import { hasPaidSubscription, paidPlanFromBilling } from "@/lib/billing/access";
 import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { isDisposableEmail, normalizeEmailIdentity } from "@/lib/auth/disposableEmail";
 
-const ONBOARDING_BONUS_TOKENS = 300;
-
-function hasActiveBilling(row: { plan: string | null; subscription_status: string }) {
-  return Boolean(row.plan) && row.subscription_status !== "none" && row.subscription_status !== "canceled";
-}
+export const ONBOARDING_BONUS_TOKENS = 50;
+const BONUS_CLAIM_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const EMAIL_CLAIM_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 
 function isMissingOnboardingBonusRpc(error: { code?: string; message?: string } | null | undefined) {
   if (!error) return false;
@@ -34,22 +34,33 @@ async function markOnboardingBonusClaimed(supabase: SupabaseClient, alreadyClaim
   return { error };
 }
 
+/** Tokens gutschreiben — kein Fake-Start-Abo. */
 async function grantOnboardingBonusLegacy(userId: string, amount: number) {
   const admin = createAdminClient();
+  const { data: row, error: readError } = await admin
+    .from("billing_subscriptions")
+    .select("monthly_tokens,used_tokens")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (readError) throw new Error(readError.message);
+  const current = Math.max((row?.monthly_tokens ?? 0) - (row?.used_tokens ?? 0), 0);
   const { error } = await admin
     .from("billing_subscriptions")
     .update({
-      plan: "start",
-      monthly_tokens: amount,
+      monthly_tokens: current + amount,
       used_tokens: 0,
-      subscription_status: "active",
+      onboarding_bonus_granted: true,
     })
     .eq("user_id", userId);
   if (error) throw new Error(error.message);
 }
 
 export async function POST(req: Request) {
-  const rateError = enforceRateLimit(req, { keyPrefix: "billing-onboarding-bonus", limit: 10, windowMs: 60_000 });
+  const rateError = await enforceRateLimitPersistent(req, {
+    keyPrefix: "billing-onboarding-bonus",
+    limit: 10,
+    windowMs: 60_000,
+  });
   if (rateError) return rateError;
   const originError = enforceSameOrigin(req);
   if (originError) return originError;
@@ -95,7 +106,42 @@ export async function POST(req: Request) {
   }
 
   let bonusGranted = false;
-  if (!alreadyClaimed && !hasActiveBilling(row)) {
+  // Nur echtes Stripe-Abo blockiert den Bonus — nicht ein früheres Fake-Start.
+  if (!alreadyClaimed && !hasPaidSubscription(row)) {
+    const email = user.email?.trim() ?? "";
+    if (!email || isDisposableEmail(email)) {
+      return NextResponse.json(
+        { error: "Willkommensbonus ist für diese E-Mail-Adresse nicht verfügbar.", code: "bonus_email_blocked" },
+        { status: 403 },
+      );
+    }
+
+    // Gmail-Aliase (+ / Punkte) zählen als eine Identität.
+    const emailClaimLimit = await enforceRateLimitPersistent(
+      req,
+      { keyPrefix: "onboarding-bonus-email", limit: 1, windowMs: EMAIL_CLAIM_WINDOW_MS },
+      { identifier: normalizeEmailIdentity(email) },
+    );
+    if (emailClaimLimit) {
+      return NextResponse.json(
+        { error: "Für diese E-Mail wurde der Willkommensbonus bereits vergeben.", code: "bonus_email_claimed" },
+        { status: 429, headers: emailClaimLimit.headers },
+      );
+    }
+
+    // Max 2 Bonus-Claims / IP / 7 Tage — bremst Massen-Signups vom gleichen Anschluss.
+    const ipClaimLimit = await enforceRateLimitPersistent(req, {
+      keyPrefix: "onboarding-bonus-ip",
+      limit: 2,
+      windowMs: BONUS_CLAIM_WINDOW_MS,
+    });
+    if (ipClaimLimit) {
+      return NextResponse.json(
+        { error: "Zu viele Willkommensboni von diesem Netzwerk. Bitte später erneut versuchen.", code: "bonus_ip_limited" },
+        { status: 429, headers: ipClaimLimit.headers },
+      );
+    }
+
     const admin = createAdminClient();
     const { data: granted, error: updateError } = await admin.rpc("billing_onboarding_bonus_atomic", {
       p_user_id: user.id,
@@ -129,14 +175,13 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     state: {
-      plan: row.plan,
+      plan: paidPlanFromBilling(row),
       monthlyTokens: row.monthly_tokens,
       usedTokens: row.used_tokens,
       remainingTokens: Math.max(row.monthly_tokens - row.used_tokens, 0),
-      status: row.subscription_status,
+      status: hasPaidSubscription(row) ? row.subscription_status : "none",
       bonusGranted,
-      bonusAlreadyClaimed: alreadyClaimed || hasActiveBilling(row),
+      bonusAlreadyClaimed: alreadyClaimed || hasPaidSubscription(row),
     },
   });
 }
-
