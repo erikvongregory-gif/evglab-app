@@ -21,9 +21,16 @@ export type TeamInviteAcceptProps = {
   invite: WorkspaceInvitePreview;
   sessionEmail: string | null;
   needsTwoFactor: boolean;
+  declined?: boolean;
 };
 
-export function TeamInviteAccept({ token, invite, sessionEmail, needsTwoFactor }: TeamInviteAcceptProps) {
+export function TeamInviteAccept({
+  token,
+  invite,
+  sessionEmail,
+  needsTwoFactor,
+  declined = false,
+}: TeamInviteAcceptProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +68,7 @@ export function TeamInviteAccept({ token, invite, sessionEmail, needsTwoFactor }
   }
 
   useEffect(() => {
+    if (declined) return;
     if (autoStarted.current) return;
     if (invite.status !== "valid") return;
     if (!sessionEmail || !emailMatches || needsTwoFactor) return;
@@ -68,7 +76,7 @@ export function TeamInviteAccept({ token, invite, sessionEmail, needsTwoFactor }
     autoStarted.current = true;
     void accept();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot auto-accept when session is ready
-  }, [invite.status, sessionEmail, emailMatches, needsTwoFactor, done, error]);
+  }, [invite.status, sessionEmail, emailMatches, needsTwoFactor, done, error, declined]);
 
   const statusCopy =
     invite.status === "missing"
@@ -76,6 +84,37 @@ export function TeamInviteAccept({ token, invite, sessionEmail, needsTwoFactor }
       : invite.status === "expired"
         ? "Diese Einladung ist abgelaufen. Bitte lass dir eine neue schicken."
         : null;
+
+  if (declined) {
+    return (
+      <div
+        className={cn(
+          "flex min-h-dvh w-full items-center justify-center bg-background p-4",
+          studioFontClassName,
+        )}
+      >
+        <div className="mx-auto w-full max-w-md">
+          <a
+            href={MARKETING_SITE_URL}
+            className="mb-6 flex items-center justify-center gap-2 text-foreground"
+            aria-label="BrewAI Startseite"
+          >
+            <EvglabMark size={22} />
+            <span className="font-semibold tracking-tight">BrewAI</span>
+          </a>
+          <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/80 p-8 shadow-xl backdrop-blur-sm">
+            <h1 className="text-center text-2xl font-semibold text-foreground">Einladung abgelehnt</h1>
+            <p className="mt-3 text-center text-sm text-muted-foreground">
+              Kein Problem — du musst nichts weiter tun. Die Einladung kannst du ignorieren.
+            </p>
+            <Button asChild className="mt-6 h-11 w-full" variant="outline">
+              <Link href={MARKETING_SITE_URL}>Zur Startseite</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

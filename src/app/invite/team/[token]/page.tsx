@@ -23,11 +23,15 @@ export const metadata: Metadata = {
 
 type Props = {
   params: Promise<{ token: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function AcceptTeamInvitationPage({ params }: Props) {
+export default async function AcceptTeamInvitationPage({ params, searchParams }: Props) {
   const { token: raw } = await params;
   const token = Array.isArray(raw) ? raw[0] : raw;
+  const query = (await searchParams) ?? {};
+  const declineRaw = query.decline;
+  const declined = (Array.isArray(declineRaw) ? declineRaw[0] : declineRaw) === "1";
   const invite = await getWorkspaceInvitePreview(token);
 
   const {
@@ -42,6 +46,7 @@ export default async function AcceptTeamInvitationPage({ params }: Props) {
       invite={invite}
       sessionEmail={sessionEmail}
       needsTwoFactor={needsTwoFactor}
+      declined={declined}
     />
   );
 }

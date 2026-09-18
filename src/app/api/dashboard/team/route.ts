@@ -60,6 +60,13 @@ export async function POST(req: Request) {
     });
     if ("error" in invite) return NextResponse.json({ error: invite.error }, { status: 409 });
     const url = `${getAppBaseUrlOrigin(new URL(req.url).origin)}/invite/team/${token}`;
+    const admin = createAdminClient();
+    const ownerAccount = await admin.auth.admin.getUserById(c.ownerId);
+    const ownerMeta = ownerAccount.data.user?.user_metadata as Record<string, unknown> | undefined;
+    const workspaceName =
+      (typeof ownerMeta?.brewery_name === "string" && ownerMeta.brewery_name.trim()) ||
+      (typeof ownerMeta?.breweryName === "string" && ownerMeta.breweryName.trim()) ||
+      null;
     try {
       await sendTeamInviteEmail({
         to: input.email,
@@ -67,9 +74,10 @@ export async function POST(req: Request) {
         role: input.role,
         inviteeName: input.name,
         inviterEmail: c.user.email,
+        workspaceName,
       });
     } catch {
-      await createAdminClient().from("workspace_invites").delete().eq("id", invite.id);
+      await admin.from("workspace_invites").delete().eq("id", invite.id);
       throw new Error("Einladung konnte nicht versendet werden.");
     }
     return NextResponse.json({ok:true,members:await members(c.ownerId)});
