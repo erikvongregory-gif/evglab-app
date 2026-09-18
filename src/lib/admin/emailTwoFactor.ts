@@ -14,7 +14,13 @@ export const PENDING_TTL_SECONDS = 600;
 export const VERIFIED_TTL_SECONDS = 60 * 60 * 12;
 export const TRUSTED_DEVICE_TTL_SECONDS = 60 * 60 * 24 * 30;
 
+/** Verhindert Cross-Use zwischen Pending/Verified/Trusted (gleicher HMAC-Schlüssel). */
+const PURPOSE_PENDING = "2fa_pending" as const;
+const PURPOSE_VERIFIED = "2fa_verified" as const;
+const PURPOSE_TRUSTED = "2fa_trusted_device" as const;
+
 type PendingPayload = {
+  purpose: typeof PURPOSE_PENDING;
   userId: string;
   email: string;
   expiresAt: number;
@@ -23,11 +29,13 @@ type PendingPayload = {
 };
 
 type VerifiedPayload = {
+  purpose: typeof PURPOSE_VERIFIED;
   userId: string;
   expiresAt: number;
 };
 
 type TrustedDevicePayload = {
+  purpose: typeof PURPOSE_TRUSTED;
   userId: string;
   expiresAt: number;
   issuedAt: number;
@@ -87,6 +95,7 @@ export function buildPending2FAToken(input: { userId: string; email: string; cod
     expiresAt,
   });
   const payload: PendingPayload = {
+    purpose: PURPOSE_PENDING,
     userId: input.userId,
     email: input.email,
     expiresAt,
@@ -98,7 +107,9 @@ export function buildPending2FAToken(input: { userId: string; email: string; cod
 
 export function verifyPending2FACode(token: string | null | undefined, input: { userId: string; code: string }) {
   const payload = decodeSigned<PendingPayload>(token);
-  if (!payload) return { ok: false as const, reason: "invalid_token" };
+  if (!payload || payload.purpose !== PURPOSE_PENDING) {
+    return { ok: false as const, reason: "invalid_token" };
+  }
   if (payload.userId !== input.userId) return { ok: false as const, reason: "user_mismatch" };
   if (Date.now() > payload.expiresAt) return { ok: false as const, reason: "expired" };
   const expected = createCodeHash({
@@ -113,7 +124,7 @@ export function verifyPending2FACode(token: string | null | undefined, input: { 
 
 export function hasValidPending2FAForUser(token: string | null | undefined, userId: string) {
   const payload = decodeSigned<PendingPayload>(token);
-  if (!payload) return false;
+  if (!payload || payload.purpose !== PURPOSE_PENDING) return false;
   if (payload.userId !== userId) return false;
   if (Date.now() > payload.expiresAt) return false;
   return true;
@@ -122,6 +133,7 @@ export function hasValidPending2FAForUser(token: string | null | undefined, user
 export function buildVerified2FAToken(input: { userId: string; ttlSeconds?: number }) {
   const ttl = Math.max(input.ttlSeconds ?? VERIFIED_TTL_SECONDS, 300);
   const payload: VerifiedPayload = {
+    purpose: PURPOSE_VERIFIED,
     userId: input.userId,
     expiresAt: Date.now() + ttl * 1000,
   };
@@ -130,7 +142,7 @@ export function buildVerified2FAToken(input: { userId: string; ttlSeconds?: numb
 
 export function isVerified2FAForUser(token: string | null | undefined, userId: string) {
   const payload = decodeSigned<VerifiedPayload>(token);
-  if (!payload) return false;
+  if (!payload || payload.purpose !== PURPOSE_VERIFIED) return false;
   if (payload.userId !== userId) return false;
   if (Date.now() > payload.expiresAt) return false;
   return true;
@@ -147,6 +159,7 @@ export function buildTrustedDeviceToken(input: {
 }) {
   const ttl = Math.max(input.ttlSeconds ?? TRUSTED_DEVICE_TTL_SECONDS, 300);
   const payload: TrustedDevicePayload = {
+    purpose: PURPOSE_TRUSTED,
     userId: input.userId,
     issuedAt: Date.now(),
     expiresAt: Date.now() + ttl * 1000,
@@ -161,7 +174,7 @@ export function isTrustedDeviceForUser(
   passwordEpoch = 0,
 ) {
   const payload = decodeSigned<TrustedDevicePayload>(token);
-  if (!payload) return false;
+  if (!payload || payload.purpose !== PURPOSE_TRUSTED) return false;
   if (payload.userId !== userId) return false;
   if (Date.now() > payload.expiresAt) return false;
   const tokenEpoch = typeof payload.passwordEpoch === "number" ? payload.passwordEpoch : 0;

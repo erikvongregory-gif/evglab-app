@@ -7,7 +7,10 @@ import crypto from "crypto";
 const PASSWORD_RECOVERY_COOKIE = "evglab_password_recovery";
 export const PASSWORD_RECOVERY_TTL_SECONDS = 15 * 60;
 
+const PURPOSE_PASSWORD_RECOVERY = "password_recovery" as const;
+
 type RecoveryPayload = {
+  purpose: typeof PURPOSE_PASSWORD_RECOVERY;
   userId: string;
   expiresAt: number;
 };
@@ -48,6 +51,7 @@ export function getPasswordRecoveryCookieName() {
 export function buildPasswordRecoveryToken(input: { userId: string; ttlSeconds?: number }) {
   const ttl = Math.max(input.ttlSeconds ?? PASSWORD_RECOVERY_TTL_SECONDS, 60);
   const payload: RecoveryPayload = {
+    purpose: PURPOSE_PASSWORD_RECOVERY,
     userId: input.userId,
     expiresAt: Date.now() + ttl * 1000,
   };
@@ -56,7 +60,7 @@ export function buildPasswordRecoveryToken(input: { userId: string; ttlSeconds?:
 
 export function isValidPasswordRecoveryToken(token: string | null | undefined, userId: string) {
   const payload = decodeSigned<RecoveryPayload>(token);
-  if (!payload) return false;
+  if (!payload || payload.purpose !== PURPOSE_PASSWORD_RECOVERY) return false;
   if (payload.userId !== userId) return false;
   if (Date.now() > payload.expiresAt) return false;
   return true;

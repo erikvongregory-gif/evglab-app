@@ -33,8 +33,10 @@ import {
   buildPasswordRecoveryToken,
   getPasswordRecoveryCookieName,
   PASSWORD_RECOVERY_TTL_SECONDS,
+  sessionHasRecoveryAmr,
 } from "@/lib/auth/passwordRecoveryGate";
 import { parseCookieHeader } from "@supabase/ssr";
+import { PASSWORD_RESET_NEXT } from "@/lib/auth/passwordResetPaths";
 
 function authErrorParam(code?: string) {
   if (code === "flow_state_not_found" || code === "pkce_code_verifier_not_found") {
@@ -112,13 +114,29 @@ function sessionPollerResponse(
   );
 }
 
+async function hasServerRecoveryProof(
+  redirectResponse: NextResponse,
+  verifiedRecoveryOtp: boolean,
+): Promise<boolean> {
+  if (verifiedRecoveryOtp) return true;
+  const supabase = await createAuthRouteHandlerClient(redirectResponse);
+  return sessionHasRecoveryAmr(supabase);
+}
+
+function resolvePostAuthNext(safeNext: string, grantedRecovery: boolean) {
+  if (grantedRecovery) return PASSWORD_RESET_NEXT;
+  // next=/passwort-zuruecksetzen ohne Recovery-Nachweis ist kein Reset-Flow
+  if (safeNext === PASSWORD_RESET_NEXT) return "/dashboard";
+  return safeNext;
+}
+
 async function redirectAfterOAuthSuccess(
   request: Request,
   opts: {
     requestId: string;
     appOrigin: string;
-    postAuthNext: string;
-    isPasswordRecovery: boolean;
+    safeNext: string;
+    verifiedRecoveryOtp?: boolean;
     redirectResponse: NextResponse;
     startedAt: number;
     user: User | null | undefined;
@@ -126,8 +144,7 @@ async function redirectAfterOAuthSuccess(
     oauthCode?: string;
   },
 ) {
-  const { requestId, appOrigin, postAuthNext, isPasswordRecovery, redirectResponse, startedAt, user } =
-    opts;
+  const { requestId, appOrigin, redirectResponse, startedAt, user } = opts;
 
   if (opts.oauthCode && user?.id) {
     const pkceHash = pkceVerifierHashFromRequest(request);
@@ -136,7 +153,12 @@ async function redirectAfterOAuthSuccess(
     }
   }
 
-  if (isPasswordRecovery && user?.id) {
+  const grantedRecovery =
+    Boolean(user?.id) &&
+    (await hasServerRecoveryProof(redirectResponse, opts.verifiedRecoveryOtp === true));
+  const postAuthNext = resolvePostAuthNext(opts.safeNext, grantedRecovery);
+
+  if (grantedRecovery && user?.id) {
     redirectResponse.cookies.set(getPasswordRecoveryCookieName(), buildPasswordRecoveryToken({ userId: user.id }), {
       httpOnly: true,
       ...secureCookieOptions(request),
@@ -144,12 +166,12 @@ async function redirectAfterOAuthSuccess(
     });
   }
 
-  if (!isPasswordRecovery && user?.id && hasTermsAcceptanceCookie(request)) {
+  if (!grantedRecovery && user?.id && hasTermsAcceptanceCookie(request)) {
     const supabase = await createAuthRouteHandlerClient(redirectResponse);
     await persistTermsAcceptanceIfPresent(request, redirectResponse, supabase, user);
   }
 
-  if (!isPasswordRecovery && user) {
+  if (!grantedRecovery && user) {
     const twoFactor = await redirectWithEmail2FAIfNeeded(request, {
       user,
       requestId,
@@ -169,6 +191,7 @@ async function redirectAfterOAuthSuccess(
     email: user?.email ?? undefined,
     status: 303,
     durationMs: Date.now() - startedAt,
+    meta: grantedRecovery ? { recovery: true } : undefined,
   });
 
   return createOAuthSessionPollerHtml(
@@ -187,8 +210,7 @@ async function finishFromBridge(
     code: string;
     requestId: string;
     appOrigin: string;
-    postAuthNext: string;
-    isPasswordRecovery: boolean;
+    safeNext: string;
     startedAt: number;
     logEvent: string;
   },
@@ -196,14 +218,16 @@ async function finishFromBridge(
   const bridged = peekBridgedOAuthSession(opts.code, pkceVerifierHashFromRequest(request));
   if (!bridged) return null;
 
-  const redirectResponse = createNoStoreRedirect(`${opts.appOrigin}${opts.postAuthNext}`, opts.requestId);
+  const redirectResponse = createNoStoreRedirect(
+    `${opts.appOrigin}${resolvePostAuthNext(opts.safeNext, false)}`,
+    opts.requestId,
+  );
   clearIncomingSupabaseAuthCookies(request, redirectResponse, { preserveCodeVerifier: true });
   applyBridgedCookies(redirectResponse, bridged);
   return redirectAfterOAuthSuccess(request, {
     requestId: opts.requestId,
     appOrigin: opts.appOrigin,
-    postAuthNext: opts.postAuthNext,
-    isPasswordRecovery: opts.isPasswordRecovery,
+    safeNext: opts.safeNext,
     redirectResponse,
     startedAt: opts.startedAt,
     user: { id: bridged.userId } as User,
@@ -221,9 +245,8 @@ export async function handleAuthCallbackGet(request: Request) {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   const safeNext = normalizeNextPath(searchParams.get("next"));
-  const isPasswordRecovery =
-    type === "recovery" || safeNext === "/passwort-zuruecksetzen";
-  const postAuthNext = isPasswordRecovery ? "/passwort-zuruecksetzen" : safeNext;
+  // Nur für Hash-Forward-UX — vergibt keinen Recovery-Cookie und überspringt keine 2FA.
+  const preferResetHashForward = type === "recovery" || safeNext === PASSWORD_RESET_NEXT;
 
   if (!isSupabaseConfigured()) {
     return createNoStoreRedirect(`${appOrigin}/anmelden?error=config`, requestId);
@@ -233,7 +256,10 @@ export async function handleAuthCallbackGet(request: Request) {
   }
 
   if (tokenHash && type) {
-    const redirectResponse = createNoStoreRedirect(`${appOrigin}${postAuthNext}`, requestId);
+    const redirectResponse = createNoStoreRedirect(
+      `${appOrigin}${resolvePostAuthNext(safeNext, type === "recovery")}`,
+      requestId,
+    );
     const supabase = await createAuthRouteHandlerClient(redirectResponse);
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) {
@@ -246,8 +272,8 @@ export async function handleAuthCallbackGet(request: Request) {
       return redirectAfterOAuthSuccess(request, {
         requestId,
         appOrigin,
-        postAuthNext,
-        isPasswordRecovery,
+        safeNext,
+        verifiedRecoveryOtp: type === "recovery",
         redirectResponse,
         startedAt,
         user,
@@ -257,9 +283,9 @@ export async function handleAuthCallbackGet(request: Request) {
   }
 
   if (!code) {
-    if (isPasswordRecovery) {
+    if (preferResetHashForward) {
       return createRecoveryHashForwardHtml({
-        targetUrl: `${appOrigin}${postAuthNext}`,
+        targetUrl: `${appOrigin}${PASSWORD_RESET_NEXT}`,
         fallbackUrl: `${appOrigin}/passwort-vergessen?error=session`,
         requestId,
       });
@@ -271,8 +297,7 @@ export async function handleAuthCallbackGet(request: Request) {
     code,
     requestId,
     appOrigin,
-    postAuthNext,
-    isPasswordRecovery,
+    safeNext,
     startedAt,
     logEvent: "oauth_bridge_early",
   });
@@ -291,18 +316,19 @@ export async function handleAuthCallbackGet(request: Request) {
       code,
       requestId,
       appOrigin,
-      postAuthNext,
-      isPasswordRecovery,
+      safeNext,
       startedAt,
       logEvent: "oauth_bridge_after_wait",
     });
     if (fromBridge) return fromBridge;
 
-    const waitRedirect = createNoStoreRedirect(`${appOrigin}${postAuthNext}`, requestId);
-    return sessionPollerResponse(appOrigin, postAuthNext, requestId, waitRedirect);
+    const waitNext = resolvePostAuthNext(safeNext, false);
+    const waitRedirect = createNoStoreRedirect(`${appOrigin}${waitNext}`, requestId);
+    return sessionPollerResponse(appOrigin, waitNext, requestId, waitRedirect);
   }
 
-  const redirectResponse = createNoStoreRedirect(`${appOrigin}${postAuthNext}`, requestId);
+  const provisionalNext = resolvePostAuthNext(safeNext, false);
+  const redirectResponse = createNoStoreRedirect(`${appOrigin}${provisionalNext}`, requestId);
   clearIncomingSupabaseAuthCookies(request, redirectResponse, { preserveCodeVerifier: true });
   const supabase = createOAuthExchangeClient(request, redirectResponse);
 
@@ -322,8 +348,8 @@ export async function handleAuthCallbackGet(request: Request) {
       return redirectAfterOAuthSuccess(request, {
         requestId,
         appOrigin,
-        postAuthNext,
-        isPasswordRecovery,
+        safeNext,
+        // type=recovery in der URL allein reicht nicht — nur JWT-AMR nach Exchange.
         redirectResponse,
         startedAt,
         user,
@@ -335,8 +361,7 @@ export async function handleAuthCallbackGet(request: Request) {
       code,
       requestId,
       appOrigin,
-      postAuthNext,
-      isPasswordRecovery,
+      safeNext,
       startedAt,
       logEvent: "oauth_bridge_after_exchange_error",
     });
@@ -354,9 +379,10 @@ export async function handleAuthCallbackGet(request: Request) {
       durationMs: Date.now() - startedAt,
       meta: { message: error.message, code: error.code },
     });
-    const errorPath = isPasswordRecovery
-      ? "/passwort-vergessen?error=session"
-      : `/anmelden?error=${authErrorParam(error.code)}&detail=${encodeURIComponent(error.code ?? "exchange_failed")}`;
+    const errorPath =
+      type === "recovery" || safeNext === PASSWORD_RESET_NEXT
+        ? "/passwort-vergessen?error=session"
+        : `/anmelden?error=${authErrorParam(error.code)}&detail=${encodeURIComponent(error.code ?? "exchange_failed")}`;
     return createNoStoreRedirect(`${appOrigin}${errorPath}`, requestId);
   } catch (error) {
     releaseOAuthCode(code);

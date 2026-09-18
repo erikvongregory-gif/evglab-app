@@ -75,7 +75,7 @@ export function ResetPasswordSessionGate({ notice, error }: Props) {
         const code = search.get("code");
         if (code) {
           window.location.replace(
-            `/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent("/passwort-zuruecksetzen")}`,
+            `/auth/callback?code=${encodeURIComponent(code)}&type=recovery&next=${encodeURIComponent("/passwort-zuruecksetzen")}`,
           );
           subscription.unsubscribe();
           return;
