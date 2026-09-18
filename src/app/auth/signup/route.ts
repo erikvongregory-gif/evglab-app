@@ -4,6 +4,7 @@ import {
   TERMS_ACCEPTANCE_FORM_FIELD,
   termsAcceptanceMetadata,
 } from "@/lib/auth/termsAcceptance";
+import { mapSignupErrorCode, signupErrorDetail } from "@/lib/auth/signUpErrors";
 import { getAppBaseUrlOrigin, isInviteOnlyEnabled, isSupabaseConfigured } from "@/lib/supabase/env";
 import {
   consumeInviteByToken,
@@ -14,9 +15,12 @@ import {
 import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
 import { isTeamInviteNextPath, withNextParam } from "@/lib/auth/teamInviteAuth";
 import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { getOrCreateRequestId } from "@/lib/security/authObservability";
+import { getOrCreateRequestId, logAuthEvent } from "@/lib/security/authObservability";
+import { redirectWithEmail2FAIfNeeded } from "@/lib/admin/postSignInAdmin2FA";
+import { createAuthRouteHandlerClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const requestId = getOrCreateRequestId(request);
   const origin = getAppBaseUrlOrigin(new URL(request.url).origin);
   const originError = enforceSameOrigin(request);
@@ -67,7 +71,10 @@ export async function POST(request: Request) {
     return fail("mode=register&error=missing");
   }
 
-  // Platform invite-only: allow team workspace invites via next=/invite/team/...
+  if (password.length < 8) {
+    return fail("mode=register&error=weak_password");
+  }
+
   if (isInviteOnlyEnabled() && !inviteToken && !teamInviteFlow) {
     return fail("mode=register&error=invite_required");
   }
@@ -110,7 +117,7 @@ export async function POST(request: Request) {
     user_metadata: {
       brewery_name: breweryName || null,
       invited_account: isInviteOnlyEnabled() || teamInviteFlow,
-      team_invite_pending: teamInviteFlow,
+      ...(teamInviteFlow ? { team_invite_pending: true } : {}),
       ...termsAcceptanceMetadata(),
     },
   });
@@ -119,17 +126,96 @@ export async function POST(request: Request) {
     if (reservedInviteId) {
       await releaseInviteById(reservedInviteId).catch(() => undefined);
     }
-    return fail("mode=register&error=auth");
+    const code = error ? mapSignupErrorCode(error) : "auth";
+    const detail = error ? signupErrorDetail(error) : undefined;
+    logAuthEvent({
+      event: "signup_failed",
+      level: "error",
+      requestId,
+      email,
+      status: 303,
+      durationMs: Date.now() - startedAt,
+      meta: { reason: code, supabaseMessage: detail, supabaseCode: error?.code },
+    });
+    if (code === "email_taken" && teamInviteFlow) {
+      return fail("mode=signin&error=email_taken");
+    }
+    const params = new URLSearchParams({ mode: "register", error: code });
+    if (detail) params.set("detail", detail);
+    return fail(params.toString());
   }
 
   if (isInviteOnlyEnabled() && inviteToken && !teamInviteFlow) {
     return fail("notice=invite_ready");
   }
 
-  // Registrierung erzeugt keine Session: danach Login (+ 2FA), next führt zurück zur Team-Einladung.
+  if (teamInviteFlow) {
+    const finishTarget = `${origin}/auth/finish?next=${encodeURIComponent(next)}`;
+    const redirectResponse = createNoStoreRedirect(finishTarget, requestId);
+    try {
+      const supabase = await createAuthRouteHandlerClient(redirectResponse);
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (!signInError) {
+        const twoFactor = await redirectWithEmail2FAIfNeeded(request, {
+          user: signInData.user,
+          requestId,
+          origin,
+          cookieSource: redirectResponse,
+          startedAt,
+          next,
+        });
+        if (twoFactor) return twoFactor;
+        logAuthEvent({
+          event: "signup_success",
+          requestId,
+          userId: data.user.id,
+          email,
+          status: 303,
+          durationMs: Date.now() - startedAt,
+          meta: { teamInvite: true, autoSignedIn: true },
+        });
+        return redirectResponse;
+      }
+      logAuthEvent({
+        event: "signup_signin_failed",
+        level: "warn",
+        requestId,
+        email,
+        status: 303,
+        durationMs: Date.now() - startedAt,
+        meta: { supabaseMessage: signInError.message },
+      });
+    } catch (signInFailure) {
+      logAuthEvent({
+        event: "signup_signin_failed",
+        level: "warn",
+        requestId,
+        email,
+        status: 303,
+        durationMs: Date.now() - startedAt,
+        meta: {
+          supabaseMessage:
+            signInFailure instanceof Error ? signInFailure.message.slice(0, 160) : "signin_exception",
+        },
+      });
+    }
+  }
+
   const loginUrl = new URL(`${origin}/anmelden`);
   loginUrl.searchParams.set("notice", "account_ready");
   if (next !== "/dashboard") loginUrl.searchParams.set("next", next);
   if (email) loginUrl.searchParams.set("email", email);
+  logAuthEvent({
+    event: "signup_success",
+    requestId,
+    userId: data.user.id,
+    email,
+    status: 303,
+    durationMs: Date.now() - startedAt,
+    meta: { teamInvite: teamInviteFlow, autoSignedIn: false },
+  });
   return createNoStoreRedirect(loginUrl.toString(), requestId);
 }

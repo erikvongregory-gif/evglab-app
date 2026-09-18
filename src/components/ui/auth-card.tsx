@@ -315,9 +315,12 @@ export function AuthCard({
 
                   <div className="space-y-2">
                     <Label htmlFor={`${reactId}-email`}>E-Mail</Label>
+                    {teamInviteMode && defaultEmail ? (
+                      <input type="hidden" name="email" value={defaultEmail} />
+                    ) : null}
                     <Input
                       id={`${reactId}-email`}
-                      name="email"
+                      name={teamInviteMode && defaultEmail ? undefined : "email"}
                       type="email"
                       required
                       autoComplete="email"

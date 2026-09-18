@@ -60,6 +60,16 @@ function messageForError(
       return mode === "register"
         ? "Bitte alle Felder ausfüllen."
         : "Bitte E-Mail und Passwort ausfüllen.";
+    case "email_taken":
+      return "Für diese E-Mail gibt es schon ein Konto. Bitte melde dich an.";
+    case "weak_password":
+      return detailHint
+        ? `Passwort zu schwach${detailHint}. Mindestens 8 Zeichen.`
+        : "Passwort zu schwach. Bitte mindestens 8 Zeichen wählen.";
+    case "invalid_email":
+      return "Diese E-Mail-Adresse ist ungültig.";
+    case "signup_disabled":
+      return "Registrierung ist derzeit deaktiviert. Bitte später erneut versuchen.";
     case "admin_2fa_session_expired":
       return "Sicherheitssitzung abgelaufen. Bitte erneut anmelden — du erhältst danach einen neuen E-Mail-Code.";
     case "admin_2fa_email_config":
@@ -68,7 +78,7 @@ function messageForError(
       return "E-Mail mit Sicherheitscode konnte nicht gesendet werden.";
     default:
       return mode === "register"
-        ? "Registrierung nicht möglich. Bitte erneut versuchen."
+        ? `Registrierung nicht möglich${detailHint}. Bitte erneut versuchen.`
         : "Anmeldung nicht möglich. Bitte erneut versuchen.";
   }
 }
