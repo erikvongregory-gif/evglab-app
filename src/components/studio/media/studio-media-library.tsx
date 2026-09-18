@@ -86,6 +86,8 @@ function MediaJobRevealThumb({
           className="absolute inset-0 size-full object-cover"
           src={imageUrl}
           alt=""
+          loading="lazy"
+          decoding="async"
           onLoad={() => setImageReady(true)}
         />
       ) : null}
@@ -120,6 +122,7 @@ function MediaJobRevealThumb({
 export type MediaItem = {
   id: string;
   imageUrl: string;
+  thumbUrl?: string;
   title?: string;
   prompt: string;
   createdAt: string;
@@ -314,15 +317,31 @@ function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
   return { jobs: cards, recheck: () => setPollNonce((n) => n + 1) };
 }
 
-export function getMediaAssetUrl(item: MediaItem): string {
+/** Signierte Storage-URL für Kacheln (Thumb falls vorhanden). */
+export function getMediaThumbUrl(item: MediaItem): string {
+  return item.thumbUrl?.trim() || item.imageUrl;
+}
+
+/** Original für Großansicht — direkt, ohne Download-Proxy. */
+export function getMediaFullUrl(item: MediaItem): string {
+  return item.imageUrl;
+}
+
+/** Nur für Datei-Download (Format/Attachment). */
+export function getMediaDownloadUrl(item: MediaItem): string {
   if (item.imageUrl.startsWith("data:") || item.imageUrl.startsWith("/api/kie/download?")) {
     return item.imageUrl;
   }
   return `/api/kie/download?url=${encodeURIComponent(item.imageUrl)}&format=${item.outputFormat}&taskId=${encodeURIComponent(item.id)}`;
 }
 
+/** @deprecated Prefer getMediaFullUrl / getMediaThumbUrl / getMediaDownloadUrl */
+export function getMediaAssetUrl(item: MediaItem): string {
+  return getMediaDownloadUrl(item);
+}
+
 export async function downloadMediaItem(item: MediaItem): Promise<string | null> {
-  const response = await fetch(getMediaAssetUrl(item));
+  const response = await fetch(getMediaDownloadUrl(item));
   if (!response.ok) {
     try {
       const payload = (await response.json()) as { error?: string };
@@ -355,6 +374,10 @@ export type StudioMediaLibraryProps = {
   focusedJobId?: string;
   /** QA only: skip real download fetch */
   mockDownload?: boolean;
+  mediaTotal?: number;
+  hasMoreMedia?: boolean;
+  loadingMoreMedia?: boolean;
+  onLoadMoreMedia?: () => void;
 };
 
 export function StudioMediaLibrary({
@@ -368,6 +391,10 @@ export function StudioMediaLibrary({
   initialQuery = "",
   focusedJobId = "",
   mockDownload = false,
+  mediaTotal,
+  hasMoreMedia = false,
+  loadingMoreMedia = false,
+  onLoadMoreMedia,
 }: StudioMediaLibraryProps) {
   const reduceMotion = useReducedMotion();
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -429,16 +456,19 @@ export function StudioMediaLibrary({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: item.id, title: trimmed }),
         });
-        const json = (await res.json().catch(() => null)) as { error?: string; items?: MediaItem[] } | null;
+        const json = (await res.json().catch(() => null)) as
+          | { error?: string; items?: MediaItem[]; id?: string; title?: string }
+          | null;
         if (!res.ok) {
           setTitleError(json?.error ?? "Titel konnte nicht gespeichert werden.");
           return;
         }
+        const nextTitle = json?.title?.trim() || trimmed;
         const nextItems = Array.isArray(json?.items)
           ? json.items
-          : items.map((entry) => (entry.id === item.id ? { ...entry, title: trimmed } : entry));
+          : items.map((entry) => (entry.id === item.id ? { ...entry, title: nextTitle } : entry));
         onItemsChange(nextItems);
-        setSelectedItem((current) => (current?.id === item.id ? { ...current, title: trimmed } : current));
+        setSelectedItem((current) => (current?.id === item.id ? { ...current, title: nextTitle } : current));
       } catch {
         setTitleError("Titel konnte nicht gespeichert werden.");
       } finally {
@@ -533,7 +563,7 @@ export function StudioMediaLibrary({
                 aria-label="Mediathek durchsuchen"
               />
             </div>
-            <Badge variant="secondary">Bilder · {items.length}</Badge>
+            <Badge variant="secondary">Bilder · {mediaTotal ?? items.length}</Badge>
           </div>
         ) : null}
 
@@ -641,8 +671,10 @@ export function StudioMediaLibrary({
                     <motion.img
                       className="block h-full w-full object-cover"
                       layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
-                      src={getMediaAssetUrl(it)}
+                      src={getMediaThumbUrl(it)}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
                     />
                   </div>
@@ -656,6 +688,19 @@ export function StudioMediaLibrary({
               ))}
             </div>
           )}
+
+          {hasMoreMedia && onLoadMoreMedia ? (
+            <div className="flex justify-center pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={loadingMoreMedia}
+                onClick={onLoadMoreMedia}
+              >
+                {loadingMoreMedia ? "Lädt …" : "Weitere Motive laden"}
+              </Button>
+            </div>
+          ) : null}
 
           <AnimatePresence>
             {selectedItem ? (
@@ -696,8 +741,9 @@ export function StudioMediaLibrary({
                       className="h-auto max-h-[min(70dvh,720px)] w-auto max-w-full object-contain"
                       style={jobAspectStyle(selectedItem.aspectRatio)}
                       layoutId={reduceMotion ? undefined : `studio-media-${selectedItem.id}`}
-                      src={getMediaAssetUrl(selectedItem)}
+                      src={getMediaFullUrl(selectedItem)}
                       alt={getMediaDisplayTitle(selectedItem)}
+                      decoding="async"
                       transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
                     />
                   </div>

@@ -13,6 +13,7 @@ function isDownloadFormat(value: string): value is DownloadFormat {
 
 const DOWNLOAD_TIMEOUT_MS = 8000;
 const MAX_IMAGE_BYTES = 60 * 1024 * 1024; // 60 MB
+const PRIVATE_CACHE = "private, max-age=3600";
 const DEFAULT_ALLOWED_HOSTS = [
   "kie.ai",
   "api.kie.ai",
@@ -63,14 +64,22 @@ function assertSafeSourceUrl(sourceUrl: string): URL {
   return parsed;
 }
 
+function sourceMatchesFormat(contentType: string, format: Exclude<DownloadFormat, "svg">): boolean {
+  const type = contentType.toLowerCase();
+  if (format === "png") return type.includes("png");
+  if (format === "jpg") return type.includes("jpeg") || type.includes("jpg");
+  return type.includes("webp");
+}
+
 export async function GET(req: Request) {
   try {
     const authGuard = await requireAuthenticatedUser(req, "kie-download-auth");
     if (!authGuard.ok) return authGuard.response;
 
+    // Nur noch echte Downloads (Kacheln nutzen signierte Storage-URLs).
     const rateError = enforceRateLimit(req, {
       keyPrefix: "kie-download",
-      limit: 20,
+      limit: 60,
       windowMs: 60_000,
     });
     if (rateError) return rateError;
@@ -122,7 +131,23 @@ export async function GET(req: Request) {
         headers: {
           "Content-Type": "image/svg+xml; charset=utf-8",
           "Content-Disposition": `attachment; filename="${fileBase}.svg"`,
-          "Cache-Control": "no-store",
+          "Cache-Control": PRIVATE_CACHE,
+        },
+      });
+    }
+
+    // Schon passendes Format → Bytes durchreichen, kein erneutes sharp-Encode.
+    if (sourceMatchesFormat(sourceContentType, formatParam)) {
+      return new NextResponse(new Uint8Array(inputBuffer), {
+        headers: {
+          "Content-Type":
+            formatParam === "png"
+              ? "image/png"
+              : formatParam === "jpg"
+                ? "image/jpeg"
+                : "image/webp",
+          "Content-Disposition": `attachment; filename="${fileBase}.${formatParam}"`,
+          "Cache-Control": PRIVATE_CACHE,
         },
       });
     }
@@ -136,13 +161,12 @@ export async function GET(req: Request) {
 
     const contentType =
       formatParam === "png" ? "image/png" : formatParam === "jpg" ? "image/jpeg" : "image/webp";
-    const responseBody = new Uint8Array(convertedBuffer);
 
-    return new NextResponse(responseBody, {
+    return new NextResponse(new Uint8Array(convertedBuffer), {
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `attachment; filename="${fileBase}.${formatParam}"`,
-        "Cache-Control": "no-store",
+        "Cache-Control": PRIVATE_CACHE,
       },
     });
   } catch (error) {

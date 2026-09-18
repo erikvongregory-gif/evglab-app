@@ -119,6 +119,8 @@ export interface SignInPageProps {
   initialMode?: AuthMode;
   inviteToken?: string;
   inviteOnly?: boolean;
+  defaultEmail?: string;
+  teamInviteMode?: boolean;
   onSignIn?: (event: React.FormEvent<HTMLFormElement>) => void;
   onSignUp?: (event: React.FormEvent<HTMLFormElement>) => void;
   onGoogleSignIn?: () => void;
@@ -208,6 +210,8 @@ export const SignInPage: React.FC<SignInPageProps> = ({
   initialMode = "signin",
   inviteToken,
   inviteOnly = false,
+  defaultEmail,
+  teamInviteMode = false,
   onSignIn,
   onSignUp,
   onGoogleSignIn,
@@ -515,10 +519,12 @@ export const SignInPage: React.FC<SignInPageProps> = ({
       formAction={postTarget}
       nextPath={nextPath}
       inviteToken={inviteToken}
+      defaultEmail={defaultEmail}
+      teamInviteMode={teamInviteMode}
       oauthProviders={showGoogle ? ["google"] : []}
       googleHref={onGoogleSignIn ? undefined : googleHref}
       feedbackNotice={feedbackNotice}
-      inviteBlocked={Boolean(inviteOnly && isRegister && !inviteToken)}
+      inviteBlocked={Boolean(inviteOnly && isRegister && !inviteToken && !teamInviteMode)}
       forgotPasswordHref={resetPasswordHref}
       showModeSwitch={!signInOnly}
     />

@@ -39,11 +39,15 @@ export interface AuthCardProps {
   formAction?: string;
   nextPath?: string;
   inviteToken?: string;
+  /** Prefill e-mail (e.g. from team invite). */
+  defaultEmail?: string;
   oauthProviders?: OAuthProvider[];
   googleHref?: string;
   feedbackNotice?: React.ReactNode;
   inviteBlocked?: boolean;
   inviteBlockedMessage?: string;
+  /** Softer signup copy when joining a team invite. */
+  teamInviteMode?: boolean;
   termsHref?: string;
   privacyHref?: string;
   showModeSwitch?: boolean;
@@ -124,11 +128,13 @@ export function AuthCard({
   formAction,
   nextPath = "/dashboard",
   inviteToken,
+  defaultEmail = "",
   oauthProviders = ["google"],
   googleHref,
   feedbackNotice,
   inviteBlocked = false,
   inviteBlockedMessage = "Registrierung ist nur mit Einladung möglich. Bitte nutze deinen Einladungslink.",
+  teamInviteMode = false,
   termsHref = marketingLegalUrl("agb"),
   privacyHref = marketingLegalUrl("datenschutz"),
   showModeSwitch = true,
@@ -139,12 +145,16 @@ export function AuthCard({
   const mode = controlledMode ?? uncontrolledMode;
   const isSignup = mode === "signup";
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(defaultEmail);
   const [password, setPassword] = useState("");
   const [brewery, setBrewery] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (defaultEmail) setEmail(defaultEmail);
+  }, [defaultEmail]);
 
   const displayError = localError ?? error;
   const showGoogle = oauthProviders.includes("google");
@@ -241,11 +251,17 @@ export function AuthCard({
               >
                 <div className="mb-8 text-center">
                   <h1 className="text-3xl font-semibold text-foreground">
-                    {isSignup ? "Konto anlegen" : "Willkommen zurück"}
+                    {isSignup
+                      ? teamInviteMode
+                        ? "Konto für die Einladung"
+                        : "Konto anlegen"
+                      : "Willkommen zurück"}
                   </h1>
                   <p className="mt-2 text-sm text-muted-foreground">
                     {isSignup
-                      ? "Markenprofil, Sortiment und Mediathek — in wenigen Schritten bereit."
+                      ? teamInviteMode
+                        ? "Lege ein Konto mit der eingeladenen E-Mail an — danach trittst du dem Team bei."
+                        : "Markenprofil, Sortiment und Mediathek — in wenigen Schritten bereit."
                       : "Melde dich an, um weiterzuarbeiten."}
                   </p>
                 </div>
@@ -281,7 +297,7 @@ export function AuthCard({
                   <input type="hidden" name="next" value={nextPath} />
                   {inviteToken ? <input type="hidden" name="inviteToken" value={inviteToken} /> : null}
 
-                  {isSignup ? (
+                  {isSignup && !teamInviteMode ? (
                     <div className="space-y-2">
                       <Label htmlFor={`${reactId}-brewery`}>Brauerei</Label>
                       <Input
@@ -306,7 +322,8 @@ export function AuthCard({
                       required
                       autoComplete="email"
                       placeholder="name@beispiel.de"
-                      disabled={busy}
+                      disabled={busy || (teamInviteMode && Boolean(defaultEmail))}
+                      readOnly={teamInviteMode && Boolean(defaultEmail)}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />

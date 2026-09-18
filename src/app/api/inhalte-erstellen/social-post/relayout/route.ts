@@ -5,7 +5,7 @@ import { getGenerationJobForUser } from "@/lib/billing/generationJobs";
 import { composeSocialTextOverlay, parsePrimaryBrandColor } from "@/lib/social/text-overlay";
 import { getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
 import { publicFetch } from "@/lib/security/public-fetch";
-import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
+import { uploadGeneratedImageWithThumb } from "@/lib/supabase/storage";
 import { persistGeneratedMediaItems } from "@/lib/dashboard/persistGeneratedMedia";
 import { hydratePrivateAssets } from "@/lib/supabase/privateAssets";
 import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
@@ -54,6 +54,7 @@ export async function POST(req: Request) {
   const outputDimensions = aspectRatioToOutputDimensions(aspectRatio);
   const brandAccent = parsePrimaryBrandColor(getBrandProfileFromMetadata(guard.userMetadata).brandColors);
   const images: string[] = [];
+  const thumbs: Array<string | undefined> = [];
 
   for (const backgroundUrl of backgrounds) {
     const downloaded = await publicFetch(backgroundUrl, { maxBytes: 25 * 1024 * 1024 });
@@ -72,13 +73,13 @@ export async function POST(req: Request) {
         ctaBackground: brandAccent,
       },
     });
-    images.push(
-      await uploadGeneratedImageToStorage({
-        userId: guard.userId,
-        buffer: composited,
-        outputFormat: "png",
-      }),
-    );
+    const uploaded = await uploadGeneratedImageWithThumb({
+      userId: guard.userId,
+      buffer: composited,
+      outputFormat: "png",
+    });
+    images.push(uploaded.imageUrl);
+    thumbs.push(uploaded.thumbUrl);
   }
 
   const nextResult = {
@@ -102,6 +103,7 @@ export async function POST(req: Request) {
     userId: guard.userId,
     jobId: job.id,
     images,
+    thumbs,
     title: parsed.data.headline.slice(0, 120),
     prompt: parsed.data.headline.slice(0, 240),
     aspectRatio,

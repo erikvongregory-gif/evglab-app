@@ -60,6 +60,10 @@ vi.mock("@/lib/openai/generateImage", () => ({
 vi.mock("@/lib/openai/aiWatermark", () => ({ applyAiWatermark: async (buffer: Buffer) => buffer }));
 vi.mock("@/lib/supabase/storage", () => ({
   uploadGeneratedImageToStorage: async () => "https://cdn.example/out.png",
+  uploadGeneratedImageWithThumb: async () => ({
+    imageUrl: "https://cdn.example/out.png",
+    thumbUrl: "https://cdn.example/out-thumb.webp",
+  }),
 }));
 vi.mock("@/lib/dashboard/persistGeneratedMedia", () => ({ persistGeneratedMediaItems: mocks.persist }));
 vi.mock("@/lib/kie/nanoBananaCharacterGenerate", async (importOriginal) => {

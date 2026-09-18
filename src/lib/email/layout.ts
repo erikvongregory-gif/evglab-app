@@ -1,23 +1,22 @@
 import { SITE } from "@/lib/siteConfig";
 
-/** BrewAI transactional mail — dark studio look (password-reset / invite / 2FA). */
+/** BrewAI transactional mail — light dashboard look (Studio / Admin). */
 export const EMAIL = {
-  accent: "#c8602a",
-  bg: "#131211",
-  card: "#1a1816",
-  text: "#f4f1ec",
-  muted: "#8a837a",
-  border: "rgba(255,255,255,0.08)",
-  borderSoft: "rgba(255,255,255,0.06)",
+  accent: "#C7691E",
+  accentInk: "#FFFFFF",
+  bg: "#F6F6F4",
+  card: "#FFFFFF",
+  text: "#18140F",
+  muted: "#5E574E",
+  border: "#E5E3DE",
+  borderSoft: "#EFEEEA",
+  tint: "#FBEFE0",
 } as const;
 
 export type EmailBody = {
   title: string;
-  /** Small uppercase brand/eyebrow line above the title */
   eyebrow?: string;
-  /** Main content HTML (paragraphs, buttons, etc.) — already inline-styled */
   bodyHtml: string;
-  /** Optional note below the card divider */
   footerNote?: string;
 };
 
@@ -30,14 +29,14 @@ export function wrapEmailHtml({ title, eyebrow = "BrewAI", bodyHtml, footerNote 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="color-scheme" content="light" />
   <title>${title} · BrewAI</title>
 </head>
 <body style="margin:0;padding:0;background:${bg};font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${bg};padding:32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:${card};border:1px solid ${border};border-radius:12px;overflow:hidden;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:${card};border:1px solid ${border};border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(24,20,15,0.04);">
           <tr>
             <td style="padding:28px 32px 8px;">
               <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${accent};font-weight:600;">${eyebrow}</p>
@@ -72,8 +71,8 @@ export function emailParagraph(html: string) {
 export function emailButton(href: string, label: string) {
   return `<table role="presentation" cellspacing="0" cellpadding="0" style="margin:8px 0 20px;">
   <tr>
-    <td style="border-radius:10px;background:${EMAIL.accent};">
-      <a href="${href}" style="display:inline-block;padding:14px 22px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;border-radius:10px;">${label}</a>
+    <td style="border-radius:8px;background:${EMAIL.accent};">
+      <a href="${href}" style="display:inline-block;padding:14px 22px;font-size:15px;font-weight:600;color:${EMAIL.accentInk};text-decoration:none;border-radius:8px;">${label}</a>
     </td>
   </tr>
 </table>`;
@@ -90,4 +89,14 @@ export function emailMutedLinkNote(href: string) {
 
 export function emailDevForwardNote(originalTo: string) {
   return `<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:${EMAIL.accent};">Dev-Weiterleitung: eigentlich an <strong>${originalTo}</strong></p>`;
+}
+
+export function emailInfoBox(html: string) {
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px;">
+  <tr>
+    <td style="padding:14px 16px;border-radius:8px;background:${EMAIL.tint};border:1px solid ${EMAIL.border};font-size:14px;line-height:1.55;color:${EMAIL.text};">
+      ${html}
+    </td>
+  </tr>
+</table>`;
 }

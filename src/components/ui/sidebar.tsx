@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { usePathname } from "next/navigation"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Slot } from "radix-ui"
 
@@ -66,7 +67,13 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
+  const pathname = usePathname()
   const [openMobile, setOpenMobile] = React.useState(false)
+
+  // Mobile Sheet nach Navigation schließen (Menüpunkt gewählt).
+  React.useEffect(() => {
+    setOpenMobile(false)
+  }, [pathname])
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.

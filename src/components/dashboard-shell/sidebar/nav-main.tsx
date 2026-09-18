@@ -84,6 +84,11 @@ function hasSubItems(item: NavMainItem): item is NavMainParentItem {
 
 export function NavMain({ items }: NavMainProps) {
   const path = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const closeMobileNav = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const isItemActive = (item: NavMainItem) => {
     if (hasSubItems(item)) {
@@ -112,7 +117,7 @@ export function NavMain({ items }: NavMainProps) {
                 tooltip="Neu erstellen"
                 className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
               >
-                <Link prefetch={false} href="/inhalte-erstellen">
+                <Link prefetch={false} href="/inhalte-erstellen" onClick={closeMobileNav}>
                   <PlusCircleIcon className="group-hover/menu-button:rotate-90 group-hover/menu-button:scale-110 motion-reduce:group-hover/menu-button:rotate-0 motion-reduce:group-hover/menu-button:scale-100" />
                   <span>Neu erstellen</span>
                 </Link>
@@ -127,6 +132,7 @@ export function NavMain({ items }: NavMainProps) {
                   prefetch={false}
                   href="/dashboard/settings"
                   aria-label="Einstellungen"
+                  onClick={closeMobileNav}
                 >
                   <MailIcon />
                   <span className="sr-only">Einstellungen</span>
@@ -185,6 +191,11 @@ function NavItem({ item, isItemActive, isSubItemActive, isSubmenuOpen }: NavItem
 }
 
 function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild aria-disabled={item.disabled} tooltip={item.title} isActive={isActive}>
@@ -193,6 +204,7 @@ function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
           href={item.url}
           target={item.newTab ? "_blank" : undefined}
           rel={item.newTab ? "noreferrer" : undefined}
+          onClick={closeMobile}
         >
           <NavLinkIcon item={item} showFallback={showIconFallback} />
           <span>{item.title}</span>
@@ -288,6 +300,10 @@ function NavLinkIcon({ item, showFallback }: NavLinkIconProps) {
 
 function NavDropdownItem({ item, isActive, isSubItemActive }: NavDropdownItemProps) {
   const Icon = item.icon;
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <SidebarMenuItem>
@@ -317,6 +333,7 @@ function NavDropdownItem({ item, isActive, isSubItemActive }: NavDropdownItemPro
                     rel={subItem.newTab ? "noreferrer" : undefined}
                     aria-current={isSubItemActive(subItem.url) ? "page" : undefined}
                     className="flex items-center gap-2"
+                    onClick={closeMobile}
                   >
                     {SubIcon && <SubIcon />}
                     <span>{subItem.title}</span>
@@ -333,6 +350,10 @@ function NavDropdownItem({ item, isActive, isSubItemActive }: NavDropdownItemPro
 
 function NavCollapsibleItem({ item, isActive, defaultOpen, isSubItemActive }: NavCollapsibleItemProps) {
   const Icon = item.icon;
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <Collapsible asChild defaultOpen={defaultOpen} className="group/collapsible">
@@ -365,6 +386,7 @@ function NavCollapsibleItem({ item, isActive, defaultOpen, isSubItemActive }: Na
                       href={subItem.url}
                       target={subItem.newTab ? "_blank" : undefined}
                       rel={subItem.newTab ? "noreferrer" : undefined}
+                      onClick={closeMobile}
                     >
                       {SubIcon && <SubIcon />}
                       <span>{subItem.title}</span>

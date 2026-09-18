@@ -9,6 +9,7 @@ import {
   createNoStoreRedirect,
   normalizeNextPath,
 } from "@/lib/security/authResponses";
+import { withNextParam } from "@/lib/auth/teamInviteAuth";
 import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
 export async function POST(request: Request) {
@@ -18,13 +19,18 @@ export async function POST(request: Request) {
   const originError = enforceSameOrigin(request);
   if (originError) return originError;
   if (!isSupabaseConfigured()) {
-    return createNoStoreRedirect(`${origin}/anmelden?error=config`, requestId);
+    return createNoStoreRedirect(withNextParam(`${origin}/anmelden?error=config`, "/dashboard"), requestId);
   }
 
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const next = normalizeNextPath(String(formData.get("next") ?? "/dashboard"));
+  const fail = (errorCode: string, extra?: Record<string, string>) => {
+    const params = new URLSearchParams({ error: errorCode, ...extra });
+    if (email) params.set("email", email);
+    return createNoStoreRedirect(withNextParam(`${origin}/anmelden?${params.toString()}`, next), requestId);
+  };
   const identifier = buildCompositeIdentifier(request, [email]);
   const rateError = await enforceRateLimitPersistent(
     request,
@@ -38,7 +44,7 @@ export async function POST(request: Request) {
   if (rateError) return rateError;
 
   if (!email || !password) {
-    return createNoStoreRedirect(`${origin}/anmelden?error=missing`, requestId);
+    return fail("missing");
   }
 
   const finishTarget = `${origin}/auth/finish?next=${encodeURIComponent(next)}`;
@@ -62,12 +68,11 @@ export async function POST(request: Request) {
         supabaseMessage: signInErrorDetail(error),
       },
     });
-    const params = new URLSearchParams({ error: errorCode });
     const detail = signInErrorDetail(error);
-    if (process.env.NODE_ENV === "development" && detail) {
-      params.set("detail", detail);
-    }
-    return createNoStoreRedirect(`${origin}/anmelden?${params.toString()}`, requestId);
+    return fail(
+      errorCode,
+      process.env.NODE_ENV === "development" && detail ? { detail } : undefined,
+    );
   }
 
   const user = signInData.user;

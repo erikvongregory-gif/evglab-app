@@ -45,7 +45,7 @@ async function deriveProgress(
     /* Billing optional — Checkliste bleibt nutzbar */
   }
 
-  const media = await readDashboardMedia(userId).catch(() => dashboard.mediaLibrary ?? []);
+  const media = await readDashboardMedia(userId, { limit: 1 }).catch(() => dashboard.mediaLibrary ?? []);
   return {
     brand: brandMode === "guided" || brandMode === "skip",
     motif: media.length > 0,

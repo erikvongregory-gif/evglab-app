@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EvglabMark } from "@/components/studio/evglab-mark";
-import { loginFontClassName } from "@/lib/fonts/studio-fonts";
-import { MARKETING_SITE_URL } from "@/lib/siteConfig";
+import { Button } from "@/components/ui/button";
 import type { WorkspaceInvitePreview } from "@/lib/dashboard/teamInvitePreview";
-import styles from "@/components/ui/sign-in.module.css";
+import { studioFontClassName } from "@/lib/fonts/studio-fonts";
+import { MARKETING_SITE_URL } from "@/lib/siteConfig";
+import { cn } from "@/lib/utils";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Administrator",
@@ -27,10 +28,12 @@ export function TeamInviteAccept({ token, invite, sessionEmail, needsTwoFactor }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const autoStarted = useRef(false);
 
   const next = `/invite/team/${token}`;
   const nextParam = encodeURIComponent(next);
   const inviteEmail = invite.email;
+  const emailParam = inviteEmail ? `&email=${encodeURIComponent(inviteEmail)}` : "";
   const emailMatches =
     Boolean(sessionEmail) &&
     Boolean(inviteEmail) &&
@@ -53,18 +56,19 @@ export function TeamInviteAccept({ token, invite, sessionEmail, needsTwoFactor }
       router.refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Einladung konnte nicht angenommen werden.");
-    } finally {
       setBusy(false);
     }
   }
 
-  const primaryLinkStyle = {
-    textAlign: "center" as const,
-    textDecoration: "none" as const,
-    display: "flex" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-  };
+  useEffect(() => {
+    if (autoStarted.current) return;
+    if (invite.status !== "valid") return;
+    if (!sessionEmail || !emailMatches || needsTwoFactor) return;
+    if (done || error) return;
+    autoStarted.current = true;
+    void accept();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot auto-accept when session is ready
+  }, [invite.status, sessionEmail, emailMatches, needsTwoFactor, done, error]);
 
   const statusCopy =
     invite.status === "missing"
@@ -74,116 +78,107 @@ export function TeamInviteAccept({ token, invite, sessionEmail, needsTwoFactor }
         : null;
 
   return (
-    <main className={`${styles.shell} ${styles.shellFormOnly} ${loginFontClassName}`}>
-      <div className={styles.glow} aria-hidden />
-      <div className={styles.mesh} aria-hidden />
-
-      <section className={styles.waitlistPanel}>
-        <a href={MARKETING_SITE_URL} className={styles.brand} aria-label="BrewAI Startseite">
-          <EvglabMark className={styles.brandMark} />
-          <span className={styles.brandName}>BrewAI</span>
+    <div
+      className={cn(
+        "flex min-h-dvh w-full items-center justify-center bg-background p-4",
+        studioFontClassName,
+      )}
+    >
+      <div className="mx-auto w-full max-w-md">
+        <a
+          href={MARKETING_SITE_URL}
+          className="mb-6 flex items-center justify-center gap-2 text-foreground"
+          aria-label="BrewAI Startseite"
+        >
+          <EvglabMark size={22} />
+          <span className="font-semibold tracking-tight">BrewAI</span>
         </a>
 
-        <h1 className={styles.waitlistTitle}>Team-Einladung</h1>
-        <p className={styles.waitlistDesc}>
-          {invite.status === "valid"
-            ? "Tritt dem BrewAI-Workspace bei und arbeitet gemeinsam an Motiven, Marke und Mediathek."
-            : statusCopy}
-        </p>
+        <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/80 shadow-xl backdrop-blur-sm">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5" />
+          <div className="relative z-10 space-y-6 p-8">
+            <div className="space-y-2 text-center">
+              <h1 className="text-3xl font-semibold text-foreground">Team-Einladung</h1>
+              <p className="text-sm text-muted-foreground">
+                {invite.status === "valid"
+                  ? "Tritt dem Workspace bei und arbeitet gemeinsam an Motiven, Marke und Mediathek."
+                  : statusCopy}
+              </p>
+            </div>
 
-        {invite.status === "valid" && inviteEmail ? (
-          <div
-            style={{
-              marginTop: 18,
-              padding: "14px 16px",
-              borderRadius: 10,
-              border: "1px solid var(--line-strong)",
-              background: "var(--bg-2)",
-            }}
-          >
-            <p className={styles.fieldLabel} style={{ marginBottom: 4 }}>
-              Eingeladen als
-            </p>
-            <p style={{ margin: 0, color: "var(--tx-0)", fontWeight: 600 }}>{inviteEmail}</p>
-            {invite.role ? (
-              <p style={{ margin: "6px 0 0", color: "var(--tx-3)", fontSize: 13 }}>
-                Rolle: {ROLE_LABEL[invite.role] ?? invite.role}
+            {invite.status === "valid" && inviteEmail ? (
+              <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">Eingeladen als</p>
+                <p className="mt-1 font-medium text-foreground">{inviteEmail}</p>
+                {invite.role ? (
+                  <p className="mt-1 text-muted-foreground">Rolle: {ROLE_LABEL[invite.role] ?? invite.role}</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {sessionEmail ? (
+              <p className="text-center text-sm text-muted-foreground">
+                Angemeldet als <strong className="text-foreground">{sessionEmail}</strong>
+                {!emailMatches && invite.status === "valid"
+                  ? " — bitte mit der eingeladenen Adresse anmelden."
+                  : null}
               </p>
             ) : null}
-          </div>
-        ) : null}
 
-        {sessionEmail ? (
-          <p style={{ marginTop: 14, fontSize: 13, color: "var(--tx-3)" }}>
-            Angemeldet als <strong style={{ color: "var(--tx-0)" }}>{sessionEmail}</strong>
-            {!emailMatches && invite.status === "valid" ? (
-              <> — bitte mit der eingeladenen Adresse anmelden.</>
+            {error ? (
+              <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+                {error}
+              </p>
             ) : null}
-          </p>
-        ) : invite.status === "valid" ? (
-          <p style={{ marginTop: 14, fontSize: 13, color: "var(--tx-3)" }}>
-            Melde dich mit der eingeladenen E-Mail an, um beizutreten.
-          </p>
-        ) : null}
 
-        {error ? (
-          <p className={`${styles.feedback} ${styles.feedbackError}`} role="alert" style={{ marginTop: 16 }}>
-            {error}
-          </p>
-        ) : null}
+            {done || (busy && emailMatches && !error) ? (
+              <p className="rounded-lg border border-border bg-muted/40 p-3 text-center text-sm text-muted-foreground" role="status">
+                {done ? "Willkommen im Team — du wirst weitergeleitet …" : "Einladung wird angenommen …"}
+              </p>
+            ) : null}
 
-        {done ? (
-          <p className={`${styles.feedback} ${styles.feedbackNotice}`} role="status" style={{ marginTop: 16 }}>
-            Willkommen im Team — du wirst weitergeleitet …
-          </p>
-        ) : null}
-
-        {invite.status === "valid" ? (
-          <div style={{ marginTop: 22, display: "grid", gap: 10 }}>
-            {!sessionEmail ? (
-              <>
-                <Link href={`/anmelden?next=${nextParam}`} className={styles.btnPrimary} style={primaryLinkStyle}>
-                  Anmelden und beitreten
-                </Link>
-                <Link
-                  href={`/anmelden?mode=register&next=${nextParam}`}
-                  className={styles.modeToggle}
-                  style={{ textAlign: "center", justifySelf: "center" }}
-                >
-                  Noch kein Konto? Registrieren
-                </Link>
-              </>
-            ) : needsTwoFactor ? (
-              <Link
-                href={`/dashboard/2fa-email?next=${nextParam}`}
-                className={styles.btnPrimary}
-                style={primaryLinkStyle}
-              >
-                Sicherheitscode bestätigen
-              </Link>
-            ) : emailMatches ? (
-              <button type="button" className={styles.btnPrimary} disabled={busy || done} onClick={() => void accept()}>
-                {busy ? "Wird angenommen …" : "Einladung annehmen"}
-              </button>
+            {invite.status === "valid" ? (
+              <div className="grid gap-3">
+                {!sessionEmail ? (
+                  <>
+                    <Button asChild className="h-11 w-full">
+                      <Link href={`/anmelden?mode=register&next=${nextParam}${emailParam}`}>
+                        Konto erstellen und beitreten
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="h-11 w-full">
+                      <Link href={`/anmelden?next=${nextParam}${emailParam}`}>Bereits Konto? Anmelden</Link>
+                    </Button>
+                  </>
+                ) : needsTwoFactor ? (
+                  <Button asChild className="h-11 w-full">
+                    <Link href={`/dashboard/2fa-email?next=${nextParam}`}>Sicherheitscode bestätigen</Link>
+                  </Button>
+                ) : emailMatches ? (
+                  <Button className="h-11 w-full" disabled={busy || done} onClick={() => void accept()}>
+                    {busy ? "Wird angenommen …" : "Einladung annehmen"}
+                  </Button>
+                ) : (
+                  <>
+                    <p className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive" role="status">
+                      Falsches Konto. Melde dich mit {inviteEmail} an.
+                    </p>
+                    <Button asChild className="h-11 w-full">
+                      <Link href={`/anmelden?mode=register&next=${nextParam}${emailParam}`}>
+                        Mit {inviteEmail} fortfahren
+                      </Link>
+                    </Button>
+                  </>
+                )}
+              </div>
             ) : (
-              <>
-                <p className={`${styles.feedback} ${styles.feedbackError}`} role="status">
-                  Falsches Konto. Melde dich mit {inviteEmail} an.
-                </p>
-                <Link href={`/anmelden?next=${nextParam}`} className={styles.btnPrimary} style={primaryLinkStyle}>
-                  Mit anderer E-Mail anmelden
-                </Link>
-              </>
+              <Button asChild className="h-11 w-full">
+                <Link href="/anmelden">Zur Anmeldung</Link>
+              </Button>
             )}
           </div>
-        ) : (
-          <div style={{ marginTop: 22 }}>
-            <Link href="/anmelden" className={styles.btnPrimary} style={primaryLinkStyle}>
-              Zur Anmeldung
-            </Link>
-          </div>
-        )}
-      </section>
-    </main>
+        </div>
+      </div>
+    </div>
   );
 }

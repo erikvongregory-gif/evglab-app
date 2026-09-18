@@ -42,6 +42,8 @@ const PATH_TABS = new Set<DashboardTab>([
   "assistant",
 ]);
 
+const MEDIA_PAGE_SIZE = 48;
+
 function tabFromPathname(pathname: string): DashboardTab | null {
   const match = pathname.match(/^\/dashboard\/([^/?#]+)/);
   if (!match?.[1]) return null;
@@ -241,6 +243,9 @@ export function DashboardRedesignShell(props: {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [mediaLoaded, setMediaLoaded] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [mediaTotal, setMediaTotal] = useState(0);
+  const [mediaHasMore, setMediaHasMore] = useState(false);
+  const [mediaLoadingMore, setMediaLoadingMore] = useState(false);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [teamLoaded, setTeamLoaded] = useState(false);
   const [teamError, setTeamError] = useState<string | null>(null);
@@ -297,11 +302,17 @@ export function DashboardRedesignShell(props: {
 
     void (async () => {
       try {
-        const res = await load("/api/dashboard/media");
+        const res = await load(`/api/dashboard/media?limit=${MEDIA_PAGE_SIZE}&offset=0`);
         if (!res || ignore) return;
         if (res.ok) {
-          const json = (await res.json()) as { items?: MediaItem[] };
+          const json = (await res.json()) as {
+            items?: MediaItem[];
+            total?: number;
+            hasMore?: boolean;
+          };
           if (Array.isArray(json.items)) setMedia(json.items);
+          setMediaTotal(typeof json.total === "number" ? json.total : json.items?.length ?? 0);
+          setMediaHasMore(Boolean(json.hasMore));
           setMediaError(null);
         } else {
           setMediaError("Mediathek konnte nicht geladen werden.");
@@ -554,11 +565,20 @@ export function DashboardRedesignShell(props: {
       setMediaLoaded(false);
       setMediaError(null);
     }
-    void fetch("/api/dashboard/media", { cache: "no-store", credentials: "include" })
+    void fetch(`/api/dashboard/media?limit=${MEDIA_PAGE_SIZE}&offset=0`, {
+      cache: "no-store",
+      credentials: "include",
+    })
       .then(async (res) => {
         if (!res.ok) throw new Error("fail");
-        const json = (await res.json()) as { items?: MediaItem[] };
+        const json = (await res.json()) as {
+          items?: MediaItem[];
+          total?: number;
+          hasMore?: boolean;
+        };
         if (Array.isArray(json.items)) setMedia(json.items);
+        setMediaTotal(typeof json.total === "number" ? json.total : json.items?.length ?? 0);
+        setMediaHasMore(Boolean(json.hasMore));
         if (!quiet) setMediaError(null);
       })
       .catch(() => {
@@ -568,6 +588,35 @@ export function DashboardRedesignShell(props: {
   }, []);
 
   const refreshMediaQuiet = useCallback(() => refreshMedia(true), [refreshMedia]);
+
+  const loadMoreMedia = useCallback(() => {
+    if (mediaLoadingMore || !mediaHasMore) return;
+    setMediaLoadingMore(true);
+    void fetch(`/api/dashboard/media?limit=${MEDIA_PAGE_SIZE}&offset=${media.length}`, {
+      cache: "no-store",
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("fail");
+        const json = (await res.json()) as {
+          items?: MediaItem[];
+          total?: number;
+          hasMore?: boolean;
+        };
+        if (Array.isArray(json.items) && json.items.length) {
+          setMedia((prev) => {
+            const seen = new Set(prev.map((item) => item.id));
+            return [...prev, ...json.items!.filter((item) => !seen.has(item.id))];
+          });
+        }
+        if (typeof json.total === "number") setMediaTotal(json.total);
+        setMediaHasMore(Boolean(json.hasMore));
+      })
+      .catch(() => {
+        /* still genug der ersten Seite sichtbar */
+      })
+      .finally(() => setMediaLoadingMore(false));
+  }, [media.length, mediaHasMore, mediaLoadingMore]);
 
   // Hinweis: Wir oeffnen das Setup-Modal NICHT mehr automatisch bei `guided + incomplete`.
   // Stattdessen wird der User ueber die Banner (Dashboard-Overview + Inhalte-erstellen)
@@ -617,6 +666,10 @@ export function DashboardRedesignShell(props: {
           hasActivePlan={hasActivePlan}
           initialQuery={searchParams.get("q") ?? ""}
           focusedJobId={searchParams.get("job") ?? ""}
+          mediaTotal={mediaTotal}
+          hasMoreMedia={mediaHasMore}
+          loadingMoreMedia={mediaLoadingMore}
+          onLoadMoreMedia={loadMoreMedia}
         />
       ) : null}
       {tab === "team" ? (

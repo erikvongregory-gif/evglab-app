@@ -12,6 +12,8 @@ interface LoginFormProps {
   inviteToken?: string;
   inviteOnly?: boolean;
   waitlistMode?: boolean;
+  defaultEmail?: string;
+  teamInviteMode?: boolean;
 }
 
 function messageForError(
@@ -71,13 +73,15 @@ function messageForError(
   }
 }
 
-function messageForNotice(code: string | undefined): string | undefined {
+function messageForNotice(code: string | undefined, teamInvite = false): string | undefined {
   if (!code) return undefined;
   switch (code) {
     case "invite_ready":
       return "Konto ist bereit. Du kannst dich jetzt anmelden.";
     case "account_ready":
-      return "Konto erstellt. Melde dich an — wir senden dir dann einen Sicherheitscode per E-Mail.";
+      return teamInvite
+        ? "Konto erstellt. Melde dich an — danach nimmst du die Team-Einladung an."
+        : "Konto erstellt. Melde dich an — wir senden dir dann einen Sicherheitscode per E-Mail.";
     case "password_updated":
       return "Passwort wurde geändert. Du kannst dich jetzt anmelden.";
     case "signed_out":
@@ -95,6 +99,8 @@ export function LoginForm({
   inviteToken,
   inviteOnly = false,
   waitlistMode,
+  defaultEmail,
+  teamInviteMode = false,
 }: LoginFormProps) {
   const searchParams = useSearchParams();
   const [persistedError, setPersistedError] = useState<string | undefined>();
@@ -105,6 +111,8 @@ export function LoginForm({
   }, [searchParams, urlError]);
 
   const errorDetail = searchParams.get("detail");
+  const emailFromQuery = searchParams.get("email")?.trim() || undefined;
+  const resolvedDefaultEmail = defaultEmail || emailFromQuery;
 
   const modeParam = searchParams.get("mode");
   const resolvedMode =
@@ -131,8 +139,13 @@ export function LoginForm({
       inviteToken={inviteToken ?? searchParams.get("invite") ?? undefined}
       inviteOnly={inviteOnly}
       waitlistMode={waitlistMode}
+      defaultEmail={resolvedDefaultEmail}
+      teamInviteMode={teamInviteMode || Boolean(nextPath.startsWith("/invite/team/"))}
       feedbackError={messageForError(persistedError, errorMode, errorDetail)}
-      feedbackNotice={messageForNotice(urlNotice ?? searchParams.get("notice") ?? undefined)}
+      feedbackNotice={messageForNotice(
+        urlNotice ?? searchParams.get("notice") ?? undefined,
+        teamInviteMode || nextPath.startsWith("/invite/team/"),
+      )}
     />
   );
 }

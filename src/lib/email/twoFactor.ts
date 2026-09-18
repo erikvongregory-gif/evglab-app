@@ -8,7 +8,7 @@ import {
 export function buildTwoFactorEmailHtml(input: { code: string; forwardedFor?: string }) {
   const codeBlock = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:8px 0 20px;">
   <tr>
-    <td align="center" style="padding:22px 16px;border-radius:10px;background:#131211;border:1px solid ${EMAIL.border};">
+    <td align="center" style="padding:22px 16px;border-radius:8px;background:${EMAIL.tint};border:1px solid ${EMAIL.border};">
       <p style="margin:0;font-size:32px;line-height:1.2;letter-spacing:0.28em;font-weight:700;color:${EMAIL.text};font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">${input.code}</p>
     </td>
   </tr>

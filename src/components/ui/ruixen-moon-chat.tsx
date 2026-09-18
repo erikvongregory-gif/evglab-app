@@ -405,8 +405,8 @@ export default function RuixenMoonChat() {
               style={{ overflow: "hidden" }}
             />
 
-            <div className="flex items-center justify-between gap-2 p-3">
-              <div className="flex min-w-0 items-center gap-1">
+            <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+              <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <Popover open={beerPickerOpen} onOpenChange={setBeerPickerOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -414,7 +414,7 @@ export default function RuixenMoonChat() {
                     variant="ghost"
                     aria-label="Sorte wählen"
                     className={cn(
-                      "h-9 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
+                      "h-9 shrink-0 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
                       "dark:bg-transparent dark:text-white dark:hover:bg-transparent",
                       selectedBeer && "font-medium",
                     )}
@@ -430,11 +430,11 @@ export default function RuixenMoonChat() {
                       <StudioIcon name="cup" size={16} />
                     )}
                     {selectedBeer ? (
-                      <span className="max-w-[9rem] truncate text-xs font-medium">
+                      <span className="hidden max-w-[9rem] truncate text-xs font-medium sm:inline">
                         {selectedBeer.name}
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground dark:text-neutral-400">
+                      <span className="hidden text-xs text-muted-foreground sm:inline dark:text-neutral-400">
                         Sorte
                       </span>
                     )}
@@ -546,7 +546,7 @@ export default function RuixenMoonChat() {
                     variant="ghost"
                     aria-label="Charakter wählen"
                     className={cn(
-                      "h-9 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
+                      "h-9 shrink-0 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
                       "dark:bg-transparent dark:text-white dark:hover:bg-transparent",
                       selectedCharacter && "font-medium",
                     )}
@@ -562,11 +562,11 @@ export default function RuixenMoonChat() {
                       <StudioIcon name="user" size={16} />
                     )}
                     {selectedCharacter ? (
-                      <span className="max-w-[9rem] truncate text-xs font-medium">
+                      <span className="hidden max-w-[9rem] truncate text-xs font-medium sm:inline">
                         {selectedCharacter.name}
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground dark:text-neutral-400">
+                      <span className="hidden text-xs text-muted-foreground sm:inline dark:text-neutral-400">
                         Charakter
                       </span>
                     )}
@@ -671,13 +671,13 @@ export default function RuixenMoonChat() {
                     variant="ghost"
                     aria-label="Format wählen"
                     className={cn(
-                      "h-9 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
+                      "h-9 shrink-0 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
                       "dark:bg-transparent dark:text-white dark:hover:bg-transparent",
                       "font-medium",
                     )}
                   >
                     <StudioIcon name="image" size={16} />
-                    <span className="text-xs font-medium">{aspectRatio}</span>
+                    <span className="text-xs font-medium tabular-nums">{aspectRatio}</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
@@ -729,18 +729,18 @@ export default function RuixenMoonChat() {
                     variant="ghost"
                     aria-label="Preset wählen"
                     className={cn(
-                      "h-9 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
+                      "h-9 shrink-0 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
                       "dark:bg-transparent dark:text-white dark:hover:bg-transparent",
                       activePreset && "font-medium",
                     )}
                   >
                     <StudioIcon name={activePreset?.icon ?? "spark"} size={16} />
                     {activePreset ? (
-                      <span className="max-w-[8rem] truncate text-xs font-medium">
+                      <span className="hidden max-w-[8rem] truncate text-xs font-medium sm:inline">
                         {activePreset.title}
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground dark:text-neutral-400">
+                      <span className="hidden text-xs text-muted-foreground sm:inline dark:text-neutral-400">
                         Preset
                       </span>
                     )}
@@ -823,15 +823,24 @@ export default function RuixenMoonChat() {
               </Popover>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex w-full shrink-0 items-center sm:w-auto sm:justify-end">
                 <GlowButton
+                  className="w-full sm:w-auto"
                   disabled={!canGenerate}
                   onClick={() => void handleGenerate()}
+                  showIcon={false}
                   label={
                     <>
                       Generieren
                       <span className="font-normal opacity-90">
-                        · {generationTokenCost.toLocaleString("de-DE")} Tokens
+                        <span className="sm:hidden">
+                          {" "}
+                          · {generationTokenCost.toLocaleString("de-DE")}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {" "}
+                          · {generationTokenCost.toLocaleString("de-DE")} Tokens
+                        </span>
                       </span>
                     </>
                   }

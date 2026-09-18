@@ -14,6 +14,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { EvglabMark } from "@/components/studio/evglab-mark";
 import { AccountSwitcher } from "@/components/dashboard-shell/header/account-switcher";
+import { AssetsFolderButton } from "@/components/dashboard-shell/header/assets-folder-button";
 import { LayoutControls } from "@/components/dashboard-shell/header/layout-controls";
 import { SearchDialog } from "@/components/dashboard-shell/header/search-dialog";
 import { ThemeSwitcher } from "@/components/dashboard-shell/header/theme-switcher";
@@ -216,6 +217,7 @@ export function BrewAiAdminShell({
                     <SearchDialog />
                   </div>
                   <div className="flex items-center gap-2">
+                    <AssetsFolderButton />
                     <LayoutControls />
                     <ThemeSwitcher />
                     <AccountSwitcher users={accountUsers} onLogout={() => void handleLogout()} />

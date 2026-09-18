@@ -12,6 +12,7 @@ import {
   releaseInviteById,
 } from "@/lib/invite/server";
 import { createNoStoreRedirect, normalizeNextPath } from "@/lib/security/authResponses";
+import { isTeamInviteNextPath, withNextParam } from "@/lib/auth/teamInviteAuth";
 import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
 
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
   const breweryName = String(formData.get("brewery") ?? "").trim();
   const inviteToken = String(formData.get("inviteToken") ?? "").trim();
   const next = normalizeNextPath(String(formData.get("next") ?? "/dashboard"));
+  const teamInviteFlow = isTeamInviteNextPath(next);
   const acceptedTerms = isTruthyTermsAcceptance(formData.get(TERMS_ACCEPTANCE_FORM_FIELD));
   const identifier = buildCompositeIdentifier(request, [email, inviteToken || null]);
   const rateLimitError = await enforceRateLimitPersistent(
@@ -43,23 +45,35 @@ export async function POST(request: Request) {
   );
   if (rateLimitError) return rateLimitError;
 
+  const fail = (pathQuery: string) => {
+    const base = `${origin}${pathQuery.startsWith("/") ? pathQuery : `/anmelden?${pathQuery}`}`;
+    const withNext = withNextParam(base, next);
+    if (email && teamInviteFlow) {
+      const u = new URL(withNext, origin);
+      u.searchParams.set("email", email);
+      return createNoStoreRedirect(u.toString(), requestId);
+    }
+    return createNoStoreRedirect(withNext, requestId);
+  };
+
   if (!acceptedTerms) {
     if (inviteToken) {
       return createNoStoreRedirect(`${origin}/invite/${encodeURIComponent(inviteToken)}?error=terms`, requestId);
     }
-    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=terms`, requestId);
+    return fail("mode=register&error=terms");
   }
 
   if (!email || !password) {
-    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=missing`, requestId);
+    return fail("mode=register&error=missing");
   }
 
-  if (isInviteOnlyEnabled() && !inviteToken) {
-    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=invite_required`, requestId);
+  // Platform invite-only: allow team workspace invites via next=/invite/team/...
+  if (isInviteOnlyEnabled() && !inviteToken && !teamInviteFlow) {
+    return fail("mode=register&error=invite_required");
   }
 
   let reservedInviteId: string | null = null;
-  if (isInviteOnlyEnabled()) {
+  if (isInviteOnlyEnabled() && inviteToken) {
     const invite = await getInviteByToken(inviteToken);
     const status = evaluateInvite(invite, email);
     if (status !== "valid" || !invite) {
@@ -71,7 +85,7 @@ export async function POST(request: Request) {
             : status === "email_mismatch"
               ? "invite_email_mismatch"
               : "invite_invalid";
-      return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=${reason}`, requestId);
+      return fail(`mode=register&error=${reason}`);
     }
     const consumed = await consumeInviteByToken(inviteToken, email);
     if (!consumed.ok || !consumed.invite) {
@@ -83,7 +97,7 @@ export async function POST(request: Request) {
             : consumed.status === "email_mismatch"
               ? "invite_email_mismatch"
               : "invite_invalid";
-      return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=${reason}`, requestId);
+      return fail(`mode=register&error=${reason}`);
     }
     reservedInviteId = consumed.invite.id;
   }
@@ -95,7 +109,8 @@ export async function POST(request: Request) {
     email_confirm: true,
     user_metadata: {
       brewery_name: breweryName || null,
-      invited_account: isInviteOnlyEnabled(),
+      invited_account: isInviteOnlyEnabled() || teamInviteFlow,
+      team_invite_pending: teamInviteFlow,
       ...termsAcceptanceMetadata(),
     },
   });
@@ -104,16 +119,17 @@ export async function POST(request: Request) {
     if (reservedInviteId) {
       await releaseInviteById(reservedInviteId).catch(() => undefined);
     }
-    return createNoStoreRedirect(`${origin}/anmelden?mode=register&error=auth`, requestId);
+    return fail("mode=register&error=auth");
   }
 
-  if (isInviteOnlyEnabled()) {
-    return createNoStoreRedirect(`${origin}/anmelden?notice=invite_ready`, requestId);
+  if (isInviteOnlyEnabled() && inviteToken && !teamInviteFlow) {
+    return fail("notice=invite_ready");
   }
 
-  // Registrierung erzeugt keine Session: der Login setzt danach den 2FA-Code an.
+  // Registrierung erzeugt keine Session: danach Login (+ 2FA), next führt zurück zur Team-Einladung.
   const loginUrl = new URL(`${origin}/anmelden`);
   loginUrl.searchParams.set("notice", "account_ready");
   if (next !== "/dashboard") loginUrl.searchParams.set("next", next);
+  if (email) loginUrl.searchParams.set("email", email);
   return createNoStoreRedirect(loginUrl.toString(), requestId);
 }

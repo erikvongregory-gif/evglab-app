@@ -42,7 +42,10 @@ vi.mock("@/lib/openai/generateImage", () => ({
   mapAspectRatioToOpenAiSize: () => "1024x1536",
   cropImageBufferToAspectRatio: vi.fn(),
 }));
-vi.mock("@/lib/supabase/storage", () => ({ uploadGeneratedImageToStorage: vi.fn() }));
+vi.mock("@/lib/supabase/storage", () => ({
+  uploadGeneratedImageToStorage: vi.fn(),
+  uploadGeneratedImageWithThumb: vi.fn(async () => ({ imageUrl: "https://cdn.example/out.png" })),
+}));
 vi.mock("@/lib/dashboard/persistGeneratedMedia", () => ({ persistGeneratedMediaItems: mocks.persist }));
 vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();

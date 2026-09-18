@@ -32,7 +32,7 @@ import {
 import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
 import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
-import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
+import { uploadGeneratedImageToStorage, uploadGeneratedImageWithThumb } from "@/lib/supabase/storage";
 import { persistGeneratedMediaItems } from "@/lib/dashboard/persistGeneratedMedia";
 import {
   assembleGenerationReferences,
@@ -498,13 +498,15 @@ async function executeStudioGeneration(args: {
   await saveGenerationProgress(job, { phase: "generating", snapshot: prepared.snapshot });
 
   const images: string[] = [];
+  const thumbs: Array<string | undefined> = [];
   const backgroundImages: string[] = [];
   const errors: string[] = [];
   const providerFailures: ProviderError[] = [];
   let linkedProvider = false;
 
-  const recordProgress = async (imageUrl: string, backgroundUrl?: string) => {
+  const recordProgress = async (imageUrl: string, backgroundUrl?: string, thumbUrl?: string) => {
     images.push(imageUrl);
+    thumbs.push(thumbUrl);
     if (backgroundUrl) backgroundImages.push(backgroundUrl);
     await saveGenerationProgress(job, {
       phase: "generating",
@@ -565,22 +567,22 @@ async function executeStudioGeneration(args: {
       const finalBuffer = prepared.input.aiWatermark
         ? await applyAiWatermark(composited, OUTPUT_FORMAT)
         : composited;
-      const imageUrl = await uploadGeneratedImageToStorage({
+      const uploaded = await uploadGeneratedImageWithThumb({
         userId: args.userId,
         buffer: finalBuffer,
         outputFormat: OUTPUT_FORMAT,
       });
-      await recordProgress(imageUrl, backgroundUrl);
+      await recordProgress(uploaded.imageUrl, backgroundUrl, uploaded.thumbUrl);
       return;
     }
 
     const finalBuffer = prepared.input.aiWatermark ? await applyAiWatermark(cropped, OUTPUT_FORMAT) : cropped;
-    const imageUrl = await uploadGeneratedImageToStorage({
+    const uploaded = await uploadGeneratedImageWithThumb({
       userId: args.userId,
       buffer: finalBuffer,
       outputFormat: OUTPUT_FORMAT,
     });
-    await recordProgress(imageUrl);
+    await recordProgress(uploaded.imageUrl, undefined, uploaded.thumbUrl);
   };
 
   for (let index = 0; index < prepared.variantsToCreate; index += 1) {
@@ -628,6 +630,7 @@ async function executeStudioGeneration(args: {
     userId: args.userId,
     jobId: job.id,
     images,
+    thumbs,
     title: prepared.mediaTitle,
     prompt: prepared.mediaTitle,
     aspectRatio: prepared.aspectRatio,

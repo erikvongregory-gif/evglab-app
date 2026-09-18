@@ -6,11 +6,18 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import { type DashboardMediaItem } from "@/lib/dashboard/metadata";
-import { readDashboardMedia, writeDashboardMedia, deleteDashboardMedia } from "@/lib/dashboard/media-store";
+import {
+  getDashboardMediaItem,
+  readDashboardMedia,
+  readDashboardMediaPage,
+  writeDashboardMedia,
+  deleteDashboardMedia,
+} from "@/lib/dashboard/media-store";
 
 const mediaSchema = z.object({
   id: z.string().min(1).max(120),
   imageUrl: z.string().url().max(2000),
+  thumbUrl: z.string().url().max(2000).optional(),
   title: z.string().min(1).max(120).optional(),
   prompt: z.string().min(1).max(240),
   createdAt: z.string().datetime(),
@@ -33,18 +40,41 @@ async function requireUserId(write = false): Promise<string | NextResponse> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user && !(await hasPassedTwoFactor(user))) return NextResponse.json({ error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" }, { status: 403 });
-  if (user) { try { user = await workspaceResourceUser(user, write); } catch { return NextResponse.json({error:"Teamzugriff nicht erlaubt."},{status:403}); } }
+  if (user && !(await hasPassedTwoFactor(user)))
+    return NextResponse.json(
+      { error: "Zwei-Faktor-Prüfung erforderlich.", code: "two_factor_required" },
+      { status: 403 },
+    );
+  if (user) {
+    try {
+      user = await workspaceResourceUser(user, write);
+    } catch {
+      return NextResponse.json({ error: "Teamzugriff nicht erlaubt." }, { status: 403 });
+    }
+  }
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
   return user.id;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const userId = await requireUserId();
   if (typeof userId !== "string") return userId;
   try {
-    const items = await readDashboardMedia(userId);
-    return NextResponse.json({ items });
+    const { searchParams } = new URL(req.url);
+    const limitRaw = searchParams.get("limit");
+    const offsetRaw = searchParams.get("offset");
+    // Ohne limit: volle Liste (Admin/Legacy). Mit limit: Seite + Metadaten.
+    if (limitRaw == null) {
+      const items = await readDashboardMedia(userId);
+      return NextResponse.json({ items, total: items.length, hasMore: false });
+    }
+    const limit = Number(limitRaw);
+    const offset = Number(offsetRaw ?? "0");
+    const page = await readDashboardMediaPage(userId, {
+      limit: Number.isFinite(limit) ? limit : 48,
+      offset: Number.isFinite(offset) ? offset : 0,
+    });
+    return NextResponse.json(page);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Mediathek konnte nicht geladen werden." },
@@ -79,8 +109,8 @@ export async function POST(req: Request) {
   };
 
   try {
-    const next = await writeDashboardMedia(userId, [item]);
-    return NextResponse.json({ ok: true, items: next });
+    await writeDashboardMedia(userId, [item]);
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.warn("[dashboard/media] POST failed:", error);
     return NextResponse.json({ error: "Mediathek konnte nicht gespeichert werden." }, { status: 500 });
@@ -107,15 +137,12 @@ export async function PATCH(req: Request) {
 
   const { id, title } = parsed.data;
   try {
-    const current = await readDashboardMedia(userId);
-    if (!current.some((entry) => entry.id === id)) {
+    const matched = await getDashboardMediaItem(userId, id);
+    if (!matched) {
       return NextResponse.json({ error: "Motiv nicht gefunden." }, { status: 404 });
     }
-    const next = await writeDashboardMedia(
-      userId,
-      current.filter(entry => entry.id === id).map(entry => ({ ...entry, title: title.trim() })),
-    );
-    return NextResponse.json({ ok: true, items: next });
+    await writeDashboardMedia(userId, [{ ...matched, title: title.trim() }]);
+    return NextResponse.json({ ok: true, id, title: title.trim() });
   } catch (error) {
     console.warn("[dashboard/media] PATCH failed:", error);
     return NextResponse.json({ error: "Titel konnte nicht gespeichert werden." }, { status: 500 });
@@ -140,8 +167,8 @@ export async function DELETE(req: Request) {
   if (typeof userId !== "string") return userId;
 
   try {
-    const next = await deleteDashboardMedia(userId, id);
-    return NextResponse.json({ ok: true, items: next });
+    await deleteDashboardMedia(userId, id);
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.warn("[dashboard/media] DELETE failed:", error);
     return NextResponse.json({ error: "Mediathek konnte nicht aktualisiert werden." }, { status: 500 });

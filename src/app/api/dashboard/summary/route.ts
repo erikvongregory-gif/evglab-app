@@ -53,7 +53,7 @@ export async function GET() {
     console.error("dashboard.summary: billing fallback aktiv", error);
   }
   const dashboard = getDashboardMetadata(user.user_metadata);
-  const media = await readDashboardMedia(user.id).catch(() => dashboard.mediaLibrary ?? []);
+  const media = await readDashboardMedia(user.id, { limit: 6 }).catch(() => dashboard.mediaLibrary ?? []);
   const client = createAdminClient();
   const activeMembers = await client.from("workspace_members").select("user_id").eq("owner_id",user.id);
   const pendingInvites = await client.from("workspace_invites").select("id").eq("owner_id",user.id).gt("expires_at",new Date().toISOString());

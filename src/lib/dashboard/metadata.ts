@@ -3,6 +3,8 @@ import { sanitizeStudioOnboardingState, type StudioOnboardingState } from "@/lib
 export type DashboardMediaItem = {
   id: string;
   imageUrl: string;
+  /** Kleines WebP-Vorschaubild für Kacheln; fehlt bei älteren Einträgen. */
+  thumbUrl?: string;
   /** Nutzerdefinierter Motiv-Titel (z. B. „Hefeweizen · Hero-Glas · Public Viewing“). */
   title?: string;
   prompt: string;

@@ -57,6 +57,8 @@ export default async function AnmeldenPage({
   const nextPath = shouldAutoCheckout
     ? `/dashboard?plan=${allowedPlan}&checkout=1&source=homepage_pricing&tab=pricing`
     : normalizeNextPath(nextFromQuery);
+  const emailRaw = params.email;
+  const emailFromQuery = Array.isArray(emailRaw) ? emailRaw[0] : emailRaw;
   const registerErrors = new Set([
     "invite_required",
     "invite_expired",
@@ -64,10 +66,15 @@ export default async function AnmeldenPage({
     "invite_invalid",
     "invite_email_mismatch",
   ]);
+  const forceRegisterForTeamInvite =
+    nextPath.startsWith("/invite/team/") &&
+    urlNotice !== "account_ready" &&
+    urlNotice !== "invite_ready";
   const initialMode =
     mode === "register" ||
     mode === "signup" ||
-    (urlError && registerErrors.has(urlError))
+    (urlError && registerErrors.has(urlError)) ||
+    forceRegisterForTeamInvite
       ? "register"
       : "signin";
 
@@ -83,6 +90,8 @@ export default async function AnmeldenPage({
         inviteToken={typeof invite === "string" ? invite : undefined}
         inviteOnly={isInviteOnlyEnabled()}
         waitlistMode={LOGIN_WAITLIST_ENABLED && !waitlistBypassActive}
+        defaultEmail={typeof emailFromQuery === "string" ? emailFromQuery : undefined}
+        teamInviteMode={nextPath.startsWith("/invite/team/")}
         urlError={typeof urlError === "string" ? urlError : undefined}
         urlNotice={typeof urlNotice === "string" ? urlNotice : undefined}
       />

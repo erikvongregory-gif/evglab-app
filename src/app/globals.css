@@ -3843,6 +3843,17 @@ html:has(.brewai-admin) {
     opacity 180ms ease;
 }
 
+@media (max-width: 639px) {
+  .glow-btn {
+    width: 100%;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--glow-acc-deep) 30%, transparent),
+      0 1px 0 color-mix(in srgb, white 28%, transparent) inset,
+      0 -1px 0 color-mix(in srgb, black 18%, transparent) inset,
+      0 4px 12px -4px color-mix(in srgb, var(--glow-acc) 40%, transparent);
+  }
+}
+
 .glow-btn::before {
   content: "";
   position: absolute;

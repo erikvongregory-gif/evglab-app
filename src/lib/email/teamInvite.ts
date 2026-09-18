@@ -3,6 +3,7 @@ import {
   EMAIL,
   emailButton,
   emailDevForwardNote,
+  emailInfoBox,
   emailMutedLinkNote,
   emailParagraph,
   wrapEmailHtml,
@@ -33,7 +34,7 @@ function buildTeamInviteHtml(input: TeamInviteEmailInput & { forwardedFor?: stri
   const name = greetingName(input.inviteeName, input.to);
   const who = input.inviterEmail?.trim()
     ? `<strong style="color:${EMAIL.text};">${input.inviterEmail.trim()}</strong>`
-    : "dein Team";
+    : "Dein Team";
   const hello = name
     ? `Hallo <strong style="color:${EMAIL.text};">${name}</strong>,`
     : "Hallo,";
@@ -42,13 +43,13 @@ function buildTeamInviteHtml(input: TeamInviteEmailInput & { forwardedFor?: stri
     input.forwardedFor ? emailDevForwardNote(input.forwardedFor) : "",
     emailParagraph(hello),
     emailParagraph(
-      `${who} lädt dich ein, gemeinsam in <strong style="color:${EMAIL.text};">BrewAI</strong> Motive zu erstellen — Marke, Mediathek und Workflow teilen.`,
+      `${who} lädt dich zu <strong style="color:${EMAIL.text};">BrewAI</strong> ein — gemeinsam Motive erstellen, Marke und Mediathek teilen.`,
     ),
-    emailParagraph(`Deine Rolle: <strong style="color:${EMAIL.text};">${roleLabel}</strong>`),
+    emailInfoBox(
+      `<strong>E-Mail:</strong> ${input.to}<br /><strong>Rolle:</strong> ${roleLabel}<br /><span style="color:${EMAIL.muted};">Noch kein Konto? Lege eines mit genau dieser E-Mail an.</span>`,
+    ),
     emailButton(input.inviteUrl, "Einladung annehmen"),
-    emailParagraph(
-      `Melde dich mit <strong style="color:${EMAIL.text};">${input.to}</strong> an und bestätige den Link. Die Einladung ist sieben Tage gültig.`,
-    ),
+    emailParagraph("Der Link ist sieben Tage gültig."),
     emailMutedLinkNote(input.inviteUrl),
   ].join("");
 
@@ -70,15 +71,15 @@ function buildTeamInviteText(input: TeamInviteEmailInput & { forwardedFor?: stri
     ...(input.forwardedFor ? [`Dev-Weiterleitung: eigentlich an ${input.forwardedFor}`, ""] : []),
     name ? `Hallo ${name},` : "Hallo,",
     "",
-    `${who} lädt dich ein, gemeinsam in BrewAI Motive zu erstellen.`,
-    `Deine Rolle: ${roleLabel}`,
+    `${who} lädt dich zu BrewAI ein.`,
+    `E-Mail: ${input.to}`,
+    `Rolle: ${roleLabel}`,
     "",
+    "Noch kein Konto? Lege eines mit genau dieser E-Mail an.",
     "Einladung annehmen:",
     input.inviteUrl,
     "",
-    `Melde dich mit ${input.to} an. Die Einladung ist sieben Tage gültig.`,
-    "",
-    "Du erwartest diese Einladung nicht? Ignoriere diese E-Mail.",
+    "Der Link ist sieben Tage gültig.",
   ].join("\n");
 }
 

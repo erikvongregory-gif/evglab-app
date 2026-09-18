@@ -6,6 +6,8 @@ export async function persistGeneratedMediaItems(input: {
   userId: string;
   jobId: string;
   images: string[];
+  /** Parallel zu images; fehlende Einträge = kein Thumb. */
+  thumbs?: Array<string | undefined>;
   title: string;
   prompt: string;
   aspectRatio: string;
@@ -16,16 +18,20 @@ export async function persistGeneratedMediaItems(input: {
   const createdAt = new Date().toISOString();
   const title = input.title.trim().slice(0, 120) || "Motiv";
   const prompt = input.prompt.trim().slice(0, 240) || title;
-  const items: DashboardMediaItem[] = input.images.map((imageUrl, index) => ({
-    id: `gen-${input.jobId}-${index}`,
-    imageUrl,
-    title,
-    prompt,
-    createdAt,
-    aspectRatio: input.aspectRatio,
-    resolution: input.resolution,
-    outputFormat: input.outputFormat,
-  }));
+  const items: DashboardMediaItem[] = input.images.map((imageUrl, index) => {
+    const thumbUrl = input.thumbs?.[index]?.trim() || undefined;
+    return {
+      id: `gen-${input.jobId}-${index}`,
+      imageUrl,
+      ...(thumbUrl ? { thumbUrl } : {}),
+      title,
+      prompt,
+      createdAt,
+      aspectRatio: input.aspectRatio,
+      resolution: input.resolution,
+      outputFormat: input.outputFormat,
+    };
+  });
   try {
     await writeDashboardMedia(input.userId, items);
     return items;
