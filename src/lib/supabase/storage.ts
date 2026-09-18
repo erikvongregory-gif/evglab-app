@@ -84,6 +84,27 @@ const FONT_MIME: Record<string, string> = {
   otf: "font/otf",
 };
 
+const AVATAR_EDGE = 256;
+
+/** Quadratisches WebP-Profilbild im privaten Bucket. */
+export async function uploadProfileAvatarToStorage(args: {
+  userId: string;
+  buffer: Buffer;
+}): Promise<string> {
+  const webp = await sharp(args.buffer)
+    .rotate()
+    .resize(AVATAR_EDGE, AVATAR_EDGE, { fit: "cover", position: "centre" })
+    .webp({ quality: 82 })
+    .toBuffer();
+
+  return uploadUserImageToStorage({
+    userId: args.userId,
+    buffer: webp,
+    mime: "image/webp",
+    folder: "avatars",
+  });
+}
+
 /** Speichert eine Marken-Schriftdatei im privaten Markenprofil. */
 export async function uploadBrandFontToStorage(args: {
   userId: string;

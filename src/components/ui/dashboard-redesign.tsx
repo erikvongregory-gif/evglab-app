@@ -89,6 +89,7 @@ type SettingsPayload = {
   profileName: string;
   breweryName: string;
   profilePhone: string;
+  profileAvatarUrl: string;
   emailNotifications: boolean;
   weeklySummary: boolean;
   brandProfileMode: "undecided" | "guided" | "skip";

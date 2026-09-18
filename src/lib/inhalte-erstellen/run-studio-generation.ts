@@ -64,6 +64,7 @@ import {
   type GenerationSnapshot,
   type StudioMode,
 } from "@/lib/inhalte-erstellen/studio-config";
+import { buildStudioMediaTitle } from "@/lib/inhalte-erstellen/media-title";
 
 const MAX_PROMPT_CHARS = 12_000;
 const OUTPUT_FORMAT = "png" as const;
@@ -478,13 +479,18 @@ async function prepareStudioGeneration(args: {
     subline: social?.subline,
     ctaText: social?.ctaText,
     brandAccent: parsePrimaryBrandColor(brandProfile.brandColors),
-    mediaTitle: (
-      social?.headline?.trim() ||
-      input.zusatzWunsch?.trim() ||
-      input.beerName?.trim() ||
-      brandProfile.breweryName.trim() ||
-      "Motiv"
-    ).slice(0, 120),
+    mediaTitle: buildStudioMediaTitle({
+      mode,
+      beerName: input.beerName,
+      bierstil: input.bierstil,
+      szene: input.szene,
+      glasTyp: input.glasTyp,
+      behaelter: input.behaelter,
+      flaschenTyp: input.flaschenTyp,
+      characterName: input.characterName,
+      headline: social?.headline,
+      breweryName: brandProfile.breweryName,
+    }),
   };
 }
 
@@ -632,7 +638,8 @@ async function executeStudioGeneration(args: {
     images,
     thumbs,
     title: prepared.mediaTitle,
-    prompt: prepared.mediaTitle,
+    // ponytail: Prompt nur für Suche/Metadaten, nie als Anzeige-Titel
+    prompt: (prepared.input.zusatzWunsch?.trim() || prepared.mediaTitle).slice(0, 240),
     aspectRatio: prepared.aspectRatio,
     resolution: prepared.billingResolution === "2K" ? "2K" : "1K",
     outputFormat: OUTPUT_FORMAT,

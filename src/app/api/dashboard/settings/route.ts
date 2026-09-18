@@ -11,6 +11,7 @@ import { getDashboardMetadata, mergeDashboardMetadata, type DashboardSettings } 
 import { parseBrandReferenceIdFromUrl, repairBrandReferenceImageUrls } from "@/lib/brand/reference-image-store";
 import { normalizeWebsiteUrl } from "@/lib/brand/url-intake";
 import { clampBrandSettingsFields, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
+import { hydratePrivateAssets } from "@/lib/supabase/privateAssets";
 
 const optionalHttpUrl = z
   .string()
@@ -25,6 +26,21 @@ const settingsSchema = z.object({
   profileName: z.string().max(120),
   breweryName: z.string().max(120),
   profilePhone: z.string().max(60),
+  profileAvatarUrl: z
+    .string()
+    .max(1200)
+    .optional()
+    .default("")
+    .transform((value) => {
+      const trimmed = value.trim();
+      if (!trimmed) return "";
+      try {
+        const parsed = new URL(trimmed);
+        return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : "";
+      } catch {
+        return "";
+      }
+    }),
   emailNotifications: z.boolean(),
   weeklySummary: z.boolean(),
   brandProfileMode: z.enum(["undecided", "guided", "skip"]),
@@ -82,6 +98,12 @@ const settingsSchema = z.object({
 
 function personalFromActor(actor: User) {
   const settings = getDashboardMetadata(actor.user_metadata).settings;
+  const oauthAvatar =
+    typeof actor.user_metadata?.avatar_url === "string"
+      ? actor.user_metadata.avatar_url
+      : typeof actor.user_metadata?.picture === "string"
+        ? actor.user_metadata.picture
+        : "";
   return {
     profileName:
       typeof settings?.profileName === "string" && settings.profileName.trim()
@@ -95,6 +117,10 @@ function personalFromActor(actor: User) {
         : typeof actor.user_metadata?.phone === "string"
           ? actor.user_metadata.phone
           : "",
+    profileAvatarUrl:
+      typeof settings?.profileAvatarUrl === "string" && settings.profileAvatarUrl.trim()
+        ? settings.profileAvatarUrl
+        : oauthAvatar,
     emailNotifications:
       typeof settings?.emailNotifications === "boolean" ? settings.emailNotifications : true,
     weeklySummary: typeof settings?.weeklySummary === "boolean" ? settings.weeklySummary : true,
@@ -181,7 +207,7 @@ export async function GET(req: Request) {
     /* Session-Metadata */
   }
 
-  const personal = personalFromActor(actorFresh);
+  const personal = await hydratePrivateAssets(personalFromActor(actorFresh), actorFresh.id);
   const brand = brandFromWorkspace(workspace, new URL(req.url).origin);
   const { brandReferenceImagesStale, ...brandSettings } = brand;
 
@@ -299,6 +325,7 @@ export async function PUT(req: Request) {
   const personalPayload = {
     profileName: payload.profileName,
     profilePhone: payload.profilePhone,
+    profileAvatarUrl: payload.profileAvatarUrl,
     emailNotifications: payload.emailNotifications,
     weeklySummary: payload.weeklySummary,
   };
@@ -307,6 +334,7 @@ export async function PUT(req: Request) {
   const ownerPersonalKeep = {
     profileName: existingBrand.profileName,
     profilePhone: existingBrand.profilePhone,
+    profileAvatarUrl: existingBrand.profileAvatarUrl,
     emailNotifications: existingBrand.emailNotifications,
     weeklySummary: existingBrand.weeklySummary,
   };
@@ -321,6 +349,7 @@ export async function PUT(req: Request) {
     ...actorMerged,
     full_name: payload.profileName || null,
     phone: payload.profilePhone || null,
+    avatar_url: payload.profileAvatarUrl || null,
   };
 
   try {

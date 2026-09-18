@@ -52,6 +52,14 @@ export default async function StudioDashboardLayout({ children }: { children: Re
       : typeof user.user_metadata?.full_name === "string"
         ? user.user_metadata.full_name
         : undefined;
+  const profileAvatarUrl =
+    typeof settings?.profileAvatarUrl === "string" && settings.profileAvatarUrl.trim()
+      ? settings.profileAvatarUrl
+      : typeof user.user_metadata?.avatar_url === "string"
+        ? user.user_metadata.avatar_url
+        : typeof user.user_metadata?.picture === "string"
+          ? user.user_metadata.picture
+          : undefined;
 
   let breweryName =
     typeof settings?.breweryName === "string"
@@ -97,6 +105,7 @@ export default async function StudioDashboardLayout({ children }: { children: Re
           userEmail={user.email}
           initialProfileName={profileName}
           initialBreweryName={breweryName}
+          initialAvatarUrl={profileAvatarUrl}
           defaultSidebarOpen={defaultOpen}
           sidebarVariant={variant}
           sidebarCollapsible={collapsible}

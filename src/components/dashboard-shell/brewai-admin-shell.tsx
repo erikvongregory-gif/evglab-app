@@ -15,7 +15,6 @@ import { useShallow } from "zustand/react/shallow";
 import { EvglabMark } from "@/components/studio/evglab-mark";
 import { AccountSwitcher } from "@/components/dashboard-shell/header/account-switcher";
 import { AssetsFolderButton } from "@/components/dashboard-shell/header/assets-folder-button";
-import { LayoutControls } from "@/components/dashboard-shell/header/layout-controls";
 import { SearchDialog } from "@/components/dashboard-shell/header/search-dialog";
 import { ThemeSwitcher } from "@/components/dashboard-shell/header/theme-switcher";
 import { NavMain } from "@/components/dashboard-shell/sidebar/nav-main";
@@ -113,6 +112,7 @@ export function BrewAiAdminShell({
   userEmail,
   initialProfileName,
   initialBreweryName,
+  initialAvatarUrl,
   defaultSidebarOpen = true,
   sidebarVariant = "sidebar",
   sidebarCollapsible: _sidebarCollapsible = "icon",
@@ -121,6 +121,7 @@ export function BrewAiAdminShell({
   userEmail?: string;
   initialProfileName?: string;
   initialBreweryName?: string;
+  initialAvatarUrl?: string;
   defaultSidebarOpen?: boolean;
   sidebarVariant?: React.ComponentProps<typeof Sidebar>["variant"];
   /** Ignored: collapse is always icon-rail, matching the template default. */
@@ -132,6 +133,9 @@ export function BrewAiAdminShell({
   const pathFullBleed = pathname === "/inhalte-erstellen" || pathname.startsWith("/inhalte-erstellen/");
   const [contentPadding, setContentPadding] = useState<string | undefined>(undefined);
   const [fullBleedOverride, setFullBleedOverride] = useState<boolean | null>(null);
+  const [profileName, setProfileName] = useState(initialProfileName ?? "");
+  const [breweryName, setBreweryName] = useState(initialBreweryName ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl?.trim() ?? "");
   const fullBleed = fullBleedOverride ?? pathFullBleed;
   const shellApi = useMemo<StudioShellContextValue>(
     () => ({
@@ -148,16 +152,40 @@ export function BrewAiAdminShell({
     setContentPadding(undefined);
   }, [pathname]);
 
-  const displayName = (initialProfileName || initialBreweryName || userEmail || "BrewAI").trim();
-  const accountUsers = [
-    {
-      id: "session",
-      name: displayName,
-      email: userEmail || "",
-      avatar: "",
-      role: initialBreweryName || "Studio",
-    },
-  ];
+  useEffect(() => {
+    setProfileName(initialProfileName ?? "");
+  }, [initialProfileName]);
+
+  useEffect(() => {
+    setBreweryName(initialBreweryName ?? "");
+  }, [initialBreweryName]);
+
+  useEffect(() => {
+    setAvatarUrl(initialAvatarUrl?.trim() ?? "");
+  }, [initialAvatarUrl]);
+
+  useEffect(() => {
+    const onProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ profileName?: string; breweryName?: string; profileAvatarUrl?: string }>)
+        .detail;
+      if (!detail || typeof detail !== "object") return;
+      if (typeof detail.profileName === "string") setProfileName(detail.profileName);
+      if (typeof detail.breweryName === "string") setBreweryName(detail.breweryName);
+      if (typeof detail.profileAvatarUrl === "string") setAvatarUrl(detail.profileAvatarUrl.trim());
+    };
+    window.addEventListener("evglab-profile-updated", onProfileUpdated);
+    return () => window.removeEventListener("evglab-profile-updated", onProfileUpdated);
+  }, []);
+
+  const displayName = (profileName || breweryName || userEmail || "BrewAI").trim();
+  const sessionUser = {
+    id: "session",
+    name: displayName,
+    email: userEmail || "",
+    avatar: avatarUrl,
+    role: breweryName || "Studio",
+  };
+  const accountUsers = [sessionUser];
 
   useEffect(() => {
     void (async () => {
@@ -189,7 +217,7 @@ export function BrewAiAdminShell({
             }
           >
             <BrewAiSidebar
-              user={{ name: displayName, email: userEmail || "", avatar: "" }}
+              user={{ name: displayName, email: userEmail || "", avatar: avatarUrl }}
               variant={sidebarVariant}
             />
             <SidebarInset
@@ -224,7 +252,6 @@ export function BrewAiAdminShell({
                   </div>
                   <div className="flex items-center gap-2">
                     <AssetsFolderButton />
-                    <LayoutControls />
                     <ThemeSwitcher />
                     <AccountSwitcher users={accountUsers} onLogout={() => void handleLogout()} />
                   </div>

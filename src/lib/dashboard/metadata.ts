@@ -16,9 +16,18 @@ export type DashboardMediaItem = {
 
 export function getMediaDisplayTitle(item: Pick<DashboardMediaItem, "title" | "prompt">): string {
   const custom = item.title?.trim();
-  if (custom) return custom;
+  if (custom && !looksLikeGenerationPrompt(custom)) return custom;
   const fallback = item.prompt?.trim();
-  return fallback || "Unbenanntes Motiv";
+  if (fallback && !looksLikeGenerationPrompt(fallback)) return fallback;
+  return "Unbenanntes Motiv";
+}
+
+/** Alte Einträge speicherten oft den EN-Prompt als Titel — nicht in der UI zeigen. */
+function looksLikeGenerationPrompt(text: string): boolean {
+  if (/\b(SCENE:|SHOT:|photorealistic|FORBIDDEN|Image 1|GLASS BRAND)\b/i.test(text)) return true;
+  if (text.includes("\n")) return true;
+  if (text.length > 70 && !text.includes(" · ") && (text.match(/,/g)?.length ?? 0) >= 3) return true;
+  return false;
 }
 
 /** Vierstellige CHARGE-Nummer für Dashboard-/Medien-Badges (z. B. 42 → „0042“). */
@@ -187,6 +196,8 @@ export type DashboardSettings = {
   profileName: string;
   breweryName: string;
   profilePhone: string;
+  /** Signierte Storage-URL (oder OAuth-Bild) für das persönliche Profilbild. */
+  profileAvatarUrl: string;
   emailNotifications: boolean;
   weeklySummary: boolean;
   brandProfileMode: "undecided" | "guided" | "skip";

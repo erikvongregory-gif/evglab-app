@@ -114,19 +114,19 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/settings">
-                  <CircleUser />
+                  <CircleUser className="group-hover/dropdown-menu-item:-rotate-6 group-focus/dropdown-menu-item:-rotate-6" />
                   Profil
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/pricing">
-                  <CreditCard />
+                  <CreditCard className="group-hover/dropdown-menu-item:-rotate-3 group-focus/dropdown-menu-item:-rotate-3" />
                   Abonnement
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/settings">
-                  <Settings2 />
+                  <Settings2 className="group-hover/dropdown-menu-item:rotate-45 group-focus/dropdown-menu-item:rotate-45" />
                   Einstellungen
                 </Link>
               </DropdownMenuItem>
@@ -137,13 +137,17 @@ export function NavUser({
                   void restartOnboarding();
                 }}
               >
-                {restartingOnboarding ? <Loader2 className="animate-spin" /> : <RotateCcw />}
+                {restartingOnboarding ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <RotateCcw className="group-hover/dropdown-menu-item:-rotate-45 group-focus/dropdown-menu-item:-rotate-45" />
+                )}
                 {restartingOnboarding ? "Onboarding wird gestartet …" : "Onboarding neu starten"}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void logout()}>
-              <LogOut />
+              <LogOut className="group-hover/dropdown-menu-item:translate-x-0.5 group-focus/dropdown-menu-item:translate-x-0.5" />
               Abmelden
             </DropdownMenuItem>
           </DropdownMenuContent>

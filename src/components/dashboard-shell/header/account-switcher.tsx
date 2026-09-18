@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { BadgeCheck, CreditCard, LogOut, Settings2 } from "lucide-react";
 
@@ -31,6 +31,11 @@ export function AccountSwitcher({
   readonly onLogout?: () => void;
 }) {
   const [activeUser, setActiveUser] = useState(users[0]);
+
+  useEffect(() => {
+    const next = users.find((user) => user.id === activeUser?.id) ?? users[0];
+    if (next) setActiveUser(next);
+  }, [users, activeUser?.id]);
 
   if (!activeUser) {
     return null;
@@ -72,26 +77,26 @@ export function AccountSwitcher({
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
             <Link href="/dashboard/settings">
-              <BadgeCheck />
+              <BadgeCheck className="group-hover/dropdown-menu-item:-rotate-6 group-focus/dropdown-menu-item:-rotate-6" />
               Profil
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/dashboard/pricing">
-              <CreditCard />
+              <CreditCard className="group-hover/dropdown-menu-item:-rotate-3 group-focus/dropdown-menu-item:-rotate-3" />
               Abonnement
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/dashboard/settings">
-              <Settings2 />
+              <Settings2 className="group-hover/dropdown-menu-item:rotate-45 group-focus/dropdown-menu-item:rotate-45" />
               Einstellungen
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onLogout}>
-          <LogOut />
+          <LogOut className="group-hover/dropdown-menu-item:translate-x-0.5 group-focus/dropdown-menu-item:translate-x-0.5" />
           Abmelden
         </DropdownMenuItem>
       </DropdownMenuContent>

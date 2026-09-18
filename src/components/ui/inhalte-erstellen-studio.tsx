@@ -22,6 +22,7 @@ import {
   type OccasionTemplate,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/occasion-templates";
 import { estimateStudioImageTokenCost } from "@/lib/billing/generationTokenCost";
+import { buildStudioMediaTitle } from "@/lib/inhalte-erstellen/media-title";
 import { hyperrealisticSchema, socialPostSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import type { SocialPostInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { hasUsableBeerEtikett, MAX_MY_BEERS, type DashboardBeer } from "@/lib/dashboard/metadata";
@@ -764,11 +765,18 @@ export function InhalteErstellenStudio({
       const mediaPromptLabel = [headline.trim(), subline.trim()].filter(Boolean).join(" · ").slice(0, 120);
       if (!data.mediaPersisted) {
         try {
+          const mediaTitle = buildStudioMediaTitle({
+            mode: "social",
+            beerName: selectedBeer?.name,
+            bierstil: selectedBeer?.bierstil || was.bierstil,
+            headline: headline.trim(),
+            breweryName: brandLabel,
+          });
           for (const [index, img] of resultImages.entries()) {
             await persistMediaItem({
               id: data.jobId ? `gen-${data.jobId}-${index}` : crypto.randomUUID(),
               imageUrl: img.imageUrl,
-              title: `${contentTab === "social" ? "Social" : "Kampagne"} · ${selectedBeer?.name || brandLabel}`,
+              title: mediaTitle,
               prompt: mediaPromptLabel,
               createdAt: new Date().toISOString(),
               aspectRatio,
@@ -1021,11 +1029,21 @@ export function InhalteErstellenStudio({
       const mediaPromptLabel = (userPrompt.trim() || activePreset?.title || was.label).slice(0, 120);
       if (!data.mediaPersisted) {
         try {
+          const mediaTitle = buildStudioMediaTitle({
+            mode: "produktfoto",
+            beerName: selectedBeer?.name,
+            bierstil: was.bierstil,
+            szene: wo.szene,
+            glasTyp: behaelter === "F" ? undefined : was.glasTyp,
+            behaelter,
+            flaschenTyp,
+            breweryName: brandLabel,
+          });
           for (const [index, img] of resultImages.entries()) {
             await persistMediaItem({
               id: data.jobId ? `gen-${data.jobId}-${index}` : `openai-${Date.now()}-${index}`,
               imageUrl: img.imageUrl,
-              title: mediaPromptLabel,
+              title: mediaTitle,
               prompt: mediaPromptLabel,
               createdAt: new Date().toISOString(),
               aspectRatio: parsed.aspectRatio,

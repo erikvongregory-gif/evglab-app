@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { brandLockLabel, formatDomain } from "@/lib/brand/brand-profile-display";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
@@ -14,16 +14,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { getInitials } from "@/lib/utils";
 
 export type AdminSettingsPayload = {
   profileName: string;
   profilePhone: string;
+  profileAvatarUrl?: string;
   breweryName: string;
   emailNotifications: boolean;
   weeklySummary: boolean;
@@ -57,14 +60,82 @@ export function AdminSettingsView({
 }) {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const draft = value;
 
   const setField = <K extends keyof AdminSettingsPayload>(key: K, next: AdminSettingsPayload[K]) => {
     if (!draft) return;
     onChange({ ...draft, [key]: next });
+  };
+
+  const applyAvatarUrl = (url: string) => {
+    if (!draft) return;
+    onChange({ ...draft, profileAvatarUrl: url });
+    window.dispatchEvent(
+      new CustomEvent("evglab-profile-updated", {
+        detail: {
+          breweryName: draft.breweryName ?? "",
+          profileName: draft.profileName ?? "",
+          profileAvatarUrl: url,
+        },
+      }),
+    );
+  };
+
+  const uploadAvatar = async (file: File) => {
+    setAvatarBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/dashboard/avatar", {
+        method: "POST",
+        credentials: "include",
+        body,
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; profileAvatarUrl?: string }
+        | null;
+      if (!res.ok) {
+        setError(json?.error || "Profilbild konnte nicht hochgeladen werden.");
+        return;
+      }
+      applyAvatarUrl(json?.profileAvatarUrl ?? "");
+      setNotice("Profilbild aktualisiert.");
+    } catch {
+      setError("Profilbild konnte nicht hochgeladen werden.");
+    } finally {
+      setAvatarBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const removeAvatar = async () => {
+    setAvatarBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/dashboard/avatar", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok) {
+        setError(json?.error || "Profilbild konnte nicht entfernt werden.");
+        return;
+      }
+      applyAvatarUrl("");
+      setNotice("Profilbild entfernt.");
+    } catch {
+      setError("Profilbild konnte nicht entfernt werden.");
+    } finally {
+      setAvatarBusy(false);
+    }
   };
 
   const save = async () => {
@@ -93,6 +164,7 @@ export function AdminSettingsView({
           detail: {
             breweryName: savedSettings.breweryName ?? "",
             profileName: savedSettings.profileName ?? "",
+            profileAvatarUrl: savedSettings.profileAvatarUrl ?? draft.profileAvatarUrl ?? "",
           },
         }),
       );
@@ -103,6 +175,9 @@ export function AdminSettingsView({
       setSaving(false);
     }
   };
+
+  const avatarUrl = draft?.profileAvatarUrl?.trim() || "";
+  const initials = getInitials(draft?.profileName?.trim() || draft?.breweryName?.trim() || "?");
 
   return (
     <div className="@container/main flex flex-col gap-4 md:gap-6">
@@ -174,9 +249,50 @@ export function AdminSettingsView({
           <Card>
             <CardHeader>
               <CardTitle>Profil</CardTitle>
-              <CardDescription>Name und Marke für Begrüßung und Sidebar</CardDescription>
+              <CardDescription>Name, Bild und Marke für Begrüßung und Sidebar</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
+                <Avatar size="lg" className="size-16 after:rounded-full">
+                  {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
+                  <AvatarFallback className="text-base">{initials}</AvatarFallback>
+                </Avatar>
+                <div className="flex min-w-0 flex-col gap-2">
+                  <p className="text-muted-foreground text-xs">JPG, PNG oder WebP · max. 5 MB</p>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void uploadAvatar(file);
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={avatarBusy}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {avatarBusy ? "Lädt…" : avatarUrl ? "Bild ändern" : "Bild hochladen"}
+                    </Button>
+                    {avatarUrl ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={avatarBusy}
+                        onClick={() => void removeAvatar()}
+                      >
+                        Entfernen
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="settings-profile-name">Dein Name</Label>
                 <Input

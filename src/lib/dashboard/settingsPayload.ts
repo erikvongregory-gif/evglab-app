@@ -87,6 +87,7 @@ export function sanitizeDashboardSettings(input: unknown): DashboardSettings {
     profileName: asString(cleaned.profileName),
     breweryName: asString(cleaned.breweryName),
     profilePhone: asString(cleaned.profilePhone),
+    profileAvatarUrl: asString(cleaned.profileAvatarUrl).trim(),
     emailNotifications: asBool(cleaned.emailNotifications, true),
     weeklySummary: asBool(cleaned.weeklySummary, true),
     brandProfileMode: asBrandMode(cleaned.brandProfileMode),

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { ImagePlus, Search, X } from "lucide-react";
+import { Check, ImagePlus, Search, X } from "lucide-react";
 import { getMediaDisplayTitle } from "@/lib/dashboard/metadata";
 import { clearActiveGeneration, readActiveGeneration } from "@/lib/inhalte-erstellen/active-generation";
 import {
@@ -14,6 +14,15 @@ import {
   type MediaJobCard,
 } from "@/lib/inhalte-erstellen/media-job-cards";
 import { jobProgressMessage, pollGenerationJob, type PolledJobResult } from "@/lib/inhalte-erstellen/poll-generation-job";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -404,6 +413,11 @@ export function StudioMediaLibrary({
   const [titleError, setTitleError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { jobs, recheck } = useStudioJobCards(focusedJobId, onMediaRefresh);
 
   useEffect(() => {
@@ -436,6 +450,74 @@ export function StudioMediaLibrary({
     setTitleError(null);
     setSelectedItem(item);
   }, []);
+
+  const exitSelecting = useCallback(() => {
+    setSelecting(false);
+    setSelectedIds([]);
+    setDeleteError(null);
+    setConfirmDeleteOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!selecting || selectedItem || confirmDeleteOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") exitSelecting();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selecting, selectedItem, confirmDeleteOpen, exitSelecting]);
+
+  const toggleSelectedId = useCallback((id: string) => {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id],
+    );
+  }, []);
+
+  const deleteMediaIds = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) return;
+      setDeleting(true);
+      setDeleteError(null);
+      try {
+        const results = await Promise.all(
+          ids.map(async (id) => {
+            const res = await fetch(`/api/dashboard/media?id=${encodeURIComponent(id)}`, {
+              method: "DELETE",
+              credentials: "same-origin",
+            });
+            if (!res.ok) {
+              const json = (await res.json().catch(() => null)) as { error?: string } | null;
+              return { id, error: json?.error ?? "Löschen fehlgeschlagen." };
+            }
+            return { id, error: null as string | null };
+          }),
+        );
+        const failed = results.filter((result) => result.error);
+        const removed = new Set(results.filter((result) => !result.error).map((result) => result.id));
+        if (removed.size > 0) {
+          onItemsChange(items.filter((item) => !removed.has(item.id)));
+          setSelectedItem((current) => (current && removed.has(current.id) ? null : current));
+          setSelectedIds((current) => current.filter((id) => !removed.has(id)));
+          onMediaRefresh?.();
+        }
+        if (failed.length > 0) {
+          setDeleteError(
+            failed.length === ids.length
+              ? failed[0]?.error ?? "Löschen fehlgeschlagen."
+              : `${failed.length} von ${ids.length} Motiven konnten nicht gelöscht werden.`,
+          );
+          return;
+        }
+        setConfirmDeleteOpen(false);
+        if (selecting) exitSelecting();
+      } catch {
+        setDeleteError("Löschen fehlgeschlagen.");
+      } finally {
+        setDeleting(false);
+      }
+    },
+    [exitSelecting, items, onItemsChange, onMediaRefresh, selecting],
+  );
 
   const saveMediaTitle = useCallback(
     async (item: MediaItem, nextTitle: string) => {
@@ -534,19 +616,58 @@ export function StudioMediaLibrary({
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl leading-none tracking-tight">Mediathek</h1>
             <p className="text-muted-foreground text-sm">
-              Fertige Motive und laufende Aufträge an einem Ort.
+              {selecting
+                ? "Motive antippen, um sie zum Löschen auszuwählen."
+                : "Fertige Motive und laufende Aufträge an einem Ort."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" asChild>
-              <Link href="/inhalte-erstellen">Zur Einstiegsseite</Link>
-            </Button>
-            <Button asChild>
-              <Link href={createHref}>
-                <ImagePlus data-icon="inline-start" />
-                {createLabel}
-              </Link>
-            </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {selecting ? (
+              <>
+                <Button type="button" variant="outline" disabled={deleting} onClick={exitSelecting}>
+                  Abbrechen
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={selectedIds.length === 0 || deleting}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setConfirmDeleteOpen(true);
+                  }}
+                >
+                  {selectedIds.length > 0
+                    ? `${selectedIds.length} ${selectedIds.length === 1 ? "Motiv" : "Motive"} löschen`
+                    : "Löschen"}
+                </Button>
+              </>
+            ) : (
+              <>
+                {loaded && items.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedItem(null);
+                      setSelecting(true);
+                      setSelectedIds([]);
+                      setDeleteError(null);
+                    }}
+                  >
+                    Auswählen
+                  </Button>
+                ) : null}
+                <Button variant="outline" asChild>
+                  <Link href="/inhalte-erstellen">Zur Einstiegsseite</Link>
+                </Button>
+                <Button asChild>
+                  <Link href={createHref}>
+                    <ImagePlus data-icon="inline-start" />
+                    {createLabel}
+                  </Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -655,36 +776,69 @@ export function StudioMediaLibrary({
                   </Card>
                 );
               })}
-              {[...leading, ...restItems].map((it) => (
-                <button
-                  key={it.id}
-                  type="button"
-                  className={cn(
-                    "mb-3 w-full break-inside-avoid overflow-hidden rounded-xl bg-card text-left shadow-sm transition-colors hover:bg-muted/40",
-                    focusedJobId && it.id.startsWith(`gen-${focusedJobId}-`) && "ring-2 ring-primary",
-                  )}
-                  onClick={() => openMediaItem(it)}
-                  aria-label={`${getMediaDisplayTitle(it)} in Großansicht öffnen`}
-                >
-                  <div className="w-full overflow-hidden bg-muted" style={jobAspectStyle(it.aspectRatio)}>
-                    <motion.img
-                      className="block h-full w-full object-cover"
-                      layoutId={reduceMotion ? undefined : `studio-media-${it.id}`}
-                      src={getMediaThumbUrl(it)}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
-                    />
-                  </div>
-                  <div className="space-y-0.5 p-3">
-                    <p className="truncate text-sm font-medium">{clampText(getMediaDisplayTitle(it), 48)}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {it.aspectRatio} · {formatRelativeTime(it.createdAt)}
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {[...leading, ...restItems].map((it) => {
+                const isSelected = selectedIds.includes(it.id);
+                return (
+                  <button
+                    key={it.id}
+                    type="button"
+                    className={cn(
+                      "relative mb-3 w-full break-inside-avoid overflow-hidden rounded-xl border-0 bg-card text-left shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-0",
+                      focusedJobId && it.id.startsWith(`gen-${focusedJobId}-`) && !selecting && "ring-2 ring-primary/50",
+                    )}
+                    onClick={() => {
+                      if (selecting) {
+                        toggleSelectedId(it.id);
+                        return;
+                      }
+                      openMediaItem(it);
+                    }}
+                    aria-pressed={selecting ? isSelected : undefined}
+                    aria-label={
+                      selecting
+                        ? `${getMediaDisplayTitle(it)} ${isSelected ? "abwählen" : "auswählen"}`
+                        : `${getMediaDisplayTitle(it)} in Großansicht öffnen`
+                    }
+                  >
+                    <div className="relative w-full overflow-hidden bg-transparent" style={jobAspectStyle(it.aspectRatio)}>
+                      <motion.img
+                        className={cn(
+                          "block h-full w-full object-cover transition-[filter,opacity] duration-200",
+                          selecting && isSelected && "blur-[2.5px] opacity-90",
+                        )}
+                        layoutId={reduceMotion || selecting ? undefined : `studio-media-${it.id}`}
+                        src={getMediaThumbUrl(it)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
+                      />
+                      {selecting && isSelected ? (
+                        <span aria-hidden className="pointer-events-none absolute inset-0 bg-white/25 backdrop-blur-[2px]" />
+                      ) : null}
+                      {selecting ? (
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "absolute top-2 right-2 flex size-6 items-center justify-center rounded-full border-0 shadow-none backdrop-blur-md",
+                            isSelected
+                              ? "bg-primary/90 text-primary-foreground"
+                              : "bg-white/55 text-transparent",
+                          )}
+                        >
+                          <Check className="size-3.5" strokeWidth={2.5} />
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="space-y-0.5 p-3">
+                      <p className="truncate text-sm font-medium">{clampText(getMediaDisplayTitle(it), 48)}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {it.aspectRatio} · {formatRelativeTime(it.createdAt)}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -792,11 +946,24 @@ export function StudioMediaLibrary({
                     {titleError ? <p className="text-destructive text-sm">{titleError}</p> : null}
                     {titleSaving ? <p className="text-muted-foreground text-sm">Titel wird gespeichert …</p> : null}
                     {downloadError ? <p className="text-destructive text-sm">{downloadError}</p> : null}
+                    {deleteError && !selecting ? <p className="text-destructive text-sm">{deleteError}</p> : null}
                     <div className="mt-auto flex flex-wrap gap-2">
-                      <Button disabled={downloading} onClick={() => void handleDownload(selectedItem)}>
+                      <Button disabled={downloading || deleting} onClick={() => void handleDownload(selectedItem)}>
                         {downloading ? "Wird heruntergeladen …" : "Herunterladen"}
                       </Button>
-                      <Button variant="outline" onClick={() => setSelectedItem(null)}>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={deleting || downloading}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setSelectedIds([selectedItem.id]);
+                          setConfirmDeleteOpen(true);
+                        }}
+                      >
+                        Löschen
+                      </Button>
+                      <Button variant="outline" disabled={deleting} onClick={() => setSelectedItem(null)}>
                         Schließen
                       </Button>
                     </div>
@@ -806,6 +973,45 @@ export function StudioMediaLibrary({
             ) : null}
           </AnimatePresence>
         </LayoutGroup>
+
+        {selecting && deleteError ? (
+          <p className="text-destructive text-sm" role="alert">
+            {deleteError}
+          </p>
+        ) : null}
+
+        <AlertDialog
+          open={confirmDeleteOpen}
+          onOpenChange={(open) => {
+            if (deleting) return;
+            setConfirmDeleteOpen(open);
+            if (!open && !selecting) setSelectedIds([]);
+          }}
+        >
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {selectedIds.length === 1 ? "Motiv löschen?" : `${selectedIds.length} Motive löschen?`}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {selectedIds.length === 1
+                  ? "Das Motiv wird dauerhaft aus der Mediathek entfernt."
+                  : "Die ausgewählten Motive werden dauerhaft aus der Mediathek entfernt."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Abbrechen</AlertDialogCancel>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleting || selectedIds.length === 0}
+                onClick={() => void deleteMediaIds(selectedIds)}
+              >
+                {deleting ? "Wird gelöscht …" : "Löschen"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

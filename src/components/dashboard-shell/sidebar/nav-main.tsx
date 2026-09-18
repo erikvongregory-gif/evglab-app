@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { ChevronRight, MailIcon, PlusCircleIcon } from "lucide-react";
+import { ChevronRight, PlusCircleIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -122,22 +121,6 @@ export function NavMain({ items }: NavMainProps) {
                   <span>Neu erstellen</span>
                 </Link>
               </SidebarMenuButton>
-              <Button
-                size="icon"
-                className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:opacity-0"
-                variant="outline"
-                asChild
-              >
-                <Link
-                  prefetch={false}
-                  href="/dashboard/settings"
-                  aria-label="Einstellungen"
-                  onClick={closeMobileNav}
-                >
-                  <MailIcon />
-                  <span className="sr-only">Einstellungen</span>
-                </Link>
-              </Button>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
@@ -228,7 +211,7 @@ const NAV_ICON_HOVER: Record<string, string> = {
 };
 
 const NAV_ICON_MOTION = cn(
-  "transition-[color,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+  "transition-[color,scale,rotate,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
   "motion-reduce:transition-none",
   "motion-reduce:group-hover/menu-button:translate-y-0 motion-reduce:group-hover/menu-button:rotate-0 motion-reduce:group-hover/menu-button:scale-100",
 );
