@@ -1,6 +1,7 @@
 import { hydratePrivateAssets } from "@/lib/supabase/privateAssets";
 import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPortalOperatorUserId } from "@/lib/auth/owner";
 import type { DashboardTeamRole } from "./metadata";
 
 function isMissingRelationError(error: { code?: string; message?: string } | null | undefined) {
@@ -36,6 +37,12 @@ export async function getWorkspace(userId: string): Promise<{ ownerId: string; r
   }
   if (!data) return { ownerId: userId, role: "owner" };
   if (await isAccountMarkedForDeletion(admin, data.owner_id)) throw new Error("Teamkonto ist zur Löschung vorgemerkt.");
+
+  // Portal-Betreiber: Teammitglieder brauchen kein Stripe-Abo am Inhaber-Konto.
+  if (await isPortalOperatorUserId(data.owner_id)) {
+    return { ownerId: data.owner_id, role: data.role as DashboardTeamRole };
+  }
+
   const billing = await admin.from("billing_subscriptions").select("plan,subscription_status").eq("user_id", data.owner_id).single();
   if (billing.error || !["active", "trialing"].includes(billing.data.subscription_status)) throw new Error("Teamabo nicht aktiv.");
   const members = await admin.from("workspace_members").select("user_id").eq("owner_id", data.owner_id).order("created_at").order("user_id");

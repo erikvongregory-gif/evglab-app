@@ -48,6 +48,10 @@ export type BrandScanSuggestion = {
   brandLabelReferenceUrl?: string;
   /** Aus Sortiment-/Produktseiten erkannte Biersorten — werden beim Aktivieren angelegt. */
   suggestedBeers?: BrandSuggestedBeer[];
+  /** Aus Website-CSS / Google Fonts erkannte Headline-Schrift. */
+  brandHeadlineFontName?: string;
+  /** Hochgeladene Schriftdatei (signed URL), falls woff2 geladen werden konnte. */
+  brandFontFileUrl?: string;
 };
 
 type Slot = {
@@ -73,6 +77,7 @@ const ANALYSIS_STEPS = [
   "Unterseiten werden gelesen…",
   "Sortiment wird erkannt…",
   "Texte & Tonalität werden erkannt…",
+  "Typografie wird übernommen…",
   "Bilder werden ausgewertet…",
   "Markenprofil wird erstellt…",
 ];
@@ -85,7 +90,7 @@ const INSTAGRAM_ANALYSIS_STEPS = [
 ];
 
 /** Pausen (ms) zwischen den Checklisten-Schritten — der letzte Schritt bleibt aktiv bis zur Antwort. */
-const ANALYSIS_STEP_DURATIONS_MS = [2400, 4200, 6200, 8600, 11000];
+const ANALYSIS_STEP_DURATIONS_MS = [2400, 4200, 6200, 8200, 10500, 12500];
 
 /** Hochwertiger Startpunkt fuer den Express-Weg ohne Analyse — Kunde ergaenzt nur den Namen. */
 function manualTemplateReview(): BrandScanSuggestion {
@@ -174,6 +179,9 @@ function suggestionFromPartial(s: Partial<BrandScanSuggestion>, defaults: Partia
     brandProfileSource: defaults.brandProfileSource ?? "url",
     brandLabelReferenceUrl: typeof s.brandLabelReferenceUrl === "string" ? s.brandLabelReferenceUrl : "",
     suggestedBeers: parseSuggestedBeers(s.suggestedBeers),
+    brandHeadlineFontName:
+      typeof s.brandHeadlineFontName === "string" ? s.brandHeadlineFontName.trim().slice(0, 80) : "",
+    brandFontFileUrl: typeof s.brandFontFileUrl === "string" ? s.brandFontFileUrl.trim().slice(0, 1200) : "",
   };
 }
 
@@ -198,6 +206,7 @@ function buildActivateRequestBody(suggestion: BrandScanSuggestion): Record<strin
     brandDonts: rest.brandDonts,
     brandInstagramUrl: rest.brandInstagramUrl,
     brandWebsiteUrl: rest.brandWebsiteUrl,
+    brandHeadlineFontName: rest.brandHeadlineFontName ?? "",
   });
 
   return {
@@ -216,6 +225,8 @@ function buildActivateRequestBody(suggestion: BrandScanSuggestion): Record<strin
           : "url",
     brandReferenceImageUrls: rest.referenceImageUrls,
     brandLabelReferenceUrl: rest.brandLabelReferenceUrl ?? "",
+    brandHeadlineFontName: clamped.brandHeadlineFontName ?? (rest.brandHeadlineFontName ?? "").trim().slice(0, 80),
+    brandFontFileUrl: (rest.brandFontFileUrl ?? "").trim().slice(0, 1200),
     referenceImagePayloads:
       hasUsableReferenceUrls(rest.referenceImageUrls) || !referenceImagePayloads?.length
         ? undefined

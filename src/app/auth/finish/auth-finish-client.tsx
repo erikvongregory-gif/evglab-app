@@ -1,5 +1,6 @@
 "use client";
 
+import { AuthTransition } from "@/components/ui/auth-transition";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -105,9 +106,5 @@ export function AuthFinishClient({ initialNext = "/dashboard" }: { initialNext?:
     };
   }, [initialNext]);
 
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#131211] px-4">
-      <p className="text-sm text-[#c4bdb3]">{message}</p>
-    </main>
-  );
+  return <AuthTransition message={message} />;
 }

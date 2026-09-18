@@ -1,10 +1,26 @@
 "use client";
 
 import React from "react";
+import {
+  AnimatedStudioIcon,
+  hasAnimatedStudioIcon,
+} from "@/components/ui/animated-studio-icon";
 
 const SW = 1.5;
 
-export function StudioIcon({ name, size = 18 }: { name: string; size?: number }) {
+export function StudioIcon({
+  name,
+  size = 18,
+  className,
+}: {
+  name: string;
+  size?: number;
+  className?: string;
+}) {
+  if (hasAnimatedStudioIcon(name)) {
+    return <AnimatedStudioIcon name={name} size={size} className={className} />;
+  }
+
   const s = size;
   const common = {
     width: s,
@@ -16,6 +32,7 @@ export function StudioIcon({ name, size = 18 }: { name: string; size?: number })
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
     "aria-hidden": true,
+    className,
   };
 
   switch (name) {

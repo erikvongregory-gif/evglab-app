@@ -66,7 +66,7 @@ export function AccountSwitcher({
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile">
+            <Link href="/dashboard/settings">
               <BadgeCheck />
               Profil
             </Link>

@@ -1,3 +1,4 @@
+import { authTransitionBody, authTransitionCss } from "@/lib/auth/transition-design";
 import { NextResponse } from "next/server";
 import { withRequestHeaders } from "@/lib/security/authObservability";
 
@@ -145,7 +146,7 @@ export function createOAuthSessionPollerHtml(
 ): NextResponse {
   const success = jsonForHtmlScript(opts.successUrl);
   const fallback = jsonForHtmlScript(opts.fallbackUrl);
-  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Anmeldung</title></head><body><p style="font-family:system-ui,sans-serif;color:#c4bdb3;background:#131211;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center">Anmeldung wird abgeschlossen …</p><script>
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>BrewAI</title><style>html,body{margin:0;background:#131211}${authTransitionCss}</style></head><body>${authTransitionBody}<script>
 (function(){var ok=${success},fb=${fallback},n=0,max=120;
 function go(u){location.replace(u)}
 function repair(){return fetch("/api/auth/repair-session",{method:"POST",credentials:"same-origin",cache:"no-store"}).catch(function(){})}

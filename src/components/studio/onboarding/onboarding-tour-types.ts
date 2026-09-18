@@ -10,6 +10,8 @@ export type OnboardingBrandDraft = {
   brandInstagramUrl: string;
   brandProfileSource: "url" | "instagram" | "manual" | "skip";
   brandLabelReferenceUrl: string;
+  brandHeadlineFontName?: string;
+  brandFontFileUrl?: string;
   referenceImageUrls: string[];
   referenceImagePayloads?: { base64: string; mime: string }[];
   suggestedBeers?: Array<{
@@ -49,6 +51,8 @@ export function emptyBrandDraft(settings?: Partial<DashboardSettings> | null): O
         ? settings.brandProfileSource
         : "manual",
     brandLabelReferenceUrl: settings?.brandLabelReferenceUrl?.trim() || "",
+    brandHeadlineFontName: settings?.brandHeadlineFontName?.trim() || "",
+    brandFontFileUrl: settings?.brandFontFileUrl?.trim() || "",
     referenceImageUrls: Array.isArray(settings?.brandReferenceImageUrls)
       ? settings.brandReferenceImageUrls.filter(Boolean).slice(0, 10)
       : [],

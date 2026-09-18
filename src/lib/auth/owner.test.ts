@@ -13,11 +13,13 @@ describe("trusted roles", () => {
   });
   it("accepts server roles", () => {
     expect(hasAdminAccess(user({app_metadata:{role:"admin"}}))).toBe(true);
+    expect(hasAdminAccess(user({app_metadata:{role:"owner"}}))).toBe(true);
     expect(isOwnerUser(user({app_metadata:{role:"owner"}}))).toBe(true);
   });
   it("requires verified email for configured owner addresses", () => {
     vi.stubEnv("OWNER_EMAILS","user@example.com");
     expect(isOwnerUser(user({email_confirmed_at:undefined}))).toBe(false);
     expect(isOwnerUser(user({}))).toBe(true);
+    expect(hasAdminAccess(user({}))).toBe(true);
   });
 });

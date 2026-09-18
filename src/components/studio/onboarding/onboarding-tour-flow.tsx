@@ -134,6 +134,8 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
         brandInstagramUrl: (s.brandInstagramUrl || "").trim(),
         brandProfileSource: "url",
         brandLabelReferenceUrl: (s.brandLabelReferenceUrl || "").trim(),
+        brandHeadlineFontName: (s.brandHeadlineFontName || "").trim().slice(0, BRAND_SETTINGS_LIMITS.brandHeadlineFontName),
+        brandFontFileUrl: (s.brandFontFileUrl || "").trim().slice(0, 1200),
         referenceImageUrls: Array.isArray(s.referenceImageUrls) ? s.referenceImageUrls.filter(Boolean).slice(0, 10) : [],
         referenceImagePayloads: s.referenceImagePayloads,
         suggestedBeers: Array.isArray(s.suggestedBeers) ? s.suggestedBeers : undefined,
@@ -163,6 +165,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
         brandColors: brand.brandColors,
         brandDos: brand.brandDos,
         brandDonts: brand.brandDonts,
+        brandHeadlineFontName: brand.brandHeadlineFontName ?? "",
       });
       const body: Record<string, unknown> = {
         breweryName: clamped.breweryName,
@@ -175,6 +178,8 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
         brandProfileSource: brand.brandProfileSource || "url",
         brandReferenceImageUrls: brand.referenceImageUrls,
         brandLabelReferenceUrl: brand.brandLabelReferenceUrl,
+        brandHeadlineFontName: clamped.brandHeadlineFontName ?? brand.brandHeadlineFontName ?? "",
+        brandFontFileUrl: brand.brandFontFileUrl ?? "",
       };
       if (brand.referenceImagePayloads?.length) {
         body.referenceImagePayloads = brand.referenceImagePayloads;

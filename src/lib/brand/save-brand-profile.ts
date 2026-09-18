@@ -51,6 +51,8 @@ export type SaveBrandProfileInput = {
   brandReferenceImageUrls?: string[];
   /** Bester Packshot (Etikett-Traeger) aus der Analyse — Quelle fuer Etikett-Treue. */
   brandLabelReferenceUrl?: string;
+  brandHeadlineFontName?: string;
+  brandFontFileUrl?: string;
   referenceImagePayloads?: BrandReferencePayload[];
   suggestedBeers?: SuggestedBeerVariety[];
 };
@@ -142,6 +144,8 @@ export function buildActivatedBrandSettings(params: {
     brandProfileSource: params.input.brandProfileSource,
     brandReferenceImageUrls: params.referenceImageUrls,
     brandLabelReferenceUrl: normalizeHttpUrlOrEmpty(params.input.brandLabelReferenceUrl),
+    brandHeadlineFontName: params.input.brandHeadlineFontName?.trim() || existing.brandHeadlineFontName || "",
+    brandFontFileUrl: normalizeHttpUrlOrEmpty(params.input.brandFontFileUrl) || existing.brandFontFileUrl || "",
     brandAnalyzedAt: params.analyzedAt ?? existing.brandAnalyzedAt ?? new Date().toISOString(),
   });
 

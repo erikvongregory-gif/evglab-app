@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import React, { useId, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { EvglabMark } from "@/components/studio/evglab-mark";
@@ -93,8 +93,9 @@ const GoogleG = () => (
   </svg>
 );
 
-function SubmitButton({ isSignup }: { isSignup: boolean }) {
-  const { pending } = useFormStatus();
+function SubmitButton({ isSignup, busy }: { isSignup: boolean; busy: boolean }) {
+  const { pending: actionPending } = useFormStatus();
+  const pending = busy || actionPending;
   return (
     <Button type="submit" className="h-11 w-full" disabled={pending}>
       {pending ? (
@@ -147,7 +148,14 @@ export function AuthCard({
 
   const displayError = localError ?? error;
   const showGoogle = oauthProviders.includes("google");
+  const [submitting, setSubmitting] = useState(false);
   const busy = loading;
+
+  useEffect(() => {
+    const reset = () => setSubmitting(false);
+    window.addEventListener("pageshow", reset);
+    return () => window.removeEventListener("pageshow", reset);
+  }, []);
 
   const setMode = (next: AuthMode) => {
     setLocalError(null);
@@ -170,6 +178,8 @@ export function AuthCard({
     setLocalError(null);
 
     if (formAction) {
+      if (submitting) { event.preventDefault(); return; }
+      setSubmitting(true);
       clearLegacySupabaseSessionCookies();
       onSubmit({
         mode,
@@ -267,7 +277,7 @@ export function AuthCard({
                   </div>
                 ) : null}
 
-                <form key={mode} className="space-y-5" {...formProps}>
+                <form key={mode} aria-busy={busy || submitting} className="space-y-5" {...formProps}>
                   <input type="hidden" name="next" value={nextPath} />
                   {inviteToken ? <input type="hidden" name="inviteToken" value={inviteToken} /> : null}
 
@@ -393,7 +403,7 @@ export function AuthCard({
                     </div>
                   ) : null}
 
-                  <SubmitButton isSignup={isSignup} />
+                  <SubmitButton isSignup={isSignup} busy={busy || submitting} />
                 </form>
 
                 {showGoogle ? (

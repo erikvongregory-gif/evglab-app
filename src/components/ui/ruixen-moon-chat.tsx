@@ -2,8 +2,10 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { GlowButton } from "@/components/ui/glow-button";
 import {
   Popover,
   PopoverContent,
@@ -31,9 +33,6 @@ import {
   effectiveAspectRatio,
   type Aspect,
 } from "@/lib/inhalte-erstellen/studio-config";
-
-const MOON_BG = "url('/studio/moon-bg.webp')";
-const MOON_BG_SRC = "/studio/moon-bg.webp";
 
 const PLACEHOLDER_ETIKETT = "https://example.com/placeholder.png";
 
@@ -113,6 +112,7 @@ export default function RuixenMoonChat() {
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<Aspect>("4:5");
   const [formatPickerOpen, setFormatPickerOpen] = useState(false);
+  const [presetPickerOpen, setPresetPickerOpen] = useState(false);
   const [beers, setBeers] = useState<DashboardBeer[]>([]);
   const [selectedBeer, setSelectedBeer] = useState<DashboardBeer | null>(null);
   const [beerPickerOpen, setBeerPickerOpen] = useState(false);
@@ -131,9 +131,9 @@ export default function RuixenMoonChat() {
     maxHeight: 150,
   });
 
-  const quickPresets = sortTemplatesForDate(OCCASION_TEMPLATES, new Date())
-    .slice(0, 8)
-    .map(({ template }) => template);
+  const quickPresets = sortTemplatesForDate(OCCASION_TEMPLATES, new Date()).map(
+    ({ template }) => template,
+  );
 
   const activePreset =
     OCCASION_TEMPLATES.find((template) => template.id === activePresetId) ?? null;
@@ -141,15 +141,17 @@ export default function RuixenMoonChat() {
   const applyPreset = useCallback(
     (template: OccasionTemplate) => {
       setActivePresetId(template.id);
-      setMessage(template.motifLine);
       setAspectRatio(
         effectiveAspectRatio(template.preset.aspectRatio, Boolean(selectedCharacter)),
       );
-      adjustHeight();
-      requestAnimationFrame(() => adjustHeight());
+      setPresetPickerOpen(false);
     },
-    [adjustHeight, selectedCharacter],
+    [selectedCharacter],
   );
+
+  const clearPreset = useCallback(() => {
+    setActivePresetId(null);
+  }, []);
 
   const selectCharacter = useCallback((character: DashboardCharacter | null) => {
     setSelectedCharacter(character);
@@ -232,10 +234,10 @@ export default function RuixenMoonChat() {
     requestedQuality: "medium",
   });
 
-  const canGenerate = Boolean(message.trim()) && !genBusy;
+  const canGenerate = (Boolean(message.trim()) || Boolean(activePreset)) && !genBusy;
 
   const handleGenerate = useCallback(async () => {
-    const prompt = message.trim();
+    const prompt = message.trim() || activePreset?.motifLine || "";
     if (!prompt || genBusy) return;
 
     if (selectedCharacter && !selectedThumb) {
@@ -309,51 +311,7 @@ export default function RuixenMoonChat() {
   ]);
 
   return (
-    <div className="relative isolate flex h-full min-h-0 w-full flex-1 flex-col items-center bg-background dark:bg-black">
-      {/* Preload decode — same asset as CSS bg so the moon is ready with first paint */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={MOON_BG_SRC}
-        alt=""
-        aria-hidden
-        fetchPriority="high"
-        decoding="sync"
-        className="pointer-events-none absolute -z-10 h-px w-px opacity-0"
-      />
-      {/* Dark moon — BrewAI Accent #C7691E / Logo-Braun */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 hidden overflow-hidden dark:block"
-      >
-        <div
-          className="absolute left-1/2 top-[55%] h-[140%] w-[145%] -translate-x-1/2 -translate-y-1/2 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: MOON_BG,
-            filter: "hue-rotate(145deg) saturate(1.15)",
-            opacity: 0.85,
-          }}
-        />
-      </div>
-      {/* Light moon — Blend isoliert im Chat, nicht über die Shell */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden dark:hidden"
-      >
-        <div
-          className="absolute left-1/2 top-[55%] h-[140%] w-[145%] -translate-x-1/2 -translate-y-1/2 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: MOON_BG,
-            filter: "invert(1) hue-rotate(318deg) saturate(1.2) contrast(1.02)",
-            mixBlendMode: "multiply",
-            opacity: 0.78,
-            WebkitMaskImage:
-              "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
-            maskImage:
-              "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
-          }}
-        />
-      </div>
-
+    <div className="relative isolate flex h-full min-h-0 w-full flex-1 flex-col items-center bg-white dark:bg-black">
       <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-col items-center">
         <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center px-4">
           <div className="text-center">
@@ -391,20 +349,58 @@ export default function RuixenMoonChat() {
                 "dark:border-sidebar-border dark:bg-sidebar",
               )}
             >
+            <AnimatePresence initial={false} mode="popLayout">
+              {activePreset ? (
+                <motion.div
+                  key={activePreset.id}
+                  initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex px-4 pt-3"
+                >
+                  <span
+                    className={cn(
+                      "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5",
+                      "border-[#C7691E]/40 bg-[#C7691E]/10 text-[#A85518]",
+                      "dark:border-[#C7691E]/40 dark:bg-[#C7691E]/15 dark:text-[#D4782A]",
+                    )}
+                  >
+                    <StudioIcon name={activePreset.icon} size={14} />
+                    <span className="truncate text-xs font-medium">
+                      {activePreset.title}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Preset entfernen"
+                      onClick={clearPreset}
+                      className="ml-0.5 rounded-full p-0.5 opacity-70 transition-opacity hover:opacity-100"
+                    >
+                      <StudioIcon name="x" size={12} />
+                    </button>
+                  </span>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+
             <Textarea
               ref={textareaRef}
               value={message}
               onChange={(e) => {
                 setMessage(e.target.value);
-                setActivePresetId(null);
                 adjustHeight();
               }}
-              placeholder="Beschreibe dein Bild…"
+              placeholder={
+                activePreset
+                  ? "Optional: Zusatzwunsch…"
+                  : "Beschreibe dein Bild…"
+              }
               className={cn(
                 "min-h-[48px] w-full resize-none border-none bg-transparent px-4 py-3 text-sm shadow-none",
                 "text-foreground placeholder:text-muted-foreground",
                 "dark:bg-transparent dark:text-white dark:placeholder:text-neutral-400",
                 "focus-visible:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0",
+                activePreset && "pt-1",
               )}
               style={{ overflow: "hidden" }}
             />
@@ -725,69 +721,127 @@ export default function RuixenMoonChat() {
                   </div>
                 </PopoverContent>
               </Popover>
+
+              <Popover open={presetPickerOpen} onOpenChange={setPresetPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label="Preset wählen"
+                    className={cn(
+                      "h-9 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
+                      "dark:bg-transparent dark:text-white dark:hover:bg-transparent",
+                      activePreset && "font-medium",
+                    )}
+                  >
+                    <StudioIcon name={activePreset?.icon ?? "spark"} size={16} />
+                    {activePreset ? (
+                      <span className="max-w-[8rem] truncate text-xs font-medium">
+                        {activePreset.title}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground dark:text-neutral-400">
+                        Preset
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  side="top"
+                  className="w-80 gap-0 p-1.5"
+                  onOpenAutoFocus={(event) => event.preventDefault()}
+                >
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    Preset wählen
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors",
+                          "hover:bg-muted",
+                          !activePreset && "bg-muted",
+                        )}
+                        onClick={() => {
+                          clearPreset();
+                          setPresetPickerOpen(false);
+                        }}
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          <StudioIcon name="spark" size={14} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">
+                            Kein Preset
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            Freier Prompt ohne Vorlage
+                          </span>
+                        </span>
+                        {!activePreset ? <StudioIcon name="check" size={14} /> : null}
+                      </button>
+
+                      {quickPresets.map((template) => {
+                        const active = activePresetId === template.id;
+                        return (
+                          <button
+                            key={template.id}
+                            type="button"
+                            className={cn(
+                              "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors",
+                              "hover:bg-muted",
+                              active && "bg-muted",
+                            )}
+                            onClick={() => applyPreset(template)}
+                          >
+                            <span
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                              style={{
+                                backgroundColor: `${template.accent}22`,
+                                color: template.accent,
+                              }}
+                            >
+                              <StudioIcon name={template.icon} size={14} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">
+                                {template.title}
+                              </span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {template.subtitle}
+                              </span>
+                            </span>
+                            {active ? <StudioIcon name="check" size={14} /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
               </div>
 
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
+                <GlowButton
                   disabled={!canGenerate}
                   onClick={() => void handleGenerate()}
-                  className={cn(
-                    "flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors",
-                    "bg-[#C7691E] text-white hover:bg-[#D4782A]",
-                    "disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-[#C7691E] disabled:text-white",
-                  )}
-                >
-                  Generieren
-                  <span className="font-normal opacity-90">
-                    · {generationTokenCost.toLocaleString("de-DE")} Tokens
-                  </span>
-                </Button>
+                  label={
+                    <>
+                      Generieren
+                      <span className="font-normal opacity-90">
+                        · {generationTokenCost.toLocaleString("de-DE")} Tokens
+                      </span>
+                    </>
+                  }
+                />
               </div>
             </div>
             </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            {quickPresets.map((template) => (
-              <QuickAction
-                key={template.id}
-                icon={<StudioIcon name={template.icon} size={14} />}
-                label={template.title}
-                active={activePresetId === template.id}
-                onClick={() => applyPreset(template)}
-              />
-            ))}
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-interface QuickActionProps {
-  icon: React.ReactNode;
-  label: string;
-  active?: boolean;
-  onClick?: () => void;
-}
-
-function QuickAction({ icon, label, active, onClick }: QuickActionProps) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-2 rounded-full",
-        "border-border bg-background/80 text-foreground hover:bg-muted",
-        "dark:border-neutral-700 dark:bg-black/50 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:hover:text-white",
-        active &&
-          "border-[#C7691E]/50 bg-[#C7691E]/10 text-[#A85518] hover:bg-[#C7691E]/15 dark:border-[#C7691E]/40 dark:bg-[#C7691E]/15 dark:text-[#D4782A]",
-      )}
-    >
-      {icon}
-      <span className="text-xs">{label}</span>
-    </Button>
   );
 }

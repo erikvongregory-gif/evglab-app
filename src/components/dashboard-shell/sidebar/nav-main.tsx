@@ -206,6 +206,7 @@ function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
 /** Hover-Motion je Nav-Icon — leicht und unterschiedlich, ohne Ablenkung. */
 const NAV_ICON_HOVER: Record<string, string> = {
   dashboard: "group-hover/menu-button:scale-110 group-hover/menu-button:-rotate-6",
+  assistant: "group-hover/menu-button:scale-110 group-hover/menu-button:-rotate-3",
   create: "group-hover/menu-button:scale-110 group-hover/menu-button:rotate-6",
   media: "group-hover/menu-button:scale-110 group-hover/menu-button:-translate-y-0.5",
   brand: "group-hover/menu-button:scale-110 group-hover/menu-button:-rotate-8",
@@ -214,18 +215,68 @@ const NAV_ICON_HOVER: Record<string, string> = {
   settings: "group-hover/menu-button:rotate-45",
 };
 
+const NAV_ICON_MOTION = cn(
+  "transition-[color,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+  "motion-reduce:transition-none",
+  "motion-reduce:group-hover/menu-button:translate-y-0 motion-reduce:group-hover/menu-button:rotate-0 motion-reduce:group-hover/menu-button:scale-100",
+);
+
+function navIconClass(itemId: string) {
+  return cn(
+    NAV_ICON_MOTION,
+    itemId !== "brand" && "group-hover/menu-button:text-acc",
+    NAV_ICON_HOVER[itemId] ?? "group-hover/menu-button:scale-110",
+  );
+}
+
+/** Palette-Tupfer: default currentColor, Hover → bunt. */
+const BRAND_PALETTE_DOTS = [
+  { cx: 13.5, cy: 6.5, hover: "group-hover/menu-button:fill-[#EF4444]" },
+  { cx: 17.5, cy: 10.5, hover: "group-hover/menu-button:fill-[#3B82F6]" },
+  { cx: 8.5, cy: 7.5, hover: "group-hover/menu-button:fill-[#EAB308]" },
+  { cx: 6.5, cy: 12.5, hover: "group-hover/menu-button:fill-[#22C55E]" },
+] as const;
+
+function BrandPaletteNavIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      className={cn("size-4 shrink-0 origin-center", className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" />
+      {BRAND_PALETTE_DOTS.map((dot) => (
+        <circle
+          key={`${dot.cx}-${dot.cy}`}
+          cx={dot.cx}
+          cy={dot.cy}
+          r="1.5"
+          stroke="none"
+          className={cn(
+            "fill-current transition-[fill] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "motion-reduce:transition-none",
+            dot.hover,
+          )}
+        />
+      ))}
+    </svg>
+  );
+}
+
 function NavLinkIcon({ item, showFallback }: NavLinkIconProps) {
+  if (item.id === "brand") {
+    return <BrandPaletteNavIcon className={navIconClass(item.id)} />;
+  }
+
   const Icon = item.icon;
 
   if (Icon) {
-    return (
-      <Icon
-        className={cn(
-          NAV_ICON_HOVER[item.id] ?? "group-hover/menu-button:scale-110",
-          "motion-reduce:group-hover/menu-button:translate-y-0 motion-reduce:group-hover/menu-button:rotate-0 motion-reduce:group-hover/menu-button:scale-100",
-        )}
-      />
-    );
+    return <Icon className={navIconClass(item.id)} />;
   }
 
   if (showFallback) {
@@ -244,12 +295,7 @@ function NavDropdownItem({ item, isActive, isSubItemActive }: NavDropdownItemPro
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton tooltip={item.title} isActive={isActive} disabled={item.disabled}>
             {Icon ? (
-              <Icon
-                className={cn(
-                  NAV_ICON_HOVER[item.id] ?? "group-hover/menu-button:scale-110",
-                  "motion-reduce:group-hover/menu-button:translate-y-0 motion-reduce:group-hover/menu-button:rotate-0 motion-reduce:group-hover/menu-button:scale-100",
-                )}
-              />
+              <Icon className={navIconClass(item.id)} />
             ) : (
               <CollapsedIconFallback title={item.title} />
             )}
@@ -294,12 +340,7 @@ function NavCollapsibleItem({ item, isActive, defaultOpen, isSubItemActive }: Na
         <CollapsibleTrigger asChild>
           <SidebarMenuButton tooltip={item.title} isActive={isActive} disabled={item.disabled}>
             {Icon ? (
-              <Icon
-                className={cn(
-                  NAV_ICON_HOVER[item.id] ?? "group-hover/menu-button:scale-110",
-                  "motion-reduce:group-hover/menu-button:translate-y-0 motion-reduce:group-hover/menu-button:rotate-0 motion-reduce:group-hover/menu-button:scale-100",
-                )}
-              />
+              <Icon className={navIconClass(item.id)} />
             ) : null}
             <span>{item.title}</span>
             <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />

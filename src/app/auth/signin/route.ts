@@ -7,7 +7,6 @@ import { createAuthRouteHandlerClient } from "@/lib/supabase/server";
 import { logAuthEvent, getOrCreateRequestId } from "@/lib/security/authObservability";
 import {
   createNoStoreRedirect,
-  createOAuthSessionPollerHtml,
   normalizeNextPath,
 } from "@/lib/security/authResponses";
 import { buildCompositeIdentifier, enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
@@ -94,9 +93,6 @@ export async function POST(request: Request) {
     status: 303,
     durationMs: Date.now() - startedAt,
   });
-  const successUrl = `${origin}${next}`;
-  return createOAuthSessionPollerHtml(
-    { successUrl, fallbackUrl: finishTarget, requestId },
-    redirectResponse,
-  );
+  // Cookies are applied before the browser follows the server-side entry check.
+  return redirectResponse;
 }

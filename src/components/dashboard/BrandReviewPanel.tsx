@@ -294,6 +294,20 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
           </div>
         </div>
 
+        {review.brandHeadlineFontName?.trim() ? (
+          <div>
+            <StudioFieldLabel className="studio-brand-review-label">Typografie</StudioFieldLabel>
+            <p className="mt-2 text-sm text-[var(--t2)]">
+              {review.brandHeadlineFontName.trim()}
+              {review.brandFontFileUrl?.trim() ? (
+                <span className="text-[var(--t3)]"> · Schrift geladen</span>
+              ) : (
+                <span className="text-[var(--t3)]"> · Name erkannt</span>
+              )}
+            </p>
+          </div>
+        ) : null}
+
         <div className="studio-brand-review-rules-wrap">
           <StudioFieldLabel className="studio-brand-review-label">Bildregeln</StudioFieldLabel>
           <div className="studio-brand-review-rules">

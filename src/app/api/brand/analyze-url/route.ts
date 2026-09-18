@@ -20,6 +20,7 @@ import {
   pickImagesByIndices,
   type ParsedWebsitePage,
 } from "@/lib/brand/website-intake";
+import { ingestBrandFontFromHtml } from "@/lib/brand/extract-brand-fonts";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -210,6 +211,22 @@ export async function POST(req: Request) {
       rawHtmlByUrl,
     });
 
+    let brandHeadlineFontName = "";
+    let brandFontFileUrl = "";
+    try {
+      const font = await ingestBrandFontFromHtml({
+        userId: user.id,
+        htmlList: Object.values(rawHtmlByUrl),
+        pageUrl: fetched.finalUrl,
+      });
+      if (font) {
+        brandHeadlineFontName = font.brandHeadlineFontName;
+        brandFontFileUrl = font.brandFontFileUrl;
+      }
+    } catch (fontError) {
+      console.warn("[brand/analyze-url] font intake failed:", fontError);
+    }
+
     return NextResponse.json({
       ok: true,
       suggestion: {
@@ -228,6 +245,8 @@ export async function POST(req: Request) {
         brandWebsiteUrl: fetched.finalUrl,
         brandProfileSource: "url" as const,
         brandLabelReferenceUrl,
+        ...(brandHeadlineFontName ? { brandHeadlineFontName } : {}),
+        ...(brandFontFileUrl ? { brandFontFileUrl } : {}),
       },
       sourceMeta: {
         pagesFetched: 1 + subpages.length,
@@ -240,6 +259,8 @@ export async function POST(req: Request) {
         pageTitle: intake.title,
         imageSelection: visionReferences.length > 0 ? "vision" : referenceImages.length > 0 ? "heuristic" : "text_only",
         beersDetected: suggestedBeers.length,
+        fontDetected: Boolean(brandHeadlineFontName),
+        fontUploaded: Boolean(brandFontFileUrl),
       },
     });
   } catch (e) {

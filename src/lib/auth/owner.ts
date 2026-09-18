@@ -53,3 +53,17 @@ export async function isOwnerUserId(userId: string): Promise<boolean> {
 
   return isOwner;
 }
+
+/**
+ * Portal-Betreiber (Owner-E-Mail / app_metadata owner|admin): Team ohne Stripe-Abo.
+ * Nicht verwechseln mit der Workspace-Rolle „admin“.
+ */
+export async function isPortalOperatorUserId(userId: string): Promise<boolean> {
+  try {
+    const admin = createAdminClient();
+    const { data } = await admin.auth.admin.getUserById(userId);
+    return hasAdminAccess(data?.user ?? null);
+  } catch {
+    return false;
+  }
+}

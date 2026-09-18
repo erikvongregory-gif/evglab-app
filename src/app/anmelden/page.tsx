@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { AuthLinkBootstrap } from "@/components/auth/auth-link-bootstrap";
 import { isWaitlistBypassCookieValid } from "@/lib/auth/waitlistBypass";
 import { SITE } from "@/lib/siteConfig";
+import { normalizeNextPath } from "@/lib/security/authResponses";
 import { resolveAuthCallbackRedirect } from "@/lib/supabase/authEntryRedirect";
 import { isInviteOnlyEnabled } from "@/lib/supabase/env";
 import { LOGIN_WAITLIST_ENABLED } from "@/lib/featureFlags";
@@ -49,11 +50,13 @@ export default async function AnmeldenPage({
   const plan = Array.isArray(planRaw) ? planRaw[0] : planRaw;
   const checkout = Array.isArray(checkoutRaw) ? checkoutRaw[0] : checkoutRaw;
   const source = Array.isArray(sourceRaw) ? sourceRaw[0] : sourceRaw;
+  const nextRaw = params.next;
+  const nextFromQuery = Array.isArray(nextRaw) ? nextRaw[0] : nextRaw;
   const allowedPlan = plan === "start" || plan === "growth" || plan === "pro" ? plan : null;
   const shouldAutoCheckout = allowedPlan && checkout === "1" && source === "homepage_pricing";
   const nextPath = shouldAutoCheckout
     ? `/dashboard?plan=${allowedPlan}&checkout=1&source=homepage_pricing&tab=pricing`
-    : "/dashboard";
+    : normalizeNextPath(nextFromQuery);
   const registerErrors = new Set([
     "invite_required",
     "invite_expired",

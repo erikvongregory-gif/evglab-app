@@ -1,6 +1,7 @@
 import { afterEach,beforeEach,expect,it,vi } from "vitest";
 const mock=vi.hoisted(()=>({from:vi.fn()}));
 vi.mock("@/lib/supabase/admin",()=>({createAdminClient:()=>({from:mock.from})}));
+vi.mock("@/lib/auth/owner",()=>({isPortalOperatorUserId:async()=>false}));
 vi.mock("@/lib/supabase/privateAssets",()=>({hydratePrivateAssets:async(x:unknown)=>x}));
 import { getWorkspace } from "./workspace";
 function query(result:unknown){return {select(){return this;},eq(){return this;},maybeSingle:async()=>result};}

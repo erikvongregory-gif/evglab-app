@@ -110,7 +110,7 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/profile">
+                <Link href="/dashboard/settings">
                   <CircleUser />
                   Profil
                 </Link>

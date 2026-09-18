@@ -6,8 +6,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { getWorkspace } from "@/lib/dashboard/workspace";
 import { ensureBillingRow } from "@/lib/billing/store";
+import { createWorkspaceInvite } from "@/lib/dashboard/teamInvites";
 import { enforceSameOrigin, enforceRateLimitPersistent } from "@/lib/security/requestGuards";
-import { sendResendEmail } from "@/lib/email/resend";
+import { sendTeamInviteEmail } from "@/lib/email/teamInvite";
 import { getAppBaseUrlOrigin } from "@/lib/supabase/env";
 const role = z.enum(["admin", "editor", "viewer"]);
 async function context(req: Request, manage = false) {
@@ -48,13 +49,29 @@ export async function POST(req: Request) {
     if(c.role!=="owner" && input.role==="admin")return NextResponse.json({error:"Nur der Inhaber darf Administratoren einladen."},{status:403});
     if(input.email.toLowerCase()===c.user.email?.toLowerCase()) return NextResponse.json({error:"Du bist bereits im Team."},{status:409});
     await ensureBillingRow(c.ownerId);
-    const token=randomBytes(32).toString("hex");
-    const admin=createAdminClient();
-    const invite=await admin.rpc("workspace_invite",{p_owner:c.ownerId,p_email:input.email,p_name:input.name??input.email,p_role:input.role,p_hash:createHash("sha256").update(token).digest("hex")});
-    if(invite.error)return NextResponse.json({error:invite.error.message},{status:409});
-    const url=`${getAppBaseUrlOrigin(new URL(req.url).origin)}/invite/team/${token}`;
-    try { await sendResendEmail({to:input.email,subject:"Deine Einladung zu BrewAI",text:`Du wurdest zu einem BrewAI-Team eingeladen. Melde dich mit ${input.email} an und bestätige die Einladung: ${url}`,html:`<p>Du wurdest zu einem BrewAI-Team eingeladen.</p><p><a href="${url}">Einladung annehmen</a></p>`}); }
-    catch { await admin.from("workspace_invites").delete().eq("id",invite.data); throw new Error("Einladung konnte nicht versendet werden."); }
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const invite = await createWorkspaceInvite({
+      ownerId: c.ownerId,
+      email: input.email,
+      name: input.name ?? input.email,
+      role: input.role,
+      tokenHash,
+    });
+    if ("error" in invite) return NextResponse.json({ error: invite.error }, { status: 409 });
+    const url = `${getAppBaseUrlOrigin(new URL(req.url).origin)}/invite/team/${token}`;
+    try {
+      await sendTeamInviteEmail({
+        to: input.email,
+        inviteUrl: url,
+        role: input.role,
+        inviteeName: input.name,
+        inviterEmail: c.user.email,
+      });
+    } catch {
+      await createAdminClient().from("workspace_invites").delete().eq("id", invite.id);
+      throw new Error("Einladung konnte nicht versendet werden.");
+    }
     return NextResponse.json({ok:true,members:await members(c.ownerId)});
   } catch(error) { return NextResponse.json({error:error instanceof Error?error.message:"Einladung fehlgeschlagen."},{status:400}); }
 }

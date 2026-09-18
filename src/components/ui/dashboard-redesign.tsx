@@ -478,6 +478,8 @@ export function DashboardRedesignShell(props: {
         brandProfileSource: suggestion.brandProfileSource,
         brandReferenceImageUrls: suggestion.referenceImageUrls,
         brandLabelReferenceUrl: suggestion.brandLabelReferenceUrl ?? "",
+        brandHeadlineFontName: suggestion.brandHeadlineFontName ?? "",
+        brandFontFileUrl: suggestion.brandFontFileUrl ?? "",
         brandAnalyzedAt: analyzedAt,
       };
 

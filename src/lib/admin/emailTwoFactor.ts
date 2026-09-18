@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { resolveDevEmailForward, sendResendEmail } from "@/lib/email/resend";
+import { buildTwoFactorEmailHtml, buildTwoFactorEmailText } from "@/lib/email/twoFactor";
 
 /**
  * E-Mail-2FA für alle Nutzer. Cookie-Namen bleiben aus Kompatibilitätsgründen
@@ -196,15 +197,14 @@ export function getTrustedDeviceCookieName() {
 
 export async function send2FACodeEmail(input: { to: string; code: string }) {
   const { to, forwarded, originalTo } = resolveDevEmailForward(input.to);
-  const hint = forwarded
-    ? `<p style="color:#6b7280;font-size:12px">Lokale Weiterleitung, eigentlich an ${originalTo}.</p>`
-    : "";
+  const forwardedFor = forwarded ? originalTo : undefined;
 
   await sendResendEmail({
     to,
-    subject: "Dein BrewAI Sicherheitscode",
-    text: `Dein BrewAI-Login-Code lautet: ${input.code}. Der Code ist 10 Minuten gültig.`,
-    html: `<p>Dein BrewAI-Login-Code lautet:</p><p style="font-size:28px;font-weight:700;letter-spacing:2px">${input.code}</p><p>Der Code ist 10 Minuten gültig.</p>${hint}`,
+    subject: "Dein Login-Code · BrewAI",
+    text: buildTwoFactorEmailText({ code: input.code, forwardedFor }),
+    html: buildTwoFactorEmailHtml({ code: input.code, forwardedFor }),
+    replyTo: "kontakt@brewai.de",
     tag: "login_2fa",
   });
 }

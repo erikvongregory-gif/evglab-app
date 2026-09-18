@@ -3,6 +3,16 @@
 import React, { useEffect, useId, useState } from "react";
 import { BrandReferenceGallery } from "@/components/dashboard/BrandReferenceGallery";
 import { BrandProfileEmptyState } from "@/components/dashboard/BrandProfileEmptyState";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { BrandingCard } from "@/components/ui/branding-card";
 import { ColorPaletteCard } from "@/components/ui/color-palette-card";
 import FileUpload from "@/components/ui/file-upload";
@@ -92,6 +102,7 @@ export function BrandProfileView({
 }) {
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fontUploadError, setFontUploadError] = useState<string | null>(null);
   const [fontReady, setFontReady] = useState(false);
@@ -439,23 +450,41 @@ export function BrandProfileView({
               size="sm"
               disabled={resetting || saving}
               className="evg-btn--danger shrink-0"
-              onClick={() => {
-                const confirmed = window.confirm(
-                  "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Farben, Tonalität und Bildregeln werden entfernt.",
-                );
-                if (!confirmed) return;
-                setResetting(true);
-                setError(null);
-                void Promise.resolve(onResetBrandProfile())
-                  .catch((e) => {
-                    setError(e instanceof Error ? e.message : "Zurücksetzen fehlgeschlagen.");
-                  })
-                  .finally(() => setResetting(false));
-              }}
+              onClick={() => setResetConfirmOpen(true)}
             >
               {resetting ? "Wird zurückgesetzt…" : "Markenprofil löschen"}
             </StudioButton>
           </div>
+
+          <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+            <AlertDialogContent size="default">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Markenprofil löschen?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Gespeicherte Farben, Tonalität und Bildregeln werden entfernt. Danach generierst du ohne festes
+                  Markenprofil.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  disabled={resetting}
+                  onClick={() => {
+                    setResetting(true);
+                    setError(null);
+                    void Promise.resolve(onResetBrandProfile())
+                      .catch((e) => {
+                        setError(e instanceof Error ? e.message : "Zurücksetzen fehlgeschlagen.");
+                      })
+                      .finally(() => setResetting(false));
+                  }}
+                >
+                  {resetting ? "Wird gelöscht…" : "Profil löschen"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         <aside className="rounded-2xl bg-[var(--s1)] p-5 shadow-sm lg:sticky lg:top-6">

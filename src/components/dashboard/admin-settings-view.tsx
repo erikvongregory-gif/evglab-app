@@ -4,6 +4,16 @@ import { useState } from "react";
 
 import { brandLockLabel, formatDomain } from "@/lib/brand/brand-profile-display";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +57,7 @@ export function AdminSettingsView({
 }) {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const draft = value;
@@ -140,17 +151,7 @@ export function AdminSettingsView({
                     <Button variant="outline" size="sm" onClick={onOpenBrandTab}>
                       Profil verwalten
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const confirmed = window.confirm(
-                          "Markenprofil wirklich löschen und generisch weitermachen? Gespeicherte Stil-Vorgaben werden entfernt.",
-                        );
-                        if (!confirmed) return;
-                        void onResetBrandProfile();
-                      }}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => setResetConfirmOpen(true)}>
                       Generisch nutzen
                     </Button>
                   </>
@@ -256,6 +257,23 @@ export function AdminSettingsView({
               </Button>
             </CardHeader>
           </Card>
+
+          <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+            <AlertDialogContent size="default">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Markenprofil löschen?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Gespeicherte Stil-Vorgaben werden entfernt. Danach generierst du ohne festes Markenprofil.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={() => void onResetBrandProfile()}>
+                  Profil löschen
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { AuthTransition } from "@/components/ui/auth-transition";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { hasPassedTwoFactor, twoFactorRedirectPath } from "@/lib/auth/twoFactorSession";
@@ -55,11 +56,7 @@ export default async function AuthFinishPage({
 
   return (
     <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[#131211] px-4">
-          <p className="text-sm text-[#c4bdb3]">Anmeldung wird abgeschlossen …</p>
-        </main>
-      }
+      fallback={<AuthTransition />}
     >
       <AuthFinishClient initialNext={preferred} />
     </Suspense>
