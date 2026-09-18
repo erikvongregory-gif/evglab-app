@@ -378,6 +378,8 @@ export type StudioMediaLibraryProps = {
   onItemsChange: (next: MediaItem[]) => void;
   onMediaRefresh?: () => void;
   hasActivePlan?: boolean;
+  /** false = Viewer: keine Generierung/Löschen. */
+  canWriteMedia?: boolean;
   initialQuery?: string;
   focusedJobId?: string;
   /** QA only: skip real download fetch */
@@ -396,6 +398,7 @@ export function StudioMediaLibrary({
   onItemsChange,
   onMediaRefresh,
   hasActivePlan = true,
+  canWriteMedia = true,
   initialQuery = "",
   focusedJobId = "",
   mockDownload = false,
@@ -606,8 +609,8 @@ export function StudioMediaLibrary({
   );
   const hasAny = visibleJobs.length > 0 || items.length > 0;
 
-  const createHref = hasActivePlan ? "/inhalte-erstellen" : "/dashboard/pricing";
-  const createLabel = hasActivePlan ? "Motiv generieren" : "Tarif wählen";
+  const createHref = !canWriteMedia ? null : hasActivePlan ? "/inhalte-erstellen" : "/dashboard/pricing";
+  const createLabel = !canWriteMedia ? "Nur Lesen" : hasActivePlan ? "Motiv generieren" : "Tarif wählen";
 
   return (
     <div data-content-padding="false" className="flex min-h-[calc(100dvh-var(--dashboard-header-height,3rem))] flex-col">
@@ -643,7 +646,7 @@ export function StudioMediaLibrary({
               </>
             ) : (
               <>
-                {loaded && items.length > 0 ? (
+                {loaded && items.length > 0 && canWriteMedia ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -660,12 +663,18 @@ export function StudioMediaLibrary({
                 <Button variant="outline" asChild>
                   <Link href="/inhalte-erstellen">Zur Einstiegsseite</Link>
                 </Button>
-                <Button asChild>
-                  <Link href={createHref}>
-                    <ImagePlus data-icon="inline-start" />
+                {createHref ? (
+                  <Button asChild>
+                    <Link href={createHref}>
+                      <ImagePlus data-icon="inline-start" />
+                      {createLabel}
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button type="button" variant="secondary" disabled>
                     {createLabel}
-                  </Link>
-                </Button>
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -729,9 +738,15 @@ export function StudioMediaLibrary({
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
-                <Button asChild>
-                  <Link href={createHref}>{hasActivePlan ? "Erstes Motiv erstellen" : "Tarif wählen"}</Link>
-                </Button>
+                {createHref ? (
+                  <Button asChild>
+                    <Link href={createHref}>{hasActivePlan ? "Erstes Motiv erstellen" : "Tarif wählen"}</Link>
+                  </Button>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    Deine Rolle ist „Nur Lesen“ — Motive erzeugen kann ein Teammitglied mit Bearbeiten-Rechten.
+                  </p>
+                )}
                 <Button variant="outline" asChild>
                   <Link href="/dashboard/brand">Markenprofil prüfen</Link>
                 </Button>
@@ -951,18 +966,20 @@ export function StudioMediaLibrary({
                       <Button disabled={downloading || deleting} onClick={() => void handleDownload(selectedItem)}>
                         {downloading ? "Wird heruntergeladen …" : "Herunterladen"}
                       </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        disabled={deleting || downloading}
-                        onClick={() => {
-                          setDeleteError(null);
-                          setSelectedIds([selectedItem.id]);
-                          setConfirmDeleteOpen(true);
-                        }}
-                      >
-                        Löschen
-                      </Button>
+                      {canWriteMedia ? (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          disabled={deleting || downloading}
+                          onClick={() => {
+                            setDeleteError(null);
+                            setSelectedIds([selectedItem.id]);
+                            setConfirmDeleteOpen(true);
+                          }}
+                        >
+                          Löschen
+                        </Button>
+                      ) : null}
                       <Button variant="outline" disabled={deleting} onClick={() => setSelectedItem(null)}>
                         Schließen
                       </Button>

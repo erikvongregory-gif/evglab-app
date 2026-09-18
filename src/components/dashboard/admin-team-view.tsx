@@ -23,27 +23,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { DashboardTeamRole } from "@/lib/dashboard/metadata";
+import {
+  canManageTeam,
+  INVITE_TEAM_ROLES,
+  TEAM_ROLE_DESCRIPTION,
+  TEAM_ROLE_LABEL,
+  type InviteTeamRole,
+} from "@/lib/dashboard/teamRoles";
 import { getInitials } from "@/lib/utils";
 
 export type AdminTeamMember = {
   id: string;
   email: string;
   name: string;
-  role: "owner" | "admin" | "editor" | "viewer";
+  role: DashboardTeamRole;
   status: "active" | "invited";
 };
 
-const ROLE_LABEL: Record<AdminTeamMember["role"], string> = {
-  owner: "Inhaber",
-  admin: "Admin",
-  editor: "Editor",
-  viewer: "Viewer",
-};
-
-const ROLE_VARIANT: Record<
-  AdminTeamMember["role"],
-  "default" | "info" | "warning" | "outline"
-> = {
+const ROLE_VARIANT: Record<DashboardTeamRole, "default" | "info" | "warning" | "outline"> = {
   owner: "default",
   admin: "info",
   editor: "warning",
@@ -54,20 +52,25 @@ export function AdminTeamView({
   members,
   loaded = true,
   loadError = null,
+  myRole = "owner",
   onMembersChange,
 }: {
   members: AdminTeamMember[];
   loaded?: boolean;
   loadError?: string | null;
+  /** Rolle des angemeldeten Users im Workspace. */
+  myRole?: DashboardTeamRole;
   onMembersChange: (next: AdminTeamMember[]) => void;
 }) {
+  const canManage = canManageTeam(myRole);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "editor" | "viewer">("editor");
+  const [inviteRole, setInviteRole] = useState<InviteTeamRole>("editor");
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
   async function sendInvite() {
     setError(null);
@@ -101,6 +104,33 @@ export function AdminTeamView({
       setError("Einladung konnte nicht gesendet werden.");
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function changeRole(memberId: string, nextRole: InviteTeamRole) {
+    setError(null);
+    setNotice(null);
+    setUpdatingRoleId(memberId);
+    try {
+      const res = await fetch("/api/dashboard/team", {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId, role: nextRole }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; members?: AdminTeamMember[] }
+        | null;
+      if (!res.ok) {
+        setError(json?.error || "Rolle konnte nicht geändert werden.");
+        return;
+      }
+      if (Array.isArray(json?.members)) onMembersChange(json.members);
+      setNotice(`Rolle auf ${TEAM_ROLE_LABEL[nextRole]} gesetzt.`);
+    } catch {
+      setError("Rolle konnte nicht geändert werden.");
+    } finally {
+      setUpdatingRoleId(null);
     }
   }
 
@@ -152,59 +182,72 @@ export function AdminTeamView({
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Mitglied einladen</CardTitle>
-          <CardDescription>Einladung mit Login-Link per E-Mail</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="grid gap-2">
-            <Label htmlFor="team-invite-email">E-Mail</Label>
-            <Input
-              id="team-invite-email"
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="kollege@beispiel.de"
-              disabled={inviting}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="team-invite-name">Name</Label>
-            <Input
-              id="team-invite-name"
-              value={inviteName}
-              onChange={(e) => setInviteName(e.target.value)}
-              placeholder="Optional"
-              disabled={inviting}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Rolle</Label>
-            <Select
-              value={inviteRole}
-              onValueChange={(v) => setInviteRole(v as "admin" | "editor" | "viewer")}
-              disabled={inviting}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="editor">Editor</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end">
-            <Button className="w-full" disabled={inviting} onClick={() => void sendInvite()}>
-              {inviting ? "Sende …" : "Einladen"}
-            </Button>
-          </div>
-          {error ? <p className="text-sm text-destructive sm:col-span-2 lg:col-span-4">{error}</p> : null}
-          {notice ? <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-4">{notice}</p> : null}
-        </CardContent>
-      </Card>
+      {canManage ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Mitglied einladen</CardTitle>
+            <CardDescription>Einladung mit Login-Link per E-Mail</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-2">
+              <Label htmlFor="team-invite-email">E-Mail</Label>
+              <Input
+                id="team-invite-email"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="kollege@beispiel.de"
+                disabled={inviting}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="team-invite-name">Name</Label>
+              <Input
+                id="team-invite-name"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                placeholder="Optional"
+                disabled={inviting}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Rolle</Label>
+              <Select
+                value={inviteRole}
+                onValueChange={(v) => setInviteRole(v as InviteTeamRole)}
+                disabled={inviting}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {INVITE_TEAM_ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {TEAM_ROLE_LABEL[role]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button className="w-full" disabled={inviting} onClick={() => void sendInvite()}>
+                {inviting ? "Sende …" : "Einladen"}
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs sm:col-span-2 lg:col-span-4">
+              {TEAM_ROLE_DESCRIPTION[inviteRole]}
+            </p>
+            {error ? <p className="text-sm text-destructive sm:col-span-2 lg:col-span-4">{error}</p> : null}
+            {notice ? <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-4">{notice}</p> : null}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            Deine Rolle ({TEAM_ROLE_LABEL[myRole]}): {TEAM_ROLE_DESCRIPTION[myRole]}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -229,7 +272,7 @@ export function AdminTeamView({
                     <TableHead>Mitglied</TableHead>
                     <TableHead>Rolle</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Aktion</TableHead>
+                    {canManage ? <TableHead className="text-right">Aktion</TableHead> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -251,9 +294,32 @@ export function AdminTeamView({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge size="sm" variant={ROLE_VARIANT[m.role]}>
-                            {ROLE_LABEL[m.role]}
-                          </Badge>
+                          {m.role === "owner" || !canManage ? (
+                            <div className="space-y-0.5">
+                              <Badge size="sm" variant={ROLE_VARIANT[m.role]}>
+                                {TEAM_ROLE_LABEL[m.role]}
+                              </Badge>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <Select
+                                value={m.role}
+                                disabled={updatingRoleId === m.id || removingId === m.id}
+                                onValueChange={(v) => void changeRole(m.id, v as InviteTeamRole)}
+                              >
+                                <SelectTrigger size="sm" className="w-[9.5rem]" aria-label={`Rolle von ${label}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {INVITE_TEAM_ROLES.map((role) => (
+                                    <SelectItem key={role} value={role}>
+                                      {TEAM_ROLE_LABEL[role]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge
@@ -263,20 +329,22 @@ export function AdminTeamView({
                             {m.status === "invited" ? "Einladung offen" : "Aktiv"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          {m.role !== "owner" ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={removingId === m.id}
-                              onClick={() => void removeMember(m.id)}
-                            >
-                              {removingId === m.id ? "Entferne …" : "Entfernen"}
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">Inhaber</span>
-                          )}
-                        </TableCell>
+                        {canManage ? (
+                          <TableCell className="text-right">
+                            {m.role !== "owner" ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={removingId === m.id}
+                                onClick={() => void removeMember(m.id)}
+                              >
+                                {removingId === m.id ? "Entferne …" : "Entfernen"}
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">Inhaber</span>
+                            )}
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     );
                   })}
@@ -284,6 +352,7 @@ export function AdminTeamView({
               </Table>
             </div>
           )}
+          {!canManage && error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
         </CardContent>
       </Card>
     </div>

@@ -1,17 +1,12 @@
 import { resolveDevEmailForward, sendResendEmail } from "@/lib/email/resend";
 import { EMAIL, emailDevForwardNote } from "@/lib/email/layout";
 import { SITE } from "@/lib/siteConfig";
-
-const ROLE_LABEL: Record<"admin" | "editor" | "viewer", string> = {
-  admin: "Administrator",
-  editor: "Editor",
-  viewer: "Viewer",
-};
+import { TEAM_ROLE_DESCRIPTION, TEAM_ROLE_LABEL, type InviteTeamRole } from "@/lib/dashboard/teamRoles";
 
 export type TeamInviteEmailInput = {
   to: string;
   inviteUrl: string;
-  role: "admin" | "editor" | "viewer";
+  role: InviteTeamRole;
   inviteeName?: string;
   inviterEmail?: string | null;
   workspaceName?: string | null;
@@ -31,7 +26,8 @@ function truncateUrl(url: string) {
 }
 
 function buildTeamInviteHtml(input: TeamInviteEmailInput & { forwardedFor?: string }) {
-  const roleLabel = ROLE_LABEL[input.role];
+  const roleLabel = TEAM_ROLE_LABEL[input.role];
+  const roleDescription = TEAM_ROLE_DESCRIPTION[input.role];
   const inviter = input.inviterEmail?.trim() || "Dein Team";
   const workspace = input.workspaceName?.trim() || "BrewAI";
   const declineUrl = `${input.inviteUrl}${input.inviteUrl.includes("?") ? "&" : "?"}decline=1`;
@@ -98,6 +94,9 @@ function buildTeamInviteHtml(input: TeamInviteEmailInput & { forwardedFor?: stri
                         <td align="right">
                           <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${text};color:#fff;font-size:12px;font-weight:600;">${escapeHtml(roleLabel)}</span>
                         </td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top:8px;font-size:12px;line-height:1.45;color:${muted};">${escapeHtml(roleDescription)}</td>
                       </tr>
                     </table>
                   </td>
@@ -170,7 +169,8 @@ function buildTeamInviteHtml(input: TeamInviteEmailInput & { forwardedFor?: stri
 }
 
 function buildTeamInviteText(input: TeamInviteEmailInput & { forwardedFor?: string }) {
-  const roleLabel = ROLE_LABEL[input.role];
+  const roleLabel = TEAM_ROLE_LABEL[input.role];
+  const roleDescription = TEAM_ROLE_DESCRIPTION[input.role];
   const inviter = input.inviterEmail?.trim() || "Dein Team";
   const workspace = input.workspaceName?.trim() || "BrewAI";
   return [
@@ -181,6 +181,7 @@ function buildTeamInviteText(input: TeamInviteEmailInput & { forwardedFor?: stri
     "",
     `E-Mail: ${input.to}`,
     `Rolle: ${roleLabel}`,
+    roleDescription,
     "Gültig bis: 7 Tage",
     "",
     "Noch kein Konto? Beim Annehmen legst du eines mit genau dieser E-Mail an.",

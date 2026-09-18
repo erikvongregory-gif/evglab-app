@@ -1,4 +1,5 @@
 import { getWorkspace, workspaceResourceUser } from "@/lib/dashboard/workspace";
+import { canWriteWithRole } from "@/lib/dashboard/teamRoles";
 import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -252,7 +253,7 @@ export async function PUT(req: Request) {
   let canWriteBrand = true;
   try {
     const membership = await getWorkspace(actor.id);
-    canWriteBrand = membership.role !== "viewer";
+    canWriteBrand = canWriteWithRole(membership.role);
     // Marke lesen immer erlaubt; Schreiben nur für Owner/Admin/Editor.
     workspace = await workspaceResourceUser(actor, false);
   } catch {

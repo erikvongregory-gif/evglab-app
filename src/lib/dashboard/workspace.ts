@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPortalOperatorUserId } from "@/lib/auth/owner";
 import type { DashboardTeamRole } from "./metadata";
+import { canWriteWithRole } from "./teamRoles";
 
 function isMissingRelationError(error: { code?: string; message?: string } | null | undefined) {
   if (!error) return false;
@@ -56,7 +57,9 @@ export async function getWorkspace(userId: string): Promise<{ ownerId: string; r
 /** Resource context only. Never use this returned identity for login, 2FA or platform-admin checks. */
 export async function workspaceResourceUser(user: User, write = false): Promise<User> {
   const workspace = await getWorkspace(user.id);
-  if (write && workspace.role === "viewer") throw new Error("Deine Teamrolle erlaubt nur Lesezugriff.");
+  if (write && !canWriteWithRole(workspace.role)) {
+    throw new Error("Deine Teamrolle erlaubt nur Lesezugriff.");
+  }
   if (workspace.ownerId === user.id) return { ...user, user_metadata: await hydratePrivateAssets(user.user_metadata,user.id) };
   const { data, error } = await createAdminClient().auth.admin.getUserById(workspace.ownerId);
   if (error || !data.user) throw new Error("Teamkonto nicht gefunden.");

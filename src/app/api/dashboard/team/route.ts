@@ -10,6 +10,7 @@ import { createWorkspaceInvite } from "@/lib/dashboard/teamInvites";
 import { enforceSameOrigin, enforceRateLimitPersistent } from "@/lib/security/requestGuards";
 import { sendTeamInviteEmail } from "@/lib/email/teamInvite";
 import { getAppBaseUrlOrigin } from "@/lib/supabase/env";
+import { canManageTeam } from "@/lib/dashboard/teamRoles";
 const role = z.enum(["admin", "editor", "viewer"]);
 async function context(req: Request, manage = false) {
   const origin = enforceSameOrigin(req); if (origin) return origin;
@@ -19,7 +20,7 @@ async function context(req: Request, manage = false) {
   const limit = await enforceRateLimitPersistent(req,{ keyPrefix:"team",limit:30,windowMs:60000 },{identifierParts:[user.id]});
   if (limit) return limit;
   const workspace = await getWorkspace(user.id);
-  if (manage && !["owner", "admin"].includes(workspace.role)) return NextResponse.json({ error: "Teamverwaltung nicht erlaubt." }, { status: 403 });
+  if (manage && !canManageTeam(workspace.role)) return NextResponse.json({ error: "Teamverwaltung nicht erlaubt." }, { status: 403 });
   return { ...workspace, user };
 }
 async function members(ownerId: string) {

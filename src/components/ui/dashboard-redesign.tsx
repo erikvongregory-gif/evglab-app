@@ -21,6 +21,7 @@ import {
 } from "@/lib/billing/checkoutClient";
 import { buildGenericBrandProfilePatch, isBrandProfileCompleteFromSettings } from "@/lib/dashboard/brandProfile";
 import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
+import { canWriteWithRole } from "@/lib/dashboard/teamRoles";
 import { fetchWithRetry } from "@/lib/http/fetchWithRetry";
 import { signOutAndRedirect } from "@/lib/auth/signOutClient";
 
@@ -250,6 +251,7 @@ export function DashboardRedesignShell(props: {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [teamLoaded, setTeamLoaded] = useState(false);
   const [teamError, setTeamError] = useState<string | null>(null);
+  const [myTeamRole, setMyTeamRole] = useState<TeamMember["role"]>("owner");
   const [settings, setSettings] = useState<SettingsPayload | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -350,8 +352,11 @@ export function DashboardRedesignShell(props: {
         const res = await load("/api/dashboard/team");
         if (!res || ignore) return;
         if (res.ok) {
-          const json = (await res.json()) as { members?: TeamMember[] };
+          const json = (await res.json()) as { members?: TeamMember[]; role?: TeamMember["role"] };
           if (Array.isArray(json.members)) setTeam(json.members);
+          if (json.role === "owner" || json.role === "admin" || json.role === "editor" || json.role === "viewer") {
+            setMyTeamRole(json.role);
+          }
           setTeamError(null);
         } else {
           setTeamError("Teamdaten konnten nicht geladen werden.");
@@ -667,6 +672,7 @@ export function DashboardRedesignShell(props: {
           onItemsChange={setMedia}
           onMediaRefresh={refreshMediaQuiet}
           hasActivePlan={hasActivePlan}
+          canWriteMedia={canWriteWithRole(myTeamRole)}
           initialQuery={searchParams.get("q") ?? ""}
           focusedJobId={searchParams.get("job") ?? ""}
           mediaTotal={mediaTotal}
@@ -680,6 +686,7 @@ export function DashboardRedesignShell(props: {
           members={team}
           loaded={teamLoaded}
           loadError={teamError}
+          myRole={myTeamRole}
           onMembersChange={(next) => {
             setTeam(next as TeamMember[]);
             refreshSummary();

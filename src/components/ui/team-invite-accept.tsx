@@ -6,15 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { EvglabMark } from "@/components/studio/evglab-mark";
 import { Button } from "@/components/ui/button";
 import type { WorkspaceInvitePreview } from "@/lib/dashboard/teamInvitePreview";
+import { TEAM_ROLE_DESCRIPTION, TEAM_ROLE_LABEL } from "@/lib/dashboard/teamRoles";
 import { studioFontClassName } from "@/lib/fonts/studio-fonts";
 import { MARKETING_SITE_URL } from "@/lib/siteConfig";
 import { cn } from "@/lib/utils";
-
-const ROLE_LABEL: Record<string, string> = {
-  admin: "Administrator",
-  editor: "Editor",
-  viewer: "Viewer",
-};
 
 export type TeamInviteAcceptProps = {
   token: string;
@@ -150,7 +145,14 @@ export function TeamInviteAccept({
                 <p className="text-muted-foreground text-xs uppercase tracking-wide">Eingeladen als</p>
                 <p className="mt-1 font-medium text-foreground">{inviteEmail}</p>
                 {invite.role ? (
-                  <p className="mt-1 text-muted-foreground">Rolle: {ROLE_LABEL[invite.role] ?? invite.role}</p>
+                  <div className="mt-2 space-y-0.5">
+                    <p className="font-medium text-foreground">
+                      Rolle: {TEAM_ROLE_LABEL[invite.role] ?? invite.role}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      {TEAM_ROLE_DESCRIPTION[invite.role]}
+                    </p>
+                  </div>
                 ) : null}
               </div>
             ) : null}

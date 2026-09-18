@@ -22,6 +22,7 @@ type HopfenHugoChatProps = {
   onSubmit: () => void;
   onSendText?: (text: string) => void;
   onNewChat?: () => void;
+  onOpenHistory?: () => void;
   loading?: boolean;
   /** Extern gesteuerter Avatar-Zustand (thinking / done / error …) */
   buddyState?: HopBuddyState;
@@ -57,6 +58,7 @@ export function HopfenHugoChat({
   onSubmit,
   onSendText,
   onNewChat,
+  onOpenHistory,
   loading = false,
   buddyState,
   variant = "page",
@@ -143,17 +145,30 @@ export function HopfenHugoChat({
                 {STATE_ROLE[resolvedState]}
               </p>
             </div>
-            {onNewChat ? (
-              <button
-                type="button"
-                className="evg-hopfenhugo-newchat"
-                onClick={onNewChat}
-                disabled={!canNewChat}
-                aria-label="Neuen Chat starten"
-              >
-                Neuer Chat
-              </button>
-            ) : null}
+            <div className="evg-hopfenhugo-head-actions">
+              {onOpenHistory ? (
+                <button
+                  type="button"
+                  className="evg-hopfenhugo-newchat evg-hopfenhugo-history-btn"
+                  onClick={onOpenHistory}
+                  disabled={loading}
+                  aria-label="Chat-Verläufe öffnen"
+                >
+                  Verläufe
+                </button>
+              ) : null}
+              {onNewChat ? (
+                <button
+                  type="button"
+                  className="evg-hopfenhugo-newchat"
+                  onClick={onNewChat}
+                  disabled={!canNewChat}
+                  aria-label="Neuen Chat starten"
+                >
+                  Neuer Chat
+                </button>
+              ) : null}
+            </div>
           </div>
         </header>
 
