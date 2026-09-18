@@ -322,7 +322,7 @@ export function AuthCard({
                       required
                       autoComplete="email"
                       placeholder="name@beispiel.de"
-                      disabled={busy || (teamInviteMode && Boolean(defaultEmail))}
+                      disabled={busy}
                       readOnly={teamInviteMode && Boolean(defaultEmail)}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}

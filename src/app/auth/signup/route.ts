@@ -46,10 +46,10 @@ export async function POST(request: Request) {
   if (rateLimitError) return rateLimitError;
 
   const fail = (pathQuery: string) => {
-    const base = `${origin}${pathQuery.startsWith("/") ? pathQuery : `/anmelden?${pathQuery}`}`;
+    const base = `${origin}/anmelden?${pathQuery}`;
     const withNext = withNextParam(base, next);
     if (email && teamInviteFlow) {
-      const u = new URL(withNext, origin);
+      const u = new URL(withNext);
       u.searchParams.set("email", email);
       return createNoStoreRedirect(u.toString(), requestId);
     }
