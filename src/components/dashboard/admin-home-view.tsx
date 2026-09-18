@@ -56,6 +56,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  aggregateTokenUsageFromDays,
   brandStatusLabel,
   formatCompactNumber,
   formatDeNumber,
@@ -63,11 +64,14 @@ import {
   formatRelativeTime,
   mediaRowTitle,
   planLabelFromKey,
+  TOKEN_RANGE_DAYS,
+  TOKEN_RANGE_LABELS,
   tokensAvailablePct,
   tokensUsed,
   type DashboardHomeMediaItem,
   type DashboardHomeSettings,
   type DashboardHomeSummary,
+  type TokenRangeKey,
 } from "@/components/studio/dashboard/dashboard-home-utils";
 import { hasActiveSubscriptionFromState } from "@/lib/billing/access";
 
@@ -284,17 +288,13 @@ function BrewAiActivityOverview({
   summaryLoaded: boolean;
   onOpenMedia: () => void;
 }) {
-  const [range, setRange] = useState<"30" | "90">("90");
+  const [range, setRange] = useState<TokenRangeKey>("7d");
+  const rangeDays = TOKEN_RANGE_DAYS[range];
 
   const chartData = useMemo(() => {
     const days = summary?.tokenUsageByDay ?? [];
     if (days.length === 0) return [];
-    const cutoff = range === "30" ? 30 : 90;
-    const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
-    return sorted.slice(-cutoff).map((point) => ({
-      date: point.date,
-      tokens: point.tokens,
-    }));
+    return aggregateTokenUsageFromDays(days, range).points;
   }, [summary?.tokenUsageByDay, range]);
 
   const hasData = chartData.some((point) => point.tokens > 0);
@@ -306,21 +306,24 @@ function BrewAiActivityOverview({
         <CardDescription>
           <span className="@[540px]/card:block hidden">
             {summary?.unlimited || summary?.tokens.unlimited
-              ? `Nominalverbrauch (ohne Abbuchung) · letzte ${range === "30" ? "30" : "90"} Tage`
-              : `Verbrauch aus Generierungen der letzten ${range === "30" ? "30" : "90"} Tage`}
+              ? `Nominalverbrauch (ohne Abbuchung) · letzte ${rangeDays} Tage`
+              : `Verbrauch aus Generierungen der letzten ${rangeDays} Tage`}
           </span>
-          <span className="@[540px]/card:hidden">Letzte {range === "30" ? "30" : "90"} Tage</span>
+          <span className="@[540px]/card:hidden">Letzte {rangeDays} Tage</span>
         </CardDescription>
         <CardAction className="flex items-center gap-2">
-          <Select value={range} onValueChange={(v) => setRange(v as "30" | "90")}>
-            <SelectTrigger size="sm" className="w-28">
+          <Select value={range} onValueChange={(v) => setRange(v as TokenRangeKey)}>
+            <SelectTrigger size="sm" className="w-32">
               <SelectValue placeholder="Zeitraum" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>Zeitraum</SelectLabel>
-                <SelectItem value="30">30 Tage</SelectItem>
-                <SelectItem value="90">90 Tage</SelectItem>
+                {(Object.keys(TOKEN_RANGE_LABELS) as TokenRangeKey[]).map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {TOKEN_RANGE_LABELS[key]}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>

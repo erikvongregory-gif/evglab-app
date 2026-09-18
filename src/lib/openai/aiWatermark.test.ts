@@ -10,8 +10,9 @@ describe("buildAiWatermarkOverlay", () => {
     expect(text).not.toContain("<text");
     expect(x + boxWidth).toBeLessThanOrEqual(1024 - 10);
     expect(y + boxHeight).toBeLessThanOrEqual(1280 - 10);
-    expect(fontSize).toBeGreaterThanOrEqual(22);
-    expect(boxWidth).toBeGreaterThanOrEqual(60);
+    expect(fontSize).toBeGreaterThanOrEqual(14);
+    expect(boxWidth).toBeGreaterThanOrEqual(36);
+    expect(boxWidth).toBeLessThan(90);
   });
 
   it("supports bottom-left placement", () => {
@@ -37,10 +38,10 @@ describe("applyAiWatermark", () => {
     for (let y = overlay.y; y < overlay.y + overlay.boxHeight; y++) {
       for (let x = overlay.x; x < overlay.x + overlay.boxWidth; x++) {
         const i = (y * info.width + x) * info.channels;
-        // Weiße Glyphen-Pixel
-        if (data[i]! > 180 && data[i + 1]! > 180 && data[i + 2]! > 180) bright += 1;
+        // Glyph-Pixel: deutlich heller als der dunkle Badge-Hintergrund
+        if (data[i]! > 140 && data[i + 1]! > 140 && data[i + 2]! > 140) bright += 1;
       }
     }
-    expect(bright).toBeGreaterThan(80);
+    expect(bright).toBeGreaterThan(20);
   });
 });

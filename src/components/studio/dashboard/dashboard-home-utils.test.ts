@@ -124,12 +124,17 @@ describe("dashboard-home-utils", () => {
   });
 
   describe("availableTokenRanges", () => {
+    it("bietet 7d und 30d bei kurzer Historie", () => {
+      const items = [media({ id: "new", createdAt: new Date().toISOString() })];
+      expect(availableTokenRanges(items)).toEqual(["7d", "30d"]);
+    });
+
     it("schaltet 90d frei ab 30 Tagen Historie", () => {
       const items = [
         media({ id: "old", createdAt: new Date(Date.now() - 40 * 86_400_000).toISOString() }),
         media({ id: "new", createdAt: new Date().toISOString() }),
       ];
-      expect(availableTokenRanges(items)).toEqual(["30d", "90d"]);
+      expect(availableTokenRanges(items)).toEqual(["7d", "30d", "90d"]);
     });
 
     it("schaltet 365d frei ab 90 Tagen Historie", () => {
@@ -137,7 +142,7 @@ describe("dashboard-home-utils", () => {
         media({ id: "old", createdAt: new Date(Date.now() - 100 * 86_400_000).toISOString() }),
         media({ id: "new", createdAt: new Date().toISOString() }),
       ];
-      expect(availableTokenRanges(items)).toEqual(["30d", "90d", "365d"]);
+      expect(availableTokenRanges(items)).toEqual(["7d", "30d", "90d", "365d"]);
     });
   });
 

@@ -48,12 +48,20 @@ export type DashboardHomeSettings = {
   brandLockLevel: "strict" | "balanced" | "loose";
 };
 
-export type TokenRangeKey = "30d" | "90d" | "365d";
+export type TokenRangeKey = "7d" | "30d" | "90d" | "365d";
 
 export const TOKEN_RANGE_DAYS: Record<TokenRangeKey, number> = {
+  "7d": 7,
   "30d": 30,
   "90d": 90,
   "365d": 365,
+};
+
+export const TOKEN_RANGE_LABELS: Record<TokenRangeKey, string> = {
+  "7d": "7 Tage",
+  "30d": "30 Tage",
+  "90d": "90 Tage",
+  "365d": "365 Tage",
 };
 
 export function formatDeNumber(n: number) {
@@ -257,7 +265,7 @@ function historySpanDays(timestamps: number[]) {
   return (Date.now() - oldest) / 86_400_000;
 }
 
-/** Freischaltung der Zeitraum-Tabs: 30d immer, 90d ab ~1 Monat Historie, 365d ab ~3 Monaten. */
+/** Freischaltung: 7d+30d immer bei Historie, 90d ab ~1 Monat, 365d ab ~3 Monaten. */
 export function availableTokenRanges(media: DashboardHomeMediaItem[], usageByDay?: { date: string; tokens: number }[]) {
   const fromJobs = (usageByDay ?? [])
     .filter((r) => r.tokens > 0)
@@ -268,7 +276,7 @@ export function availableTokenRanges(media: DashboardHomeMediaItem[], usageByDay
     .filter(Number.isFinite);
   const spanDays = historySpanDays(fromJobs.length ? fromJobs : fromMedia);
   if (spanDays <= 0 && fromJobs.length === 0 && fromMedia.length === 0) return [] as TokenRangeKey[];
-  const keys: TokenRangeKey[] = ["30d"];
+  const keys: TokenRangeKey[] = ["7d", "30d"];
   if (spanDays >= TOKEN_RANGE_DAYS["30d"]) keys.push("90d");
   if (spanDays >= TOKEN_RANGE_DAYS["90d"]) keys.push("365d");
   return keys;
