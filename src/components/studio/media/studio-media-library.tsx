@@ -14,7 +14,6 @@ import {
   type MediaJobCard,
 } from "@/lib/inhalte-erstellen/media-job-cards";
 import { jobProgressMessage, pollGenerationJob, type PolledJobResult } from "@/lib/inhalte-erstellen/poll-generation-job";
-import { StudioCreateComposer } from "@/components/ui/inhalte-erstellen-studio";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -535,7 +534,7 @@ export function StudioMediaLibrary({
           <div className="flex flex-col gap-1">
             <h1 className="text-3xl leading-none tracking-tight">Mediathek</h1>
             <p className="text-muted-foreground text-sm">
-              Fertige Motive und laufende Aufträge — Eingabe bleibt unten verfügbar.
+              Fertige Motive und laufende Aufträge an einem Ort.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -807,18 +806,6 @@ export function StudioMediaLibrary({
             ) : null}
           </AnimatePresence>
         </LayoutGroup>
-      </div>
-
-      <div className="sticky bottom-0 border-t bg-background/95 p-3 backdrop-blur md:p-4">
-        {hasActivePlan ? (
-          <StudioCreateComposer variant="dock" />
-        ) : (
-          <div className="flex justify-center">
-            <Button asChild>
-              <Link href="/dashboard/pricing">Tarif wählen, um zu generieren</Link>
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );
