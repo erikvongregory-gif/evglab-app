@@ -60,6 +60,7 @@ export default function GradientChatInput({
   className,
 }: GradientChatInputProps) {
   const [uncontrolled, setUncontrolled] = React.useState("");
+  const [focused, setFocused] = React.useState(false);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const idRef = React.useRef(0);
   const timersRef = React.useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -198,18 +199,24 @@ export default function GradientChatInput({
             <Input
               value={value}
               onChange={(e) => setValue(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
                   handleSend();
                 }
               }}
-              placeholder={placeholder}
+              placeholder={focused ? undefined : placeholder}
               aria-label="Nachricht"
               disabled={disabled}
               maxLength={1200}
               autoComplete="off"
-              className="h-auto flex-1 border-0 bg-transparent px-0 py-0 text-base shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent md:text-sm"
+              className={cn(
+                "h-auto min-w-0 flex-1 border-0 bg-transparent py-0 pl-1 pr-0 text-base shadow-none",
+                "caret-[var(--color-acc,#C7691E)]",
+                "focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent md:text-sm",
+              )}
             />
           </div>
           <Button

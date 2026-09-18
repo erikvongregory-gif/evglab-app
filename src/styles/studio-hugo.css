@@ -94,12 +94,23 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: linear-gradient(155deg, var(--ac-2), var(--ac-3));
+  background: transparent;
   display: grid;
   place-items: center;
-  box-shadow: 0 6px 16px rgba(201, 162, 77, 0.28);
+  box-shadow: none;
   animation: evg-hopfenhugo-bob 3.2s ease-in-out infinite;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.evg-hopfenhugo-avatar-bob .brewai-chat-avatar,
+.brewai-chat-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  user-select: none;
+  pointer-events: none;
 }
 
 .evg-hopfenhugo-avatar-bob svg {
@@ -117,6 +128,20 @@
   background: var(--ok);
   border: 2px solid var(--s1);
   z-index: 1;
+}
+
+.evg-hopfenhugo-status.is-busy {
+  background: var(--ac, #c7691e);
+  animation: hbDotPulse 1.2s ease-in-out infinite;
+}
+
+.evg-hopfenhugo-status.is-error {
+  background: var(--err, #c0392b);
+  animation: none;
+}
+
+.evg-hopfenhugo-status.is-ok {
+  background: var(--ok);
 }
 
 .evg-hopfenhugo-head-copy {
@@ -141,6 +166,36 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--t3);
+}
+
+.evg-hopfenhugo-newchat {
+  flex: none;
+  padding: 6px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  background: var(--s2);
+  color: var(--t2);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.16s, color 0.16s, background 0.16s, opacity 0.16s;
+}
+
+.evg-hopfenhugo-newchat:hover:not(:disabled) {
+  background: var(--s3);
+  color: var(--t1);
+}
+
+.evg-hopfenhugo-newchat:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.evg-hopfenhugo-newchat:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
 }
 
 .evg-hopfenhugo-close {
@@ -608,4 +663,268 @@
 
 .evg-hopfenhugo-panel--column .evg-hopfenhugo-policy {
   display: none;
+}
+
+/* ── Brew Buddy (Chat-Avatar, ersetzt Hopfendolde) ─────────────── */
+.hop-buddy,
+.brew-buddy {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  flex-shrink: 0;
+  line-height: 0;
+  overflow: visible;
+}
+
+.hop-buddy svg,
+.brew-buddy svg {
+  display: block;
+  overflow: visible;
+}
+
+.evg-hopfenhugo-avatar-bob {
+  overflow: visible;
+}
+
+.evg-hopfenhugo-avatar-bob:has(.hop-buddy),
+.evg-hopfenhugo-avatar-bob:has(.brew-buddy) {
+  animation: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+@keyframes cbBreathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.012);
+  }
+}
+@keyframes cbSway {
+  0%,
+  100% {
+    transform: rotate(-2.2deg);
+  }
+  50% {
+    transform: rotate(2.2deg);
+  }
+}
+@keyframes cbTilt {
+  0%,
+  100% {
+    transform: rotate(-7deg) translateY(-6px);
+  }
+  50% {
+    transform: rotate(5deg) translateY(-12px);
+  }
+}
+@keyframes cbTypeNod {
+  0%,
+  100% {
+    transform: rotate(-1.5deg) translateY(6px);
+  }
+  50% {
+    transform: rotate(1.5deg) translateY(12px);
+  }
+}
+@keyframes cbTalkNod {
+  0%,
+  100% {
+    transform: rotate(-1.2deg) translateY(0);
+  }
+  50% {
+    transform: rotate(1.4deg) translateY(-8px);
+  }
+}
+@keyframes cbHeadShake {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0) translateX(0);
+  }
+  70% {
+    transform: rotate(-4deg) translateX(-14px);
+  }
+  80% {
+    transform: rotate(4deg) translateX(14px);
+  }
+  90% {
+    transform: rotate(-2deg) translateX(-6px);
+  }
+}
+@keyframes cbShrug {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+@keyframes cbPop {
+  0% {
+    transform: translateY(60px) scale(0.86);
+  }
+  55% {
+    transform: translateY(-26px) scale(1.05);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes cbBlink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.08);
+  }
+}
+@keyframes cbBlinkFast {
+  0%,
+  78%,
+  100% {
+    transform: scaleY(1);
+  }
+  84% {
+    transform: scaleY(0.08);
+  }
+}
+@keyframes cbGazeUp {
+  0%,
+  100% {
+    transform: translate(-20px, -20px);
+  }
+  50% {
+    transform: translate(20px, -16px);
+  }
+}
+@keyframes cbGazeScan {
+  0% {
+    transform: translate(-18px, 14px);
+  }
+  80% {
+    transform: translate(18px, 14px);
+  }
+  90%,
+  100% {
+    transform: translate(-18px, 14px);
+  }
+}
+@keyframes cbBrowThink {
+  0%,
+  100% {
+    transform: translateY(-14px) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(2deg);
+  }
+}
+@keyframes cbBrowTalk {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+@keyframes cbTalkMouth {
+  0%,
+  100% {
+    transform: scale(0.92, 0.4);
+  }
+  45% {
+    transform: scale(1.1, 1.45);
+  }
+  70% {
+    transform: scale(1, 0.85);
+  }
+}
+@keyframes cbTapChin {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-5deg) translateY(-8px);
+  }
+  60% {
+    transform: rotate(2deg);
+  }
+}
+@keyframes cbTapL {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-22px) rotate(-4deg);
+  }
+}
+@keyframes cbTapR {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-22px) rotate(4deg);
+  }
+}
+@keyframes cbWave {
+  0%,
+  100% {
+    transform: rotate(-16deg);
+  }
+  50% {
+    transform: rotate(18deg);
+  }
+}
+@keyframes cbDotPulse {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.72);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+@keyframes cbDotBounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-26px);
+  }
+}
+@keyframes cbBar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@keyframes cbStroke {
+  0% {
+    stroke-dashoffset: 170;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hop-buddy *,
+  .brew-buddy * {
+    animation: none !important;
+  }
 }
