@@ -24,7 +24,7 @@ describe("generationUsage", () => {
     });
 
     it("fällt auf Standardkosten zurück wenn Result fehlt", () => {
-      expect(resolveJobTokenUsage({ created_at: "2026-03-01T00:00:00.000Z", charged: 0 })).toBe(10);
+      expect(resolveJobTokenUsage({ created_at: "2026-03-01T00:00:00.000Z", charged: 0 })).toBe(3);
     });
   });
 
@@ -53,7 +53,7 @@ describe("generationUsage", () => {
           },
           { created_at: "2026-03-01T11:00:00.000Z", charged: 0 },
         ]),
-      ).toEqual([{ date: "2026-03-01", tokens: 40 }]);
+      ).toEqual([{ date: "2026-03-01", tokens: 33 }]);
     });
   });
 

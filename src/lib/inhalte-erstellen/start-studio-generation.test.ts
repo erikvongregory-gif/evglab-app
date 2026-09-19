@@ -79,7 +79,19 @@ describe("startStudioGeneration", () => {
           store.delete(key);
         },
       },
+      dispatchEvent: vi.fn(() => true),
     });
+    vi.stubGlobal(
+      "CustomEvent",
+      class CustomEvent {
+        type: string;
+        detail: unknown;
+        constructor(type: string, init?: { detail?: unknown }) {
+          this.type = type;
+          this.detail = init?.detail;
+        }
+      },
+    );
   });
   afterEach(() => {
     clearActiveGeneration();
