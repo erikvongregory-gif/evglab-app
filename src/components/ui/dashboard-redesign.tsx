@@ -19,6 +19,9 @@ import {
   clearHomepageCheckoutParams,
   getHomepageCheckoutPlan,
 } from "@/lib/billing/checkoutClient";
+import { useBillingCredits } from "@/components/dashboard-shell/billing-credits-provider";
+import { setBillingCredits, type ClientBillingState } from "@/lib/billing/creditsCache";
+import { markDashboardPerf } from "@/lib/dashboard/dashboardPerf";
 import { buildGenericBrandProfilePatch, isBrandProfileCompleteFromSettings } from "@/lib/dashboard/brandProfile";
 import { mergeDashboardSettings, sanitizeDashboardSettings } from "@/lib/dashboard/settingsPayload";
 import { canWriteWithRole } from "@/lib/dashboard/teamRoles";
@@ -262,6 +265,40 @@ export function DashboardRedesignShell(props: {
   const [brandProfileNotice, setBrandProfileNotice] = useState("");
   const [pricingCheckoutError, setPricingCheckoutError] = useState<string | null>(null);
   const homepageCheckoutStartedRef = useRef(false);
+  const firstAssetMarkedRef = useRef(false);
+  const { state: credits } = useBillingCredits();
+
+  const applyCreditsToSummary = useCallback((prev: DashboardSummary | null, state: ClientBillingState) => {
+    const tokens = {
+      monthly: state.monthlyTokens,
+      used: state.usedTokens,
+      remaining: state.remainingTokens,
+      unlimited: Boolean(state.unlimited),
+    };
+    if (!prev) {
+      return {
+        unlimited: Boolean(state.unlimited),
+        tokens,
+        postsThisMonth: null,
+        teamMembers: 0,
+        openInvites: 0,
+        billingStatus: state.status,
+        plan: state.plan,
+      } satisfies DashboardSummary;
+    }
+    return {
+      ...prev,
+      unlimited: Boolean(state.unlimited ?? prev.unlimited),
+      tokens,
+      plan: state.plan ?? prev.plan,
+      billingStatus: state.status || prev.billingStatus,
+    };
+  }, []);
+
+  const displaySummary = useMemo(() => {
+    if (credits) return applyCreditsToSummary(summary, credits);
+    return summary;
+  }, [applyCreditsToSummary, credits, summary]);
 
   const profileName = settings?.profileName?.trim() || initialProfileName?.trim() || "";
   const breweryName = settings?.breweryName?.trim() || initialBreweryName?.trim() || "";
@@ -313,7 +350,13 @@ export function DashboardRedesignShell(props: {
             total?: number;
             hasMore?: boolean;
           };
-          if (Array.isArray(json.items)) setMedia(json.items);
+          if (Array.isArray(json.items)) {
+            setMedia(json.items);
+            if (!firstAssetMarkedRef.current && json.items.length > 0) {
+              firstAssetMarkedRef.current = true;
+              markDashboardPerf("first-asset");
+            }
+          }
           setMediaTotal(typeof json.total === "number" ? json.total : json.items?.length ?? 0);
           setMediaHasMore(Boolean(json.hasMore));
           setMediaError(null);
@@ -335,6 +378,14 @@ export function DashboardRedesignShell(props: {
           const json = (await res.json()) as { summary?: DashboardSummary };
           if (json.summary) {
             setSummary(json.summary);
+            setBillingCredits({
+              plan: json.summary.plan,
+              monthlyTokens: json.summary.tokens.monthly,
+              usedTokens: json.summary.tokens.used,
+              remainingTokens: json.summary.tokens.remaining,
+              status: json.summary.billingStatus,
+              unlimited: Boolean(json.summary.unlimited || json.summary.tokens.unlimited),
+            });
             setSummaryError(null);
           }
         } else {
@@ -405,10 +456,10 @@ export function DashboardRedesignShell(props: {
     setShowBrandProfileChoice(false);
 
     const hasPaidPlan =
-      Boolean(summary?.unlimited || summary?.tokens.unlimited) ||
+      Boolean(displaySummary?.unlimited || displaySummary?.tokens.unlimited) ||
       (!summaryError &&
-        !summary?.degradedBilling &&
-        hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus));
+        !displaySummary?.degradedBilling &&
+        hasActiveSubscriptionFromState(displaySummary?.plan, displaySummary?.billingStatus));
     if (hasPaidPlan) {
       clearHomepageCheckoutParams(params);
       const qs = params.toString();
@@ -424,24 +475,7 @@ export function DashboardRedesignShell(props: {
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settingsLoaded, summary, searchParams]);
-
-  useEffect(() => {
-    const onBillingUpdated = () => {
-      void (async () => {
-        try {
-          const res = await fetch("/api/dashboard/summary", { cache: "no-store", credentials: "include" });
-          if (!res.ok) return;
-          const json = (await res.json()) as { summary?: DashboardSummary };
-          if (json.summary) setSummary(json.summary);
-        } catch {
-          /* ignore */
-        }
-      })();
-    };
-    window.addEventListener("evglab-billing-updated", onBillingUpdated);
-    return () => window.removeEventListener("evglab-billing-updated", onBillingUpdated);
-  }, []);
+  }, [settingsLoaded, displaySummary, searchParams]);
 
   const { setBrandProfileActive } = useStudioShell();
 
@@ -630,18 +664,18 @@ export function DashboardRedesignShell(props: {
 
   // Bezahltes Abo ODER noch Bonus-Tokens → Studio nutzbar; Checkout nur bei Paid überspringen (oben).
   const hasActivePlan =
-    Boolean(summary?.unlimited || summary?.tokens.unlimited) ||
+    Boolean(displaySummary?.unlimited || displaySummary?.tokens.unlimited) ||
     (!summaryError &&
-      !summary?.degradedBilling &&
-      (hasActiveSubscriptionFromState(summary?.plan, summary?.billingStatus) ||
-        (summary?.tokens.remaining ?? 0) > 0));
+      !displaySummary?.degradedBilling &&
+      (hasActiveSubscriptionFromState(displaySummary?.plan, displaySummary?.billingStatus) ||
+        (displaySummary?.tokens.remaining ?? 0) > 0));
 
   return (
     <>
       <StudioViewTransition viewKey={tab} variant="tab">
       {tab === "dashboard" ? (
         <AdminHomeView
-          summary={summary}
+          summary={displaySummary}
           summaryLoaded={summaryLoaded}
           summaryError={summaryError}
           media={media}
@@ -734,10 +768,10 @@ export function DashboardRedesignShell(props: {
       ) : null}
       {tab === "pricing" ? (
         <AdminPricingView
-          currentPlan={(summary?.plan ?? null) as SubscriptionPlanKey | null}
-          monthlyTokens={summary?.tokens.monthly ?? 0}
-          usedTokens={summary?.tokens.used ?? 0}
-          remainingTokens={summary?.tokens.remaining ?? 0}
+          currentPlan={(displaySummary?.plan ?? null) as SubscriptionPlanKey | null}
+          monthlyTokens={displaySummary?.tokens.monthly ?? 0}
+          usedTokens={displaySummary?.tokens.used ?? 0}
+          remainingTokens={displaySummary?.tokens.remaining ?? 0}
           initialCheckoutError={pricingCheckoutError}
         />
       ) : null}

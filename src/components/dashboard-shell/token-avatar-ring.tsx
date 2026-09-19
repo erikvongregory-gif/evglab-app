@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { fetchBillingState, type ClientBillingState } from "@/lib/billing/clientBootstrap";
+import type { ReactNode } from "react";
+import { useBillingCredits } from "@/components/dashboard-shell/billing-credits-provider";
 import { cn } from "@/lib/utils";
 
 export type BillingTokenSnapshot = {
@@ -11,34 +11,13 @@ export type BillingTokenSnapshot = {
 };
 
 export function useBillingTokens(): BillingTokenSnapshot | null {
-  const [snapshot, setSnapshot] = useState<BillingTokenSnapshot | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const apply = (state: ClientBillingState | null) => {
-      if (cancelled || !state) return;
-      setSnapshot({
-        remaining: state.remainingTokens,
-        total: Math.max(state.monthlyTokens, 0),
-        unlimited: Boolean(state.unlimited),
-      });
-    };
-
-    const load = async () => {
-      apply(await fetchBillingState());
-    };
-
-    void load();
-    const onUpdate = () => void load();
-    window.addEventListener("evglab-billing-updated", onUpdate);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("evglab-billing-updated", onUpdate);
-    };
-  }, []);
-
-  return snapshot;
+  const { state } = useBillingCredits();
+  if (!state) return null;
+  return {
+    remaining: state.remainingTokens,
+    total: Math.max(state.monthlyTokens, 0),
+    unlimited: Boolean(state.unlimited),
+  };
 }
 
 /** Anteil verbleibender Tokens (1 = voll, 0 = leer). Unlimited = voller Ring. */

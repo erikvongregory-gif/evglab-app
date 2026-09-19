@@ -8,10 +8,8 @@ import {
 } from "@/components/dashboard-shell/brewai-admin-shell";
 import { hasAdminAccess, isOwnerUser } from "@/lib/auth/owner";
 import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
-import { getFreshUserDashboardMetadata } from "@/lib/dashboard/freshMetadata";
-import { getDashboardMetadata } from "@/lib/dashboard/metadata";
+import { getShellGateDashboardMetadata } from "@/lib/dashboard/freshMetadata";
 import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
-import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -41,7 +39,8 @@ export default async function StudioDashboardLayout({ children }: { children: Re
     redirect(TWO_FACTOR_PAGE);
   }
 
-  const dashboard = await getFreshUserDashboardMetadata(user.id, user.user_metadata);
+  // Nur Gate + Profiltexte — keine Asset-Signing-/Beers-Ladung im Shell-Pfad.
+  const dashboard = await getShellGateDashboardMetadata(user.id, user.user_metadata);
   if (needsFullOnboardingFlow(sanitizeStudioOnboardingState(dashboard.onboarding))) {
     redirect("/onboarding");
   }
@@ -61,26 +60,14 @@ export default async function StudioDashboardLayout({ children }: { children: Re
           ? user.user_metadata.picture
           : undefined;
 
-  let breweryName =
+  const breweryName =
     typeof settings?.breweryName === "string"
       ? settings.breweryName
       : typeof user.user_metadata?.brewery === "string"
         ? user.user_metadata.brewery
-        : undefined;
-  try {
-    const resourceUser = await workspaceResourceUser(user);
-    if (resourceUser.id !== user.id) {
-      const workspaceSettings = getDashboardMetadata(resourceUser.user_metadata).settings;
-      breweryName =
-        (typeof workspaceSettings?.breweryName === "string" && workspaceSettings.breweryName) ||
-        (typeof resourceUser.user_metadata?.brewery === "string" && resourceUser.user_metadata.brewery) ||
-        (typeof resourceUser.user_metadata?.brewery_name === "string" &&
-          resourceUser.user_metadata.brewery_name) ||
-        breweryName;
-    }
-  } catch {
-    /* Actor-Brewery beibehalten */
-  }
+        : typeof user.user_metadata?.brewery_name === "string"
+          ? user.user_metadata.brewery_name
+          : undefined;
 
   void hasAdminAccess(user);
   void isOwnerUser(user);
@@ -100,19 +87,17 @@ export default async function StudioDashboardLayout({ children }: { children: Re
         sidebar_collapsible: collapsible,
       }}
     >
-      <Suspense fallback={<BrewAiAdminLayoutFallback />}>
-        <BrewAiAdminShell
-          userEmail={user.email}
-          initialProfileName={profileName}
-          initialBreweryName={breweryName}
-          initialAvatarUrl={profileAvatarUrl}
-          defaultSidebarOpen={defaultOpen}
-          sidebarVariant={variant}
-          sidebarCollapsible={collapsible}
-        >
-          {children}
-        </BrewAiAdminShell>
-      </Suspense>
+      <BrewAiAdminShell
+        userEmail={user.email}
+        initialProfileName={profileName}
+        initialBreweryName={breweryName}
+        initialAvatarUrl={profileAvatarUrl}
+        defaultSidebarOpen={defaultOpen}
+        sidebarVariant={variant}
+        sidebarCollapsible={collapsible}
+      >
+        <Suspense fallback={<BrewAiAdminLayoutFallback />}>{children}</Suspense>
+      </BrewAiAdminShell>
     </PreferencesStoreProvider>
   );
 }

@@ -6,7 +6,6 @@ import { isOwnerUser } from "@/lib/auth/owner";
 import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
 
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
@@ -14,6 +13,7 @@ const NO_STORE_HEADERS = {
   Expires: "0",
 };
 
+/** Liest Billing nur aus der DB. Stripe-Sync läuft über Webhooks, Checkout und /api/billing/sync. */
 export async function GET() {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Supabase ist nicht konfiguriert." }, { status: 500 });
@@ -52,23 +52,7 @@ export async function GET() {
   }
 
   await ensureBillingRow(user.id);
-  let row = await getBillingRow(user.id);
-
-  // Hard fallback: wenn lokal kein bezahltes Abo steht, mit Stripe synchronisieren.
-  if (!hasPaidSubscription(row)) {
-    try {
-      const syncResult = await syncBillingFromStripe({
-        userId: user.id,
-        userEmail: user.email,
-        currentRow: row,
-      });
-      if (syncResult.synced) {
-        row = await getBillingRow(user.id);
-      }
-    } catch {
-      // fallback bleibt still; state wird trotzdem ausgeliefert
-    }
-  }
+  const row = await getBillingRow(user.id);
 
   const state = row
     ? {

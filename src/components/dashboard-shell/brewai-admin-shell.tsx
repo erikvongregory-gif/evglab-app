@@ -37,7 +37,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { APP_CONFIG } from "@/config/app-config";
-import { runBillingBootstrap } from "@/lib/billing/clientBootstrap";
+import { BillingCreditsProvider } from "@/components/dashboard-shell/billing-credits-provider";
 import { cn } from "@/lib/utils";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { createClient } from "@/lib/supabase/client";
@@ -187,16 +187,6 @@ export function BrewAiAdminShell({
   };
   const accountUsers = [sessionUser];
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        await runBillingBootstrap();
-      } catch {
-        // Billing-Bootstrap darf die Shell nicht blockieren.
-      }
-    })();
-  }, []);
-
   const handleLogout = useCallback(async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -206,6 +196,7 @@ export function BrewAiAdminShell({
 
   return (
     <TooltipProvider>
+      <BillingCreditsProvider>
       <StudioShellContext.Provider value={shellApi}>
         <div className="brewai-admin">
           <SidebarProvider
@@ -275,6 +266,7 @@ export function BrewAiAdminShell({
           <Toaster />
         </div>
       </StudioShellContext.Provider>
+      </BillingCreditsProvider>
     </TooltipProvider>
   );
 }

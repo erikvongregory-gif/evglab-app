@@ -7,7 +7,6 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { isOwnerUser } from "@/lib/auth/owner";
 import { hasPaidSubscription, paidPlanFromBilling } from "@/lib/billing/access";
 import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/billing/store";
-import { syncBillingFromStripe } from "@/lib/billing/stripeSync";
 import { getDashboardMetadata } from "@/lib/dashboard/metadata";
 import { readDashboardMedia } from "@/lib/dashboard/media-store";
 import { loadGenerationUsageStats } from "@/lib/dashboard/generationUsage";
@@ -34,20 +33,6 @@ export async function GET() {
     } else {
       await ensureBillingRow(user.id);
       billing = await getBillingRow(user.id);
-    }
-    if (!isOwner && !hasPaidSubscription(billing)) {
-      try {
-        const syncResult = await syncBillingFromStripe({
-          userId: user.id,
-          userEmail: user.email,
-          currentRow: billing,
-        });
-        if (syncResult.synced) {
-          billing = await getBillingRow(user.id);
-        }
-      } catch {
-        /* Stripe-Sync optional; Summary liefert trotzdem */
-      }
     }
   } catch (error) {
     degradedBilling = true;

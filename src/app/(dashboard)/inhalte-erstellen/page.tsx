@@ -58,6 +58,7 @@ export default async function InhalteErstellenPage() {
   if (!isOwnerUser(user)) {
     await ensureBillingRow(resourceUser.id);
     let billing = await getBillingRow(resourceUser.id);
+    // Begrenzte Reparatur vor Zugangssperre — nicht beim normalen Dashboard-Besuch.
     if (!hasActiveSubscription(billing)) {
       try {
         const syncResult = await syncBillingFromStripe({

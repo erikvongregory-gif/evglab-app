@@ -1,28 +1,22 @@
 import type { BillingReceiptData } from "@/components/ui/billing-receipt-printer";
+import {
+  loadBillingCredits,
+  setBillingCredits,
+  type ClientBillingState,
+} from "@/lib/billing/creditsCache";
 
-export type ClientBillingState = {
-  plan: string | null;
-  monthlyTokens: number;
-  usedTokens: number;
-  remainingTokens: number;
-  status: string;
-  unlimited?: boolean;
-};
+export type { ClientBillingState };
 
 export type BillingBootstrapResult = {
   state: ClientBillingState | null;
   receipt: BillingReceiptData | null;
 };
 
-export async function fetchBillingState(): Promise<ClientBillingState | null> {
-  try {
-    const res = await fetch("/api/billing/state", { cache: "no-store", credentials: "include" });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { state?: ClientBillingState };
-    return json.state ?? null;
-  } catch {
-    return null;
-  }
+/** Öffentliche API — nutzt den gemeinsamen Credits-Cache. */
+export async function fetchBillingState(options?: {
+  force?: boolean;
+}): Promise<ClientBillingState | null> {
+  return loadBillingCredits(options);
 }
 
 export async function syncBillingFromClient(): Promise<void> {
@@ -61,6 +55,7 @@ export async function confirmBillingSession(
           preview: false,
         }
       : null;
+    if (json.state) setBillingCredits(json.state);
     return { ok: true, receipt, state: json.state ?? null };
   } catch {
     /* Webhook bleibt Fallback */
@@ -76,9 +71,13 @@ function cleanBillingQueryParams() {
   window.history.replaceState({}, "", cleaned.toString());
 }
 
+function notifyBillingUpdated() {
+  window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
+}
+
 async function waitForActiveBilling(): Promise<ClientBillingState | null> {
   for (let i = 0; i < 8; i += 1) {
-    const state = await fetchBillingState();
+    const state = await loadBillingCredits({ force: true });
     if (state?.plan && state.status !== "none" && state.status !== "canceled") {
       return state;
     }
@@ -87,10 +86,14 @@ async function waitForActiveBilling(): Promise<ClientBillingState | null> {
     }
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }
-  return fetchBillingState();
+  return loadBillingCredits({ force: true });
 }
 
-/** Nach Checkout-Redirect und bei leerer DB: Stripe-Sync + Session bestätigen. */
+/**
+ * Billing nach Navigation.
+ * Normalfall: nur DB-State (kein Stripe).
+ * Stripe-Sync: Checkout-Redirect, explizites `?billing=repair`, sonst Webhooks.
+ */
 export async function runBillingBootstrap(): Promise<BillingBootstrapResult> {
   if (typeof window === "undefined") return { state: null, receipt: null };
 
@@ -102,7 +105,7 @@ export async function runBillingBootstrap(): Promise<BillingBootstrapResult> {
     const confirmed = await confirmBillingSession(sessionId);
     const state = confirmed.state ?? (await waitForActiveBilling());
     cleanBillingQueryParams();
-    window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
+    notifyBillingUpdated();
     if (confirmed.ok && confirmed.receipt) {
       window.dispatchEvent(new CustomEvent("evglab-billing-receipt", { detail: confirmed.receipt }));
     }
@@ -113,12 +116,12 @@ export async function runBillingBootstrap(): Promise<BillingBootstrapResult> {
     const confirmed = await confirmBillingSession(sessionId);
     await syncBillingFromClient();
     cleanBillingQueryParams();
-    window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
+    notifyBillingUpdated();
     if (confirmed.ok && confirmed.receipt) {
       window.dispatchEvent(new CustomEvent("evglab-billing-receipt", { detail: confirmed.receipt }));
     }
     return {
-      state: confirmed.state ?? (await fetchBillingState()),
+      state: confirmed.state ?? (await loadBillingCredits({ force: true })),
       receipt: confirmed.ok ? confirmed.receipt : null,
     };
   }
@@ -132,17 +135,16 @@ export async function runBillingBootstrap(): Promise<BillingBootstrapResult> {
     cleanBillingQueryParams();
   }
 
-  let state = await fetchBillingState();
-  if (!state?.plan || state.status === "none" || state.status === "canceled") {
+  // Explizite Reparatur (Support/Deep-Link) — nicht bei none/canceled im Normalfall.
+  if (billing === "repair") {
     await syncBillingFromClient();
-    state = await fetchBillingState();
-  } else {
-    await syncBillingFromClient();
-    state = await fetchBillingState();
+    cleanBillingQueryParams();
+    const state = await loadBillingCredits({ force: true });
+    if (state) notifyBillingUpdated();
+    return { state, receipt: null };
   }
 
-  if (state) {
-    window.dispatchEvent(new CustomEvent("evglab-billing-updated"));
-  }
+  // Normaler Seitenaufruf: nur DB, kein Stripe.
+  const state = await loadBillingCredits({ force: true });
   return { state, receipt: null };
 }
