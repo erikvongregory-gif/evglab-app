@@ -150,6 +150,7 @@ export function LoginForm({
       initialMode={errorMode}
       inviteToken={inviteToken ?? searchParams.get("invite") ?? undefined}
       inviteOnly={inviteOnly}
+      signInOnly={inviteOnly && !inviteToken && !teamInviteMode && !nextPath.startsWith("/invite/team/")}
       waitlistMode={waitlistMode}
       defaultEmail={resolvedDefaultEmail}
       teamInviteMode={teamInviteMode || Boolean(nextPath.startsWith("/invite/team/"))}
