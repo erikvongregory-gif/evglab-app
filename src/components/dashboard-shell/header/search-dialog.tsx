@@ -150,6 +150,7 @@ export function SearchDialog() {
   return (
     <>
       <Button
+        id="tour-search"
         onClick={() => handleOpenChange(true)}
         variant="link"
         className="px-0! font-normal text-muted-foreground hover:no-underline"

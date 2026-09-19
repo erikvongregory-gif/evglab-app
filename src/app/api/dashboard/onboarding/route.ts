@@ -28,6 +28,8 @@ const patchSchema = z.object({
   /** ISO string oder null zum Zurücksetzen (Restart). */
   completedAt: z.union([z.string().max(40), z.null()]).optional(),
   tourVersion: z.union([z.literal(1), z.null()]).optional(),
+  /** Dashboard-UI-Rundgang; null zum Zurücksetzen. */
+  uiTourVersion: z.union([z.literal(1), z.null()]).optional(),
 });
 
 async function deriveProgress(

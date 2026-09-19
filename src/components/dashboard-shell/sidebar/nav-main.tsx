@@ -116,7 +116,12 @@ export function NavMain({ items }: NavMainProps) {
                 tooltip="Neu erstellen"
                 className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
               >
-                <Link prefetch={false} href="/inhalte-erstellen" onClick={closeMobileNav}>
+                <Link
+                  id="tour-create"
+                  prefetch={false}
+                  href="/inhalte-erstellen"
+                  onClick={closeMobileNav}
+                >
                   <PlusCircleIcon className="group-hover/menu-button:rotate-90 group-hover/menu-button:scale-110 motion-reduce:group-hover/menu-button:rotate-0 motion-reduce:group-hover/menu-button:scale-100" />
                   <span>Neu erstellen</span>
                 </Link>
@@ -183,6 +188,7 @@ function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
     <SidebarMenuItem>
       <SidebarMenuButton asChild aria-disabled={item.disabled} tooltip={item.title} isActive={isActive}>
         <Link
+          id={`tour-nav-${item.id}`}
           prefetch={false}
           href={item.url}
           target={item.newTab ? "_blank" : undefined}

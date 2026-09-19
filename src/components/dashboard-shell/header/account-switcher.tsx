@@ -44,7 +44,11 @@ export function AccountSwitcher({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <button
+          id="tour-avatar"
+          type="button"
+          className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <TokenAvatarRing size={36}>
             <Avatar className="size-full rounded-full after:hidden">
               <AvatarImage src={activeUser.avatar || undefined} alt={activeUser.name} />

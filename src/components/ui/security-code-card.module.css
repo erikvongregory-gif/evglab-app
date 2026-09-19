@@ -1,4 +1,225 @@
-/* Outcome overlay + digit rattle — design stays on the card; this is animation only */
+/* Security code card — layout, motion, mobile */
+
+.page {
+  display: flex;
+  min-height: 100dvh;
+  min-height: 100svh;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  background: var(--background);
+  padding:
+    max(1rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+  animation: pageIn 0.55s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 480px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--foreground);
+  text-decoration: none;
+  animation: rise 0.5s 0.05s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transition: opacity 0.2s ease;
+}
+
+.brand:hover {
+  opacity: 0.8;
+}
+
+.brandName {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.beta {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  line-height: 1;
+}
+
+.card {
+  position: relative;
+  overflow: visible;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+  background: color-mix(in oklab, var(--card) 80%, transparent);
+  box-shadow: 0 20px 40px -16px color-mix(in oklab, var(--foreground) 12%, transparent);
+  backdrop-filter: blur(8px);
+  animation: cardIn 0.6s 0.08s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+
+.cardGlow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+  background:
+    radial-gradient(80% 60% at 50% -10%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 70%),
+    linear-gradient(135deg, color-mix(in oklab, var(--primary) 5%, transparent), color-mix(in oklab, var(--secondary) 5%, transparent));
+  animation: glowPulse 6s ease-in-out infinite;
+}
+
+.cardBody {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  animation: rise 0.5s 0.18s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.iconRing {
+  position: relative;
+  display: flex;
+  width: 3.75rem;
+  height: 3.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--background);
+  box-shadow:
+    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+    inset 0 0 0 1px var(--border);
+  animation: iconBreathe 3.6s ease-in-out infinite;
+}
+
+.icon {
+  width: 1.65rem;
+  height: 1.65rem;
+  color: var(--muted-foreground);
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.lead {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.formBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  animation: rise 0.5s 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.otpWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  overflow: visible;
+  padding-block: 6px;
+}
+
+.otpContainer {
+  display: flex !important;
+  width: 100%;
+  height: auto !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+.otpGroup {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(0.25rem, 1.6vw, 0.5rem);
+  width: 100%;
+  max-width: 100%;
+  min-height: 2.75rem;
+  overflow: visible;
+}
+
+.otpSlot {
+  box-sizing: border-box;
+  width: clamp(2.25rem, 12vw, 2.65rem);
+  height: clamp(2.25rem, 12vw, 2.65rem);
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  flex: 0 0 auto;
+  border-radius: 0.5rem;
+  border: 1px solid var(--input) !important;
+  font-size: 1.05rem;
+  line-height: 1;
+  overflow: visible;
+  animation: slotIn 0.45s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.backupInput {
+  animation: rise 0.45s 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: rise 0.5s 0.34s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.actionBtn {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.actionBtn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.actionBtn:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.signOut {
+  animation: rise 0.5s 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Outcome overlay + digit rattle */
 
 .rattling {
   animation: digitflip 0.12s linear infinite;
@@ -17,6 +238,7 @@
   justify-content: center;
   text-align: center;
   padding: 2rem;
+  border-radius: inherit;
   background: color-mix(in oklab, var(--card) 92%, transparent);
   backdrop-filter: blur(6px);
   animation: fade 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -88,6 +310,78 @@
   animation: popin 0.4s 0.22s cubic-bezier(0.4, 0, 0.2, 1) backwards;
 }
 
+/* Keyframes */
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slotIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes iconBreathe {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+      inset 0 0 0 1px var(--border),
+      0 0 0 0 color-mix(in oklab, var(--primary) 0%, transparent);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow:
+      0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+      inset 0 0 0 1px var(--border),
+      0 0 0 8px color-mix(in oklab, var(--primary) 8%, transparent);
+  }
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @keyframes fade {
   from {
     opacity: 0;
@@ -148,7 +442,111 @@
   }
 }
 
+/* ≥390px: slightly larger OTP cells */
+@media (min-width: 390px) {
+  .otpSlot {
+    width: clamp(2.5rem, 11vw, 2.9rem);
+    height: clamp(2.5rem, 11vw, 2.9rem);
+    font-size: 1.125rem;
+  }
+
+  .otpGroup {
+    gap: clamp(0.35rem, 1.8vw, 0.5rem);
+    min-height: 3rem;
+  }
+
+  .cardBody {
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+
+  .iconRing {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .icon {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+}
+
+/* Tablet+ */
+@media (min-width: 768px) {
+  .page {
+    padding:
+      max(1.5rem, env(safe-area-inset-top, 0px))
+      max(1.5rem, env(safe-area-inset-right, 0px))
+      max(1.5rem, env(safe-area-inset-bottom, 0px))
+      max(1.5rem, env(safe-area-inset-left, 0px));
+  }
+
+  .brand {
+    margin-bottom: 1.75rem;
+  }
+
+  .cardBody {
+    padding: 2rem;
+  }
+
+  .iconRing {
+    width: 5rem;
+    height: 5rem;
+  }
+
+  .icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .otpSlot {
+    width: 3.5rem;
+    height: 3.5rem;
+    font-size: 1.125rem;
+  }
+
+  .otpGroup {
+    gap: 0.75rem;
+    min-height: 3.5rem;
+  }
+}
+
+/* Narrow phones: shrink OTP to fit without scroll when possible */
+@media (max-width: 359px) {
+  .otpSlot {
+    width: 2.2rem;
+    height: 2.2rem;
+    font-size: 0.95rem;
+  }
+
+  .otpGroup {
+    gap: 0.25rem;
+    min-height: 2.35rem;
+  }
+
+  .cardBody {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .title {
+    font-size: 1.125rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .page,
+  .brand,
+  .card,
+  .cardGlow,
+  .header,
+  .iconRing,
+  .formBlock,
+  .otpSlot,
+  .backupInput,
+  .actions,
+  .signOut,
+  .actionBtn,
   .verified,
   .checkRing,
   .checkPath,
@@ -158,6 +556,10 @@
   .verifiedLead,
   .rattling {
     animation: none !important;
+  }
+
+  .actionBtn:not(:disabled):hover {
+    transform: none;
   }
 
   .checkPath,

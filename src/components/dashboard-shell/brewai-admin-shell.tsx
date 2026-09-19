@@ -38,6 +38,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { APP_CONFIG } from "@/config/app-config";
 import { BillingCreditsProvider } from "@/components/dashboard-shell/billing-credits-provider";
+import { DashboardProductTour } from "@/components/dashboard-shell/dashboard-product-tour";
 import { cn } from "@/lib/utils";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { createClient } from "@/lib/supabase/client";
@@ -113,6 +114,7 @@ export function BrewAiAdminShell({
   initialProfileName,
   initialBreweryName,
   initialAvatarUrl,
+  uiTourSeen = false,
   defaultSidebarOpen = true,
   sidebarVariant = "sidebar",
   sidebarCollapsible: _sidebarCollapsible = "icon",
@@ -122,6 +124,8 @@ export function BrewAiAdminShell({
   initialProfileName?: string;
   initialBreweryName?: string;
   initialAvatarUrl?: string;
+  /** Server: Dashboard-UI-Rundgang bereits abgeschlossen. */
+  uiTourSeen?: boolean;
   defaultSidebarOpen?: boolean;
   sidebarVariant?: React.ComponentProps<typeof Sidebar>["variant"];
   /** Ignored: collapse is always icon-rail, matching the template default. */
@@ -264,6 +268,7 @@ export function BrewAiAdminShell({
             <LumaBar />
           </SidebarProvider>
           <Toaster />
+          <DashboardProductTour initialSeen={uiTourSeen} />
         </div>
       </StudioShellContext.Provider>
       </BillingCreditsProvider>

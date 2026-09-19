@@ -5,6 +5,9 @@ export type OnboardingFlowStep = 1 | 2 | 3 | 4 | 5;
 /** Aktuelle Product-Tour-Version — alte `completedAt` ohne diese Version zählen nicht. */
 export const ONBOARDING_TOUR_VERSION = 1;
 
+/** Dashboard-UI-Rundgang (Sidebar/Shell) — unabhängig vom Marken-Onboarding. */
+export const UI_TOUR_VERSION = 1;
+
 /**
  * Nur kompakte Flags — landet in `user_metadata.dashboard.onboarding` und darf
  * das Auth-JWT nicht aufblähen.
@@ -30,6 +33,8 @@ export type StudioOnboardingState = {
   completedAt?: string;
   /** Abgeschlossene Tour-Version — fehlt bei Legacy-Abschlüssen. */
   tourVersion?: number;
+  /** Abgeschlossener Dashboard-UI-Rundgang (nicht Markenprofil). */
+  uiTourVersion?: number;
 };
 
 export type StudioOnboardingProgress = Record<StudioOnboardingTaskId, boolean>;
@@ -80,6 +85,10 @@ export function sanitizeStudioOnboardingState(raw: unknown): StudioOnboardingSta
     typeof base.tourVersion === "number" && Number.isFinite(base.tourVersion)
       ? Math.max(0, Math.min(99, Math.floor(base.tourVersion)))
       : undefined;
+  const uiTourVersion =
+    typeof base.uiTourVersion === "number" && Number.isFinite(base.uiTourVersion)
+      ? Math.max(0, Math.min(99, Math.floor(base.uiTourVersion)))
+      : undefined;
   return {
     v: 1,
     welcome: base.welcome === true,
@@ -90,6 +99,7 @@ export function sanitizeStudioOnboardingState(raw: unknown): StudioOnboardingSta
     ...(currentStep ? { currentStep } : {}),
     ...(completedAt ? { completedAt } : {}),
     ...(tourVersion !== undefined ? { tourVersion } : {}),
+    ...(uiTourVersion !== undefined ? { uiTourVersion } : {}),
   };
 }
 
@@ -98,6 +108,7 @@ export function mergeStudioOnboardingState(
   patch: Partial<StudioOnboardingState> & {
     completedAt?: string | null;
     tourVersion?: number | null;
+    uiTourVersion?: number | null;
   },
 ): StudioOnboardingState {
   const merged: Record<string, unknown> = { ...current, ...patch };
@@ -107,6 +118,9 @@ export function mergeStudioOnboardingState(
   }
   if (patch.tourVersion === null || patch.tourVersion === 0) {
     delete merged.tourVersion;
+  }
+  if (patch.uiTourVersion === null || patch.uiTourVersion === 0) {
+    delete merged.uiTourVersion;
   }
   if (patch.currentStep === undefined && "currentStep" in patch) {
     delete merged.currentStep;
@@ -130,6 +144,11 @@ export function isLegacyOnboardingSettled(state: StudioOnboardingState): boolean
 /** Product-Tour abgeschlossen — alte Abschlüsse ohne `tourVersion` zählen nicht. */
 export function isOnboardingTourComplete(state: StudioOnboardingState): boolean {
   return Boolean(state.completedAt) && (state.tourVersion ?? 0) >= ONBOARDING_TOUR_VERSION;
+}
+
+/** Dashboard-UI-Rundgang bereits gesehen (Finish oder Skip). */
+export function isUiTourComplete(state: StudioOnboardingState): boolean {
+  return (state.uiTourVersion ?? 0) >= UI_TOUR_VERSION;
 }
 
 /** @deprecated Nutze isOnboardingTourComplete */

@@ -193,7 +193,7 @@ export function HopfenHugoChat({
               >
                 {msg.role === "assistant" ? (
                   <>
-                    <span className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                    <span className="mb-1 block text-[11px] font-medium tracking-wide text-[var(--ac)]">
                       {ASSISTANT_NAME}
                     </span>
                     {msg.text}
@@ -253,7 +253,7 @@ export function HopfenHugoChat({
             autoReply={null}
             showBubbles={false}
             sound={false}
-            className="max-w-none"
+            className="w-full"
           />
           <p className="evg-hopfenhugo-policy">
             Antworten folgen den{" "}

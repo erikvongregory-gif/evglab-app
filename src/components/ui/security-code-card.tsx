@@ -203,32 +203,28 @@ export function SecurityCodeCard({
   }, [outcome]);
 
   return (
-    <div
-      className={cn(
-        "flex min-h-dvh w-full items-center justify-center bg-background p-4",
-        studioFontClassName,
-      )}
-    >
-      <div className="mx-auto w-full max-w-[480px]">
+    <div className={cn(styles.page, studioFontClassName)}>
+      <div className={styles.shell}>
         <a
           href={MARKETING_SITE_URL}
-          className="mb-6 flex items-center justify-center gap-2 text-foreground"
+          className={styles.brand}
           aria-label="BrewAI Startseite"
         >
           <EvglabMark size={22} />
-          <span className="font-semibold tracking-tight">BrewAI</span>
+          <span className={styles.brandName}>BrewAI</span>
+          <span className={styles.beta}>Beta</span>
         </a>
 
-        <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/80 shadow-xl backdrop-blur-sm">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5" />
-          <div className="relative z-10 flex flex-col gap-6 p-6 md:p-8">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="relative flex size-16 items-center justify-center rounded-full bg-background shadow-xs ring-1 ring-border ring-inset md:size-20">
-                <MailCheck className="size-7 text-muted-foreground md:size-8" />
+        <div className={styles.card}>
+          <div className={styles.cardGlow} aria-hidden />
+          <div className={styles.cardBody}>
+            <div className={styles.header}>
+              <div className={styles.iconRing}>
+                <MailCheck className={styles.icon} aria-hidden />
               </div>
-              <div className="space-y-1.5">
-                <h1 className="font-medium text-xl md:text-xl">{title}</h1>
-                <p className="text-muted-foreground text-sm tracking-tight">
+              <div className={styles.headerText}>
+                <h1 className={styles.title}>{title}</h1>
+                <p className={styles.lead}>
                   {hasPendingCode ? (
                     <>
                       Wir haben einen 6-stelligen Code an <strong>{email}</strong> gesendet.
@@ -265,8 +261,8 @@ export function SecurityCodeCard({
             ) : null}
 
             {canEnterCode && outcome === "idle" ? (
-              <div className="space-y-5">
-                <div className="flex justify-center">
+              <div className={styles.formBlock}>
+                <div className={styles.otpWrap}>
                   <InputOTP
                     maxLength={DIGIT_COUNT}
                     value={otpValue}
@@ -276,16 +272,18 @@ export function SecurityCodeCard({
                     }}
                     disabled={verifyBusy}
                     autoFocus={hasPendingCode}
+                    containerClassName={styles.otpContainer}
                   >
-                    <InputOTPGroup className="gap-2 md:gap-3">
+                    <InputOTPGroup className={styles.otpGroup}>
                       {Array.from({ length: DIGIT_COUNT }, (_, i) => (
                         <InputOTPSlot
                           key={i}
                           index={i}
                           className={cn(
-                            "size-12 rounded-md border text-lg md:size-14",
+                            styles.otpSlot,
                             rattling[i] && styles.rattling,
                           )}
+                          style={{ animationDelay: `${0.28 + i * 0.05}s` }}
                         />
                       ))}
                     </InputOTPGroup>
@@ -300,12 +298,13 @@ export function SecurityCodeCard({
                     value={backupCode}
                     disabled={verifyBusy}
                     onChange={(e) => setBackupCode(e.target.value)}
+                    className={styles.backupInput}
                   />
                 ) : null}
 
                 <Button
                   type="button"
-                  className="h-11 w-full"
+                  className={cn("h-11 w-full", styles.actionBtn)}
                   disabled={verifyBusy || !complete}
                   onClick={runVerifyAnimationThenSubmit}
                 >
@@ -330,14 +329,14 @@ export function SecurityCodeCard({
                   onSubmit={() => {
                     if (hasPendingCode) setResendCooldown(30);
                   }}
-                  className="space-y-3"
+                  className={styles.actions}
                 >
                   <input type="hidden" name="action" value="send" />
                   <input type="hidden" name="next" value={nextPath} />
                   <Button
                     type="submit"
                     variant={canEnterCode ? "outline" : "default"}
-                    className="h-11 w-full"
+                    className={cn("h-11 w-full", styles.actionBtn)}
                     disabled={verifyBusy || (hasPendingCode && resendCooldown > 0)}
                   >
                     {hasPendingCode
@@ -349,7 +348,12 @@ export function SecurityCodeCard({
                 </form>
 
                 <form action="/auth/signout" method="post">
-                  <Button type="submit" variant="ghost" className="w-full" disabled={verifyBusy}>
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    className={cn("w-full", styles.signOut)}
+                    disabled={verifyBusy}
+                  >
                     Abmelden
                   </Button>
                 </form>

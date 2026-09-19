@@ -172,7 +172,7 @@ export default function GradientChatInput({
   const gradient = `linear-gradient(135deg, ${gradientColors.join(", ")})`;
 
   return (
-    <div className={cn("relative mx-auto w-full max-w-3xl", className)}>
+    <div className={cn("relative w-full", className)}>
       <div
         aria-hidden
         className="pointer-events-none absolute -inset-[2px] rounded-[26px] opacity-70 blur-[10px] transition-opacity"

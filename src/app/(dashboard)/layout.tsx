@@ -9,7 +9,11 @@ import {
 import { hasAdminAccess, isOwnerUser } from "@/lib/auth/owner";
 import { TWO_FACTOR_PAGE, hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { getShellGateDashboardMetadata } from "@/lib/dashboard/freshMetadata";
-import { needsFullOnboardingFlow, sanitizeStudioOnboardingState } from "@/lib/dashboard/onboarding";
+import {
+  isUiTourComplete,
+  needsFullOnboardingFlow,
+  sanitizeStudioOnboardingState,
+} from "@/lib/dashboard/onboarding";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -41,9 +45,11 @@ export default async function StudioDashboardLayout({ children }: { children: Re
 
   // Nur Gate + Profiltexte — keine Asset-Signing-/Beers-Ladung im Shell-Pfad.
   const dashboard = await getShellGateDashboardMetadata(user.id, user.user_metadata);
-  if (needsFullOnboardingFlow(sanitizeStudioOnboardingState(dashboard.onboarding))) {
+  const onboardingState = sanitizeStudioOnboardingState(dashboard.onboarding);
+  if (needsFullOnboardingFlow(onboardingState)) {
     redirect("/onboarding");
   }
+  const uiTourSeen = isUiTourComplete(onboardingState);
   const settings = dashboard.settings as Record<string, unknown> | undefined;
   const profileName =
     typeof settings?.profileName === "string"
@@ -92,6 +98,7 @@ export default async function StudioDashboardLayout({ children }: { children: Re
         initialProfileName={profileName}
         initialBreweryName={breweryName}
         initialAvatarUrl={profileAvatarUrl}
+        uiTourSeen={uiTourSeen}
         defaultSidebarOpen={defaultOpen}
         sidebarVariant={variant}
         sidebarCollapsible={collapsible}

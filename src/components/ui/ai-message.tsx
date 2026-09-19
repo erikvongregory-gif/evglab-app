@@ -181,7 +181,9 @@ const AIMessage = ({
             "w-fit max-w-prose text-sm leading-relaxed",
             bubble && "rounded-2xl px-3.5 py-2.5",
             bubble && isUser && "rounded-br-md bg-foreground text-background",
-            bubble && !isUser && "rounded-bl-md bg-muted text-foreground",
+            bubble &&
+              !isUser &&
+              "rounded-bl-md border border-[color-mix(in_srgb,var(--ac,#C7691E)_14%,transparent)] bg-[color-mix(in_srgb,var(--ac-tint,#FBEFE0)_82%,var(--background))] text-foreground dark:border-[color-mix(in_srgb,var(--ac,#C7691E)_32%,transparent)] dark:bg-[color-mix(in_srgb,var(--ac,#C7691E)_18%,var(--background))]",
             !bubble && "text-foreground",
           )}
         >
