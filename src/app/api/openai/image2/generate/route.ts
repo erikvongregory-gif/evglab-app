@@ -8,6 +8,7 @@ import { z } from "zod";
 import { classifyProviderResponse } from "@/lib/ai/providerErrors";
 import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequest";
 import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
+import { calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import {
   buildBrandProfilePromptContext,
@@ -184,8 +185,11 @@ export async function POST(req: Request) {
 
     const hasReferenceImage = Boolean(body.referenceImageUrls?.length);
     const usedModelLabel = hasReferenceImage ? "gpt-image-2-image-to-image" : "gpt-image-2-text-to-image";
-    const baseCost = body.resolution === "4K" ? 35 : body.resolution === "2K" ? 20 : 10;
-    const tokenCost = baseCost + (hasReferenceImage ? 5 : 0) + (body.strictLabelMode ? 10 : 0);
+    const tokenCost = calculatePerVariantTokenCost({
+      resolution: body.resolution === "4K" ? "4K" : body.resolution === "2K" ? "2K" : "1K",
+      hasReferenceImage,
+      strictLabelMode: body.strictLabelMode,
+    });
     const remainingTokens = Math.max((currentState?.monthly_tokens ?? 0) - (currentState?.used_tokens ?? 0), 0);
     if (remainingTokens < tokenCost) {
       return NextResponse.json(

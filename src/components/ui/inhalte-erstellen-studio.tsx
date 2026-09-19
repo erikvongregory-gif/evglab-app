@@ -124,6 +124,7 @@ export function InhalteErstellenStudio({
   const [stiltreue, setStiltreue] = useState<Stiltreue>("hoch");
   const [aspectRatio, setAspectRatio] = useState<Aspect>("4:5");
   const [variantCount, setVariantCount] = useState<VariantCount>(1);
+  const [requestQuality, setRequestQuality] = useState<"medium" | "high" | "ultra">("medium");
   const [aiWatermark, setAiWatermark] = useState(false);
   const [hyperreal, setHyperreal] = useState(false);
 
@@ -487,7 +488,7 @@ export function InhalteErstellenStudio({
   const hasProductImage = Boolean(profileEtikettUrl) && !productImageFailed && !productImageLoading;
 
   // Request-Qualität für Vorschau und Payload — Server rechnet damit (nicht Compiler-Qualität).
-  const studioRequestQuality = "medium" as const;
+  const studioRequestQuality = requestQuality;
 
   const generationTokenCost = useMemo(() => {
     const glassOnly = behaelter === "G";
@@ -502,7 +503,7 @@ export function InhalteErstellenStudio({
       variantCount,
       requestedQuality: studioRequestQuality,
     });
-  }, [behaelter, etikettModus, extraReferences.length, flaschenTyp, profileEtikettUrl, variantCount]);
+  }, [behaelter, etikettModus, extraReferences.length, flaschenTyp, profileEtikettUrl, requestQuality, variantCount]);
 
   const sortedPresets = useMemo(() => sortTemplatesForDate(OCCASION_TEMPLATES, new Date()), []);
 
@@ -1662,6 +1663,30 @@ export function InhalteErstellenStudio({
                   onClick={() => setAspectRatio(ar)}
                 >
                   {ar}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="studio-create-field">
+            <span className="studio-create-field__label">Qualität</span>
+            <div className="studio-create-segment" role="radiogroup" aria-label="Bildqualität">
+              {(
+                [
+                  ["medium", "1K"],
+                  ["high", "2K"],
+                  ["ultra", "4K"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={requestQuality === id}
+                  className={`studio-create-segment__btn${requestQuality === id ? " is-active" : ""}`}
+                  onClick={() => setRequestQuality(id)}
+                >
+                  {label}
                 </button>
               ))}
             </div>

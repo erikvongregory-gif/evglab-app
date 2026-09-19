@@ -1,3 +1,4 @@
+import { crawlCatalogPages } from "@/lib/brand/catalog-crawl";
 import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
@@ -9,16 +10,14 @@ import { analyzeWebsiteBrand, computeAnalysisConfidence, selectBeerProductImageI
 import { storeBrandReferenceImagesAsUrls } from "@/lib/brand/persist-reference-urls";
 import { fetchWebsiteHtmlForBrandIntake, fetchWebsiteHtmlWithBrowser } from "@/lib/brand/browser-intake";
 import { looksLikeBlockedGatePage } from "@/lib/brand/consent-gate-dismiss";
-import { isInstagramUrl, normalizeWebsiteUrl } from "@/lib/brand/url-intake";
+import { isInstagramUrl, normalizeWebsiteUrl, safeFetchHtml } from "@/lib/brand/url-intake";
 import { extractBeerVarietiesFromIntake } from "@/lib/brand/beer-catalog-intake";
 import {
   downloadCandidateImages,
-  extractRelevantInternalLinks,
   mergeParsedWebsitePages,
   parseWebsiteHtml,
   pickBrandReferenceImages,
   pickImagesByIndices,
-  type ParsedWebsitePage,
 } from "@/lib/brand/website-intake";
 import { ingestBrandFontFromHtml } from "@/lib/brand/extract-brand-fonts";
 
@@ -86,7 +85,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg }, { status: 502 });
     }
 
-    // Startseite + bis zu 4 marken-relevante Unterseiten (Ueber uns, Sortiment …) analysieren.
+    // Startseite laden; danach Sortiment und Produktdetails in zwei Ebenen erschliessen.
     let homepage = parseWebsiteHtml(fetched.html, fetched.finalUrl);
     if (looksLikeBlockedGatePage(fetched.html, homepage.textExcerpt)) {
       try {
@@ -108,23 +107,14 @@ export async function POST(req: Request) {
       }
     }
 
-    const rawHtmlByUrl: Record<string, string> = { [fetched.finalUrl]: fetched.html };
-    const subpageLinks = extractRelevantInternalLinks(fetched.html, fetched.finalUrl, 4);
-    const subpages = (
-      await Promise.all(
-        subpageLinks.map(async (link) => {
-          try {
-            const sub = await fetchWebsiteHtmlForBrandIntake(link.url);
-            const parsed = parseWebsiteHtml(sub.html, sub.finalUrl);
-            if (looksLikeBlockedGatePage(sub.html, parsed.textExcerpt)) return null;
-            rawHtmlByUrl[sub.finalUrl] = sub.html;
-            return parsed;
-          } catch {
-            return null;
-          }
-        }),
-      )
-    ).filter((page): page is ParsedWebsitePage => page !== null);
+    const { pages: subpages, rawHtmlByUrl } = await crawlCatalogPages(fetched, async (url) => {
+      const result = await safeFetchHtml(url);
+      const page = parseWebsiteHtml(result.html, result.finalUrl);
+      if (looksLikeBlockedGatePage(result.html, page.textExcerpt) || page.textExcerpt.length < 80) {
+        return fetchWebsiteHtmlForBrandIntake(url);
+      }
+      return result;
+    });
 
     const intake = mergeParsedWebsitePages([homepage, ...subpages]);
     const downloadedImages = await downloadCandidateImages(intake.imageCandidates);

@@ -7,8 +7,9 @@ export function calculatePerVariantTokenCost(args: {
   hasReferenceImage?: boolean;
   strictLabelMode?: boolean;
 }): number {
-  const base = args.resolution === "4K" ? 35 : args.resolution === "2K" ? 20 : 10;
-  return base + (args.hasReferenceImage ? 5 : 0) + (args.strictLabelMode ? 10 : 0);
+  // ~4–5× Provider-COGS (OpenAI medium/high); früher 10/20/35 +5/+10
+  const base = args.resolution === "4K" ? 12 : args.resolution === "2K" ? 6 : 3;
+  return base + (args.hasReferenceImage ? 2 : 0) + (args.strictLabelMode ? 3 : 0);
 }
 
 export function calculateGenerationTokenCost(args: {
@@ -22,24 +23,24 @@ export function calculateGenerationTokenCost(args: {
 }
 
 /**
- * Gleiche Qualitäts→Abrechnungs-Auflösung wie create-task / social-post.
- * Env überschreibt; sonst Produktfoto ⇒ high; sonst Compiler/Request-Qualität.
+ * Qualitäts→Abrechnungs-Auflösung wie create-task / social-post.
+ * Env überschreibt medium/high. User-Wahl inkl. ultra (4K) zählt sonst;
+ * ohne Wahl: Produktfoto ⇒ 2K, sonst 1K.
  */
 export function resolveImageBillingResolution(args: {
   hasProductPhoto: boolean;
   qualityEnv?: string | null;
-  compiledOrRequestedQuality?: "low" | "medium" | "high" | null;
-}): "1K" | "2K" {
+  compiledOrRequestedQuality?: "low" | "medium" | "high" | "ultra" | null;
+}): GenerationResolution {
   const env = args.qualityEnv?.trim().toLowerCase();
-  const openAiQuality: "low" | "medium" | "high" =
-    env === "low" || env === "medium" || env === "high"
-      ? env
-      : args.hasProductPhoto
-        ? "high"
-        : args.compiledOrRequestedQuality === "high"
-          ? "high"
-          : "medium";
-  return openAiQuality === "high" ? "2K" : "1K";
+  if (env === "low" || env === "medium") return "1K";
+  if (env === "high") return "2K";
+
+  const requested = args.compiledOrRequestedQuality;
+  if (requested === "ultra") return "4K";
+  if (requested === "high") return "2K";
+  if (requested === "medium" || requested === "low") return "1K";
+  return args.hasProductPhoto ? "2K" : "1K";
 }
 
 /**
@@ -55,7 +56,7 @@ export function estimateStudioImageTokenCost(args: {
   etikettModus: "marke" | "generisch";
   variantCount?: number;
   /** Request-/Compiler-Qualität (ohne Env-Override). */
-  requestedQuality?: "low" | "medium" | "high" | null;
+  requestedQuality?: "low" | "medium" | "high" | "ultra" | null;
   /** Optional explizites Env; sonst NEXT_PUBLIC_OPENAI_IMAGE_QUALITY. */
   qualityEnv?: string | null;
 }): number {
@@ -98,8 +99,14 @@ export function calculateSeedanceVideoTokenCost(args: {
 }
 
 export function formatPlanImageEstimate(monthlyTokens: number): string {
-  const min = Math.max(1, Math.floor(monthlyTokens / 35));
-  const max = Math.max(min, Math.floor(monthlyTokens / 10));
+  const expensive = calculatePerVariantTokenCost({
+    resolution: "4K",
+    hasReferenceImage: true,
+    strictLabelMode: true,
+  });
+  const cheap = calculatePerVariantTokenCost({ resolution: "1K" });
+  const min = Math.max(1, Math.floor(monthlyTokens / expensive));
+  const max = Math.max(min, Math.floor(monthlyTokens / cheap));
   return `ca. ${min.toLocaleString("de-DE")}–${max.toLocaleString("de-DE")} Bilder`;
 }
 

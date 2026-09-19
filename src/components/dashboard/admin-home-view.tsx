@@ -94,6 +94,8 @@ export type AdminHomeViewProps = {
   onOpenBrandSetup: () => void;
   onRetrySummary?: () => void;
   onRetryMedia?: () => void;
+  /** Optional start range for the token chart (marketing previews). */
+  initialTokenRange?: TokenRangeKey;
 };
 
 const chartConfig = {
@@ -283,12 +285,14 @@ function BrewAiActivityOverview({
   summary,
   summaryLoaded,
   onOpenMedia,
+  initialRange = "7d",
 }: {
   summary: DashboardHomeSummary | null;
   summaryLoaded: boolean;
   onOpenMedia: () => void;
+  initialRange?: TokenRangeKey;
 }) {
-  const [range, setRange] = useState<TokenRangeKey>("7d");
+  const [range, setRange] = useState<TokenRangeKey>(initialRange);
   const rangeDays = TOKEN_RANGE_DAYS[range];
 
   const chartData = useMemo(() => {
@@ -541,6 +545,7 @@ export function AdminHomeView({
   onOpenTab,
   onRetrySummary,
   onRetryMedia,
+  initialTokenRange,
 }: AdminHomeViewProps) {
   return (
     <div className="@container/main flex flex-col gap-4 md:gap-6">
@@ -558,6 +563,7 @@ export function AdminHomeView({
         summary={summary}
         summaryLoaded={summaryLoaded}
         onOpenMedia={() => onOpenTab("media")}
+        initialRange={initialTokenRange}
       />
       <BrewAiAssetsOverview
         media={media}

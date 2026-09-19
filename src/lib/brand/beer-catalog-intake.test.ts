@@ -51,6 +51,68 @@ describe("beer-catalog-intake", () => {
     expect(result.find((item) => item.name === "Mineralwasser")?.produktKategorie).toBe("mineralwasser");
   });
 
+  it("recognizes flavours in a lemonade section and keeps their lazy-loaded images local", () => {
+    const result = scan(`<section><h2>Unsere Limonaden</h2>
+      <article><h3>Zitrone</h3><img src="data:image/gif;base64,AA" data-src="/assets/4711.webp"></article>
+      <article><h3>Orange</h3><picture><source srcset="/assets/4712.webp 800w"><img src="/placeholder.png"></picture></article>
+      </section><section><h2>Unser Team</h2><h3>Holunder</h3></section>`);
+    expect(result.map((item) => [item.name, item.produktKategorie, item.etikettUrl])).toEqual([
+      ["Orange", "limonade", "https://bier-brauerei.de/assets/4712.webp"],
+      ["Zitrone", "limonade", "https://bier-brauerei.de/assets/4711.webp"],
+    ]);
+  });
+
+  it("reads nested JSON-LD products with category evidence and image objects", () => {
+    const result = scan(`<script type="application/ld+json">${JSON.stringify({ "@graph": [
+      { "@type": "Product", name: "Zitrone", category: "Limonaden", image: { contentUrl: "/zitrone.webp" } },
+      { "@type": "Product", name: "Pils Glas", category: "Bier", image: "/glas.jpg" },
+    ] })}</script>`);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ name: "Zitrone", produktKategorie: "limonade", etikettUrl: "https://bier-brauerei.de/zitrone.webp" });
+  });
+
+  it("deduplicates packaging, brand prefixes and image sizes without merging variants", () => {
+    const result = scan("<h2>Testbrauerei Pils</h2><h2>Pils 0,5 l</h2><h2>Pils alkoholfrei</h2>", [
+      catalogImage("https://example.com/pils-flasche-300x600.png"),
+      catalogImage("https://example.com/pils-flasche-600x1200.png"),
+      catalogImage("https://example.com/pils-alkoholfrei.png"),
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result.find((item) => item.name === "Testbrauerei Pils")?.etikettUrl).toContain("pils-flasche");
+    expect(result.find((item) => item.name === "Pils alkoholfrei")?.etikettUrl).toContain("pils-alkoholfrei");
+  });
+
+  it("never assigns regular cola to zero or a different flavour by shared category", () => {
+    const result = scan("<h2>Cola</h2><h2>Cola Zero</h2><h2>Limonade Orange</h2><h2>Limonade Zitrone</h2>", [
+      catalogImage("https://example.com/cola.png"), catalogImage("https://example.com/limonade-orange.png"),
+    ]);
+    expect(result).toHaveLength(4);
+    expect(result.find((item) => item.name === "Cola Zero")?.etikettUrl).toBe("");
+    expect(result.find((item) => item.name === "Limonade Zitrone")?.etikettUrl).toBe("");
+  });
+
+  it("keeps multiple beer varieties even when the only image is an ambiguous pils", () => {
+    const result = scan("<h2>Natur Pils</h2><h2>Premium Pils</h2>", [catalogImage("https://example.com/pils.png")]);
+    expect(result.map((item) => item.name)).toEqual(["Natur Pils", "Premium Pils"]);
+    expect(result.every((item) => !item.etikettUrl)).toBe(true);
+  });
+
+  it("rejects shared assortment artwork and keeps flavours from a page-level lemonade title", () => {
+    const result = scan(`<h1>Limonaden</h1><article><h2>Zitrone</h2><img src="/sortiment.jpg"></article>
+      <article><h2>Orange</h2><img src="/sortiment.jpg"></article>`);
+    expect(result).toHaveLength(2);
+    expect(result.every((item) => item.produktKategorie === "limonade" && !item.etikettUrl)).toBe(true);
+  });
+
+  it("deduplicates spelling and packaging again when saving repeated scans", () => {
+    const original = suggestedBeersToDashboard(scan("<h2>Müller Pils</h2>"));
+    const suggestions = scan("<h2>Mueller-Pils 0,5 l</h2><h2>Mueller Pils</h2>");
+    const replaced = replaceSuggestedBeers(original, suggestions);
+    expect(replaced).toHaveLength(1);
+    expect(replaced[0].id).toBe(original[0].id);
+    expect(mergeSuggestedBeers(original, suggestions)).toHaveLength(1);
+  });
+
   it("does not promote arbitrary packshots, CMS filenames or brewery paths to beers", () => {
     const files = ["tasse", "premium-original", "csm_Brauerei-geschenk_abcdef12", "pils-glas", "bier-shirt", "alkoholfrei", "flasche", "label", "original", "wasser"];
     const images = files.map((file) => catalogImage(`https://bier-brauerei.de/biere/${file}.jpg`));

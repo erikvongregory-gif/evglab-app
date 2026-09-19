@@ -11,6 +11,20 @@ describe("imageAspectRatio", () => {
     expect(mapAspectRatioToOpenAiSize("16:9")).toBe("1536x1024");
   });
 
+  it("maps 4K to custom long-edge sizes", () => {
+    const square = mapAspectRatioToOpenAiSize("1:1", "4K");
+    const [sw, sh] = square.split("x").map(Number);
+    expect(sw).toBe(sh);
+    expect(sw! * sh!).toBeLessThanOrEqual(8_294_400);
+    expect(sw!).toBeGreaterThanOrEqual(2800);
+
+    const landscape = mapAspectRatioToOpenAiSize("16:9", "4K");
+    const [w, h] = landscape.split("x").map(Number);
+    expect(w).toBeGreaterThan(h!);
+    expect(Math.max(w!, h!)).toBeLessThanOrEqual(3824);
+    expect(w! * h!).toBeLessThanOrEqual(8_294_400);
+  });
+
   it("crops 4:5 from native 2:3 portrait", () => {
     expect(aspectRatioToOutputDimensions("4:5")).toEqual({ width: 1024, height: 1280 });
     expect(aspectRatioToCropRect("4:5")).toEqual({ left: 0, top: 128, width: 1024, height: 1280 });

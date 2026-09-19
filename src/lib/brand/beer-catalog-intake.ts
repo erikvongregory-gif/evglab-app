@@ -1,3 +1,4 @@
+import { catalogIdentity, catalogToken, readCatalogEvidence, readCatalogImages } from "./catalog-products";
 import { randomUUID } from "node:crypto";
 import { BEER_STYLE_OPTIONS, findBeerStyle } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
 import {
@@ -8,7 +9,7 @@ import {
   type ProduktKategorie,
 } from "@/lib/dashboard/metadata";
 import { uploadUserImageToStorage } from "@/lib/supabase/storage";
-import { assertSafePublicUrl, BROWSER_USER_AGENT, resolveAbsoluteUrl, URL_FETCH_TIMEOUT_MS } from "@/lib/brand/url-intake";
+import { assertSafePublicUrl, BROWSER_USER_AGENT, URL_FETCH_TIMEOUT_MS } from "@/lib/brand/url-intake";
 import { publicFetch } from "@/lib/security/public-fetch";
 import {
   type DownloadedImage,
@@ -37,14 +38,13 @@ const FILENAME_SKIP_SLUGS = new Set([
   "gebaeude",
 ]);
 
-const HTML_NAME_SKIP = /festhalle|kontakt|newsletter|historie|über uns|ueber uns|impressum/i;
 // Product evidence must come from the item itself, never its domain or parent
 // directory (a brewery's /bier/ shop can also contain glasses and merchandise).
 const BEER_PRODUCT_SIGNAL = /\b(?:bier|beer|pils(?:ner|ener)?|hell(?:es|er)?|dunkel(?:es|er)?|(?:hefe|kristall)?weizen|weissbier|weizenbier|lager(?:bier)?|(?:doppel|eis|weizen)?bock|bockbier|radler|(?:ne|double-)?ipa|stout|porter|saison|koelsch|maerzen|kellerbier|zwickl|zwickelbier|altbier|festbier|oktoberfestbier|edelstoff|maximator|pale-ale)\b/;
-const LIMONADE_SIGNAL = /\b(?:limonade|limo|cola|spezi|brause|orangeade|orangenlimonade|zitronenlimonade)\b/;
+const LIMONADE_SIGNAL = /\b(?:limonade|limo|cola|spezi|brause|orangeade|orangenlimonade|zitronenlimonade|zitronenlimo|orangenlimo|kola|fritz-kola|ginger-ale|bitter-lemon|tonic(?:-water|-wasser)?)\b/;
 const TAFELWASSER_SIGNAL = /\btafel(?:-)?wasser\b/;
 const MINERALWASSER_SIGNAL = /\b(?:mineral(?:-)?wasser|quell(?:-)?wasser)\b/;
-const NON_CATALOG_PRODUCT = /\b(?:saft|saefte|schorle|energy|gin|whisk(?:e)?y|rum|vodka|wodka|schnaps|likoer|brand|braende|wein|sekt|cider|glas|glaeser|bierglas|bierglaeser|pilsglas|weizenglas|krug|kruege|bierkrug|masskrug|tasse\w*|becher|flaschenoeffner|oeffner|bierdeckel|untersetzer|shirt\w*|hoodie\w*|muetze\w*|cap|caps|kleidung|merch\w*|gutschein\w*|geschenk\w*|probierpaket\w*|bierpaket\w*|set|sets|paket\w*|fuehrung\w*|verkostung\w*|bierprobe\w*|tonic(?:-)?wasser)\b/;
+const NON_CATALOG_PRODUCT = /\b(?:saft|saefte|schorle|energy|gin|whisk(?:e)?y|rum|vodka|wodka|schnaps|likoer|brand|braende|wein|sekt|cider|glas|glaeser|bierglas|bierglaeser|pilsglas|weizenglas|krug|kruege|bierkrug|masskrug|tasse\w*|becher|flaschenoeffner|oeffner|bierdeckel|untersetzer|shirt\w*|hoodie\w*|muetze\w*|cap|caps|kleidung|merch\w*|gutschein\w*|geschenk\w*|probierpaket\w*|bierpaket\w*|set|sets|paket\w*|fuehrung\w*|verkostung\w*|bierprobe\w*)\b/;
 const GENERIC_CATALOG_HEADING = /\b(?:unsere?|sortiment|biere|biersorten|sorten|entdecken|entdecke|welt|geschichte|braukunst|brauen|erleben|qualitaet|angebote|produkte|shop|zubehoer|verkauf|getraenke)\b/;
 
 export function detectProduktKategorie(value: string): ProduktKategorie | null {
@@ -177,186 +177,22 @@ export function extractProductSlugFromImageUrl(url: string): string | null {
 
 type CatalogImageRef = { url: string; alt: string; kategorie?: ProduktKategorie };
 
-function scoreImageForBeerName(name: string, image: CatalogImageRef, breweryName: string): number {
-  const combined = `${image.url} ${image.alt}`.toLowerCase();
-  const nameNorm = name.toLowerCase();
-  const nameSlug = normalizeToken(name.replace(new RegExp(`^${breweryShortName(breweryName)}`, "i"), "").trim() || name);
-  const nameTokens = nameSlug.split("-").filter((part) => part.length >= 3);
-  let score = 0;
-
-  for (const token of nameTokens) {
-    if (combined.includes(token)) score += 14;
-  }
-  if (nameNorm.length >= 4 && combined.includes(nameNorm.replace(/\s+/g, ""))) score += 10;
-  if (NAME_STYLE_HINTS.some((hint) => hint.pattern.test(name) && hint.pattern.test(combined))) score += 8;
-
-  const imageSlug = extractProductSlugFromImageUrl(image.url);
-  if (imageSlug && findBestMatchingImageSlug(nameSlug, [imageSlug])) score += 20;
-  if (image.alt.trim().length >= 3) score += 4;
-  if (/\.(jpe?g|png|webp|avif)(\?|$)/i.test(image.url)) score += 2;
-  if (PRODUCT_IMAGE_NOISE.test(combined)) score -= 80;
-  return score;
-}
-
-function findBestEtikettUrlForBeerName(
-  name: string,
-  images: CatalogImageRef[],
-  breweryName: string,
-  kategorie?: ProduktKategorie,
-): string {
-  const pool = kategorie ? images.filter((image) => image.kategorie === kategorie) : images;
-  const search = pool.length ? pool : images;
-  let bestUrl = "";
-  let bestScore = 0;
-  for (const image of search) {
-    const score = scoreImageForBeerName(name, image, breweryName);
-    if (score > bestScore) {
-      bestScore = score;
-      bestUrl = image.url;
-    }
-  }
-  return bestScore >= 12 ? bestUrl : "";
-}
-
-function stripTags(html: string): string {
-  return html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ");
-}
-
-function decodeHtmlEntities(input: string): string {
-  return input
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ");
-}
-
-function extractCatalogNamesFromHtml(html: string): Array<{ name: string; kategorie: ProduktKategorie }> {
-  const names: Array<{ name: string; kategorie: ProduktKategorie }> = [];
-  const patterns = [
-    /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi,
-    /<(?:strong|b)[^>]*class=["'][^"']*product[^"']*["'][^>]*>([\s\S]*?)<\/(?:strong|b)>/gi,
-    /<(?:li|p)[^>]*class=["'][^"']*(?:product|bier|sorte)[^"']*["'][^>]*>([\s\S]*?)<\/(?:li|p)>/gi,
-  ];
-  for (const pattern of patterns) {
-    for (const match of html.matchAll(pattern)) {
-      const text = decodeHtmlEntities(stripTags(match[1] ?? "")).replace(/\s+/g, " ").trim();
-      if (text.length < 3 || text.length > 80) continue;
-      if (/impressum|datenschutz|newsletter|kontakt|cookie|menü|menu/i.test(text)) continue;
-      if (HTML_NAME_SKIP.test(text)) continue;
-      const kategorie = detectProduktKategorie(text);
-      if (kategorie) names.push({ name: text, kategorie });
-    }
-  }
-  return names;
-}
-
-function collectProductImages(
-  downloadedImages: DownloadedImage[],
-  imageCandidates: ImageCandidate[],
-  htmlImages: CatalogImageRef[],
-  beerNames: string[],
-): CatalogImageRef[] {
-  const seen = new Set<string>();
-  const out: CatalogImageRef[] = [];
-  const add = (url: string, alt: string) => {
-    const trimmed = url.trim();
-    if (!trimmed || seen.has(trimmed)) return;
-    if (PRODUCT_IMAGE_NOISE.test(trimmed)) return;
-    const slug = extractProductSlugFromImageUrl(trimmed);
-    const itemText = `${imageFilename(trimmed)} ${alt}`;
-    if (NON_CATALOG_PRODUCT.test(normalizeToken(itemText))) return;
-    const matchesBeerName = slug && /\balkoholfrei\b/.test(slug) && beerNames.some((name) =>
-      findBestMatchingImageSlug(normalizeToken(name), [slug]),
-    );
-    const kategorie = detectProduktKategorie(itemText) ?? (matchesBeerName ? "bier" : null);
-    if (!kategorie) return;
-    seen.add(trimmed);
-    out.push({ url: trimmed, alt: alt.trim(), kategorie });
-  };
-
-  for (const image of downloadedImages) add(image.url, image.alt);
-  for (const candidate of imageCandidates) add(candidate.url, candidate.alt);
-  for (const image of htmlImages) add(image.url, image.alt);
-  return out;
-}
-
-function styleTokenScore(token: string): number {
-  let score = token.length;
-  if (NAME_STYLE_HINTS.some((hint) => hint.pattern.test(token))) score += 8;
-  return score;
-}
-
-function findBestMatchingImageSlug(nameSlug: string, imageSlugs: string[]): string | null {
-  const token = normalizeToken(nameSlug);
-  if (!token) return null;
-  if (imageSlugs.includes(token)) return token;
-
-  const nameTokens = token.split("-").filter((part) => part.length >= 3);
-  let bestTokenMatch: string | null = null;
-  let bestTokenScore = 0;
-  for (const part of nameTokens) {
-    if (!imageSlugs.includes(part)) continue;
-    const score = styleTokenScore(part);
-    if (score > bestTokenScore) {
-      bestTokenScore = score;
-      bestTokenMatch = part;
-    }
-  }
-  if (bestTokenMatch) return bestTokenMatch;
-
-  let bestPartial: string | null = null;
-  let bestPartialScore = 0;
-  for (const imageSlug of imageSlugs) {
-    if (!token.includes(imageSlug) && !imageSlug.includes(token)) continue;
-    const score = styleTokenScore(imageSlug);
-    if (score > bestPartialScore) {
-      bestPartialScore = score;
-      bestPartial = imageSlug;
-    }
-  }
-  if (bestPartial) return bestPartial;
-
-  for (const imageSlug of imageSlugs) {
-    if (token.startsWith(imageSlug) || imageSlug.startsWith(token)) return imageSlug;
-  }
-
-  return null;
-}
-
-function pickEtikettUrl(slug: string, productImages: CatalogImageRef[], kategorie?: ProduktKategorie): string {
-  const pool = kategorie ? productImages.filter((image) => image.kategorie === kategorie) : productImages;
-  const images = pool.length ? pool : productImages;
-  const imageSlugs = images
-    .map((image) => extractProductSlugFromImageUrl(image.url))
-    .filter((value): value is string => Boolean(value));
-  const matched = findBestMatchingImageSlug(slug, imageSlugs);
-  if (!matched) return "";
-  return images.find((image) => extractProductSlugFromImageUrl(image.url) === matched)?.url ?? "";
-}
-
-function extractAttr(tag: string, name: string): string {
-  const re = new RegExp(`${name}=["']([^"']*)["']`, "i");
-  return tag.match(re)?.[1]?.trim() ?? "";
-}
-
-function extractCatalogImagesFromHtml(html: string, pageUrl: string): CatalogImageRef[] {
-  const images: CatalogImageRef[] = [];
-  for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
-    const tag = match[0] ?? "";
-    const src =
-      extractAttr(tag, "src") ||
-      extractAttr(tag, "data-src") ||
-      extractAttr(tag, "data-lazy-src") ||
-      extractAttr(tag, "data-original");
-    if (!src || src.startsWith("data:")) continue;
-    const abs = resolveAbsoluteUrl(pageUrl, src);
-    if (!abs) continue;
-    const alt = decodeHtmlEntities(extractAttr(tag, "alt"));
-    images.push({ url: abs, alt });
-  }
-  return images;
+function imageMatchScore(name: string, image: CatalogImageRef, brewery: string): number {
+  const wanted = catalogIdentity(name, brewery);
+  const alt = catalogIdentity(image.alt, brewery);
+  const slug = catalogIdentity(extractProductSlugFromImageUrl(image.url) ?? "", brewery);
+  if (wanted === alt || wanted === slug) return 100;
+  const modifiers = /(?:^|-)(alkoholfrei|zero|light|zuckerfrei|bock|naturtrueb|zitrone|orange|grapefruit|blutorange|helles|dunkel|0-0)(?=-|$)/g;
+  const wantedModifiers = [...wanted.matchAll(modifiers)].map((match) => match[1]);
+  return Math.max(0, ...[alt, slug].filter(Boolean).map((candidate) => {
+    const otherModifiers = [...candidate.matchAll(modifiers)].map((match) => match[1]);
+    // Never assign a regular product image to its zero/alcohol-free/flavour variant.
+    if (otherModifiers.some((part) => !wantedModifiers.includes(part))) return 0;
+    if (wantedModifiers.some((part) => !otherModifiers.includes(part) && part !== "helles")) return 0;
+    const tokens = candidate.split("-");
+    const wantedTokens = wanted.split("-");
+    return tokens.every((part) => wantedTokens.includes(part)) ? 40 + candidate.length : 0;
+  }));
 }
 
 export function extractBeerVarietiesFromIntake(params: {
@@ -366,90 +202,81 @@ export function extractBeerVarietiesFromIntake(params: {
   breweryName: string;
   rawHtmlByUrl?: Record<string, string>;
 }): SuggestedBeerVariety[] {
-  const byKey = new Map<string, { name: string; etikettUrl: string; kategorie: ProduktKategorie }>();
-  const brewery = params.breweryName.trim() || "Brauerei";
-  const htmlNames = params.pages.flatMap((page) =>
-    extractCatalogNamesFromHtml(params.rawHtmlByUrl?.[page.pageUrl] ?? ""),
-  );
-  const htmlImages = params.pages.flatMap((page) => {
-    const html = params.rawHtmlByUrl?.[page.pageUrl] ?? "";
-    if (!html) return [];
-    return extractCatalogImagesFromHtml(html, page.pageUrl);
-  });
-  const productImages = collectProductImages(
-    params.downloadedImages,
-    params.imageCandidates ?? params.pages.flatMap((page) => page.imageCandidates),
-    htmlImages,
-    htmlNames.map((item) => item.name),
-  );
-
-  const slugsFor = (kategorie: ProduktKategorie) =>
-    productImages
-      .filter((image) => image.kategorie === kategorie)
-      .map((image) => extractProductSlugFromImageUrl(image.url))
-      .filter((value): value is string => Boolean(value));
-
-  for (const image of productImages) {
+  const brewery = params.breweryName.trim();
+  type Entry = { name: string; kategorie: ProduktKategorie; etikettUrl: string; score: number };
+  const entries = new Map<string, Entry>();
+  const images: CatalogImageRef[] = [];
+  const add = (name: string, kategorie: ProduktKategorie, etikettUrl = "", score = 0) => {
+    const identity = catalogIdentity(name, brewery);
+    if (!identity) return;
+    const key = `${kategorie}:${identity}`;
+    const existing = entries.get(key);
+    if (!existing) entries.set(key, { name, kategorie, etikettUrl, score });
+    else if (etikettUrl && score > existing.score) Object.assign(existing, { etikettUrl, score });
+  };
+  for (const page of params.pages) {
+    for (const product of readCatalogEvidence(params.rawHtmlByUrl?.[page.pageUrl] ?? "", page.pageUrl)) {
+      const token = catalogToken(product.name);
+      if (NON_CATALOG_PRODUCT.test(token) || GENERIC_CATALOG_HEADING.test(token)) continue;
+      const flavour = /\b(?:zitrone|orange|blutorange|grapefruit|zitrus|limette|rhabarber|waldmeister|himbeere|holunder|mandarine)\b/.test(token);
+      const lemonadeContext = /limonad|limo|softdrink|erfrischungsgetr/i.test(product.context);
+      const category = (product.category ?? "").replace(/\bLimonaden\b/gi, "Limonade").replace(/\bBiere\b/gi, "Bier");
+      const kategorie = detectProduktKategorie(product.name) ?? detectProduktKategorie(category) ?? (flavour && lemonadeContext ? "limonade" : null);
+      if (!kategorie) continue;
+      const uniqueImage = product.images.length === 1 ? product.images[0] : "";
+      add(product.name, kategorie, uniqueImage, uniqueImage ? 200 : 0);
+      for (const url of product.images) images.push({ url, alt: product.images.length === 1 ? product.name : "", kategorie });
+    }
+  }
+  // Shared catalogue art is not a trustworthy image for either individual variety.
+  const imageUses = new Map<string, number>();
+  for (const entry of entries.values()) {
+    if (entry.etikettUrl) imageUses.set(entry.etikettUrl, (imageUses.get(entry.etikettUrl) ?? 0) + 1);
+  }
+  for (const entry of entries.values()) {
+    if ((imageUses.get(entry.etikettUrl) ?? 0) > 1) Object.assign(entry, { etikettUrl: "", score: 0 });
+  }
+  const candidates = [...params.pages.flatMap((page) => readCatalogImages(params.rawHtmlByUrl?.[page.pageUrl] ?? "", page.pageUrl)), ...params.downloadedImages, ...(params.imageCandidates ?? []), ...params.pages.flatMap((page) => page.imageCandidates)];
+  for (const candidate of candidates) {
+    const slug = extractProductSlugFromImageUrl(candidate.url);
+    if (!slug || PRODUCT_IMAGE_NOISE.test(imageFilename(candidate.url))) continue;
+    const text = `${imageFilename(candidate.url)} ${candidate.alt}`;
+    if (NON_CATALOG_PRODUCT.test(catalogToken(text))) continue;
+    const kategorie = detectProduktKategorie(candidate.alt) ?? detectProduktKategorie(slug)
+      ?? (/\balkoholfrei\b/.test(slug) && [...entries.values()].some((entry) => entry.kategorie === "bier" && imageMatchScore(entry.name, candidate, brewery) > 0) ? "bier" : null);
+    if (kategorie) images.push({ url: candidate.url, alt: candidate.alt, kategorie });
+  }
+  // An image may enrich an existing product. It must not merge two named varieties.
+  const claimedImages = new Set([...entries.values()].map((entry) => entry.etikettUrl).filter(Boolean));
+  for (const entry of entries.values()) {
+    const ranked = images.filter((image) => image.kategorie === entry.kategorie && (imageUses.get(image.url) ?? 0) <= 1)
+      .map((image) => ({ image, score: imageMatchScore(entry.name, image, brewery) }))
+      .filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
+    for (const match of ranked) {
+      const competitors = [...entries.values()].filter((other) => other !== entry && other.kategorie === entry.kategorie && imageMatchScore(other.name, match.image, brewery) >= match.score);
+      if (competitors.length) continue;
+      claimedImages.add(match.image.url);
+      if (match.score > entry.score) Object.assign(entry, { etikettUrl: match.image.url, score: match.score });
+    }
+  }
+  for (const image of images) {
+    if (claimedImages.has(image.url) || !image.kategorie || (imageUses.get(image.url) ?? 0) > 1) continue;
     const slug = extractProductSlugFromImageUrl(image.url);
     if (!slug) continue;
-    const kategorie = image.kategorie ?? detectProduktKategorie(`${imageFilename(image.url)} ${image.alt}`);
-    if (!kategorie) continue;
-    byKey.set(`${kategorie}:${slug}`, {
-      name: detectProduktKategorie(image.alt) ? image.alt : humanizeBeerSlug(slug, brewery),
-      etikettUrl: image.url,
-      kategorie,
-    });
+    const name = detectProduktKategorie(image.alt) ? image.alt : humanizeBeerSlug(catalogIdentity(slug), brewery);
+    // Ambiguous short filename evidence must not become an additional phantom variety.
+    if ([...entries.values()].some((entry) => entry.kategorie === image.kategorie && imageMatchScore(entry.name, image, brewery) > 0)) continue;
+    add(name, image.kategorie, image.url, 50);
   }
-
-  for (const { name: rawName, kategorie } of htmlNames) {
-    const stripped = rawName.replace(new RegExp(`^${breweryShortName(brewery)}`, "i"), "").trim();
-    const nameSlug = normalizeToken(stripped || rawName);
-    if (!nameSlug || nameSlug.length < 3) continue;
-    const imageSlug = findBestMatchingImageSlug(nameSlug, slugsFor(kategorie));
-    const matchedKey = imageSlug ? `${kategorie}:${imageSlug}` : "";
-    if (matchedKey && byKey.has(matchedKey)) {
-      const entry = byKey.get(matchedKey)!;
-      entry.name = rawName.trim();
-      if (!entry.etikettUrl) entry.etikettUrl = pickEtikettUrl(nameSlug, productImages, kategorie);
-      continue;
-    }
-    const nameKey = `${kategorie}:${nameSlug}`;
-    if (!byKey.has(nameKey)) {
-      byKey.set(nameKey, {
-        name: rawName.trim(),
-        kategorie,
-        etikettUrl:
-          pickEtikettUrl(nameSlug, productImages, kategorie) ||
-          findBestEtikettUrlForBeerName(rawName.trim(), productImages, brewery, kategorie),
-      });
-    }
-  }
-
-  const varieties: SuggestedBeerVariety[] = [];
-  const seenNames = new Set<string>();
-  for (const [key, entry] of byKey) {
-    const nameKey = `${entry.kategorie}:${normalizeToken(entry.name)}`;
-    if (seenNames.has(nameKey)) continue;
-    seenNames.add(nameKey);
-    const slug = key.slice(key.indexOf(":") + 1);
-    const bierstil = inferProduktBezeichnung(`${slug} ${entry.name}`, entry.kategorie);
+  return [...entries.values()].slice(0, MAX_MY_BEERS).map((entry): SuggestedBeerVariety => {
+    const bierstil = inferProduktBezeichnung(entry.name, entry.kategorie);
     const style = entry.kategorie === "bier" ? findBeerStyle(bierstil) : undefined;
-    const etikettUrl =
-      entry.etikettUrl ||
-      findBestEtikettUrlForBeerName(entry.name, productImages, brewery, entry.kategorie);
-    varieties.push({
-      name: entry.name.slice(0, 80),
-      produktKategorie: entry.kategorie,
-      bierstil,
-      flaschenTyp: "nrw_500",
-      flaschenfarbe: entry.kategorie === "bier" ? "braun" : "klar",
-      glasTyp: style?.glasTyp ?? "willibecher",
-      etikettUrl: etikettUrl.slice(0, 1200),
-    });
-    if (varieties.length >= MAX_MY_BEERS) break;
-  }
-
-  return varieties.sort((a, b) => a.name.localeCompare(b.name, "de"));
+    return {
+      name: entry.name.slice(0, 80), produktKategorie: entry.kategorie, bierstil,
+      flaschenTyp: "nrw_500", flaschenfarbe: entry.kategorie === "bier" ? "braun" : "klar",
+      glasTyp: style?.glasTyp ?? "willibecher", etikettUrl: entry.etikettUrl.slice(0, 1200),
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
 
 export function suggestedBeersToDashboard(suggested: SuggestedBeerVariety[]): DashboardBeer[] {
@@ -465,8 +292,8 @@ export function replaceSuggestedBeers(
   existing: DashboardBeer[],
   suggested: SuggestedBeerVariety[],
 ): DashboardBeer[] {
-  const byName = new Map(
-    sanitizeDashboardBeers(existing).map((beer) => [beer.name.trim().toLowerCase(), beer] as const),
+  const byName = new Map<string, DashboardBeer>(
+    sanitizeDashboardBeers(existing).map((beer) => [`${sanitizeProduktKategorie(beer.produktKategorie)}:${catalogIdentity(beer.name)}`, beer] as const),
   );
   const out: DashboardBeer[] = [];
   const seen = new Set<string>();
@@ -475,7 +302,7 @@ export function replaceSuggestedBeers(
     if (out.length >= MAX_MY_BEERS) break;
     const name = suggestion.name.trim();
     if (!name) continue;
-    const key = name.toLowerCase();
+    const key = `${sanitizeProduktKategorie(suggestion.produktKategorie)}:${catalogIdentity(name)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const prev = byName.get(key);
@@ -498,14 +325,14 @@ export function replaceSuggestedBeers(
 
 export function mergeSuggestedBeers(existing: DashboardBeer[], suggested: SuggestedBeerVariety[]): DashboardBeer[] {
   const out = [...sanitizeDashboardBeers(existing)];
-  const seen = new Set(out.map((beer) => beer.name.trim().toLowerCase()));
+  const seen = new Set(out.map((beer) => `${sanitizeProduktKategorie(beer.produktKategorie)}:${catalogIdentity(beer.name)}`));
 
   for (const suggestion of suggested) {
     if (out.length >= MAX_MY_BEERS) break;
     const name = suggestion.name.trim();
     if (!name) continue;
-    const key = name.toLowerCase();
-    const existingBeer = out.find((beer) => beer.name.trim().toLowerCase() === key);
+    const key = `${sanitizeProduktKategorie(suggestion.produktKategorie)}:${catalogIdentity(name)}`;
+    const existingBeer = out.find((beer) => `${sanitizeProduktKategorie(beer.produktKategorie)}:${catalogIdentity(beer.name)}` === key);
     if (existingBeer) {
       if (!existingBeer.etikettUrl.trim() && suggestion.etikettUrl.trim()) {
         existingBeer.etikettUrl = suggestion.etikettUrl.trim().slice(0, 1200);

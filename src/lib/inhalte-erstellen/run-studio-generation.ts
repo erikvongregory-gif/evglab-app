@@ -84,7 +84,7 @@ type PreparedGeneration = {
   aspectRatio: GenerationSnapshot["aspectRatio"];
   size: ReturnType<typeof mapAspectRatioToOpenAiSize>;
   outputDimensions: { width: number; height: number };
-  billingResolution: "1K" | "2K";
+  billingResolution: "1K" | "2K" | "4K";
   openAiQuality: "low" | "medium" | "high";
   perVariantCost: number;
   variantsToCreate: number;
@@ -407,7 +407,8 @@ async function prepareStudioGeneration(args: {
   if (mode === "social") prompt = appendCopySpaceDirective(prompt);
 
   const qualityEnv = process.env.OPENAI_IMAGE_QUALITY?.trim().toLowerCase();
-  const requestedQuality = input.quality === "high" ? "high" : "medium";
+  const requestedQuality =
+    input.quality === "ultra" ? "ultra" : input.quality === "high" ? "high" : "medium";
   const billingResolution = resolveImageBillingResolution({
     hasProductPhoto: hasProductPhoto || useCharacterIdentity,
     qualityEnv,
@@ -416,9 +417,9 @@ async function prepareStudioGeneration(args: {
   const openAiQuality: "low" | "medium" | "high" =
     qualityEnv === "low" || qualityEnv === "medium" || qualityEnv === "high"
       ? qualityEnv
-      : billingResolution === "2K"
-        ? "high"
-        : "medium";
+      : billingResolution === "1K"
+        ? "medium"
+        : "high";
   const hasReferenceForBilling = assembled.references.length > 0;
   const strictLabelMode = wantsBrandLabel && hasProductPhoto;
   const perVariantCost = calculatePerVariantTokenCost({
@@ -469,8 +470,8 @@ async function prepareStudioGeneration(args: {
       ? process.env.KIE_NANOBANANA_IMAGE_MODEL?.trim() || "nano-banana-pro"
       : process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL,
     aspectRatio,
-    size: mapAspectRatioToOpenAiSize(aspectRatio),
-    outputDimensions: aspectRatioToOutputDimensions(aspectRatio),
+    size: mapAspectRatioToOpenAiSize(aspectRatio, billingResolution),
+    outputDimensions: aspectRatioToOutputDimensions(aspectRatio, billingResolution),
     billingResolution,
     openAiQuality,
     perVariantCost,
@@ -531,7 +532,7 @@ async function executeStudioGeneration(args: {
           prompt: prepared.prompt,
           references: prepared.referenceImages,
           aspectRatio: prepared.aspectRatio,
-          resolution: prepared.billingResolution === "2K" ? "2K" : "1K",
+          resolution: prepared.billingResolution,
           onTaskId: async (taskId) => {
             if (linkedProvider) return;
             linkedProvider = true;
@@ -550,7 +551,12 @@ async function executeStudioGeneration(args: {
 
     const cropped = prepared.useCharacterIdentity
       ? await cropBufferFaceSafe(rawBuffer, prepared.aspectRatio, OUTPUT_FORMAT)
-      : await cropImageBufferToAspectRatio(rawBuffer, prepared.aspectRatio, OUTPUT_FORMAT);
+      : await cropImageBufferToAspectRatio(
+          rawBuffer,
+          prepared.aspectRatio,
+          OUTPUT_FORMAT,
+          prepared.billingResolution,
+        );
 
     if (mode === "social" && prepared.headline) {
       const backgroundUrl = await uploadGeneratedImageToStorage({
@@ -641,7 +647,7 @@ async function executeStudioGeneration(args: {
     // ponytail: Prompt nur für Suche/Metadaten, nie als Anzeige-Titel
     prompt: (prepared.input.zusatzWunsch?.trim() || prepared.mediaTitle).slice(0, 240),
     aspectRatio: prepared.aspectRatio,
-    resolution: prepared.billingResolution === "2K" ? "2K" : "1K",
+    resolution: prepared.billingResolution,
     outputFormat: OUTPUT_FORMAT,
   });
   const responseBody = {
@@ -661,7 +667,7 @@ async function executeStudioGeneration(args: {
     aspectRatio: prepared.aspectRatio,
     outputDimensions: prepared.outputDimensions,
     outputFormat: OUTPUT_FORMAT,
-    resolution: prepared.billingResolution === "2K" ? "2K" : "1K",
+    resolution: prepared.billingResolution,
     jobId: job.id,
     mediaPersisted: mediaItems.length > 0,
     billing: buildGenerationBillingSnapshot({

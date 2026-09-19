@@ -9,7 +9,7 @@ describe("generationTokenCost", () => {
         hasReferenceImage: true,
         strictLabelMode: true,
       }),
-    ).toBe(35);
+    ).toBe(11);
   });
 
   it("multipliziert mit Variantenanzahl", () => {
@@ -20,7 +20,7 @@ describe("generationTokenCost", () => {
         strictLabelMode: true,
         variantCount: 3,
       }),
-    ).toBe(105);
+    ).toBe(33);
   });
 
   it("Studio-Vorschau entspricht Server-Kosten mit Produktfoto", () => {
@@ -30,7 +30,15 @@ describe("generationTokenCost", () => {
         etikettModus: "marke",
         variantCount: 3,
       }),
-    ).toBe(105);
+    ).toBe(33);
+    expect(
+      estimateStudioImageTokenCost({
+        usesProductPhoto: true,
+        etikettModus: "marke",
+        variantCount: 1,
+        requestedQuality: "medium",
+      }),
+    ).toBe(8);
     expect(
       estimateStudioImageTokenCost({
         usesProductPhoto: false,
@@ -38,7 +46,39 @@ describe("generationTokenCost", () => {
         etikettModus: "generisch",
         variantCount: 1,
       }),
-    ).toBe(15);
+    ).toBe(5);
+  });
+
+  it("User-Qualität schlägt Produktfoto-Default", () => {
+    expect(
+      resolveImageBillingResolution({
+        hasProductPhoto: true,
+        compiledOrRequestedQuality: "medium",
+      }),
+    ).toBe("1K");
+    expect(
+      resolveImageBillingResolution({
+        hasProductPhoto: true,
+        compiledOrRequestedQuality: "high",
+      }),
+    ).toBe("2K");
+    expect(
+      resolveImageBillingResolution({
+        hasProductPhoto: false,
+        compiledOrRequestedQuality: "ultra",
+      }),
+    ).toBe("4K");
+  });
+
+  it("4K Markenbild kostet 17 Tokens", () => {
+    expect(
+      estimateStudioImageTokenCost({
+        usesProductPhoto: true,
+        etikettModus: "marke",
+        variantCount: 1,
+        requestedQuality: "ultra",
+      }),
+    ).toBe(17);
   });
 
   it("berücksichtigt Qualitäts-Env und Request-Qualität ohne Produktfoto", () => {
@@ -62,7 +102,7 @@ describe("generationTokenCost", () => {
         variantCount: 1,
         qualityEnv: "high",
       }),
-    ).toBe(25);
+    ).toBe(8);
     expect(
       estimateStudioImageTokenCost({
         usesProductPhoto: false,
@@ -70,16 +110,16 @@ describe("generationTokenCost", () => {
         variantCount: 1,
         requestedQuality: "high",
       }),
-    ).toBe(20);
+    ).toBe(6);
   });
 
-  it("1K ohne Referenz = 10 Tokens", () => {
+  it("1K ohne Referenz = 3 Tokens", () => {
     expect(
       calculatePerVariantTokenCost({
         resolution: "1K",
         hasReferenceImage: false,
       }),
-    ).toBe(10);
+    ).toBe(3);
   });
 
   it("Standard-Video Seedance 720p 8s = 90 Tokens", () => {

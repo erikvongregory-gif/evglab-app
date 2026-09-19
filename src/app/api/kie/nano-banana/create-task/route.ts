@@ -8,6 +8,7 @@ import { logProviderFailure, providerErrorResponse } from "@/lib/ai/providerRequ
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
+import { calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 import {
@@ -238,8 +239,11 @@ export async function POST(req: Request) {
 
     const mappedAspect = mapAspectRatioForGptImage2(body.aspectRatio);
     const effectiveResolution = normalizeResolutionForGptImage2(body.resolution, mappedAspect);
-    const baseCost = effectiveResolution === "4K" ? 35 : effectiveResolution === "2K" ? 20 : 10;
-    const tokenCost = baseCost + (hasReferenceImages ? 5 : 0) + (body.strictLabelMode ? 10 : 0);
+    const tokenCost = calculatePerVariantTokenCost({
+      resolution: effectiveResolution,
+      hasReferenceImage: hasReferenceImages,
+      strictLabelMode: body.strictLabelMode,
+    });
     const remainingTokens = Math.max((currentState?.monthly_tokens ?? 0) - (currentState?.used_tokens ?? 0), 0);
     if (remainingTokens < tokenCost) {
       return NextResponse.json(

@@ -100,12 +100,16 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: transparent;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--primary, var(--ac, #c7691e)) 5%, transparent),
+    var(--card, #fff)
+  );
   display: grid;
   place-items: center;
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(24, 20, 15, 0.05);
   animation: evg-hopfenhugo-bob 3.2s ease-in-out infinite;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .evg-hopfenhugo-avatar-bob .brewai-chat-avatar,
@@ -331,15 +335,19 @@
 }
 
 .evg-hopfenhugo-bubble--assistant {
-  border-color: color-mix(in srgb, var(--ac) 16%, transparent);
-  background: color-mix(in srgb, var(--ac-tint) 82%, var(--s1, var(--background)));
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--ac) 8%, transparent);
+  border-color: transparent;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--primary, var(--ac, #c7691e)) 5%, transparent),
+    var(--card, var(--s1, #fff))
+  );
+  box-shadow: 0 1px 2px rgba(24, 20, 15, 0.05);
 }
 
 :is(.dark, .dark *) .evg-hopfenhugo-bubble--assistant {
-  border-color: color-mix(in srgb, var(--ac) 32%, transparent);
-  background: color-mix(in srgb, var(--ac) 18%, var(--s2, var(--background)));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  border-color: transparent;
+  background: var(--card, var(--s2, var(--background)));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   color: var(--t1, var(--foreground));
 }
 
@@ -1019,6 +1027,29 @@
 }
 
 /* ── Brew Buddy (Chat-Avatar, ersetzt Hopfendolde) ─────────────── */
+.brewai-msg-avatar-ring {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--primary, var(--ac, #c7691e)) 5%, transparent),
+    var(--card, #fff)
+  );
+  box-shadow: 0 1px 2px rgba(24, 20, 15, 0.05);
+}
+
+:is(.dark, .dark *) .brewai-msg-avatar-ring,
+:is(.dark, .dark *) .evg-hopfenhugo-avatar-bob,
+:is(.dark, .dark *) .evg-hopfenhugo-avatar-bob:has(.hop-buddy),
+:is(.dark, .dark *) .evg-hopfenhugo-avatar-bob:has(.brew-buddy) {
+  background: var(--card, #1a1a1a);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
 .hop-buddy,
 .brew-buddy {
   display: inline-flex;
@@ -1035,15 +1066,16 @@
   overflow: visible;
 }
 
-.evg-hopfenhugo-avatar-bob {
-  overflow: visible;
-}
-
 .evg-hopfenhugo-avatar-bob:has(.hop-buddy),
 .evg-hopfenhugo-avatar-bob:has(.brew-buddy) {
   animation: none;
-  background: transparent;
-  box-shadow: none;
+  overflow: hidden;
+  background: linear-gradient(
+    to top,
+    color-mix(in oklab, var(--primary, var(--ac, #c7691e)) 5%, transparent),
+    var(--card, #fff)
+  );
+  box-shadow: 0 1px 2px rgba(24, 20, 15, 0.05);
 }
 
 @keyframes cbBreathe {

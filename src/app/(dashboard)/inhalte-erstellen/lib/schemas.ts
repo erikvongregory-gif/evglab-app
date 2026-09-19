@@ -39,7 +39,7 @@ export const bierstilSchema = z.enum([
   "rauchbier",
 ]);
 
-export const imageQualitySchema = z.enum(["medium", "high"]).default("high");
+export const imageQualitySchema = z.enum(["medium", "high", "ultra"]).default("high");
 export const aspectRatioSchema = z
   .enum(["1:1", "4:5", "3:4", "9:16", "4:3", "16:9"])
   .default("4:5");

@@ -183,7 +183,7 @@ const AIMessage = ({
             bubble && isUser && "rounded-br-md bg-foreground text-background",
             bubble &&
               !isUser &&
-              "rounded-bl-md border border-[color-mix(in_srgb,var(--ac,#C7691E)_14%,transparent)] bg-[color-mix(in_srgb,var(--ac-tint,#FBEFE0)_82%,var(--background))] text-foreground dark:border-[color-mix(in_srgb,var(--ac,#C7691E)_32%,transparent)] dark:bg-[color-mix(in_srgb,var(--ac,#C7691E)_18%,var(--background))]",
+              "rounded-2xl rounded-bl-md border-0 bg-linear-to-t from-primary/5 to-card text-foreground shadow-xs dark:bg-card dark:from-transparent",
             !bubble && "text-foreground",
           )}
         >

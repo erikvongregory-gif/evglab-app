@@ -46,6 +46,14 @@ const ASPECT_OPTIONS: { value: Aspect; hint: string }[] = [
   { value: "16:9", hint: "Landscape" },
 ];
 
+type RequestQuality = "medium" | "high" | "ultra";
+
+const QUALITY_OPTIONS: { value: RequestQuality; label: string; hint: string }[] = [
+  { value: "medium", label: "Standard", hint: "1K · weniger Tokens" },
+  { value: "high", label: "Hoch", hint: "2K · schärfer" },
+  { value: "ultra", label: "4K", hint: "Druck / Detail" },
+];
+
 const VALID_SZENEN = new Set<string>([
   "biergarten_sommer",
   "wirtshaus_innen",
@@ -113,6 +121,8 @@ export default function RuixenMoonChat() {
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<Aspect>("4:5");
   const [formatPickerOpen, setFormatPickerOpen] = useState(false);
+  const [requestQuality, setRequestQuality] = useState<RequestQuality>("medium");
+  const [qualityPickerOpen, setQualityPickerOpen] = useState(false);
   const [presetPickerOpen, setPresetPickerOpen] = useState(false);
   const [beers, setBeers] = useState<DashboardBeer[]>([]);
   const [selectedBeer, setSelectedBeer] = useState<DashboardBeer | null>(null);
@@ -234,7 +244,7 @@ export default function RuixenMoonChat() {
     extraReferenceCount: characterRefCount,
     etikettModus: usesProductPhoto ? "marke" : "generisch",
     variantCount: 1,
-    requestedQuality: "medium",
+    requestedQuality: requestQuality,
   });
 
   const canGenerate = (Boolean(message.trim()) || Boolean(activePreset)) && !genBusy;
@@ -283,7 +293,7 @@ export default function RuixenMoonChat() {
       characterReferenceImages: selectedCharacter
         ? selectedCharacter.referenceImageUrls.filter((url) => url?.trim()).slice(0, 3)
         : undefined,
-      quality: "medium" as const,
+      quality: requestQuality,
       variantCount: 1,
     };
 
@@ -309,6 +319,7 @@ export default function RuixenMoonChat() {
     genBusy,
     hyperreal,
     message,
+    requestQuality,
     router,
     selectedBeer,
     selectedCharacter,
@@ -717,6 +728,60 @@ export default function RuixenMoonChat() {
                           )}
                         >
                           <span className="w-12 font-medium tabular-nums">{value}</span>
+                          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                            {hint}
+                          </span>
+                          {active ? <StudioIcon name="check" size={14} /> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              <Popover open={qualityPickerOpen} onOpenChange={setQualityPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label="Qualität wählen"
+                    className={cn(
+                      "h-9 shrink-0 gap-2 bg-transparent px-2 text-foreground hover:bg-transparent",
+                      "dark:bg-transparent dark:text-white dark:hover:bg-transparent",
+                      "font-medium",
+                    )}
+                  >
+                    <StudioIcon name="spark" size={16} />
+                    <span className="text-xs font-medium tabular-nums">
+                      {requestQuality === "ultra" ? "4K" : requestQuality === "high" ? "2K" : "1K"}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-56 p-2"
+                  onOpenAutoFocus={(event) => event.preventDefault()}
+                >
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    Qualität / Skalierung
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    {QUALITY_OPTIONS.map(({ value, label, hint }) => {
+                      const active = requestQuality === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => {
+                            setRequestQuality(value);
+                            setQualityPickerOpen(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted",
+                            active && "bg-muted",
+                          )}
+                        >
+                          <span className="w-20 font-medium">{label}</span>
                           <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                             {hint}
                           </span>

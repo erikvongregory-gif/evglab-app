@@ -18,9 +18,10 @@ export async function cropImageBufferToAspectRatio(
   buffer: Buffer,
   aspectRatio: string,
   outputFormat: "png" | "jpg" = "png",
+  resolution: "1K" | "2K" | "4K" = "1K",
 ): Promise<Buffer> {
-  const crop = aspectRatioToCropRect(aspectRatio);
-  const source = mapAspectRatioToOpenAiSize(aspectRatio);
+  const crop = aspectRatioToCropRect(aspectRatio, resolution);
+  const source = mapAspectRatioToOpenAiSize(aspectRatio, resolution);
   const [nativeW, nativeH] = source.split("x").map(Number);
   if (crop.width === nativeW && crop.height === nativeH) return buffer;
 

@@ -185,7 +185,9 @@ export function HopfenHugoChat({
                 from={msg.role}
                 avatar={
                   msg.role === "assistant" ? (
-                    <HopBuddyAvatar state="idle" size={28} badge={false} />
+                    <span className="brewai-msg-avatar-ring">
+                      <HopBuddyAvatar state="idle" size={28} badge={false} />
+                    </span>
                   ) : undefined
                 }
                 copyText={msg.role === "assistant" ? msg.text : undefined}
@@ -225,11 +227,13 @@ export function HopfenHugoChat({
               <AIMessage
                 from="assistant"
                 avatar={
-                  <HopBuddyAvatar
-                    state={resolvedState === "typing" ? "typing" : "thinking"}
-                    size={28}
-                    badge={false}
-                  />
+                  <span className="brewai-msg-avatar-ring">
+                    <HopBuddyAvatar
+                      state={resolvedState === "typing" ? "typing" : "thinking"}
+                      size={28}
+                      badge={false}
+                    />
+                  </span>
                 }
                 bubble
               >
