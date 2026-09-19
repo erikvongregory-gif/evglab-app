@@ -494,6 +494,7 @@ export const SignInPage: React.FC<SignInPageProps> = ({
     );
   }
 
+  const registrationClosed = Boolean(inviteOnly && !inviteToken && !teamInviteMode);
   const errorText =
     typeof displayError === "string"
       ? displayError
@@ -525,9 +526,10 @@ export const SignInPage: React.FC<SignInPageProps> = ({
       oauthProviders={showGoogle ? ["google"] : []}
       googleHref={onGoogleSignIn ? undefined : googleHref}
       feedbackNotice={feedbackNotice}
-      inviteBlocked={Boolean(inviteOnly && isRegister && !inviteToken && !teamInviteMode)}
+      inviteBlocked={registrationClosed && isRegister}
+      inviteBlockedMessage="Die Registrierung ist derzeit geschlossen. Melde dich mit deinem bestehenden Konto an."
       forgotPasswordHref={resetPasswordHref}
-      showModeSwitch={!signInOnly}
+      showModeSwitch={!signInOnly && !registrationClosed}
     />
   );
 };
