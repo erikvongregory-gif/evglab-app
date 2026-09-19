@@ -2,7 +2,7 @@ import { reserveGeneration } from "@/lib/billing/generationJobs";
 import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
-import { aspectRatioToImageSize, generateCampaignImage } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
+import { aspectRatioToImageSize, generateCampaignImage, toOpenAiApiQuality } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
 import { buildCampaignTextPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/campaign-text";
 import { campaignTextSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { createReferenceResolverFromMetadata, assertResolvableReferenceUrls, resolveReferenceUrlsForGeneration } from "@/lib/brand/resolve-reference-for-generation";
@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { canUseCampaignWithTextProfile, getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
 import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
-import { calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
+import { calculatePerVariantTokenCost, resolveImageBillingResolution } from "@/lib/billing/generationTokenCost";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -51,7 +51,10 @@ export async function POST(req: Request) {
 
     const input = parsed.data;
     const perImageCost = calculatePerVariantTokenCost({
-      resolution: input.quality === "high" ? "2K" : "1K",
+      resolution: resolveImageBillingResolution({
+        hasProductPhoto: (input.referenzBilder?.length ?? 0) > 0,
+        compiledOrRequestedQuality: input.quality,
+      }),
       hasReferenceImage: (input.referenzBilder?.length ?? 0) > 0,
     });
     const budgetError = await requireTokenBudget(guard.userId, perImageCost);
@@ -67,7 +70,7 @@ export async function POST(req: Request) {
       prompt,
       feedReferenzen: referenzBilder,
       size: aspectRatioToImageSize(input.aspectRatio),
-      quality: input.quality,
+      quality: toOpenAiApiQuality(input.quality),
       resolveReferenceUrl: createReferenceResolverFromMetadata(guard.userMetadata),
     });
 

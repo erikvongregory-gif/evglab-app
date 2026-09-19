@@ -1,12 +1,12 @@
 import { reserveGeneration } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
-import { aspectRatioToImageSize, generateProductStudio } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
+import { aspectRatioToImageSize, generateProductStudio, toOpenAiApiQuality } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
 import { buildProductStudioPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/product-studio";
 import { productStudioSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { createReferenceResolverFromMetadata, assertResolvableReferenceUrls, resolveReferenceUrlsForGeneration } from "@/lib/brand/resolve-reference-for-generation";
 import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
-import { calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
+import { calculatePerVariantTokenCost, resolveImageBillingResolution } from "@/lib/billing/generationTokenCost";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,7 +25,10 @@ export async function POST(req: Request) {
 
     const input = parsed.data;
     const perImageCost = calculatePerVariantTokenCost({
-      resolution: input.quality === "high" ? "2K" : "1K",
+      resolution: resolveImageBillingResolution({
+        hasProductPhoto: true,
+        compiledOrRequestedQuality: input.quality,
+      }),
       hasReferenceImage: true,
     });
     const budgetError = await requireTokenBudget(guard.userId, perImageCost);
@@ -41,7 +44,7 @@ export async function POST(req: Request) {
       prompt,
       referenzBildUrl,
       size: aspectRatioToImageSize(input.aspectRatio),
-      quality: input.quality,
+      quality: toOpenAiApiQuality(input.quality),
       resolveReferenceUrl: createReferenceResolverFromMetadata(guard.userMetadata),
     });
 

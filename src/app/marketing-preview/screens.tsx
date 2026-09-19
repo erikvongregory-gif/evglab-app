@@ -177,7 +177,7 @@ function ScreenBody({ screen }: { screen: MarketingScreenId }) {
           onOpenBrandSetup={noop}
           onSkipBrandProfile={noop}
           onResetBrandProfile={asyncNoop}
-          onChange={(patch) => setBrand((prev) => ({ ...prev, ...patch }))}
+          onChange={(patch) => setBrand((prev) => ({ ...prev, ...patch }) as typeof prev)}
           onSave={asyncNoop}
         />
       );

@@ -176,12 +176,27 @@ export const SETTINGS_INCOMPLETE: DashboardHomeSettings = {
   brandLockLevel: "balanced",
 };
 
-export const BRAND_COMPLETE = {
-  brandProfileMode: "guided" as const,
+export type MarketingBrandSettings = {
+  brandProfileMode: "undecided" | "guided" | "skip";
+  brandInstagramUrl: string;
+  brandWebsiteUrl: string;
+  brandProfileSource: "url" | "instagram" | "manual" | "skip";
+  brandLockLevel: "strict" | "balanced" | "loose";
+  breweryName: string;
+  brandTone: string;
+  brandColors: string;
+  brandDos: string;
+  brandDonts: string;
+  brandReferenceImageUrls: string[];
+  brandAnalyzedAt?: string;
+};
+
+export const BRAND_COMPLETE: MarketingBrandSettings = {
+  brandProfileMode: "guided",
   brandInstagramUrl: "https://instagram.com/testbrauerei",
   brandWebsiteUrl: "https://testbrauerei.de",
-  brandProfileSource: "url" as const,
-  brandLockLevel: "balanced" as const,
+  brandProfileSource: "url",
+  brandLockLevel: "balanced",
   breweryName: BREWERY,
   brandTone: "handwerklich, warm, modern, regional",
   brandColors: "#C7691E, #1A1816, #F4F1EC, #3D5A40",
@@ -195,18 +210,18 @@ export const BRAND_COMPLETE = {
   brandAnalyzedAt: new Date().toISOString(),
 };
 
-export const BRAND_EMPTY = {
-  brandProfileMode: "undecided" as const,
+export const BRAND_EMPTY: MarketingBrandSettings = {
+  brandProfileMode: "undecided",
   brandInstagramUrl: "",
   brandWebsiteUrl: "",
-  brandProfileSource: "manual" as const,
-  brandLockLevel: "balanced" as const,
+  brandProfileSource: "manual",
+  brandLockLevel: "balanced",
   breweryName: "",
   brandTone: "",
   brandColors: "",
   brandDos: "",
   brandDonts: "",
-  brandReferenceImageUrls: [] as string[],
+  brandReferenceImageUrls: [],
 };
 
 export const TEAM_MEMBERS: AdminTeamMember[] = [

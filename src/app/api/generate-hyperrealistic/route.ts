@@ -2,7 +2,7 @@ import { reserveGeneration } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
-import { aspectRatioToImageSize, generateHyperrealistic } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
+import { aspectRatioToImageSize, generateHyperrealistic, toOpenAiApiQuality } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
 import { buildHyperrealisticPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
@@ -15,7 +15,7 @@ import {
   enforceHyperrealisticPromptConstraints,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/enforce-prompt-constraints";
 import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
-import { calculatePerVariantTokenCost } from "@/lib/billing/generationTokenCost";
+import { calculatePerVariantTokenCost, resolveImageBillingResolution } from "@/lib/billing/generationTokenCost";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -35,7 +35,10 @@ export async function POST(req: Request) {
     const input = parsed.data;
     const hasReferenceImage = input.etikettModus !== "generisch" && Boolean(input.etikettBild);
     const perImageCost = calculatePerVariantTokenCost({
-      resolution: input.quality === "high" ? "2K" : "1K",
+      resolution: resolveImageBillingResolution({
+        hasProductPhoto: hasReferenceImage,
+        compiledOrRequestedQuality: input.quality,
+      }),
       hasReferenceImage,
       strictLabelMode: input.etikettModus === "marke" && hasReferenceImage,
     });
@@ -89,7 +92,7 @@ export async function POST(req: Request) {
       prompt,
       etikettUrl,
       size: aspectRatioToImageSize(input.aspectRatio),
-      quality: input.quality,
+      quality: toOpenAiApiQuality(input.quality),
       resolveReferenceUrl: createReferenceResolverFromMetadata(guard.userMetadata),
     });
 

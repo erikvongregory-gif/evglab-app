@@ -12,6 +12,13 @@ function createOpenAiClient(): OpenAI {
 
 export type ImageSize = "1024x1024" | "1024x1280" | "1024x1536" | "1024x1792" | "1792x1024" | "1280x1024";
 export type Quality = "low" | "medium" | "high";
+
+/** Studio `ultra` (4K) → OpenAI API nur low/medium/high. */
+export function toOpenAiApiQuality(quality: "low" | "medium" | "high" | "ultra" | undefined): Quality {
+  if (quality === "low") return "low";
+  if (quality === "high" || quality === "ultra") return "high";
+  return "medium";
+}
 type ImageApiData = Array<{ b64_json?: string; url?: string; revised_prompt?: string }>;
 
 export type ReferenceUrlResolver = (url: string, index?: number) => Promise<Buffer | null | undefined>;

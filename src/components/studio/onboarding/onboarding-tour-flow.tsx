@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { TaskSteps, type TaskStep } from "@/components/ui/task-steps";
 import { cn } from "@/lib/utils";
-import type { DashboardBeer } from "@/lib/dashboard/metadata";
+import type { DashboardBeer, ProduktKategorie } from "@/lib/dashboard/metadata";
 import { GETRANKEART_OPTIONS, produktKategorieLabel, sanitizeProduktKategorie } from "@/lib/dashboard/metadata";
 import { BRAND_SETTINGS_LIMITS, clampBrandSettingsFields } from "@/lib/dashboard/settingsPayload";
 import { ONBOARDING_TOUR_VERSION } from "@/lib/dashboard/onboarding";
@@ -36,7 +36,7 @@ function SortimentBeerRow({
   beer: SortimentRowBeer;
   canEditCategory: boolean;
   reduceMotion: boolean | null;
-  onCategoryChange: (produktKategorie: string) => void;
+  onCategoryChange: (produktKategorie: ProduktKategorie) => void;
   onRemove: () => void;
 }) {
   const bottleRef = useRef<HTMLDivElement>(null);
@@ -216,6 +216,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
   }>(null);
   const undoTimerRef = useRef<number | null>(null);
   const analyzedInput = useRef({ name: breweryName, url: websiteUrl });
+  const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState(websiteUrl);
   const brandReady = brandLooksReady(brand);
 
   const taskSteps: TaskStep[] = useMemo(
@@ -368,6 +369,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
       setBrand(next);
       activated.current = false;
       analyzedInput.current = { name: next.breweryName || breweryName.trim(), url };
+      setLastAnalyzedUrl(url);
       setWebsiteUrl(url);
       if (next.breweryName) setBreweryName(next.breweryName);
       return next;
@@ -524,7 +526,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
   const primaryLabel = busy
     ? scanning ? "Wird analysiert …" : activating ? "Wird gespeichert …" : "Einen Moment …"
     : step === 0 ? "Website analysieren" : step === 1 ? "Weiter" : "Studio öffnen";
-  const scanTarget = hostnameLabel(websiteUrl.trim() ? websiteUrl : analyzedInput.current.url);
+  const scanTarget = hostnameLabel(websiteUrl.trim() || lastAnalyzedUrl);
 
   return (
     <div className="brewai-admin min-h-dvh bg-background text-foreground">

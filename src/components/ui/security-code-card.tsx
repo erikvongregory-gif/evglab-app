@@ -65,7 +65,9 @@ export function SecurityCodeCard({
   const [resendCooldown, setResendCooldown] = useState(0);
   const timersRef = useRef<number[]>([]);
   const codeRef = useRef(code);
-  codeRef.current = code;
+  useEffect(() => {
+    codeRef.current = code;
+  }, [code]);
 
   const complete = code.length === DIGIT_COUNT || (ownerHasBackupCode && backupCode.trim().length >= 6);
 

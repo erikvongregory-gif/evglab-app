@@ -11,7 +11,7 @@ import { buildOwnerBillingRow, ensureBillingRow, getBillingRow } from "@/lib/bil
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { isDisposableEmail, normalizeEmailIdentity } from "@/lib/auth/disposableEmail";
 
-export const ONBOARDING_BONUS_TOKENS = 50;
+const ONBOARDING_BONUS_TOKENS = 50;
 const BONUS_CLAIM_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const EMAIL_CLAIM_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 
