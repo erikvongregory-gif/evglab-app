@@ -113,7 +113,7 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     features: buildPlanFeatures(
       "enterprise",
       "25 Teamplätze (Inhaber inklusive)",
-      "Dedizierter Success-Manager + SLA",
+      "Direkter Ansprechpartner für euer Team",
     ),
   },
 ];
