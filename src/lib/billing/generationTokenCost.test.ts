@@ -122,24 +122,46 @@ describe("generationTokenCost", () => {
     ).toBe(3);
   });
 
-  it("Standard-Video Seedance 720p 8s = 90 Tokens", () => {
-    expect(
-      calculateSeedanceVideoTokenCost({
-        resolution: "720p",
-        duration: 8,
-        generateAudio: false,
-      }),
-    ).toBe(90);
+  it("Video: Dauer × Auflösung (Seedance 2, ohne Audio)", () => {
+    expect(calculateSeedanceVideoTokenCost({ resolution: "480p", duration: 4 })).toBe(32);
+    expect(calculateSeedanceVideoTokenCost({ resolution: "480p", duration: 5 })).toBe(40);
+    expect(calculateSeedanceVideoTokenCost({ resolution: "480p", duration: 6 })).toBe(48);
+    expect(calculateSeedanceVideoTokenCost({ resolution: "720p", duration: 4 })).toBe(64);
+    expect(calculateSeedanceVideoTokenCost({ resolution: "720p", duration: 5 })).toBe(80);
+    expect(calculateSeedanceVideoTokenCost({ resolution: "720p", duration: 6 })).toBe(96);
+    expect(calculateSeedanceVideoTokenCost({ resolution: "1080p", duration: 5 })).toBe(200);
   });
 
-  it("längeres Video addiert Dauer-Aufschlag", () => {
+  it("Video: Audio +25 %, Modell-Multiplikator, Varianten 1:1", () => {
     expect(
       calculateSeedanceVideoTokenCost({
         resolution: "720p",
-        duration: 12,
-        generateAudio: false,
+        duration: 5,
+        generateAudio: true,
       }),
-    ).toBe(106);
+    ).toBe(100);
+    expect(
+      calculateSeedanceVideoTokenCost({
+        resolution: "720p",
+        duration: 5,
+        modelId: "seedance-2-mini",
+      }),
+    ).toBe(44);
+    expect(
+      calculateSeedanceVideoTokenCost({
+        resolution: "720p",
+        duration: 5,
+        modelId: "seedance-2.5",
+      }),
+    ).toBe(120);
+    expect(
+      calculateSeedanceVideoTokenCost({
+        resolution: "720p",
+        duration: 5,
+        generateAudio: true,
+        variantCount: 4,
+      }),
+    ).toBe(400);
   });
 
   it("Client-Vorschau medium entspricht Request-Qualitaet ohne Produktfoto", () => {

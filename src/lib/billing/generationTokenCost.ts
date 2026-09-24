@@ -81,21 +81,48 @@ export function estimateStudioImageTokenCost(args: {
   });
 }
 
-/** Standard-Video (Seedance 2 · 720p · ~8 s · ohne Audio) — deutlich teurer als Bilder. */
+/**
+ * Tokens/Sekunde · Seedance-2-Liste (~4,5× BytePlus-COGS bei ~0,04 €/Token).
+ * 480p ≈ 8 · 720p ≈ 16 · 1080p ≈ 40
+ */
+const VIDEO_TOKENS_PER_SEC: Record<SeedanceResolution, number> = {
+  "480p": 8,
+  "720p": 16,
+  "1080p": 40,
+};
+
+/** Modell-Aufschlag relativ zu Seedance 2 Standard. */
+export function resolveVideoModelMultiplier(modelId?: string | null): number {
+  const id = (modelId ?? "").toLowerCase();
+  if (id.includes("mini")) return 0.55;
+  if (id.includes("fast")) return 0.8;
+  if (id.includes("2.5") || id.includes("2-5") || /\b25\b/.test(id)) return 1.5;
+  return 1;
+}
+
+/**
+ * Video-Tokenkosten: Dauer × Auflösung × Modell × Audio × Varianten.
+ * Jede Variante / jeder Batch-Lauf kostet voll (kein Mengenrabatt).
+ */
 export function calculateSeedanceVideoTokenCost(args: {
   resolution?: SeedanceResolution;
   duration?: number;
   generateAudio?: boolean;
+  modelId?: string | null;
+  variantCount?: number;
 }): number {
   const fromEnv = Number.parseInt(process.env.KIE_SEEDANCE_TOKEN_COST ?? "", 10);
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  if (Number.isFinite(fromEnv) && fromEnv > 0) {
+    return fromEnv * Math.max(1, args.variantCount ?? 1);
+  }
 
-  const duration = Math.max(4, Math.min(15, args.duration ?? 8));
+  const duration = Math.max(4, Math.min(15, Math.round(args.duration ?? 5)));
   const resolution = args.resolution ?? "720p";
-  const base = resolution === "1080p" ? 120 : resolution === "480p" ? 70 : 90;
-  const durationFactor = duration > 8 ? Math.ceil((duration - 8) / 2) * 8 : 0;
-  const audioFactor = args.generateAudio ? 20 : 0;
-  return base + durationFactor + audioFactor;
+  const perSec = VIDEO_TOKENS_PER_SEC[resolution] ?? VIDEO_TOKENS_PER_SEC["720p"];
+  const model = resolveVideoModelMultiplier(args.modelId);
+  const audio = args.generateAudio ? 1.25 : 1;
+  const perClip = Math.max(1, Math.ceil(duration * perSec * model * audio));
+  return perClip * Math.max(1, args.variantCount ?? 1);
 }
 
 export function formatPlanImageEstimate(monthlyTokens: number): string {
@@ -111,8 +138,16 @@ export function formatPlanImageEstimate(monthlyTokens: number): string {
 }
 
 export function formatPlanVideoEstimate(monthlyTokens: number): string {
-  const standardCost = calculateSeedanceVideoTokenCost({ resolution: "720p", duration: 8 });
-  const longCost = calculateSeedanceVideoTokenCost({ resolution: "720p", duration: 12 });
+  const standardCost = calculateSeedanceVideoTokenCost({
+    resolution: "720p",
+    duration: 5,
+    generateAudio: true,
+  });
+  const longCost = calculateSeedanceVideoTokenCost({
+    resolution: "720p",
+    duration: 12,
+    generateAudio: true,
+  });
   const maxVideos = Math.max(1, Math.floor(monthlyTokens / standardCost));
   const minVideos = Math.max(1, Math.floor(monthlyTokens / longCost));
   return `ca. ${minVideos.toLocaleString("de-DE")}–${maxVideos.toLocaleString("de-DE")} Videos`;

@@ -30,6 +30,7 @@ import { useActive } from "@/lib/generation/stores/active";
 import { useVideoMedia } from "@/lib/generation/stores/media";
 import { useVideoPrompt } from "@/lib/generation/stores/prompt";
 import { useSettings } from "@/lib/generation/stores/settings";
+import { getMediaDisplayTitle, type DashboardMediaItem } from "@/lib/dashboard/metadata";
 import {
   ROLE_LABELS,
   VideoAssetPicker,
@@ -58,6 +59,13 @@ const ROLE_ACCEPT: Record<MediaRole, string> = {
 function kindOfFile(file: File): "image" | "video" | "audio" {
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/")) return "audio";
+  return "image";
+}
+
+/** Mediathek speichert Videos teils als imageUrl — an Extension/Pfad erkennen. */
+function kindFromMediaUrl(url: string): "image" | "video" | "audio" {
+  if (/\.(mp4|webm|mov)(\?|#|$)/i.test(url)) return "video";
+  if (/\.(mp3|wav|ogg|m4a)(\?|#|$)/i.test(url)) return "audio";
   return "image";
 }
 
@@ -115,11 +123,47 @@ export function VideoGenerationStudio({ breweryName }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [assetsOpen, setAssetsOpen] = useState(false);
   const [uploads, setUploads] = useState<ShelfUpload[]>([]);
+  const [mediaLibrary, setMediaLibrary] = useState<ShelfGeneration[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const attachRoleRef = useRef<MediaRole>("start");
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({ minHeight: 48, maxHeight: 150 });
 
   useEffect(() => () => stopWatching(), []);
+
+  // Mediathek laden, sobald der Plus-Picker öffnet.
+  useEffect(() => {
+    if (!assetsOpen) return;
+    let live = true;
+    setLibraryLoading(true);
+    void fetch("/api/dashboard/media?limit=48&offset=0", { credentials: "include", cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Mediathek nicht ladbar");
+        const data = (await res.json()) as { items?: DashboardMediaItem[] };
+        if (!live) return;
+        const mapped: ShelfGeneration[] = [];
+        for (const item of data.items ?? []) {
+          const url = item.imageUrl?.trim();
+          if (!url || !/^https?:\/\//i.test(url)) continue;
+          mapped.push({
+            url,
+            kind: kindFromMediaUrl(url),
+            title: getMediaDisplayTitle(item),
+            thumbUrl: item.thumbUrl?.trim() || undefined,
+          });
+        }
+        setMediaLibrary(mapped);
+      })
+      .catch(() => {
+        if (live) setMediaLibrary([]);
+      })
+      .finally(() => {
+        if (live) setLibraryLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [assetsOpen]);
 
   const estimatedCost = useMemo(() => {
     const resolutionRaw = String(values.resolution ?? "720p");
@@ -129,14 +173,14 @@ export function VideoGenerationStudio({ breweryName }: Props) {
         : resolutionRaw === "480p"
           ? "480p"
           : "720p";
-    return (
-      calculateSeedanceVideoTokenCost({
-        resolution,
-        duration: typeof values.duration === "number" ? Math.min(15, values.duration) : 5,
-        generateAudio: Boolean(values.generateAudio ?? true),
-      }) * batch
-    );
-  }, [values, batch]);
+    return calculateSeedanceVideoTokenCost({
+      resolution,
+      duration: typeof values.duration === "number" ? Math.min(15, values.duration) : 5,
+      generateAudio: Boolean(values.generateAudio ?? true),
+      modelId: model.id,
+      variantCount: batch,
+    });
+  }, [values, batch, model.id]);
 
   const canGenerate = prompt.text.trim().length > 0 && !busy;
   const hasMediaRoles = Object.keys(model.roles).length > 0;
@@ -149,15 +193,23 @@ export function VideoGenerationStudio({ breweryName }: Props) {
     return parts.slice(0, 2).join(" · ") || "Einstellungen";
   }, [values]);
 
-  const shelfGenerations = useMemo((): ShelfGeneration[] => {
-    return tiles
+  /** Mediathek + fertige Session-Videos (für Video-Slot / Wiederverwendung). */
+  const shelfLibrary = useMemo((): ShelfGeneration[] => {
+    const fromSession = tiles
       .filter((t) => t.status === "completed" && t.videoUrl)
       .map((t) => ({
         url: t.videoUrl!,
         kind: "video" as const,
         title: t.plane.prompt.text.slice(0, 80) || "Video",
       }));
-  }, [tiles]);
+    const seen = new Set(mediaLibrary.map((item) => item.url));
+    const merged = [...mediaLibrary];
+    for (const item of fromSession) {
+      if (seen.has(item.url)) continue;
+      merged.unshift(item);
+    }
+    return merged;
+  }, [mediaLibrary, tiles]);
 
   function beginAttach(role: MediaRole) {
     const input = fileRef.current;
@@ -377,27 +429,61 @@ export function VideoGenerationStudio({ breweryName }: Props) {
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
-                    className="flex flex-wrap gap-1.5 px-4 pt-3"
+                    className="flex flex-wrap gap-2 px-3 pt-3"
                   >
                     {media.items.map((item) => (
-                      <span
-                        key={item.id}
-                        className={cn(
-                          "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1",
-                          "border-[#C7691E]/40 bg-[#C7691E]/10 text-[#A85518]",
-                          "dark:border-[#C7691E]/40 dark:bg-[#C7691E]/15 dark:text-[#D4782A]",
-                        )}
-                      >
-                        <span className="truncate text-xs font-medium">{ROLE_LABELS[item.role]}</span>
+                      <div key={item.id} className="group relative">
+                        <div
+                          className={cn(
+                            "relative size-14 overflow-hidden rounded-xl border border-border bg-muted shadow-sm",
+                            "ring-1 ring-[#C7691E]/20",
+                          )}
+                          title={ROLE_LABELS[item.role]}
+                        >
+                          {item.role === "audio" ? (
+                            <span className="flex h-full items-center justify-center text-[10px] font-medium text-muted-foreground">
+                              Audio
+                            </span>
+                          ) : item.role === "video" ? (
+                            <video
+                              src={item.url}
+                              muted
+                              playsInline
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={item.url}
+                              alt={ROLE_LABELS[item.role]}
+                              className="h-full w-full object-cover"
+                            />
+                          )}
+                          <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1 pb-0.5 pt-3 text-[9px] font-semibold uppercase tracking-wide text-white">
+                            {item.role === "start"
+                              ? "Start"
+                              : item.role === "end"
+                                ? "Ende"
+                                : item.role === "reference"
+                                  ? "Ref"
+                                  : item.role === "video"
+                                    ? "Video"
+                                    : "Audio"}
+                          </span>
+                        </div>
                         <button
                           type="button"
-                          aria-label="Entfernen"
+                          aria-label={`${ROLE_LABELS[item.role]} entfernen`}
                           onClick={() => media.remove(item.id)}
-                          className="rounded-full p-0.5 opacity-70 hover:opacity-100"
+                          className={cn(
+                            "absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full",
+                            "border border-border bg-background text-muted-foreground shadow-sm",
+                            "opacity-90 transition-opacity hover:opacity-100 hover:text-foreground",
+                          )}
                         >
-                          <StudioIcon name="x" size={12} />
+                          <StudioIcon name="x" size={10} />
                         </button>
-                      </span>
+                      </div>
                     ))}
                   </motion.div>
                 ) : null}
@@ -438,7 +524,8 @@ export function VideoGenerationStudio({ breweryName }: Props) {
                         model={model}
                         items={media.items}
                         uploads={uploads}
-                        generations={shelfGenerations}
+                        library={shelfLibrary}
+                        libraryLoading={libraryLoading}
                         uploading={uploading}
                         onUpload={beginAttach}
                         onApply={applyRoleUrls}

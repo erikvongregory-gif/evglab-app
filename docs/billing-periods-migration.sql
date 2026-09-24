@@ -25,8 +25,7 @@ alter table generation_jobs add column if not exists allocations jsonb not null 
 -- Preserve visible balances on the first application; do not reconstruct historical credits.
 insert into token_lots(user_id,source,remaining,expires_at,grant_key)
 select user_id,'monthly',greatest(monthly_allowance-monthly_spent,0),
-  coalesce(current_period_end,now()+interval '1 month') +
-    (case plan when 'pro' then 90 when 'growth' then 60 else 30 end)*interval '1 day','migration-monthly'
+  coalesce(current_period_end,now()+interval '1 month') + interval '30 days','migration-monthly'
 from billing_subscriptions on conflict(user_id,grant_key) do nothing;
 insert into token_lots(user_id,source,remaining,grant_key)
 select user_id,'purchased',purchased_balance,'migration-purchased' from billing_subscriptions
@@ -45,15 +44,14 @@ end $$;
 
 create or replace function billing_refresh_monthly(p_user_id uuid) returns void
 language plpgsql security definer set search_path=public as $$
-declare b billing_subscriptions; expiry timestamptz; carry integer; next_at timestamptz;
+declare b billing_subscriptions; expiry timestamptz; next_at timestamptz;
 begin
   select * into b from billing_subscriptions where user_id=p_user_id for update;
   if not found then return; end if;
-  carry:=case b.plan when 'pro' then 90 when 'growth' then 60 else 30 end;
   while b.token_next_at is not null and b.token_next_at<=now()
     and b.token_next_at<b.current_period_end and b.subscription_status in ('active','trialing') and b.plan is not null loop
     next_at:=b.token_anchor+make_interval(months=>b.token_period_index+2);
-    expiry:=next_at+make_interval(days=>carry);
+    expiry:=next_at+interval '30 days';
     insert into token_lots(user_id,source,remaining,expires_at,grant_key)
       values(p_user_id,'monthly',b.monthly_allowance,expiry,'period:'||b.stripe_subscription_id||':'||b.token_next_at::text)
       on conflict(user_id,grant_key) do nothing;
@@ -80,8 +78,7 @@ begin
     update billing_subscriptions set token_anchor=p_start,token_next_at=boundary,token_period_index=idx,last_token_period_end=boundary
       where user_id=p_user_id;
     -- Migrated current tokens expire relative to the first budget period, not the yearly invoice.
-    update token_lots set expires_at=boundary+
-      make_interval(days=>case b.plan when 'pro' then 90 when 'growth' then 60 else 30 end)
+    update token_lots set expires_at=boundary+interval '30 days'
       where user_id=p_user_id and grant_key in ('migration-monthly','initial:'||p_subscription_id);
   end if;
   perform billing_refresh_monthly(p_user_id);
@@ -140,7 +137,7 @@ begin
   if b.stripe_subscription_id is not null and b.stripe_subscription_id<>p_subscription_id and b.subscription_status not in ('canceled','none') then
     raise exception 'A different subscription is already linked';
   end if;
-  expiry:=coalesce(b.token_next_at,now()+interval '1 month')+make_interval(days=>case p_plan when 'pro' then 90 when 'growth' then 60 else 30 end);
+  expiry:=coalesce(b.token_next_at,now()+interval '1 month')+interval '30 days';
   delta:=case when b.stripe_subscription_id is distinct from p_subscription_id and b.subscription_status='canceled'
     then p_allowance else greatest(p_allowance-b.token_period_granted,0) end;
   if delta>0 then insert into token_lots(user_id,source,remaining,expires_at,grant_key)

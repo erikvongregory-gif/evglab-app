@@ -18,7 +18,11 @@ export type StudioPlanDefinition = {
   features: string[];
 };
 
-function buildPlanFeatures(planId: SubscriptionPlanKey, carryDays: string, teamLine: string, supportLine: string): string[] {
+/** Ungenutzte Abo-Tokens: einmalig in den Folgemonat, danach Verfall. */
+export const TOKEN_CARRY_DAYS = 30;
+const CARRY_FEATURE = "Ungenutzte Tokens 1 Monat übertragbar";
+
+function buildPlanFeatures(planId: SubscriptionPlanKey, teamLine: string, supportLine: string): string[] {
   const tokens = SUBSCRIPTION_PLAN_TOKENS[planId];
   return [
     `${tokens.toLocaleString("de-DE")} Tokens / Monat`,
@@ -26,7 +30,7 @@ function buildPlanFeatures(planId: SubscriptionPlanKey, carryDays: string, teamL
     "Videos Erstellen (Seedance 2)",
     teamLine,
     supportLine,
-    carryDays,
+    CARRY_FEATURE,
   ];
 }
 
@@ -41,7 +45,6 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     savingsLabel: "21% Ersparnis inklusive",
     features: buildPlanFeatures(
       "start",
-      "Tokens 30 Tage übertragbar",
       "1 Teamplatz (Inhaber inklusive)",
       "E-Mail-Support",
     ),
@@ -57,7 +60,6 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     recommended: true,
     features: buildPlanFeatures(
       "growth",
-      "Tokens 60 Tage übertragbar",
       "3 Teamplätze (Inhaber inklusive)",
       "Priorisierter Support",
     ),
@@ -72,7 +74,6 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
     savingsLabel: "25% Ersparnis inklusive",
     features: buildPlanFeatures(
       "pro",
-      "Tokens 90 Tage übertragbar",
       "10 Teamplätze (Inhaber inklusive)",
       "Fast-Lane Rendering + Premium-Support",
     ),
@@ -95,6 +96,6 @@ export function getPlanAnnualSavingsVsList(plan: StudioPlanDefinition): number {
   return (plan.compareAtMonthly - plan.monthly) * 12;
 }
 
-/** Hinweis für UI: typischer Video-Verbrauch (720p, ~8 s). */
+/** Hinweis für UI: typischer Video-Verbrauch (720p, 5 s, mit Audio). */
 export const SEEDANCE_VIDEO_TOKEN_HINT =
-  "Ein Standard-Video (Seedance 2 · 720p · ~8 s) kostet 90 Tokens — deutlich mehr als eine Bild-Generierung.";
+  "Ein Standard-Video (Seedance 2 · 720p · 5 s · mit Audio) kostet 100 Tokens — Varianten und längere Clips multiplizieren 1:1.";

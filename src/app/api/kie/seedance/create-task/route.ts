@@ -83,7 +83,12 @@ export async function POST(req: Request) {
     const duration = body.duration ?? durationForPreset(body.presetId);
     const generateAudio = body.generateAudio ?? false;
     const aspectRatio = mapAspectRatioForSeedance(body.aspectRatio);
-    const tokenCost = calculateSeedanceVideoTokenCost({ resolution, duration, generateAudio });
+    const tokenCost = calculateSeedanceVideoTokenCost({
+      resolution,
+      duration,
+      generateAudio,
+      modelId: KIE_SEEDANCE_MODEL,
+    });
     const remainingTokens = Math.max((currentState?.monthly_tokens ?? 0) - (currentState?.used_tokens ?? 0), 0);
     if (remainingTokens < tokenCost) {
       return NextResponse.json(

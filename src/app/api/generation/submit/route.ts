@@ -146,6 +146,7 @@ export async function POST(req: Request) {
       resolution,
       duration: Math.min(15, duration),
       generateAudio,
+      modelId: plane.model,
     });
     const remainingTokens = Math.max(
       (currentState?.monthly_tokens ?? 0) - (currentState?.used_tokens ?? 0),

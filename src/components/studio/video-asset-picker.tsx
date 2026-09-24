@@ -18,6 +18,7 @@ export type ShelfGeneration = {
   url: string;
   kind: AssetKind;
   title: string;
+  thumbUrl?: string;
 };
 
 const ROLE_ORDER: MediaRole[] = ["start", "end", "reference", "video", "audio"];
@@ -55,14 +56,15 @@ function roleNoun(role: MediaRole, count: number): string {
   return "Audios";
 }
 
-type Source = "uploads" | "generations";
+type Source = "uploads" | "library";
 
-/** Asset-Picker im BrewAI-Look — Logik analog OpenHiggsfield. */
+/** Asset-Picker im BrewAI-Look — Uploads + Mediathek (Bilder/Videos). */
 export function VideoAssetPicker({
   model,
   items,
   uploads,
-  generations,
+  library,
+  libraryLoading,
   uploading,
   onUpload,
   onApply,
@@ -71,7 +73,9 @@ export function VideoAssetPicker({
   model: ModelEntry;
   items: MediaItem[];
   uploads: ShelfUpload[];
-  generations: ShelfGeneration[];
+  /** Mediathek + Session-Ergebnisse, gefiltert nach Role-Kind. */
+  library: ShelfGeneration[];
+  libraryLoading?: boolean;
   uploading: boolean;
   onUpload: (role: MediaRole) => void;
   onApply: (role: MediaRole, urls: string[]) => void;
@@ -79,7 +83,7 @@ export function VideoAssetPicker({
 }) {
   const roles = rolesOf(model);
   const [role, setRole] = useState<MediaRole>(() => roles[0] ?? "start");
-  const [source, setSource] = useState<Source>("uploads");
+  const [source, setSource] = useState<Source>("library");
   const [selected, setSelected] = useState<string[]>(() => urlsOf(items, roles[0] ?? "start"));
 
   const kind = ROLE_KINDS[role];
@@ -91,11 +95,11 @@ export function VideoAssetPicker({
     () => uploads.filter((u) => u.kind === kind),
     [uploads, kind],
   );
-  const genAssets = useMemo(
-    () => generations.filter((g) => g.kind === kind),
-    [generations, kind],
+  const libraryAssets = useMemo(
+    () => library.filter((g) => g.kind === kind),
+    [library, kind],
   );
-  const assets = source === "uploads" ? uploadAssets : genAssets;
+  const assets = source === "uploads" ? uploadAssets : libraryAssets;
 
   useEffect(() => {
     if (!roles.includes(role) && roles[0]) {
@@ -160,37 +164,54 @@ export function VideoAssetPicker({
 
   return (
     <div className="flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-0" role="dialog" aria-label="Medien anhängen">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-1.5">
-        <div className="flex items-center gap-0.5" role="tablist" aria-label="Quelle">
+      <div className="flex items-start gap-2 border-b border-border px-2.5 pb-2.5 pt-2">
+        <div
+          className="grid flex-1 grid-cols-2 gap-0.5 rounded-xl bg-muted p-1 dark:bg-neutral-800/80"
+          role="tablist"
+          aria-label="Quelle"
+        >
           {(
             [
-              ["uploads", "Uploads", uploadAssets.length],
-              ["generations", "Generierungen", genAssets.length],
+              ["library", "Mediathek", "media", libraryAssets.length],
+              ["uploads", "Uploads", "plus", uploadAssets.length],
             ] as const
-          ).map(([id, label, count]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={source === id}
-              onClick={() => setSource(id)}
-              className={cn(
-                "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                source === id
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-              )}
-            >
-              {label}
-              <span className="ml-1.5 tabular-nums opacity-60">{count}</span>
-            </button>
-          ))}
+          ).map(([id, label, icon, count]) => {
+            const active = source === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setSource(id)}
+                className={cn(
+                  "inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition-all",
+                  active
+                    ? "bg-background text-foreground shadow-sm dark:bg-neutral-700 dark:text-neutral-100"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <StudioIcon name={icon} size={14} />
+                <span>{label}</span>
+                <span
+                  className={cn(
+                    "min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums leading-none",
+                    active
+                      ? "bg-[#C7691E]/15 text-[#A85518] dark:text-[#D4782A]"
+                      : "bg-background/60 text-muted-foreground dark:bg-neutral-900/40",
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
         <button
           type="button"
           aria-label="Schließen"
           onClick={onClose}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="mt-0.5 shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <StudioIcon name="x" size={14} />
         </button>
@@ -225,8 +246,13 @@ export function VideoAssetPicker({
         </div>
       ) : null}
 
-      <div className="min-h-[11rem] px-2 py-3">
-        {assets.length === 0 ? (
+      <div className="min-h-[11rem] max-h-[16rem] overflow-y-auto px-2 py-3">
+        {libraryLoading && source === "library" ? (
+          <div className="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center text-sm text-muted-foreground">
+            <span className="size-5 animate-spin rounded-full border-2 border-[#C7691E] border-t-transparent" />
+            Mediathek wird geladen…
+          </div>
+        ) : assets.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 px-4 py-6 text-center">
             <span className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <StudioIcon name={source === "uploads" ? "plus" : "media"} size={16} />
@@ -235,15 +261,19 @@ export function VideoAssetPicker({
               {source === "uploads"
                 ? "Noch nichts hochgeladen"
                 : kind === "audio"
-                  ? "Aus Generierungen kommt kein Audio"
-                  : `Noch keine ${kind === "video" ? "Video-" : "Bild-"}Generierungen`}
+                  ? "Keine Audios in der Mediathek"
+                  : kind === "video"
+                    ? "Noch keine Videos in der Mediathek"
+                    : "Noch keine Bilder in der Mediathek"}
             </p>
             <p className="max-w-[16rem] text-xs text-muted-foreground">
               {source === "uploads"
                 ? "Dateien von diesem Gerät bleiben für den nächsten Lauf in der Ablage."
-                : kind === "audio"
-                  ? "Audio bitte unter Uploads von diesem Gerät anhängen."
-                  : "Fertige Ergebnisse erscheinen hier und können erneut angehängt werden."}
+                : kind === "image"
+                  ? "Unter „Bilder erstellen“ erzeugte Motive erscheinen hier und lassen sich als Start-, Endbild oder Referenz verwenden."
+                  : kind === "video"
+                    ? "Fertige Videos aus diesem Studio landen hier und können erneut angehängt werden."
+                    : "Audio bitte unter Uploads von diesem Gerät anhängen."}
             </p>
             {source === "uploads" ? (
               <Button
@@ -283,7 +313,8 @@ export function VideoAssetPicker({
               const on = picked.has(asset.url);
               const blocked = !on && room === 0;
               const isVideo = asset.kind === "video";
-              const title = "name" in asset ? asset.name : asset.title;
+              const title = "name" in asset ? (asset as ShelfUpload).name : asset.title;
+              const thumb = "thumbUrl" in asset ? (asset as ShelfGeneration).thumbUrl : undefined;
               return (
                 <button
                   key={asset.url}
@@ -305,7 +336,7 @@ export function VideoAssetPicker({
                     </span>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                    <img src={thumb || asset.url} alt="" className="h-full w-full object-cover" />
                   )}
                   {on ? (
                     <span className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-[#C7691E] text-white">
