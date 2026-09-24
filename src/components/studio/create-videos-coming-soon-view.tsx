@@ -1,43 +1,93 @@
 import Link from "next/link";
-import { StudioButton, StudioPageHeader } from "@/components/studio/ui";
+import { StudioIcon } from "@/components/studio/icons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+const FEATURES = [
+  {
+    icon: "spark" as const,
+    title: "Reels & Stories im Markenlook",
+    text: "Kurze Clips, die zu deiner Bildsprache passen.",
+  },
+  {
+    icon: "brand" as const,
+    title: "Basierend auf deinem Markenprofil",
+    text: "Farben, Ton und Stil fließen automatisch ein.",
+  },
+  {
+    icon: "media" as const,
+    title: "Optimiert für Social Media",
+    text: "Formate für Feed, Story und Werbeclips.",
+  },
+] as const;
 
 export function CreateVideosComingSoonView() {
   return (
-    <>
-      <StudioPageHeader
-        eyebrow="Videos Erstellen"
-        title={
-          <>
-            Demnächst <em>verfügbar</em>
-          </>
-        }
-        subtitle="KI-Videos im Markenstil — Reels, Stories und Werbeclips aus deinem Markenprofil."
-      />
-      <div className="studio-card studio-card-pad" style={{ marginTop: 22, maxWidth: 560 }}>
-        <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: "var(--tx-1)" }}>
-          „Videos Erstellen“ ist in Arbeit. Du findest den Bereich schon in der Navigation — sobald die Funktion live
-          ist, kannst du hier kurze Marken-Videos generieren.
-        </p>
-        <ul style={{ margin: "16px 0 0", paddingLeft: 18, color: "var(--tx-2)", fontSize: 13.5, lineHeight: 1.6 }}>
-          <li>Reels & Stories im Markenlook</li>
-          <li>Basierend auf deinem Markenprofil</li>
-          <li>Optimiert für Social Media</li>
-        </ul>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 22 }}>
-          <StudioButton href="/inhalte-erstellen" variant="primary">
-            Bilder Erstellen
-          </StudioButton>
-          <StudioButton href="/dashboard" variant="ghost">
-            Zum Dashboard
-          </StudioButton>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
+      <header className="space-y-3">
+        <Badge variant="secondary" className="rounded-md px-2.5 py-0.5 text-xs font-medium">
+          Demnächst verfügbar
+        </Badge>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            Videos Erstellen
+          </h1>
+          <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
+            KI-Videos im Markenstil — Reels, Stories und Werbeclips aus deinem Markenprofil.
+          </p>
         </div>
-        <p style={{ margin: "18px 0 0", fontSize: 12.5, color: "var(--tx-3)" }}>
-          Fragen?{" "}
-          <Link href="mailto:kontakt@brewai.de" style={{ color: "var(--tx-2)", textDecoration: "underline" }}>
-            kontakt@brewai.de
-          </Link>
-        </p>
-      </div>
-    </>
+      </header>
+
+      <Card className="border-border shadow-sm">
+        <CardHeader className="gap-2 border-b border-border/60 pb-5">
+          <CardTitle className="text-base font-semibold">In Arbeit</CardTitle>
+          <CardDescription className="text-sm leading-relaxed">
+            „Videos Erstellen“ wird gerade vorbereitet. Den Bereich siehst du schon in der Navigation —
+            sobald die Funktion live ist, kannst du hier kurze Marken-Videos generieren.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-6">
+          <ul className="space-y-4">
+            {FEATURES.map((feature) => (
+              <li key={feature.title} className="flex gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-foreground">
+                  <StudioIcon name={feature.icon} size={18} />
+                </span>
+                <div className="min-w-0 space-y-0.5 pt-0.5">
+                  <p className="text-sm font-medium text-foreground">{feature.title}</p>
+                  <p className="text-sm text-muted-foreground">{feature.text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
+            <Button asChild>
+              <Link href="/inhalte-erstellen">
+                <StudioIcon name="spark" size={16} />
+                Bilder Erstellen
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard">
+                <StudioIcon name="dash" size={16} />
+                Zum Dashboard
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <p className="text-sm text-muted-foreground">
+        Fragen?{" "}
+        <a
+          href="mailto:kontakt@brewai.de"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          kontakt@brewai.de
+        </a>
+      </p>
+    </div>
   );
 }

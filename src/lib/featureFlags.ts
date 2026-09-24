@@ -6,10 +6,7 @@ export const LOGIN_WAITLIST_ENABLED =
     : process.env.NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED !== "off" &&
       process.env.NEXT_PUBLIC_LOGIN_WAITLIST_ENABLED !== "false";
 
-/** Videos Erstellen — Dev standard an; Production braucht NEXT_PUBLIC_VIDEOS_CREATE_ENABLED=true. */
+/** Videos Erstellen — vorerst gesperrt (Coming Soon). Nur mit NEXT_PUBLIC_VIDEOS_CREATE_ENABLED=true freischalten. */
 export function isVideosCreateEnabled(): boolean {
-  if (process.env.NODE_ENV === "development") {
-    return process.env.NEXT_PUBLIC_VIDEOS_CREATE_ENABLED !== "false";
-  }
   return process.env.NEXT_PUBLIC_VIDEOS_CREATE_ENABLED === "true";
 }

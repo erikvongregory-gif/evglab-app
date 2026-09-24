@@ -1,8 +1,10 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StudioButton, StudioCard } from "@/components/studio/ui";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { MemberSelector, type Member } from "@/components/ui/member-selector";
 import { readAndCompressImage, splitDataUrl } from "@/lib/images/compress-image";
 import {
@@ -14,6 +16,8 @@ import {
 type DraftPhoto = { dataUrl: string; mime: string; base64: string };
 
 export function BrandCharactersSection() {
+  const nameId = useId();
+  const roleId = useId();
   const [characters, setCharacters] = useState<DashboardCharacter[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +145,14 @@ export function BrandCharactersSection() {
     }
   }
 
+  function resetDraft() {
+    setCreating(false);
+    setName("");
+    setRole("");
+    setDraftPhotos([]);
+    setError(null);
+  }
+
   async function onSelectionChange(nextSelected: string[]) {
     if (saving) return;
     const removed = selectedIds.filter((id) => !nextSelected.includes(id));
@@ -155,22 +167,22 @@ export function BrandCharactersSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="studio-brand-sec__head">
-        <h2>Charaktere</h2>
+      <div className="border-b border-border pb-3">
+        <h2 className="m-0 text-[15px] font-semibold tracking-tight text-foreground">Charaktere</h2>
       </div>
-      <p className="text-sm leading-relaxed text-[var(--t3)]">
+      <p className="text-sm leading-relaxed text-muted-foreground">
         Optional. Mehrere Personen anlegen (z.&nbsp;B. Braumeister) — dann beim Bildgenerieren denselben Charakter
         wiederverwenden, ohne dass jemand beim Shooting dabei sein muss.
       </p>
 
       {error ? (
-        <p className="studio-brand-inline-error" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       ) : null}
 
       {!loaded ? (
-        <p className="studio-brand-rules-sub">Wird geladen…</p>
+        <p className="text-xs text-muted-foreground">Wird geladen…</p>
       ) : (
         <div className="space-y-4">
           <MemberSelector
@@ -190,53 +202,72 @@ export function BrandCharactersSection() {
           />
 
           {creating ? (
-            <StudioCard pad className="studio-brand-char-create">
-              <label className="studio-brand-char-field">
-                <span>Name</span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="z. B. Thomas"
-                  maxLength={80}
-                  disabled={saving}
-                />
-              </label>
-              <label className="studio-brand-char-field">
-                <span>Rolle (optional)</span>
-                <input
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  placeholder="z. B. Braumeister"
-                  maxLength={60}
-                  disabled={saving}
-                />
-              </label>
-              <div className="studio-brand-char-field">
-                <span>Fotos (1–{MAX_CHARACTER_REFERENCE_IMAGES})</span>
-                <div className="studio-brand-char-draft-thumbs">
+            <div className="space-y-5 rounded-xl border border-border bg-card p-4 sm:p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor={nameId} className="text-xs text-muted-foreground">
+                    Name
+                  </Label>
+                  <Input
+                    id={nameId}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="z. B. Thomas"
+                    maxLength={80}
+                    disabled={saving}
+                    autoFocus
+                    className="h-11 bg-background text-[15px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={roleId} className="text-xs text-muted-foreground">
+                    Rolle <span className="font-normal">(optional)</span>
+                  </Label>
+                  <Input
+                    id={roleId}
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    placeholder="z. B. Braumeister"
+                    maxLength={60}
+                    disabled={saving}
+                    className="h-11 bg-background text-[15px]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Fotos (1–{MAX_CHARACTER_REFERENCE_IMAGES})
+                </Label>
+                <div className="flex flex-wrap items-center gap-2">
                   {draftPhotos.map((p, i) => (
                     <button
                       key={p.dataUrl.slice(0, 48) + i}
                       type="button"
-                      className="studio-brand-char-draft-thumb"
+                      className="relative size-16 overflow-hidden rounded-lg border border-border bg-muted transition hover:opacity-80 disabled:opacity-50"
                       disabled={saving}
                       onClick={() => setDraftPhotos((prev) => prev.filter((_, idx) => idx !== i))}
-                      title="Entfernen"
+                      title="Foto entfernen"
                     >
-                      <img src={p.dataUrl} alt="" />
+                      <img src={p.dataUrl} alt="" className="size-full object-cover" />
                     </button>
                   ))}
                   {draftPhotos.length < MAX_CHARACTER_REFERENCE_IMAGES ? (
-                    <button
+                    <Button
                       type="button"
-                      className="studio-brand-char-add-photo"
+                      variant="outline"
                       disabled={saving}
                       onClick={() => fileRef.current?.click()}
+                      className="size-16 flex-col gap-0.5 rounded-lg border-dashed text-xs text-muted-foreground"
                     >
-                      + Foto
-                    </button>
+                      <span className="text-base leading-none">+</span>
+                      Foto
+                    </Button>
                   ) : null}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Mindestens ein Foto. Klick auf ein Vorschaubild entfernt es wieder.
+                </p>
                 <input
                   ref={fileRef}
                   type="file"
@@ -249,27 +280,16 @@ export function BrandCharactersSection() {
                   }}
                 />
               </div>
-              <div className="studio-brand-char-actions">
-                <StudioButton type="button" size="sm" disabled={saving} onClick={() => void saveNew()}>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button type="button" disabled={saving} onClick={() => void saveNew()}>
                   {saving ? "Speichern…" : "Charakter speichern"}
-                </StudioButton>
-                <StudioButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={saving}
-                  onClick={() => {
-                    setCreating(false);
-                    setName("");
-                    setRole("");
-                    setDraftPhotos([]);
-                    setError(null);
-                  }}
-                >
+                </Button>
+                <Button type="button" variant="ghost" disabled={saving} onClick={resetDraft}>
                   Abbrechen
-                </StudioButton>
+                </Button>
               </div>
-            </StudioCard>
+            </div>
           ) : null}
         </div>
       )}
