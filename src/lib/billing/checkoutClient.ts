@@ -1,5 +1,5 @@
 import type { BillingInterval } from "@/lib/billing/planCatalog";
-import type { SubscriptionPlanKey } from "@/lib/billing/tokenState";
+import { isSubscriptionPlanKey, type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 
 export type BillingCheckoutResult =
   | { ok: true }
@@ -9,8 +9,7 @@ export function getHomepageCheckoutPlan(params: URLSearchParams): SubscriptionPl
   const plan = params.get("plan");
   const checkout = params.get("checkout");
   const source = params.get("source");
-  const isValidPlan = plan === "start" || plan === "growth" || plan === "pro";
-  if (!isValidPlan || checkout !== "1" || source !== "homepage_pricing") return null;
+  if (!isSubscriptionPlanKey(plan) || checkout !== "1" || source !== "homepage_pricing") return null;
   return plan;
 }
 

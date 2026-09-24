@@ -53,7 +53,7 @@ type PatchPayload = {
   plan?: SubscriptionPlanKey | null;
 };
 
-const ALLOWED_PLANS = new Set<SubscriptionPlanKey>(["start", "growth", "pro"]);
+const ALLOWED_PLANS = new Set<SubscriptionPlanKey>(["start", "growth", "pro", "enterprise"]);
 
 export async function PATCH(req: Request) {
   const originError = enforceSameOrigin(req);

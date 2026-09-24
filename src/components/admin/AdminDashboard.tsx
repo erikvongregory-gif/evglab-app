@@ -26,7 +26,7 @@ type BillingRow = {
   hasStripeCustomer: boolean;
 };
 
-type PlanOption = "start" | "growth" | "pro";
+type PlanOption = "start" | "growth" | "pro" | "enterprise";
 
 export function AdminDashboard() {
   const [tab, setTab] = useState<AdminTab>("users");
@@ -56,7 +56,7 @@ export function AdminDashboard() {
     setBillingPlanDrafts((prev) => {
       const next = { ...prev };
       rows.forEach((row) => {
-        if (row.plan === "start" || row.plan === "growth" || row.plan === "pro") {
+        if (row.plan === "start" || row.plan === "growth" || row.plan === "pro" || row.plan === "enterprise") {
           next[row.userId] = row.plan;
         } else if (!next[row.userId]) {
           next[row.userId] = "start";
@@ -272,6 +272,7 @@ export function AdminDashboard() {
                     <option value="start">Start</option>
                     <option value="growth">Growth</option>
                     <option value="pro">Pro</option>
+                    <option value="enterprise">Enterprise</option>
                   </select>
                   <StudioButton
                     size="sm"

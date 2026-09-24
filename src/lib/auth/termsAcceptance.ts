@@ -1,5 +1,5 @@
 /** Versionsstempel für nachweisbare AGB-/Datenschutz-Zustimmung. */
-export const TERMS_ACCEPTANCE_VERSION = "2026-09-24";
+export const TERMS_ACCEPTANCE_VERSION = "2026-09-24b";
 
 export const TERMS_ACCEPTANCE_COOKIE = "brewai_terms_accepted";
 

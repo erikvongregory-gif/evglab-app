@@ -2,6 +2,8 @@ import { hydratePrivateAssets } from "@/lib/supabase/privateAssets";
 import type { User } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPortalOperatorUserId } from "@/lib/auth/owner";
+import { planSeatLimit } from "@/lib/billing/planCatalog";
+import type { SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import type { DashboardTeamRole } from "./metadata";
 import { canWriteWithRole } from "./teamRoles";
 
@@ -48,7 +50,7 @@ export async function getWorkspace(userId: string): Promise<{ ownerId: string; r
   if (billing.error || !["active", "trialing"].includes(billing.data.subscription_status)) throw new Error("Teamabo nicht aktiv.");
   const members = await admin.from("workspace_members").select("user_id").eq("owner_id", data.owner_id).order("created_at").order("user_id");
   if (members.error) throw new Error("Teamplätze konnten nicht geprüft werden.");
-  const limit = billing.data.plan === "pro" ? 10 : billing.data.plan === "growth" ? 3 : 1;
+  const limit = planSeatLimit(billing.data.plan as SubscriptionPlanKey | null);
   const position = (members.data ?? []).findIndex(m => m.user_id === userId);
   if (position < 0 || position >= limit - 1) throw new Error("Teamplatz im aktuellen Tarif nicht verfügbar.");
   return { ownerId: data.owner_id, role: data.role as DashboardTeamRole };

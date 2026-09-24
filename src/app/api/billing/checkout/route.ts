@@ -20,7 +20,7 @@ import { type SubscriptionPlanKey } from "@/lib/billing/tokenState";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
 
 const checkoutSchema = z.object({
-  plan: z.enum(["start", "growth", "pro"]),
+  plan: z.enum(["start", "growth", "pro", "enterprise"]),
   interval: z.enum(["monthly", "yearly"]).optional().default("yearly"),
   consumerEarlyPerformanceConsent: z.literal(true),
 });

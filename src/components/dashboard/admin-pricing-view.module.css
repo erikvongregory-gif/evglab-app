@@ -20,9 +20,15 @@
 .period .savings { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px; font-size: 10px; color: #111; background: #eff6ff; }
 .wordClip { display: inline-flex; overflow: hidden; vertical-align: top; }
 .wordClip > span { display: inline-block; }
-.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 12px; border-radius: 12px; background: linear-gradient(#f5f5f5, #e5e5e5); color: #111827; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 12px; border-radius: 12px; background: linear-gradient(#f5f5f5, #e5e5e5); color: #111827; }
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
+}
 .plan { min-width: 0; display: flex; flex-direction: column; padding: 24px; border-radius: 12px; }
-.featured { position: relative; margin-block: -24px; padding-block: 36px; color: #fff; background: linear-gradient(#171717, #000); border: 1px solid #737373; box-shadow: 0 0 0 2px #171717; }
+.featured { position: relative; color: #fff; background: linear-gradient(#171717, #000); border: 1px solid #737373; box-shadow: 0 0 0 2px #171717; }
 .badges { min-height: 26px; display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .badges span { background: #e0e0e0; color: #333; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.4; }
 .featured .badges span { color: white; background: #525252; }

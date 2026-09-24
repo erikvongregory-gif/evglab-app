@@ -72,7 +72,7 @@ export default async function AnmeldenPage({
   const source = Array.isArray(sourceRaw) ? sourceRaw[0] : sourceRaw;
   const nextRaw = params.next;
   const nextFromQuery = Array.isArray(nextRaw) ? nextRaw[0] : nextRaw;
-  const allowedPlan = plan === "start" || plan === "growth" || plan === "pro" ? plan : null;
+  const allowedPlan = plan === "start" || plan === "growth" || plan === "pro" || plan === "enterprise" ? plan : null;
   const shouldAutoCheckout = allowedPlan && checkout === "1" && source === "homepage_pricing";
   const nextPath = shouldAutoCheckout
     ? `/dashboard?plan=${allowedPlan}&checkout=1&source=homepage_pricing&tab=pricing`

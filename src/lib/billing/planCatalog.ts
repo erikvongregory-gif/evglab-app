@@ -18,9 +18,33 @@ export type StudioPlanDefinition = {
   features: string[];
 };
 
-/** Ungenutzte Abo-Tokens: einmalig in den Folgemonat, danach Verfall. */
-export const TOKEN_CARRY_DAYS = 30;
-const CARRY_FEATURE = "Ungenutzte Tokens 1 Monat übertragbar";
+/** Übertrag ungenutzter Abo-Tokens in Tagen ab Periodenende. */
+export const TOKEN_CARRY_DAYS_BY_PLAN: Record<SubscriptionPlanKey, number> = {
+  start: 0,
+  growth: 30,
+  pro: 60,
+  enterprise: 90,
+};
+
+export const PLAN_SEAT_LIMITS: Record<SubscriptionPlanKey, number> = {
+  start: 1,
+  growth: 3,
+  pro: 10,
+  enterprise: 25,
+};
+
+export function carryFeatureLabel(planId: SubscriptionPlanKey): string {
+  const days = TOKEN_CARRY_DAYS_BY_PLAN[planId];
+  if (days <= 0) return "Keine Übertragung ungenutzter Tokens";
+  if (days <= 30) return "Ungenutzte Tokens 1 Monat übertragbar";
+  if (days <= 60) return "Ungenutzte Tokens 2 Monate übertragbar";
+  return "Ungenutzte Tokens 3 Monate übertragbar";
+}
+
+export function planSeatLimit(plan: SubscriptionPlanKey | null | undefined): number {
+  if (!plan) return 1;
+  return PLAN_SEAT_LIMITS[plan] ?? 1;
+}
 
 function buildPlanFeatures(planId: SubscriptionPlanKey, teamLine: string, supportLine: string): string[] {
   const tokens = SUBSCRIPTION_PLAN_TOKENS[planId];
@@ -30,7 +54,7 @@ function buildPlanFeatures(planId: SubscriptionPlanKey, teamLine: string, suppor
     "Videos erstellen mit Seedance 2.5",
     teamLine,
     supportLine,
-    CARRY_FEATURE,
+    carryFeatureLabel(planId),
   ];
 }
 
@@ -78,9 +102,23 @@ export const STUDIO_PLANS: StudioPlanDefinition[] = [
       "Fast-Lane Rendering + Premium-Support",
     ),
   },
+  {
+    id: "enterprise",
+    tag: "Für Gruppen, Verbünde und Agenturen",
+    name: "Brauerei Enterprise",
+    monthly: 599,
+    yearly: 499,
+    compareAtMonthly: 799,
+    savingsLabel: "25% Ersparnis inklusive",
+    features: buildPlanFeatures(
+      "enterprise",
+      "25 Teamplätze (Inhaber inklusive)",
+      "Dedizierter Success-Manager + SLA",
+    ),
+  },
 ];
 
-export const PLAN_ORDER: SubscriptionPlanKey[] = ["start", "growth", "pro"];
+export const PLAN_ORDER: SubscriptionPlanKey[] = ["start", "growth", "pro", "enterprise"];
 
 export function planRank(plan: SubscriptionPlanKey): number {
   return PLAN_ORDER.indexOf(plan);

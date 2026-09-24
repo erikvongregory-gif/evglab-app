@@ -117,7 +117,7 @@ export async function updateSession(request: NextRequest) {
     const targetUrl = new URL(entry, request.url);
     if (
       entry === "/dashboard" &&
-      (plan === "start" || plan === "growth" || plan === "pro") &&
+      (plan === "start" || plan === "growth" || plan === "pro" || plan === "enterprise") &&
       checkout === "1" &&
       source === "homepage_pricing"
     ) {

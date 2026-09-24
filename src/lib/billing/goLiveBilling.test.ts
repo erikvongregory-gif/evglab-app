@@ -105,9 +105,14 @@ it("reclaims a crashed webhook without acknowledging an in-flight event",async()
   await db.exec("update stripe_webhook_events set created_at=now()-interval '11 minutes'");
   expect((await db.query<{claim:boolean}>("select stripe_claim_event('event','invoice.paid') claim")).rows[0].claim).toBe(true);
 });
-it.each([["start"],["growth"],["pro"]] as const)("expires %s carry after 30 days (1 month)",async(plan)=>{
-  await db.query("update billing_subscriptions set plan=$2,token_anchor=now()-interval '1 month',token_next_at=now()-interval '1 second' where user_id=$1",[user,plan]);
-  await db.query("select billing_refresh_monthly($1)",[user]);
-  const result=await db.query<{days:number}>("select extract(epoch from (l.expires_at-b.token_next_at))/86400 as days from token_lots l join billing_subscriptions b using(user_id) where l.grant_key like 'period:%'");
-  expect(Number(result.rows[0].days)).toBe(30);
+it.each([
+  ["start", 0],
+  ["growth", 30],
+  ["pro", 60],
+  ["enterprise", 90],
+] as const)("expires %s carry after %i days", async (plan, days) => {
+  await db.query("update billing_subscriptions set plan=$2,token_anchor=now()-interval '1 month',token_next_at=now()-interval '1 second' where user_id=$1", [user, plan]);
+  await db.query("select billing_refresh_monthly($1)", [user]);
+  const result = await db.query<{ days: number }>("select extract(epoch from (l.expires_at-b.token_next_at))/86400 as days from token_lots l join billing_subscriptions b using(user_id) where l.grant_key like 'period:%'");
+  expect(Number(result.rows[0].days)).toBe(days);
 });

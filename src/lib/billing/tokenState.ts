@@ -1,12 +1,19 @@
 import crypto from "crypto";
 
-export type SubscriptionPlanKey = "start" | "growth" | "pro";
+export type SubscriptionPlanKey = "start" | "growth" | "pro" | "enterprise";
 
 export const SUBSCRIPTION_PLAN_TOKENS: Record<SubscriptionPlanKey, number> = {
   start: 1200,
   growth: 3000,
   pro: 7500,
+  enterprise: 20000,
 };
+
+export const SUBSCRIPTION_PLAN_KEYS: SubscriptionPlanKey[] = ["start", "growth", "pro", "enterprise"];
+
+export function isSubscriptionPlanKey(value: string | null | undefined): value is SubscriptionPlanKey {
+  return value === "start" || value === "growth" || value === "pro" || value === "enterprise";
+}
 
 export type BillingState = {
   plan: SubscriptionPlanKey | null;

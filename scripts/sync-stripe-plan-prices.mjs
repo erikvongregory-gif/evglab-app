@@ -1,10 +1,11 @@
 /**
- * Legt neue Plan-Preise in Stripe an (Monatsabo = Listenpreis, Jahresabo = Aktionspreis).
+ * Legt Plan-Preise in Stripe an (Monatsabo = Listenpreis, Jahresabo = Aktionspreis).
+ * Enterprise: legt Produkt an, falls noch keines in .env.local steht.
  *
  * Nutzung (Test):
  *   node scripts/sync-stripe-plan-prices.mjs
  *
- * Nutzung (Live — nur mit Live-Key in .env.local oder Umgebung):
+ * Nutzung (Live):
  *   STRIPE_SECRET_KEY=sk_live_... node scripts/sync-stripe-plan-prices.mjs
  */
 import fs from "node:fs";
@@ -17,12 +18,21 @@ const PLAN_AMOUNTS = {
   start: { monthlyList: 100_00, yearlyPromoAnnual: 79 * 12 * 100 },
   growth: { monthlyList: 200_00, yearlyPromoAnnual: 149 * 12 * 100 },
   pro: { monthlyList: 400_00, yearlyPromoAnnual: 299 * 12 * 100 },
+  enterprise: { monthlyList: 799_00, yearlyPromoAnnual: 599 * 12 * 100 },
 };
 
 const ENV_KEYS = {
   start: { monthly: "STRIPE_PRICE_START_MONTHLY", yearly: "STRIPE_PRICE_START_YEARLY" },
   growth: { monthly: "STRIPE_PRICE_GROWTH_MONTHLY", yearly: "STRIPE_PRICE_GROWTH_YEARLY" },
   pro: { monthly: "STRIPE_PRICE_PRO_MONTHLY", yearly: "STRIPE_PRICE_PRO_YEARLY" },
+  enterprise: { monthly: "STRIPE_PRICE_ENTERPRISE_MONTHLY", yearly: "STRIPE_PRICE_ENTERPRISE_YEARLY" },
+};
+
+const PRODUCT_NAMES = {
+  start: "Brauerei Start",
+  growth: "Brauerei Wachstum",
+  pro: "Brauerei Pro",
+  enterprise: "Brauerei Enterprise",
 };
 
 function loadEnvFile(filePath) {
@@ -68,13 +78,23 @@ async function main() {
 
   const created = {};
   const envUpdates = {};
+  const only = process.env.SYNC_ONLY_PLAN; // z. B. enterprise
 
   for (const [plan, amounts] of Object.entries(PLAN_AMOUNTS)) {
+    if (only && plan !== only) continue;
     const keys = ENV_KEYS[plan];
-    const productId = await resolveProductId(stripe, envLocal[keys.monthly] ?? envLocal[keys.yearly]);
+    let productId = await resolveProductId(stripe, envLocal[keys.monthly] ?? envLocal[keys.yearly]);
     if (!productId) {
-      console.error(`Kein Produkt für Plan "${plan}" gefunden. Bitte bestehende Price-ID in .env.local setzen.`);
-      process.exit(1);
+      if (plan !== "enterprise") {
+        console.error(`Kein Produkt für Plan "${plan}" gefunden. Bitte bestehende Price-ID in .env.local setzen.`);
+        process.exit(1);
+      }
+      const product = await stripe.products.create({
+        name: PRODUCT_NAMES.enterprise,
+        metadata: { plan: "enterprise" },
+      });
+      productId = product.id;
+      console.log(`Enterprise-Produkt angelegt: ${productId}`);
     }
 
     const monthly = await stripe.prices.create({
