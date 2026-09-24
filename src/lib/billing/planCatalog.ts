@@ -27,7 +27,7 @@ function buildPlanFeatures(planId: SubscriptionPlanKey, teamLine: string, suppor
   return [
     `${tokens.toLocaleString("de-DE")} Tokens / Monat`,
     `${formatPlanImageEstimate(tokens)} · ${formatPlanVideoEstimate(tokens)}`,
-    "Videos Erstellen (Seedance 2)",
+    "Videos erstellen mit Seedance 2.5",
     teamLine,
     supportLine,
     CARRY_FEATURE,
@@ -98,4 +98,4 @@ export function getPlanAnnualSavingsVsList(plan: StudioPlanDefinition): number {
 
 /** Hinweis für UI: typischer Video-Verbrauch (720p, 5 s, mit Audio). */
 export const SEEDANCE_VIDEO_TOKEN_HINT =
-  "Ein Standard-Video (Seedance 2 · 720p · 5 s · mit Audio) kostet 100 Tokens — Varianten und längere Clips multiplizieren 1:1.";
+  "Ein Standard-Video (Seedance 2.5 · 720p · 5 s · mit Audio) kostet 100 Tokens — Varianten und längere Clips multiplizieren 1:1.";

@@ -348,7 +348,7 @@ export function AdminPricingView({
       <p className="text-muted-foreground text-xs leading-relaxed">
         Alle Preise gemäß § 19 UStG ohne Umsatzsteuer · Monatlich oder jährlich abrechenbar · Monatlich kündbar zum Ende
         des Abrechnungszeitraums · Ungenutzte Abo-Tokens 1 Monat übertragbar · Separat gekaufte Token-Pakete verfallen
-        12 Monate nach Kauf · Videos via Seedance 2
+        12 Monate nach Kauf · Videos via Seedance 2.5
       </p>
     </div>
   );
