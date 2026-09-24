@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env PORT=3001 node --max-http-header-size=524288 ./node_modules/next/dist/bin/next dev --webpack --port 3001",
+    "dev": "cross-env PORT=3001 node --max-http-header-size=524288 ./node_modules/next/dist/bin/next dev --turbopack --port 3001",
     "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\" && npm run dev",
     "build": "next build",
     "start": "node --max-http-header-size=524288 ./node_modules/next/dist/bin/next start",

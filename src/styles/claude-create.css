@@ -176,24 +176,6 @@
   }
 }
 
-@keyframes brew-glow-impulse {
-  0% {
-    opacity: 0;
-  }
-  18% {
-    opacity: 1;
-  }
-  42% {
-    opacity: 0.35;
-  }
-  62% {
-    opacity: 0.95;
-  }
-  100% {
-    opacity: 0.72;
-  }
-}
-
 .brew-composer {
   position: relative;
   isolation: isolate;
@@ -242,9 +224,7 @@
 .brew-composer:hover .brew-composer__glow,
 .brew-composer:focus-within .brew-composer__glow,
 .brew-composer.is-busy .brew-composer__glow {
-  animation:
-    brew-glow-spin 2.6s linear infinite,
-    brew-glow-impulse 1s ease-out 2;
+  animation: brew-glow-spin 2.6s linear infinite;
 }
 
 .brew-composer:hover .brew-composer__ring,

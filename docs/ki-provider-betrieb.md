@@ -13,7 +13,8 @@ sobald das Prepaid-Guthaben aufgebraucht ist.
 |----------|---------------|------------|
 | **OpenAI** (Bildgenerierung) | platform.openai.com → Settings → Billing → Auto recharge | Schwelle + Aufladebetrag (Minimum 5 USD) und optional ein monatliches Auflade-Limit |
 | **Anthropic** (Prompt-Generierung, Markenanalyse) | console.anthropic.com → Settings → Billing → Auto-reload → Edit | Mindestguthaben als Auslöser + Aufladebetrag |
-| **kie.ai** (Videos, Referenz-Uploads) | kie.ai Dashboard → Billing | Guthaben manuell überwachen; Auto-Top-up nur falls angeboten |
+| **BytePlus ModelArk** (Seedance-Videos) | BytePlus Console → ModelArk → API Key | Prepaid/Billing für Inference; Seedance-Modelle freischalten |
+| **kie.ai** (Legacy) | kie.ai Dashboard → Billing | Guthaben manuell überwachen; Auto-Top-up nur falls angeboten |
 | **Photoroom / remove.bg** (Freisteller) | jeweiliges Dashboard | Abo bzw. Credit-Paket |
 | **Resend** (E-Mail, 2FA-Codes) | resend.com → Settings | Plan mit ausreichendem Monatsvolumen |
 

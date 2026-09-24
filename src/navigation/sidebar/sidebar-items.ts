@@ -1,4 +1,5 @@
 import {
+  Clapperboard,
   CreditCard,
   FolderOpen,
   ImagePlus,
@@ -71,6 +72,12 @@ export const sidebarItems: NavGroup[] = [
         title: "Bilder erstellen",
         url: "/inhalte-erstellen",
         icon: ImagePlus,
+      },
+      {
+        id: "create-videos",
+        title: "Videos erstellen",
+        url: "/videos-erstellen",
+        icon: Clapperboard,
       },
       {
         id: "media",

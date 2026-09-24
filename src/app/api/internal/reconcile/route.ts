@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { finishGeneration, type GenerationJob } from "@/lib/billing/generationJobs";
 import { reconcileKieJob } from "@/lib/kie/reconcileJob";
+import { reconcileModelArkJob } from "@/lib/generation/reconcileJob";
+import { isModelArkRequestId } from "@/lib/generation";
 import { deleteAccount } from "@/lib/dashboard/deleteAccount";
 export const runtime="nodejs";
 export const maxDuration=300;
@@ -16,7 +18,8 @@ export async function POST(req: Request) {
   let errors=0;
   for(const row of jobs.data??[]) {
     try {
-      if(row.provider_task_id)await reconcileKieJob(row);
+      if(row.provider_task_id && isModelArkRequestId(row.provider_task_id))await reconcileModelArkJob(row);
+      else if(row.provider_task_id)await reconcileKieJob(row);
       else if(Date.parse(row.created_at)<Date.now()-30*60*1000) {
         const images=Array.isArray(row.result?.images)?row.result.images:[];
         const cost=Number(row.result?.perVariantCost??0);

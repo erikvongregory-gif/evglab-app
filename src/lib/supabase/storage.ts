@@ -7,15 +7,27 @@ const BUCKET = process.env.SUPABASE_GENERATED_IMAGES_BUCKET?.trim() || "generate
 /** Kachel-Vorschaubilder: max. Kantenlänge, WebP. */
 const THUMB_MAX_EDGE = 512;
 
+function mimeToExt(mime: string): { ext: string; contentType: string } {
+  const m = mime.toLowerCase();
+  if (m.includes("png")) return { ext: "png", contentType: "image/png" };
+  if (m.includes("webp")) return { ext: "webp", contentType: "image/webp" };
+  if (m.includes("gif")) return { ext: "gif", contentType: "image/gif" };
+  if (m.includes("mp4")) return { ext: "mp4", contentType: "video/mp4" };
+  if (m.includes("webm")) return { ext: "webm", contentType: "video/webm" };
+  if (m.includes("quicktime") || m.includes("mov")) return { ext: "mov", contentType: "video/quicktime" };
+  if (m.includes("mpeg") || m.includes("mp3")) return { ext: "mp3", contentType: "audio/mpeg" };
+  if (m.includes("wav")) return { ext: "wav", contentType: "audio/wav" };
+  if (m.includes("ogg")) return { ext: "ogg", contentType: "audio/ogg" };
+  return { ext: "jpg", contentType: "image/jpeg" };
+}
+
 export async function uploadUserImageToStorage(args: {
   userId: string;
   buffer: Buffer;
   mime: string;
   folder: string;
 }): Promise<string> {
-  const mime = args.mime.toLowerCase();
-  const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
-  const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+  const { ext, contentType } = mimeToExt(args.mime);
   const path = `${args.folder}/${args.userId}/${Date.now()}-${randomUUID()}.${ext}`;
 
   const admin = createAdminClient();
@@ -25,7 +37,7 @@ export async function uploadUserImageToStorage(args: {
     upsert: false,
   });
   if (error) {
-    throw new Error(`Bild-Upload zu Supabase Storage fehlgeschlagen: ${error.message}`);
+    throw new Error(`Upload zu Supabase Storage fehlgeschlagen: ${error.message}`);
   }
 
   return signStoragePath(path);

@@ -134,7 +134,11 @@ export function BrewAiAdminShell({
   void _sidebarCollapsible;
   const router = useRouter();
   const pathname = usePathname();
-  const pathFullBleed = pathname === "/inhalte-erstellen" || pathname.startsWith("/inhalte-erstellen/");
+  const pathFullBleed =
+    pathname === "/inhalte-erstellen" ||
+    pathname.startsWith("/inhalte-erstellen/") ||
+    pathname === "/videos-erstellen" ||
+    pathname.startsWith("/videos-erstellen/");
   const [contentPadding, setContentPadding] = useState<string | undefined>(undefined);
   const [fullBleedOverride, setFullBleedOverride] = useState<boolean | null>(null);
   const [profileName, setProfileName] = useState(initialProfileName ?? "");
