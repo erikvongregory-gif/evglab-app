@@ -7,7 +7,7 @@
 -- ============================================================================
 create table if not exists public.billing_subscriptions (
   user_id uuid primary key references auth.users (id) on delete cascade,
-  plan text null check (plan is null or plan in ('start', 'growth', 'pro')),
+  plan text null check (plan is null or plan in ('start', 'growth', 'pro', 'enterprise')),
   monthly_tokens integer not null default 0 check (monthly_tokens >= 0),
   used_tokens integer not null default 0 check (used_tokens >= 0),
   stripe_customer_id text null,

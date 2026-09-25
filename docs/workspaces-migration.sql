@@ -35,7 +35,7 @@ declare b billing_subscriptions; seats integer; n integer; result uuid;
 begin
   select * into b from billing_subscriptions where user_id=p_owner for update;
   if not found or b.subscription_status not in ('active','trialing') then raise exception 'Aktives Abo erforderlich'; end if;
-  seats:=case b.plan when 'pro' then 10 when 'growth' then 3 else 1 end;
+  seats:=case b.plan when 'enterprise' then 25 when 'pro' then 10 when 'growth' then 3 else 1 end;
   delete from workspace_invites where owner_id=p_owner and expires_at<=now();
   select 1+(select count(*) from workspace_members where owner_id=p_owner)+(select count(*) from workspace_invites where owner_id=p_owner) into n;
   if n>=seats then raise exception 'Alle Teamplätze sind belegt'; end if;
@@ -57,7 +57,7 @@ begin
     or exists(select 1 from billing_subscriptions where user_id=p_user and stripe_subscription_id is not null and subscription_status not in ('none','canceled')) then
     raise exception 'Konto ist bereits einem Team oder eigenen Abo zugeordnet';
   end if;
-  seats:=case b.plan when 'pro' then 10 when 'growth' then 3 else 1 end;
+  seats:=case b.plan when 'enterprise' then 25 when 'pro' then 10 when 'growth' then 3 else 1 end;
   if (select count(*)+1 from workspace_members where owner_id=invite.owner_id)>=seats then raise exception 'Keine Teamplätze frei'; end if;
   insert into workspace_members(user_id,owner_id,role) values(p_user,invite.owner_id,invite.role);
   delete from workspace_invites where id=invite.id;

@@ -322,7 +322,8 @@ async function prepareStudioGeneration(args: {
     input.behaelter === "F" ? null : await loadGlassShapeReference(input.glasTyp);
 
   // Look-Refs vor Extra-Uploads reservieren — sonst fallen Campaign/Reportage/Premium-Looks still weg.
-  const REF_BUDGET = 6;
+  // Charakter-Pfad bleibt bei 4 Slots (Gesicht + Produkt + Extras); Produktpfad darf 6 für Style-Looks.
+  const REF_BUDGET = useCharacterIdentity ? 4 : 6;
   const coreReferenceCount = useCharacterIdentity
     ? characterRefs.length + (visionReference ? 1 : 0)
     : (visionReference ? 1 : 0) + (shapeReference ? 1 : 0) + (glassReference ? 1 : 0);

@@ -7,6 +7,14 @@ const user = "00000000-0000-0000-0000-000000000001";
 beforeAll(async () => {
   await db.exec("create role anon;create role authenticated;create role service_role;create schema auth;create table auth.users(id uuid primary key);");
   for (const file of ["billing-schema", "stripe-webhook-events-schema", "billing-atomic-migration", "billing-access-hardening-migration", "generation-jobs-migration", "billing-periods-migration", "generation-result-billing-migration", "go-live-security-migration", "workspaces-migration", "account-deletion-migration", "checkout-lock-migration", "webhook-recovery-migration"]) await db.exec(readFileSync(`docs/${file}.sql`, "utf8"));
+  // Enterprise + planabhängiger Carry (Supabase-Migration): docs-SQL endet noch bei 30-Tage-Flat.
+  await db.exec(`
+    alter table public.billing_subscriptions drop constraint if exists billing_subscriptions_plan_check;
+    alter table public.billing_subscriptions
+      add constraint billing_subscriptions_plan_check
+      check (plan is null or plan in ('start', 'growth', 'pro', 'enterprise'));
+  `);
+  await db.exec(readFileSync("supabase/migrations/20260924110000_token_carry_by_plan_enterprise.sql", "utf8"));
 }, 30000);
 afterAll(() => db.close());
 beforeEach(async () => {

@@ -50,12 +50,11 @@ describe("assembleGenerationReferences", () => {
     expect(assembled.references.map((item) => item.base64)).toEqual([
       "face",
       "bottle",
-      "campaign-1",
-      "campaign-2",
       "user-scene",
+      "campaign-1",
     ]);
     expect(assembled.extraRefCount).toBe(1);
-    expect(assembled.campaignRefCount).toBe(2);
-    expect(assembled.roles.at(-1)).toEqual({ index: 5, role: "scene" });
+    expect(assembled.campaignRefCount).toBe(1);
+    expect(assembled.roles.at(-1)).toEqual({ index: 4, role: "look" });
   });
 });

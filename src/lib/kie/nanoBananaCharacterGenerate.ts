@@ -246,18 +246,18 @@ export function assembleGenerationReferences(input: {
     };
   }
   const identity = [...input.characterRefs, input.visionReference].filter(Boolean) as OpenAiReferenceImage[];
-  const campaigns = (input.campaignRefs ?? []).slice(0, Math.max(0, 6 - identity.length));
-  const extras = input.extraRefs.slice(0, Math.max(0, 6 - identity.length - campaigns.length));
+  const extras = input.extraRefs.slice(0, Math.max(0, 4 - identity.length));
+  const campaigns = (input.campaignRefs ?? []).slice(0, Math.max(0, 4 - identity.length - extras.length));
   const roles = [
     ...input.characterRefs.map(() => "character" as const),
     ...(input.visionReference ? (["product"] as const) : []),
-    ...campaigns.map(() => "look" as const),
     ...extras.map((_, index) =>
       input.extraRefRoles?.[index] === "look" ? ("look" as const) : ("scene" as const),
     ),
+    ...campaigns.map(() => "look" as const),
   ].map((role, index) => ({ index: index + 1, role }));
   return {
-    references: [...identity, ...campaigns, ...extras],
+    references: [...identity, ...extras, ...campaigns],
     extraRefCount: extras.length,
     campaignRefCount: campaigns.length,
     roles,
