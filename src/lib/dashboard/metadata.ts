@@ -12,7 +12,21 @@ export type DashboardMediaItem = {
   aspectRatio: string;
   resolution: "1K" | "2K" | "4K";
   outputFormat: "png" | "jpg";
+  /** Fotostil aus dem Studio; fehlt bei älteren Einträgen. */
+  photoStyle?: "reportage" | "premium" | "campaign";
+  /** Gewählte Biersorte beim Generieren; fehlt bei älteren Einträgen. */
+  beerName?: string;
+  beerId?: string;
 };
+
+export function mediaPhotoStyleLabel(
+  photoStyle: DashboardMediaItem["photoStyle"] | null | undefined,
+): string | null {
+  if (photoStyle === "campaign") return "Kampagne";
+  if (photoStyle === "premium") return "Premium";
+  if (photoStyle === "reportage") return "Reportage";
+  return null;
+}
 
 export function getMediaDisplayTitle(item: Pick<DashboardMediaItem, "title" | "prompt">): string {
   const custom = item.title?.trim();

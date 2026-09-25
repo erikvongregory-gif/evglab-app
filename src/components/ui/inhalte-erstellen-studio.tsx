@@ -29,6 +29,7 @@ import { hasUsableBeerEtikett, MAX_MY_BEERS, type DashboardBeer } from "@/lib/da
 import { readAndCompressImage, splitDataUrl } from "@/lib/images/compress-image";
 import { StudioUiSwitch } from "@/components/studio/ui/switch";
 import { ImageGeneration } from "@/components/ui/ai-chat-image-generation-1";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 
 type ImageResponse = { b64_json?: string; url?: string };
@@ -37,6 +38,7 @@ type MobileCreatePanel = "brief" | "preview" | "settings";
 type Stiltreue = "frei" | "normal" | "hoch";
 type VariantCount = 1 | 2 | 3;
 type Aspect = HyperrealisticInput["aspectRatio"];
+type PhotoStyle = NonNullable<HyperrealisticInput["photoStyle"]>;
 
 const WO_OPTIONS: Array<{ label: string; szene: HyperrealisticInput["szene"] }> = [
   { label: "Biergarten", szene: "biergarten_sommer" },
@@ -52,6 +54,23 @@ const WO_OPTIONS: Array<{ label: string; szene: HyperrealisticInput["szene"] }> 
 
 const ASPECT_OPTIONS: Aspect[] = ["1:1", "4:5", "3:4", "9:16", "4:3", "16:9"];
 const VARIANT_OPTIONS: VariantCount[] = [1, 2, 3];
+const PHOTO_STYLE_OPTIONS: Array<{ id: PhotoStyle; label: string; hint: string }> = [
+  {
+    id: "reportage",
+    label: "Reportage",
+    hint: "Candid und roh: Blitz oder hartes Available Light, unperfekter Crop, Flasche nur nebenbei — wie ein echtes Snapshot vom Abend.",
+  },
+  {
+    id: "premium",
+    label: "Premium-Fotografie",
+    hint: "Ruhige Hospitality-Fotografie: weiches Licht, optisches Bokeh, Flasche lesbar im Vordergrund, Menschen sekundär — Biergarten oder Dining.",
+  },
+  {
+    id: "campaign",
+    label: "Kampagnenmotiv",
+    hint: "Art-directed Key Visual: Produkt füllt den Frame, enger Crop, Hände reichen oder toasten — keine Biergarten-Stillleben-Postkarte.",
+  },
+];
 
 const POST_ZIEL_OPTIONS: Array<{ id: SocialPostInput["postZiel"]; label: string }> = [
   { id: "community_engagement", label: "Community" },
@@ -126,6 +145,7 @@ export function InhalteErstellenStudio({
   const [variantCount, setVariantCount] = useState<VariantCount>(1);
   const [requestQuality, setRequestQuality] = useState<"medium" | "high" | "ultra">("medium");
   const [aiWatermark, setAiWatermark] = useState(false);
+  const [photoStyle, setPhotoStyle] = useState<PhotoStyle>("reportage");
   const [hyperreal, setHyperreal] = useState(false);
 
   const [was, setWas] = useState(BEER_STYLE_OPTIONS[0]);
@@ -689,6 +709,7 @@ export function InhalteErstellenStudio({
         etikettModus,
         stiltreue,
         contentPreset: "campaign_social" as const,
+        photoStyle,
         hyperreal,
         beerName: selectedBeer?.name?.trim() || undefined,
         zusatzWunsch,
@@ -865,6 +886,7 @@ export function InhalteErstellenStudio({
         kiPlattform: "gpt_image_2" as const,
         etikettModus,
         stiltreue,
+        photoStyle,
         hyperreal,
         beerName: selectedBeer?.name?.trim() || undefined,
         zusatzWunsch,
@@ -1146,14 +1168,36 @@ export function InhalteErstellenStudio({
           <p>Vom Produktfoto zum markenkonformen Motiv</p>
         </div>
         <div className="studio-create-page-head__actions">
-          <button
-            type="button"
-            className={`studio-create-chip studio-create-chip--hyperreal${hyperreal ? " is-active" : ""}`}
-            aria-pressed={hyperreal}
-            onClick={() => setHyperreal((v) => !v)}
-          >
-            Hyperreal
-          </button>
+          <div className="studio-create-style-chips" aria-label="Fotostil">
+            {PHOTO_STYLE_OPTIONS.map((option) => (
+              <span key={option.id} className="studio-create-style-chip-wrap">
+                <button
+                  type="button"
+                  className={`studio-create-chip studio-create-chip--photo-style${photoStyle === option.id ? " is-active" : ""}`}
+                  aria-pressed={photoStyle === option.id}
+                  title={option.label}
+                  onClick={() => setPhotoStyle(option.id)}
+                >
+                  {option.label}
+                </button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="studio-create-style-info"
+                      aria-label={`${option.label}: Infos`}
+                    >
+                      !
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="bottom" align="center" className="w-64 p-3 text-xs leading-relaxed text-muted-foreground">
+                    <div className="mb-1 font-semibold text-foreground">{option.label}</div>
+                    {option.hint}
+                  </PopoverContent>
+                </Popover>
+              </span>
+            ))}
+          </div>
           <div className="studio-create-page-head__cost">
             Verfügbar <strong>{tokensRemaining !== null ? formatDeNumber(tokensRemaining) : "—"} Tokens</strong>
           </div>
@@ -1734,6 +1778,40 @@ export function InhalteErstellenStudio({
             </div>
           </div>
 
+          <div className="studio-create-field">
+            <span className="studio-create-field__label">Fotostil</span>
+            <div className="studio-create-segment studio-create-segment--photo-style" role="radiogroup" aria-label="Fotostil">
+              {PHOTO_STYLE_OPTIONS.map((option) => (
+                <span key={option.id} className="studio-create-style-chip-wrap studio-create-style-chip-wrap--segment">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={photoStyle === option.id}
+                    className={`studio-create-segment__btn${photoStyle === option.id ? " is-active" : ""}`}
+                    onClick={() => setPhotoStyle(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="studio-create-style-info"
+                        aria-label={`${option.label}: Infos`}
+                      >
+                        !
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="center" className="w-64 p-3 text-xs leading-relaxed text-muted-foreground">
+                      <div className="mb-1 font-semibold text-foreground">{option.label}</div>
+                      {option.hint}
+                    </PopoverContent>
+                  </Popover>
+                </span>
+              ))}
+            </div>
+          </div>
+
           <div className="studio-create-field studio-create-field--switch">
             <StudioUiSwitch
               checked={hyperreal}
@@ -1741,7 +1819,7 @@ export function InhalteErstellenStudio({
               label="Hyperreal"
             />
             <span className="studio-create-field__hint">
-              Verstärkt echte Kameraanmutung, plausibles Licht und Materialien sowie natürliche Unperfektheit — ohne CGI-Look.
+              Kein eigener Stil: verstärkt Flüssigkeit, Glas, Haut und Materialien im gewählten Fotostil — auch bei Kampagne sinnvoll.
             </span>
           </div>
 
@@ -1762,6 +1840,7 @@ export function InhalteErstellenStudio({
             </div>
             <div>
               Format {aspectRatio} · Markenprofil {etikettModus === "marke" ? "aktiv" : "frei"}
+              {` · ${PHOTO_STYLE_OPTIONS.find((option) => option.id === photoStyle)?.label ?? "Reportage"}`}
               {hyperreal ? " · Hyperreal" : ""}
               {aiWatermark ? " · AI-Label" : ""}
             </div>

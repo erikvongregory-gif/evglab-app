@@ -13,11 +13,16 @@ export async function persistGeneratedMediaItems(input: {
   aspectRatio: string;
   resolution: "1K" | "2K" | "4K";
   outputFormat: "png" | "jpg";
+  photoStyle?: DashboardMediaItem["photoStyle"];
+  beerName?: string;
+  beerId?: string;
 }): Promise<DashboardMediaItem[]> {
   if (!input.images.length) return [];
   const createdAt = new Date().toISOString();
   const title = input.title.trim().slice(0, 120) || "Motiv";
   const prompt = input.prompt.trim().slice(0, 240) || title;
+  const beerName = input.beerName?.trim().slice(0, 80) || undefined;
+  const beerId = input.beerId?.trim().slice(0, 64) || undefined;
   const items: DashboardMediaItem[] = input.images.map((imageUrl, index) => {
     const thumbUrl = input.thumbs?.[index]?.trim() || undefined;
     return {
@@ -30,6 +35,9 @@ export async function persistGeneratedMediaItems(input: {
       aspectRatio: input.aspectRatio,
       resolution: input.resolution,
       outputFormat: input.outputFormat,
+      ...(input.photoStyle ? { photoStyle: input.photoStyle } : {}),
+      ...(beerName ? { beerName } : {}),
+      ...(beerId ? { beerId } : {}),
     };
   });
   try {

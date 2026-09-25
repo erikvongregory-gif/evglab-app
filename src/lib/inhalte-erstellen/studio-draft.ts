@@ -33,6 +33,7 @@ export function defaultStudioDraft(partial?: Partial<StudioDraft>): StudioDraft 
     extraReferences: [] as ExtraReference[],
     aspectRatio: "4:5" as const,
     variantCount: 1 as const,
+    photoStyle: "reportage" as const,
     hyperreal: false,
     aiWatermark: false,
     behaelter: "B" as const,

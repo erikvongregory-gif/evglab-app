@@ -80,7 +80,7 @@ export async function POST(req: Request) {
       mode: "campaign_text",
       prompt,
       images,
-      model: "gpt-image-2.5-flare",
+      model: "gpt-image-2.5-sunburst",
       userId: guard.userId,
       billing: charge.billing,
     });

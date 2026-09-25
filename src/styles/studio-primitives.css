@@ -695,6 +695,21 @@
   color: var(--t2);
   animation: stu-modal-in var(--dur-page) var(--ease);
 }
+/* Biersorte-Dialog: 2-Spalten-Panel braucht ~880px — Default 440px quetscht/verzerrt. */
+.stu-dialog.evg-studio.stu-dialog--beer {
+  width: min(880px, calc(100vw - 32px));
+  max-height: min(90vh, 900px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: auto;
+}
+.stu-dialog.evg-studio.stu-dialog--beer .studio-beer-create {
+  margin-inline: 0;
+  max-width: none;
+  box-shadow: var(--sh-modal);
+}
 .stu-dialog.evg-studio[data-state="closed"] {
   animation: stu-modal-out var(--dur-page-out) var(--ease);
 }

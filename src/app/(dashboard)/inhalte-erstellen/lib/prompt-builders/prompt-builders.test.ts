@@ -3,6 +3,7 @@ import { buildCampaignTextPrompt } from "./campaign-text";
 import { buildHyperrealisticPrompt, buildProductPlacementPrompt, applyClientIntentOverrides } from "./hyperrealistic";
 import { buildProductIsolatePrompt } from "./product-isolate";
 import { DEFAULT_GLAS_BY_STIL, buildProductStudioPrompt, resolveStudioGlas } from "./product-studio";
+import { buildPhotoStyleLockFragment } from "./hyperrealism-blocks";
 import { campaignTextSchema, hyperrealisticSchema, productIsolateSchema, productStudioSchema } from "../schemas";
 import { applyContentPresetPrompt } from "@/lib/image-types/policy";
 
@@ -10,11 +11,39 @@ describe("inhalte-erstellen prompt builders", () => {
   it("activates the reusable Hyperreal prompt lock", () => {
     const prompt = applyContentPresetPrompt("A beer in a garden.", "hyperreal");
     expect(prompt).toContain("Preset lock (NON-NEGOTIABLE): Hyperreal Motif");
-    expect(prompt).toContain("real commercial beverage photography");
-    expect(prompt).toContain("85mm lens, f/5.6, ISO 100, 1/160 s");
+    expect(prompt).toContain("Preserve the selected photo style");
+    expect(prompt).toContain("Camera and composition must follow the selected photo-style lock");
     expect(prompt).toContain("physically correct refraction");
     expect(prompt).toContain("Strictly forbid illustration");
     expect(prompt).toContain("film grain");
+  });
+
+  it("keeps the three explicit photo-style locks visually distinct", () => {
+    const base = {
+      aiWatermark: false,
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500" as const,
+      flaschenfarbe: "braun" as const,
+      bierstil: "helles",
+      szene: "biergarten_sommer" as const,
+      personImBild: false,
+      tageszeit: "goldene_stunde" as const,
+      stimmung: "entspannt" as const,
+      aspectRatio: "4:5" as const,
+      quality: "medium" as const,
+      variantCount: 1 as const,
+    };
+    const reportage = buildPhotoStyleLockFragment({ ...base, photoStyle: "reportage" });
+    const premium = buildPhotoStyleLockFragment({ ...base, photoStyle: "premium" });
+    const campaign = buildPhotoStyleLockFragment({ ...base, photoStyle: "campaign" });
+
+    expect(reportage).toMatch(/CANDID REPORTAGE|direct flash|Invent entirely new fictional adults|Never reuse a face/i);
+    expect(reportage).toMatch(/Forbidden: product thrust|repeating the same person/i);
+    expect(premium).toMatch(/PREMIUM HOSPITALITY|soft optical bokeh|razor-sharp/i);
+    expect(premium).toMatch(/Forbidden AI-gloss|beauty-retouched wax skin|on-camera direct flash|product thrust/i);
+    expect(campaign).toMatch(/ART-DIRECTED CAMPAIGN MOTIF|product fills a large share|LOOK references' grammar/i);
+    expect(campaign).toMatch(/Forbidden.*Premium|beer-garden table|Maßkrug postcard/i);
+    expect(new Set([reportage, premium, campaign])).toHaveLength(3);
   });
 
   it("builds a hyperrealistic prompt snapshot", () => {
@@ -110,10 +139,10 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(prompt).toMatch(/entire printed label/);
     expect(prompt).not.toMatch(/ABK/);
     expect(prompt).not.toMatch(/EXACT TEXT/);
-    expect(prompt).toMatch(/not an advertisement/i);
-    expect(prompt).toMatch(/Kodak Portra 400/);
+    expect(prompt).toMatch(/authentic real-camera photograph/i);
+    expect(prompt).toMatch(/full-frame camera/i);
     expect(prompt).toMatch(/PRODUCT INTEGRATION — CRITICAL/);
-    expect(prompt).toMatch(/NOT as a flat cutout, sticker, pasted layer, or composited object/);
+    expect(prompt).toMatch(/never as a flat cutout, sticker, pasted layer, or composited object/);
     expect(prompt).toMatch(/Do NOT preserve the reference image's lighting/);
     expect(prompt).toMatch(/share the SAME camera, lens, focal plane/);
     expect(prompt).not.toMatch(/Keep unchanged from Image 1/i);
@@ -168,6 +197,161 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(hoch).toMatch(/entire printed label/);
     expect(normal).toMatch(/faithful reference/);
     expect(normal).not.toMatch(/entire printed label/);
+  });
+
+  it("keeps free style fidelity internally consistent", () => {
+    const prompt = buildProductPlacementPrompt({
+      aiWatermark: false,
+      stimmung: "entspannt",
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "goldene_stunde",
+      etikettModus: "generisch",
+      stiltreue: "frei",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(prompt).toMatch(/vessel and material reference/i);
+    expect(prompt).toMatch(/branding is not locked/i);
+    expect(prompt).not.toMatch(/exact product and brand identity/i);
+  });
+
+  it("describes every attached reference by its actual role", () => {
+    const prompt = buildProductPlacementPrompt(
+      {
+        aiWatermark: false,
+        stimmung: "entspannt",
+        etikettBild: "https://example.com/etikett.png",
+        flaschenTyp: "nrw_500",
+        flaschenfarbe: "braun",
+        bierstil: "helles",
+        glasTyp: "willibecher",
+        szene: "biergarten_sommer",
+        behaelter: "B",
+        personImBild: false,
+        personenModus: "A",
+        tageszeit: "goldene_stunde",
+        etikettModus: "marke",
+        stiltreue: "hoch",
+        aspectRatio: "4:5",
+        quality: "medium",
+        variantCount: 1,
+      },
+      {
+        referenceRoles: [
+          { index: 1, role: "product" },
+          { index: 2, role: "glass" },
+          { index: 3, role: "look" },
+        ],
+      },
+    );
+    expect(prompt).toMatch(/Image 2 defines ONLY the exact glass silhouette/i);
+    expect(prompt).toMatch(/Image 3 is a LOOK reference(?: only| and PRIMARY style guide)/i);
+  });
+
+  it("selects campaign camera direction instead of forcing a documentary film look", () => {
+    const prompt = buildProductPlacementPrompt({
+      aiWatermark: false,
+      stimmung: "feierlich",
+      stimmungTrend: "premium",
+      contentPreset: "campaign_social",
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      glasTyp: "willibecher",
+      szene: "wirtshaus_innen",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "abend_warm",
+      etikettModus: "marke",
+      stiltreue: "hoch",
+      aspectRatio: "4:5",
+      quality: "high",
+      variantCount: 1,
+    });
+    expect(prompt).toMatch(/low or forced perspective with the product dominant/i);
+    expect(prompt).toMatch(/real photographed brand campaign|real camera campaign still/i);
+    expect(prompt).not.toMatch(/Kodak Portra|fine analog grain/i);
+  });
+
+  it("lets an explicit reportage selection override the automatic social campaign style", () => {
+    const prompt = buildProductPlacementPrompt({
+      aiWatermark: false,
+      stimmung: "feierlich",
+      contentPreset: "campaign_social",
+      photoStyle: "reportage",
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      szene: "wirtshaus_innen",
+      behaelter: "F",
+      personImBild: true,
+      personenModus: "D",
+      tageszeit: "abend_warm",
+      aspectRatio: "4:5",
+      quality: "high",
+      variantCount: 1,
+    });
+    expect(prompt).toMatch(/candid snapshot framing with imperfect edges|28–35mm/i);
+    expect(prompt).toMatch(/candid flash or street-reportage photograph/i);
+    expect(prompt).not.toMatch(/low or forced perspective with the product dominant/i);
+  });
+
+  it("applies explicit premium photography independent of people and mood", () => {
+    const prompt = buildProductPlacementPrompt({
+      aiWatermark: false,
+      stimmung: "gesellig",
+      stimmungTrend: "nachhaltig",
+      photoStyle: "premium",
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      szene: "brauereihof",
+      behaelter: "B",
+      personImBild: true,
+      personenModus: "D",
+      tageszeit: "goldene_stunde",
+      aspectRatio: "4:5",
+      quality: "high",
+      variantCount: 1,
+    });
+    expect(prompt).toMatch(/85mm lens at f\/5\.6/i);
+    expect(prompt).toMatch(/premium hospitality photography|LOOK-reference hospitality light/i);
+    expect(prompt).toMatch(/real hospitality photography|ordinary guests|not a glossy AI lifestyle/i);
+  });
+
+  it("applies explicit campaign art direction outside the social preset", () => {
+    const prompt = buildProductPlacementPrompt({
+      aiWatermark: false,
+      stimmung: "entspannt",
+      photoStyle: "campaign",
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "nrw_500",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      szene: "biergarten_sommer",
+      behaelter: "F",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "mittag",
+      aspectRatio: "16:9",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(prompt).toMatch(/low or forced perspective with the product dominant|product fills the foreground/i);
+    expect(prompt).toMatch(/real photographed brand campaign|real camera campaign still|campaign still like the LOOK/i);
   });
 
   it("lets free-text intent override biergarten defaults for mountain toasting", () => {

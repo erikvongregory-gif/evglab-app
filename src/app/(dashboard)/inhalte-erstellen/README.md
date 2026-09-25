@@ -4,14 +4,18 @@ Modulare Bild-Engine fuer Brauerei-Kunden. Jeder Modus besitzt ein eigenes Zod-S
 
 ## Modi
 
-- Hyperrealistisch: `POST /api/generate-hyperrealistic`, `gpt-image-2.5-flare`, Etikett als Referenzbild, `n: 2`.
+- Aktuelles Studio: `POST /api/inhalte-erstellen/create-task` bzw. `social-post`, `gpt-image-2.5-sunburst`, Produkt-, Form-, Glas-, Szenen- und Look-Referenzen mit festen Rollen.
+- Fotostil im aktuellen Studio: `photoStyle: reportage | premium | campaign`; die Auswahl steuert Kamera, Licht und Komposition. `hyperreal` bleibt ein unabhängig kombinierbarer Realismus-Lock.
+- Hyperrealistisch (Legacy): `POST /api/generate-hyperrealistic`, `gpt-image-2.5-sunburst`, Etikett als Referenzbild, `n: 2`.
 - Produkt freistellen: `POST /api/generate-isolate`, Photoroom Segment API, Fallback `remove.bg`, kein GPT-Rendering.
-- Produkt Studio: `POST /api/generate-studio`, `gpt-image-2.5-flare`, Auto-Glas und Auto-Garnitur nach Bierstil.
-- Kampagnenbild mit Text: `POST /api/generate-campaign`, `gpt-image-2.5-flare`, 3-5 Feed-Referenzen, Thinking fuer Layout/Text aktiv.
+- Produkt Studio: `POST /api/generate-studio`, `gpt-image-2.5-sunburst`, Auto-Glas und Auto-Garnitur nach Bierstil.
+- Kampagnenbild mit Text: `POST /api/generate-campaign`, `gpt-image-2.5-sunburst`, 3-5 Feed-Referenzen, Thinking fuer Layout/Text aktiv.
 
 ## Single Source Of Truth
 
 `lib/brewing-knowledge.ts` enthaelt Flaschen, Glasformen und Bierstil-Garnituren. Prompt-Builder duerfen diese Daten nicht duplizieren.
+
+Interne neutrale Formreferenzen liegen in Supabase unter `bottle-references/` und `glass-references/`; lokale Fallback-Dateien und Aufnahmeregeln sind in `assets/REFERENCE_IMAGES.md` dokumentiert.
 
 Neue Flasche:
 
@@ -34,4 +38,4 @@ Die Seite zeigt pro Modus eine Prompt-Vorschau unter "Advanced anzeigen", einen 
 
 Bestehende Routen wie `/api/openai/image2/generate` und `/api/kie/nano-banana/create-task` bleiben als Legacy-Pfade erhalten. Die neuen Routen sind bewusst separat, damit bestehende Dashboard-Flows nicht gebrochen werden. Nach erfolgreicher UI-Migration koennen Legacy-Routen als deprecated markiert und spaeter entfernt werden.
 
-Lokale Next.js-Dokumente unter `node_modules/next/dist/docs/` waren in diesem Checkout nicht vorhanden; fuer Route Handler wurde die aktuelle Next.js Route-Handler-Dokumentation geprueft.
+Die lokale Next.js-Dokumentation unter `node_modules/next/dist/docs/` ist fuer Aenderungen an Route Handlern verbindlich.

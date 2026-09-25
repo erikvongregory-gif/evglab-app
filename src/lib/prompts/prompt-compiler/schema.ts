@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 
-export const referenceRoleSchema = z.enum(["product", "label", "mood", "shape"]);
+export const referenceRoleSchema = z.enum(["product", "label", "mood", "shape", "glass", "scene", "look"]);
 
 export const compiledBriefSchema = z.object({
   normalized_brief: z.object({

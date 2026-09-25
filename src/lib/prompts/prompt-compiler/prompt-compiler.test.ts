@@ -70,6 +70,7 @@ describe("prompt-compiler", () => {
     const result = validateBriefForGeneration({
       input: baseInput,
       hasProductPhoto: false,
+      hasShapeReference: true,
       hasUsableBrief: true,
     });
     expect(result.blocking_issues.some((i) => /Produktfoto/i.test(i))).toBe(true);
@@ -79,6 +80,7 @@ describe("prompt-compiler", () => {
     const result = validateBriefForGeneration({
       input: { ...baseInput, flaschenTyp: "longneck_500", etikettModus: "generisch", stiltreue: "frei" },
       hasProductPhoto: false,
+      hasShapeReference: false,
       hasUsableBrief: true,
     });
     expect(result.blocking_issues.some((i) => /Formreferenz|erfunden/i.test(i))).toBe(true);
@@ -88,6 +90,7 @@ describe("prompt-compiler", () => {
     const result = validateBriefForGeneration({
       input: { ...baseInput, etikettModus: "generisch", stiltreue: "frei" },
       hasProductPhoto: false,
+      hasShapeReference: true,
       hasUsableBrief: true,
     });
     expect(result.blocking_issues.filter((i) => /Produktfoto/i.test(i))).toHaveLength(0);
@@ -109,7 +112,7 @@ describe("prompt-compiler", () => {
     }
     expect(prompt).toMatch(/in der brauerei wird angestoßen/);
     expect(prompt).toMatch(/NRW/);
-    expect(prompt).toMatch(/kein Kronkorken auf der Mündung/);
+    expect(prompt).toMatch(/no cap may remain on the mouth/);
     expect(prompt).toMatch(/beer bottle/);
   });
 

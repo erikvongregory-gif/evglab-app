@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       mode: "product_studio",
       prompt,
       images,
-      model: "gpt-image-2.5-flare",
+      model: "gpt-image-2.5-sunburst",
       userId: guard.userId,
       billing: charge.billing,
     });

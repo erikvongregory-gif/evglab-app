@@ -221,6 +221,14 @@
     animation: stu-sheet-in 240ms var(--ease);
   }
 
+  .stu-dialog.evg-studio.stu-dialog--sheet-mobile.stu-dialog--beer {
+    max-height: min(92dvh, 900px);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
   .stu-dialog.evg-studio.stu-dialog--sheet-mobile[data-state="closed"] {
     animation: stu-sheet-out 180ms var(--ease);
   }
@@ -538,6 +546,30 @@
     min-height: 44px;
     padding-inline: 14px;
     font-size: 13px;
+  }
+
+  .evg-studio .studio-create-page-head__actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .evg-studio .studio-create-style-chips {
+    width: 100%;
+  }
+
+  .evg-studio .studio-create-chip--photo-style {
+    min-height: 44px;
+    padding-inline: 12px;
+    font-size: 13px;
+  }
+
+  .evg-studio .studio-create-segment--photo-style {
+    flex-wrap: wrap;
+  }
+
+  .evg-studio .studio-create-segment--photo-style .studio-create-segment__btn {
+    flex: 1 1 calc(50% - 4px);
+    min-height: 42px;
   }
 
   .evg-studio .studio-create-field--switch .stu-switch-row {

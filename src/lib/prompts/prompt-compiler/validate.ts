@@ -4,6 +4,7 @@ import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/li
 export type ValidationContext = {
   input: HyperrealisticInput;
   hasProductPhoto: boolean;
+  hasShapeReference: boolean;
   hasUsableBrief: boolean;
 };
 
@@ -19,7 +20,7 @@ export type BriefValidation = {
 export function validateBriefForGeneration(ctx: ValidationContext): BriefValidation {
   const blocking_issues: string[] = [];
   const missing_information: string[] = [];
-  const { input, hasProductPhoto, hasUsableBrief } = ctx;
+  const { input, hasProductPhoto, hasShapeReference, hasUsableBrief } = ctx;
   const bottle = FLASCHEN_TYPEN[input.flaschenTyp];
   const wantsBrand = input.etikettModus !== "generisch";
   const glassOnly = input.behaelter === "G";
@@ -36,13 +37,13 @@ export function validateBriefForGeneration(ctx: ValidationContext): BriefValidat
     );
   }
 
-  if (!glassOnly && !hasProductPhoto && !bottle.hasShapeReference) {
+  if (!glassOnly && !hasProductPhoto && !hasShapeReference) {
     blocking_issues.push(
       `Keine Formreferenz für „${bottle.display_name}“: Bitte Produktfoto hochladen — Flaschenform wird nicht erfunden.`,
     );
   }
 
-  if (!glassOnly && !hasProductPhoto && bottle.hasShapeReference) {
+  if (!glassOnly && !hasProductPhoto && hasShapeReference) {
     missing_information.push(
       "Kein Produktfoto: Nur Formreferenz verfügbar — Etikett-/Markentreue eingeschränkt.",
     );

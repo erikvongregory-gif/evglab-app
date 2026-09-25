@@ -82,8 +82,8 @@ export async function generateOpenAiImage(args: {
       if (refs.length > 0) {
         const form = new FormData();
         form.append("model", model);
-        // Mehrere Referenzbilder: jedes als eigenes `image`-Feld (Array-Semantik).
-        refs.forEach((ref, index) => form.append("image", referenceToFile(ref, index)));
+        const imageField = refs.length > 1 ? "image[]" : "image";
+        refs.forEach((ref, index) => form.append(imageField, referenceToFile(ref, index)));
         form.append("prompt", prompt);
         form.append("size", size);
         form.append("output_format", outputFmt);

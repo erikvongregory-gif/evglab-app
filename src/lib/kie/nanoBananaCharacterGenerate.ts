@@ -213,19 +213,55 @@ export function assembleGenerationReferences(input: {
   characterRefs: OpenAiReferenceImage[];
   visionReference: OpenAiReferenceImage | null;
   extraRefs: OpenAiReferenceImage[];
+  extraRefRoles?: Array<"scene" | "look">;
+  campaignRefs?: OpenAiReferenceImage[];
   shapeReference: OpenAiReferenceImage | null;
-}): { references: OpenAiReferenceImage[]; extraRefCount: number } {
+  glassReference?: OpenAiReferenceImage | null;
+}): {
+  references: OpenAiReferenceImage[];
+  extraRefCount: number;
+  campaignRefCount: number;
+  roles: Array<{ index: number; role: "character" | "product" | "shape" | "glass" | "scene" | "look" }>;
+} {
   if (!input.useCharacterIdentity) {
+    const ordered = [
+      input.visionReference ? { image: input.visionReference, role: "product" as const } : null,
+      input.shapeReference ? { image: input.shapeReference, role: "shape" as const } : null,
+      input.glassReference ? { image: input.glassReference, role: "glass" as const } : null,
+      // Style-Looks vor User-Extras — Kampagnen-Grammatik hat Vorrang vor Szene-Uploads.
+      ...(input.campaignRefs ?? []).map((image) => ({ image, role: "look" as const })),
+      ...input.extraRefs.map((image, index) => ({
+        image,
+        role: input.extraRefRoles?.[index] === "look" ? ("look" as const) : ("scene" as const),
+      })),
+    ].filter(Boolean) as Array<{
+      image: OpenAiReferenceImage;
+      role: "product" | "shape" | "glass" | "scene" | "look";
+    }>;
     return {
-      references: [input.visionReference, ...input.extraRefs, input.shapeReference].filter(
-        Boolean,
-      ) as OpenAiReferenceImage[],
+      references: ordered.map(({ image }) => image),
       extraRefCount: input.extraRefs.length,
+      campaignRefCount: input.campaignRefs?.length ?? 0,
+      roles: ordered.map(({ role }, index) => ({ index: index + 1, role })),
     };
   }
   const identity = [...input.characterRefs, input.visionReference].filter(Boolean) as OpenAiReferenceImage[];
-  const extras = input.extraRefs.slice(0, Math.max(0, 4 - identity.length));
-  return { references: [...identity, ...extras], extraRefCount: extras.length };
+  const campaigns = (input.campaignRefs ?? []).slice(0, Math.max(0, 6 - identity.length));
+  const extras = input.extraRefs.slice(0, Math.max(0, 6 - identity.length - campaigns.length));
+  const roles = [
+    ...input.characterRefs.map(() => "character" as const),
+    ...(input.visionReference ? (["product"] as const) : []),
+    ...campaigns.map(() => "look" as const),
+    ...extras.map((_, index) =>
+      input.extraRefRoles?.[index] === "look" ? ("look" as const) : ("scene" as const),
+    ),
+  ].map((role, index) => ({ index: index + 1, role }));
+  return {
+    references: [...identity, ...campaigns, ...extras],
+    extraRefCount: extras.length,
+    campaignRefCount: campaigns.length,
+    roles,
+  };
 }
 
 const SCENE_LINES: Record<string, string> = {

@@ -9,8 +9,9 @@ You convert structured German briefing data into one technically precise, produc
 Hard rules:
 - Output ONLY the final English prompt as plain text.
 - No markdown, no headings, no explanations, no JSON, no code fences.
-- Always assume target model is GPT Image 2 unless briefing specifies otherwise.
-- Keep result looking like an unretouched handheld photograph, not a CGI ad.
+- Always assume target model is GPT Image 2.5 Sunburst unless briefing specifies otherwise.
+- Match the photographic treatment to the job: candid editorial, controlled premium product photography, or an art-directed campaign.
+- Keep materials, light, shadows, reflections, and perspective physically believable.
 `.trim();
 
 export const DASHBOARD_PROMPT_OUTPUT_RULES = `
@@ -18,8 +19,10 @@ Dashboard-API-Modus (ueberschreibt Schritt 5 Ausgabeformat):
 - Gib NUR den finalen englischen Bildprompt als reinen Fliesstext zurueck.
 - Kein Markdown, keine Ueberschriften, kein Deutsch, kein Konfigurationsblock.
 - Wende Schritte 2–4 intern an (Glas-Mapping, SRM-Farbe, Licht, Kamera, Negative als Prosa am Ende).
-- Bei GPT Image 2: beginne mit "Unretouched handheld photograph, Kodak Portra 400.", nutze SRM+Hex im Subject-Block. VERBOTEN als Qualitaets-Trigger: ultra-detailed, professionally retouched, photorealistic commercial product shot.
-- Integriere Negative Prompts als "Avoid ... Do not include ... Exclude ..." am Promptende.
+- Bei GPT Image 2.5 Sunburst: strukturiere Scene → Subject → Composition → Lighting/Camera → Preserve/Change Constraints. Nutze SRM+Hex im Subject-Block.
+- Waehle Kamera und Licht passend zum Auftrag. Erzwinge keinen Analogfilm-/Handheld-Look fuer Premium- oder Kampagnenmotive.
+- Benenne bei mehreren Bildern jedes Bild per Index und exklusiver Rolle (Produkt, Form, Glas, Szene oder Look).
+- Integriere nur motivbezogene Ausschluesse als kurze Prosa am Promptende.
 `.trim();
 
 function stripMarkdownFrontmatter(markdown: string): string {

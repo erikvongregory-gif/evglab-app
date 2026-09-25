@@ -27,11 +27,12 @@ export function shouldShowJobCard(
   job: Pick<MediaJobCard, "jobId" | "status" | "images">,
   mediaIds: Iterable<string>,
 ) {
+  // Fehlgeschlagene Versuche gehören nicht in die Mediathek (Fehler bleibt im Studio).
+  if (job.status === "failed") return false;
   const ids = mediaIds instanceof Set ? mediaIds : new Set(mediaIds);
   const persisted = job.images.some((_, index) => ids.has(mediaIdForJobVariant(job.jobId, index)))
     || [...ids].some((id) => isMediaIdForJob(id, job.jobId));
   if (job.status === "reserved") return true;
-  if (job.status === "failed" && job.images.length === 0) return !persisted;
   return !persisted;
 }
 

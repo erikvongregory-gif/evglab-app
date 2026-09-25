@@ -2,9 +2,8 @@ import { after, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { applyClientIntentOverrides, buildProductPlacementPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
-import { ensureClosureLogic } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
+import { buildPhotoStyleLockFragment, ensureClosureLogic } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
 import { hyperrealisticSchema, socialPostSchema, type HyperrealisticInput, type SocialPostInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
-import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
 import {
   buildBrandProfilePromptContext,
@@ -31,6 +30,10 @@ import {
 } from "@/lib/openai/generateImage";
 import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
+import { loadGlassShapeReference } from "@/lib/openai/glassShapeReference";
+import { loadCampaignStyleReferences } from "@/lib/openai/campaignStyleReferences";
+import { loadPremiumStyleReferences } from "@/lib/openai/premiumStyleReferences";
+import { loadReportageStyleReferences } from "@/lib/openai/reportageStyleReferences";
 import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 import { uploadGeneratedImageToStorage, uploadGeneratedImageWithThumb } from "@/lib/supabase/storage";
 import { persistGeneratedMediaItems } from "@/lib/dashboard/persistGeneratedMedia";
@@ -312,10 +315,52 @@ async function prepareStudioGeneration(args: {
   }
 
   const hasProductPhoto = Boolean(visionReference) && input.behaelter !== "G";
-  const bottle = FLASCHEN_TYPEN[input.flaschenTyp];
   const shapeReference =
     input.behaelter === "G" || hasProductPhoto ? null : await loadBottleShapeReference(input.flaschenTyp);
-  const hasShapeReference = Boolean(shapeReference) || bottle.hasShapeReference;
+  const hasShapeReference = Boolean(shapeReference);
+  const glassReference =
+    input.behaelter === "F" ? null : await loadGlassShapeReference(input.glasTyp);
+
+  // Look-Refs vor Extra-Uploads reservieren — sonst fallen Campaign/Reportage/Premium-Looks still weg.
+  const REF_BUDGET = 6;
+  const coreReferenceCount = useCharacterIdentity
+    ? characterRefs.length + (visionReference ? 1 : 0)
+    : (visionReference ? 1 : 0) + (shapeReference ? 1 : 0) + (glassReference ? 1 : 0);
+  const styleLookLimit = Math.min(2, Math.max(0, REF_BUDGET - coreReferenceCount));
+  const styleLookReferences =
+    input.photoStyle === "campaign"
+      ? await loadCampaignStyleReferences(input, styleLookLimit)
+      : input.photoStyle === "reportage"
+        ? await loadReportageStyleReferences(input, styleLookLimit)
+        : input.photoStyle === "premium"
+          ? await loadPremiumStyleReferences(input, styleLookLimit)
+          : [];
+  const extraBudget = Math.max(0, REF_BUDGET - coreReferenceCount - styleLookReferences.length);
+  const cappedExtraRefs = extraRefs.slice(0, extraBudget);
+
+  const assembled = assembleGenerationReferences({
+    useCharacterIdentity,
+    characterRefs,
+    visionReference,
+    extraRefs: cappedExtraRefs,
+    extraRefRoles: input.extraReferenceRoles,
+    campaignRefs: styleLookReferences,
+    shapeReference,
+    glassReference,
+  });
+  const compilerReferenceRoles = assembled.roles.flatMap(({ index, role }) =>
+    role === "character" ? [] : [{ index, role, note: "" }],
+  );
+  if ((input.extraReferenceImages?.length ?? 0) > cappedExtraRefs.length) {
+    return NextResponse.json(
+      {
+        error:
+          "Zusätzliche Referenzbilder passen mit dieser Produkt- und Stilauswahl nicht ins Motiv. Bitte welche entfernen.",
+        code: "extra_refs_overflow",
+      },
+      { status: 422 },
+    );
+  }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
   const anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
@@ -327,7 +372,8 @@ async function prepareStudioGeneration(args: {
     brandProfileContext,
     hasProductPhoto,
     hasShapeReference,
-    referenceImages: visionReference ? [visionReference] : undefined,
+    referenceImages: assembled.references,
+    referenceRoles: compilerReferenceRoles,
   });
 
   if (compiled.blocking_issues.length > 0) {
@@ -353,10 +399,13 @@ async function prepareStudioGeneration(args: {
       compiled.normalized_brief.people,
       input.zusatzWunsch?.trim(),
     ].filter((part, index, arr) => Boolean(part) && arr.indexOf(part) === index);
-    prompt = buildProductPlacementPrompt({
-      ...input,
-      zusatzWunsch: briefParts.join(". ").slice(0, 800) || input.zusatzWunsch,
-    });
+    prompt = buildProductPlacementPrompt(
+      {
+        ...input,
+        zusatzWunsch: briefParts.join(". ").slice(0, 800) || input.zusatzWunsch,
+      },
+      { referenceRoles: compilerReferenceRoles },
+    );
     if (brandProfileContext) prompt = `${prompt} ${brandProfileContext.replace(/\n+/g, " ")}`;
     if (labelIntent.stiltreue === "hoch" && wantsBrandLabel) {
       prompt = `${prompt} LABEL FIDELITY: Keep Image 1 label identical — every letter, logo, crest. Change only the environment.`;
@@ -364,44 +413,27 @@ async function prepareStudioGeneration(args: {
   } else {
     prompt = compiled.image_prompt;
   }
+
+  if (useCharacterIdentity) {
+    prompt = buildCharacterIdentityPrompt({
+      szene: input.szene,
+      zusatzWunsch: input.zusatzWunsch,
+      characterName: input.characterName,
+      characterRole: input.characterRole,
+      appearanceLock: input.characterAppearanceLock,
+      characterRefCount: characterRefs.length,
+      extraRefCount: assembled.extraRefCount + assembled.campaignRefCount,
+      brandContext: brandProfileContext || undefined,
+    });
+  }
+
   if (input.hyperreal === true || input.contentPreset === "hyperreal") {
     prompt = applyContentPresetPrompt(prompt, "hyperreal");
   }
-  prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS);
-
-  const assembled = assembleGenerationReferences({
-    useCharacterIdentity,
-    characterRefs,
-    visionReference,
-    extraRefs,
-    shapeReference,
-  });
-  if ((input.extraReferenceImages?.length ?? 0) > assembled.extraRefCount) {
-    return NextResponse.json(
-      {
-        error:
-          "Zusätzliche Referenzbilder passen mit dieser Produkt- und Personenauswahl nicht ins Motiv. Bitte welche entfernen.",
-        code: "extra_refs_overflow",
-      },
-      { status: 422 },
-    );
-  }
-
-  if (useCharacterIdentity) {
-    prompt = withAdultSceneContext(
-      buildCharacterIdentityPrompt({
-        szene: input.szene,
-        zusatzWunsch: input.zusatzWunsch,
-        characterName: input.characterName,
-        characterRole: input.characterRole,
-        appearanceLock: input.characterAppearanceLock,
-        characterRefCount: characterRefs.length,
-        extraRefCount: assembled.extraRefCount,
-        brandContext: brandProfileContext || undefined,
-      }),
-      MAX_PROMPT_CHARS,
-    );
-  }
+  const photoStyleLock = buildPhotoStyleLockFragment(input);
+  // Style-Lock + Anti-AI nach Truncation wieder anhängen — sonst stirbt der Gloss-Schutz am Prompt-Ende.
+  prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS - photoStyleLock.length - 2);
+  prompt = `${prompt}\n\n${photoStyleLock}`;
 
   prompt = ensureClosureLogic(prompt, input);
   if (mode === "social") prompt = appendCopySpaceDirective(prompt);
@@ -649,6 +681,8 @@ async function executeStudioGeneration(args: {
     aspectRatio: prepared.aspectRatio,
     resolution: prepared.billingResolution,
     outputFormat: OUTPUT_FORMAT,
+    photoStyle: prepared.input.photoStyle,
+    beerName: prepared.input.beerName,
   });
   const responseBody = {
     images: images.map((imageUrl) => ({ imageUrl })),

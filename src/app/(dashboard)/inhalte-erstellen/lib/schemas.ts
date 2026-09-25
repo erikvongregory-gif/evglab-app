@@ -173,6 +173,8 @@ export const hyperrealisticSchema = z.object({
   stiltreue: z.enum(["frei", "normal", "hoch"]).optional(),
   /** Content-Tab Framing fuer applyContentPresetPrompt. */
   contentPreset: z.enum(["hyperreal", "campaign_social"]).optional(),
+  /** Bewusste fotografische Bildsprache; ueberschreibt die automatische Stilableitung. */
+  photoStyle: z.enum(["reportage", "premium", "campaign"]).optional(),
   /** Optionaler UI-Lock fuer besonders realistische Kamera-, Licht- und Materialwirkung. */
   hyperreal: z.boolean().optional(),
   aspectRatio: aspectRatioSchema,

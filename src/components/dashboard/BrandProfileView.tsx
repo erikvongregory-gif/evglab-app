@@ -31,6 +31,7 @@ import {
   parseHexSwatches,
   parseToneTags,
 } from "@/lib/brand/brand-profile-display";
+import { BrandBeersSection } from "@/components/dashboard/BrandBeersSection";
 import { BrandCharactersSection } from "@/components/dashboard/BrandCharactersSection";
 
 const BRAND_FONT_FAMILY = "BrewAiBrandHeadline";
@@ -434,6 +435,8 @@ export function BrandProfileView({
           </section>
 
           <BrandReferenceGallery urls={value.brandReferenceImageUrls} />
+
+          <BrandBeersSection />
 
           <BrandCharactersSection />
 

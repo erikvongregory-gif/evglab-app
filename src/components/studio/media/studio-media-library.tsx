@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { Check, ImagePlus, Search, X } from "lucide-react";
-import { getMediaDisplayTitle } from "@/lib/dashboard/metadata";
+import { Check, ChevronDown, ImagePlus, Search, X } from "lucide-react";
+import { getMediaDisplayTitle, mediaPhotoStyleLabel, type DashboardBeer } from "@/lib/dashboard/metadata";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { clearActiveGeneration, readActiveGeneration } from "@/lib/inhalte-erstellen/active-generation";
 import {
   isLandscapeAspect,
@@ -137,8 +138,38 @@ export type MediaItem = {
   aspectRatio: string;
   resolution: "1K" | "2K" | "4K";
   outputFormat: "png" | "jpg";
+  photoStyle?: "reportage" | "premium" | "campaign";
+  beerName?: string;
+  beerId?: string;
   generation?: { chargeNumber?: number | null } | null;
 };
+
+type MediaSortOrder = "newest" | "oldest";
+
+const MEDIA_SORT_KEY = "brewai.media.sort";
+
+function readMediaSortOrder(): MediaSortOrder {
+  if (typeof window === "undefined") return "newest";
+  try {
+    return window.localStorage.getItem(MEDIA_SORT_KEY) === "oldest" ? "oldest" : "newest";
+  } catch {
+    return "newest";
+  }
+}
+
+/** Match nur gegen hinterlegte Sorten — nie Freitext/Prompt-Fragmente aus dem Titel. */
+export function mediaMatchesBeer(
+  item: MediaItem,
+  beer: { id?: string; name: string },
+): boolean {
+  const name = beer.name.trim();
+  if (!name) return false;
+  if (beer.id && item.beerId === beer.id) return true;
+  if (item.beerName?.trim().toLowerCase() === name.toLowerCase()) return true;
+  const title = getMediaDisplayTitle(item);
+  const first = title.split(" · ")[0]?.trim() ?? "";
+  return first.toLowerCase() === name.toLowerCase();
+}
 
 const STUDIO_EASE = [0.22, 0.68, 0.2, 1] as const;
 const MEDIA_LIGHTBOX_SPRING = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.85 };
@@ -188,11 +219,12 @@ function cardFromJob(job: JobsApiJob, highlighted: boolean, fallback?: Partial<M
 }
 
 function isLiveListedJob(job: JobsApiJob, focusedJobId: string) {
+  // Fehlversuche nie in der Mediathek listen — nur laufende/noch nicht persistierte Erfolge.
+  if (job.status === "failed") return false;
   if (job.id === focusedJobId) return true;
   if (job.status === "reserved") return true;
   const createdAt = job.created_at ? Date.parse(job.created_at) : 0;
   const recent = createdAt > 0 && Date.now() - createdAt < 15 * 60_000;
-  if (job.status === "failed" && recent) return true;
   if (job.status === "completed" && job.result?.mediaPersisted === false && recent) return true;
   return false;
 }
@@ -214,6 +246,7 @@ function optimisticJobCard(jobId: string): MediaJobCard {
 function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
   const [jobs, setJobs] = useState<MediaJobCard[]>([]);
   const [pollNonce, setPollNonce] = useState(0);
+  const [suppressedJobIds, setSuppressedJobIds] = useState(() => new Set<string>());
 
   const mergeJob = useCallback((next: MediaJobCard) => {
     setJobs((current) => {
@@ -222,10 +255,26 @@ function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
     });
   }, []);
 
+  const dismissJob = useCallback((jobId: string) => {
+    setSuppressedJobIds((prev) => {
+      if (prev.has(jobId)) return prev;
+      const next = new Set(prev);
+      next.add(jobId);
+      return next;
+    });
+    setJobs((current) => current.filter((item) => item.jobId !== jobId));
+  }, []);
+
   const cards = useMemo(() => {
-    if (!focusedJobId || jobs.some((job) => job.jobId === focusedJobId)) return jobs;
+    if (
+      !focusedJobId
+      || suppressedJobIds.has(focusedJobId)
+      || jobs.some((job) => job.jobId === focusedJobId)
+    ) {
+      return jobs;
+    }
     return [optimisticJobCard(focusedJobId), ...jobs];
-  }, [focusedJobId, jobs]);
+  }, [focusedJobId, jobs, suppressedJobIds]);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -242,6 +291,7 @@ function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
         expectedVariants: card.expectedVariants,
         signal: ac.signal,
         onProgress: (_message, result) => {
+          if (result.status === "failed") return;
           mergeJob({
             ...card,
             ...cardFromJob({ id: card.jobId, status: result.status || "reserved", result }, Boolean(card.highlighted), card),
@@ -251,10 +301,17 @@ function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
         },
       }).then((result) => {
         if (ac.signal.aborted) return;
+        const status =
+          result.status || (result.error ? "failed" : result.pending ? "reserved" : "completed");
+        if (status === "failed" && !result.pending) {
+          dismissJob(card.jobId);
+          if (!result.connectionIssue) refreshIfNeeded(card.jobId);
+          return;
+        }
         const next = {
           ...card,
           ...cardFromJob(
-            { id: card.jobId, status: result.status || (result.error ? "failed" : result.pending ? "reserved" : "completed"), result },
+            { id: card.jobId, status, result },
             Boolean(card.highlighted),
             card,
           ),
@@ -263,7 +320,7 @@ function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
           error: result.error,
         };
         mergeJob(next);
-        if (!result.pending && !result.connectionIssue && (result.images?.length || result.error)) {
+        if (!result.pending && !result.connectionIssue && result.images?.length) {
           refreshIfNeeded(card.jobId);
         }
       });
@@ -291,25 +348,26 @@ function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
           });
           if (oneRes.ok) {
             const oneJson = (await oneRes.json()) as { job?: JobsApiJob };
-            if (oneJson.job?.id) listed.unshift(oneJson.job);
+            if (oneJson.job?.id) {
+              if (oneJson.job.status === "failed") {
+                dismissJob(focusedJobId);
+              } else {
+                listed.unshift(oneJson.job);
+              }
+            }
           } else if (oneRes.status === 404) {
-            mergeJob({
-              jobId: focusedJobId,
-              status: "failed",
-              phase: "failed",
-              aspectRatio: "4:5",
-              expectedVariants: 1,
-              images: [],
-              error: "Auftrag nicht gefunden.",
-              highlighted: true,
-            });
+            dismissJob(focusedJobId);
           }
         }
-        const nextCards = listed.map((job) => cardFromJob(job, job.id === focusedJobId));
+        const nextCards = listed
+          .filter((job) => job.status !== "failed")
+          .map((job) => cardFromJob(job, job.id === focusedJobId));
         setJobs((current) => {
           const byId = new Map(nextCards.map((job) => [job.jobId, job]));
           for (const job of current) {
-            if (!byId.has(job.jobId)) byId.set(job.jobId, job);
+            if (byId.has(job.jobId)) continue;
+            // Nur laufende Jobs aus dem Session-State behalten — Failures nicht „dauerhaft“ mergen.
+            if (job.status === "reserved") byId.set(job.jobId, job);
           }
           return [...byId.values()];
         });
@@ -320,7 +378,7 @@ function useStudioJobCards(focusedJobId: string, onMediaRefresh?: () => void) {
     })();
 
     return () => ac.abort();
-  }, [focusedJobId, mergeJob, onMediaRefresh, pollNonce]);
+  }, [dismissJob, focusedJobId, mergeJob, onMediaRefresh, pollNonce]);
 
   return { jobs: cards, recheck: () => setPollNonce((n) => n + 1) };
 }
@@ -410,6 +468,11 @@ export function StudioMediaLibrary({
   const reduceMotion = useReducedMotion();
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState(initialQuery);
+  const [beerFilter, setBeerFilter] = useState<string | null>(null);
+  const [beerPopoverOpen, setBeerPopoverOpen] = useState(false);
+  const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
+  const [assortmentBeers, setAssortmentBeers] = useState<DashboardBeer[]>([]);
+  const [sortOrder, setSortOrder] = useState<MediaSortOrder>("newest");
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
   const [titleSaving, setTitleSaving] = useState(false);
@@ -582,17 +645,81 @@ export function StudioMediaLibrary({
     [mockDownload],
   );
 
+  useEffect(() => {
+    setSortOrder(readMediaSortOrder());
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(MEDIA_SORT_KEY, sortOrder);
+    } catch {
+      /* ignore */
+    }
+  }, [sortOrder]);
+
+  useEffect(() => {
+    let ignore = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/dashboard/my-beers", { cache: "no-store", credentials: "include" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { beers?: DashboardBeer[] };
+        if (!ignore && Array.isArray(data.beers)) setAssortmentBeers(data.beers);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const beerOptions = useMemo(() => {
+    const byName = new Map<string, { id: string; name: string; count: number }>();
+    for (const beer of assortmentBeers) {
+      const name = beer.name.trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (byName.has(key)) continue;
+      byName.set(key, { id: beer.id, name, count: 0 });
+    }
+    for (const option of byName.values()) {
+      option.count = items.reduce(
+        (sum, item) => sum + (mediaMatchesBeer(item, option) ? 1 : 0),
+        0,
+      );
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, "de"));
+  }, [assortmentBeers, items]);
+
+  useEffect(() => {
+    if (beerFilter && !beerOptions.some((option) => option.name === beerFilter)) {
+      setBeerFilter(null);
+    }
+  }, [beerFilter, beerOptions]);
+
   const visibleItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (it) =>
+    const activeBeer = beerFilter
+      ? beerOptions.find((option) => option.name === beerFilter) ?? { name: beerFilter }
+      : null;
+    const filtered = items.filter((it) => {
+      if (activeBeer && !mediaMatchesBeer(it, activeBeer)) return false;
+      if (!q) return true;
+      return (
         getMediaDisplayTitle(it).toLowerCase().includes(q) ||
+        (it.beerName?.toLowerCase().includes(q) ?? false) ||
         it.prompt.toLowerCase().includes(q) ||
         it.aspectRatio.toLowerCase().includes(q) ||
-        it.resolution.toLowerCase().includes(q),
-    );
-  }, [items, search]);
+        it.resolution.toLowerCase().includes(q)
+      );
+    });
+    return [...filtered].sort((a, b) => {
+      const da = Date.parse(a.createdAt) || 0;
+      const db = Date.parse(b.createdAt) || 0;
+      return sortOrder === "newest" ? db - da : da - db;
+    });
+  }, [items, search, beerFilter, beerOptions, sortOrder]);
 
   const mediaIds = useMemo(() => new Set(items.map((item) => item.id)), [items]);
   const visibleJobs = useMemo(
@@ -660,6 +787,52 @@ export function StudioMediaLibrary({
                     Auswählen
                   </Button>
                 ) : null}
+                {loaded && beerOptions.length > 0 ? (
+                  <Popover open={beerPopoverOpen} onOpenChange={setBeerPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline">
+                        {beerFilter ? `Sorte · ${beerFilter}` : "Sorte"}
+                        <ChevronDown data-icon="inline-end" className="opacity-60" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-72 p-2">
+                      <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">
+                        Hinterlegte Biersorten
+                      </div>
+                      <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
+                        <button
+                          type="button"
+                          className={`flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                            beerFilter === null ? "bg-muted font-medium" : ""
+                          }`}
+                          onClick={() => {
+                            setBeerFilter(null);
+                            setBeerPopoverOpen(false);
+                          }}
+                        >
+                          Alle Motive
+                          <span className="text-muted-foreground tabular-nums">{items.length}</span>
+                        </button>
+                        {beerOptions.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                              beerFilter === option.name ? "bg-muted font-medium" : ""
+                            }`}
+                            onClick={() => {
+                              setBeerFilter(option.name);
+                              setBeerPopoverOpen(false);
+                            }}
+                          >
+                            <span className="min-w-0 truncate">{option.name}</span>
+                            <span className="text-muted-foreground shrink-0 tabular-nums">{option.count}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : null}
                 <Button variant="outline" asChild>
                   <Link href="/inhalte-erstellen">Zur Einstiegsseite</Link>
                 </Button>
@@ -692,7 +865,47 @@ export function StudioMediaLibrary({
                 aria-label="Mediathek durchsuchen"
               />
             </div>
-            <Badge variant="secondary">Bilder · {mediaTotal ?? items.length}</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover open={sortPopoverOpen} onOpenChange={setSortPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" aria-label="Sortierung nach Zeit">
+                    {sortOrder === "newest" ? "Neueste zuerst" : "Älteste zuerst"}
+                    <ChevronDown data-icon="inline-end" className="opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-52 p-2">
+                  <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">Sortierung</div>
+                  <div className="flex flex-col gap-0.5">
+                    {(
+                      [
+                        { value: "newest", label: "Neueste zuerst" },
+                        { value: "oldest", label: "Älteste zuerst" },
+                      ] as const
+                    ).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-muted ${
+                          sortOrder === option.value ? "bg-muted font-medium" : ""
+                        }`}
+                        onClick={() => {
+                          setSortOrder(option.value);
+                          setSortPopoverOpen(false);
+                        }}
+                      >
+                        {option.label}
+                        {sortOrder === option.value ? (
+                          <Check className="size-4 shrink-0 opacity-70" aria-hidden />
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Badge variant="secondary">
+                Bilder · {beerFilter || search.trim() ? visibleItems.length : (mediaTotal ?? items.length)}
+              </Badge>
+            </div>
           </div>
         ) : null}
 
@@ -843,6 +1056,14 @@ export function StudioMediaLibrary({
                         >
                           <Check className="size-3.5" strokeWidth={2.5} />
                         </span>
+                      ) : mediaPhotoStyleLabel(it.photoStyle) ? (
+                        <Badge
+                          variant="secondary"
+                          size="sm"
+                          className="absolute top-2 left-2 border-0 bg-black/55 text-white shadow-none backdrop-blur-sm"
+                        >
+                          {mediaPhotoStyleLabel(it.photoStyle)}
+                        </Badge>
                       ) : null}
                     </div>
                     <div className="space-y-0.5 p-3">
@@ -899,12 +1120,21 @@ export function StudioMediaLibrary({
                 >
                   <div
                     className={cn(
-                      "flex min-h-0 items-center justify-center bg-muted p-3 sm:p-5",
+                      "relative flex min-h-0 items-center justify-center bg-muted p-3 sm:p-5",
                       isLandscapeAspect(selectedItem.aspectRatio)
                         ? "md:min-w-0 md:flex-1"
                         : "md:w-[min(100%,26rem)] md:flex-none",
                     )}
                   >
+                    {mediaPhotoStyleLabel(selectedItem.photoStyle) ? (
+                      <Badge
+                        variant="secondary"
+                        size="sm"
+                        className="absolute top-4 left-4 z-[1] border-0 bg-black/55 text-white shadow-none backdrop-blur-sm sm:top-6 sm:left-6"
+                      >
+                        {mediaPhotoStyleLabel(selectedItem.photoStyle)}
+                      </Badge>
+                    ) : null}
                     <motion.img
                       className="h-auto max-h-[min(70dvh,720px)] w-auto max-w-full object-contain"
                       style={jobAspectStyle(selectedItem.aspectRatio)}
@@ -949,8 +1179,15 @@ export function StudioMediaLibrary({
                             Titel speichern
                           </Button>
                           <span className="text-muted-foreground text-xs">
-                            {selectedItem.resolution} · {selectedItem.aspectRatio} ·{" "}
-                            {selectedItem.outputFormat.toUpperCase()} · {formatRelativeTime(selectedItem.createdAt)}
+                            {[
+                              mediaPhotoStyleLabel(selectedItem.photoStyle),
+                              selectedItem.resolution,
+                              selectedItem.aspectRatio,
+                              selectedItem.outputFormat.toUpperCase(),
+                              formatRelativeTime(selectedItem.createdAt),
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </span>
                         </div>
                       </div>

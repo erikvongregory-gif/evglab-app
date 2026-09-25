@@ -33,11 +33,16 @@ export function BeerCreateDialog({
 }) {
   return (
     <StudioUiDialog open={open} onOpenChange={onOpenChange}>
-      <StudioUiDialogContent sheetOnMobile className="studio-create-modal__panel studio-create-modal__panel--beer" aria-label="Neue Sorte anlegen">
-        <StudioUiDialogHeader>
-          <StudioUiDialogTitle>Neue Sorte anlegen</StudioUiDialogTitle>
-          <StudioUiDialogDescription>Foto, Getränkeart und Flasche einmal hinterlegen — danach in jedem Motiv verfügbar.</StudioUiDialogDescription>
-        </StudioUiDialogHeader>
+      <StudioUiDialogContent
+        sheetOnMobile
+        className="stu-dialog--beer"
+        aria-label="Neue Sorte anlegen"
+      >
+        {/* Panel bringt eigenen Titel — Dialog-Title nur für a11y. */}
+        <StudioUiDialogTitle className="sr-only">Neue Sorte anlegen</StudioUiDialogTitle>
+        <StudioUiDialogDescription className="sr-only">
+          Foto, Getränkeart und Flasche einmal hinterlegen — danach in jedem Motiv verfügbar.
+        </StudioUiDialogDescription>
         <BeerCreatePanel
           key={`${open}-${initialKategorie}`}
           error={error}

@@ -37,6 +37,53 @@
   flex: none;
 }
 
+.evg-studio .studio-create-style-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.evg-studio .studio-create-style-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.evg-studio .studio-create-style-chip-wrap--segment {
+  flex: 1;
+  min-width: 0;
+}
+
+.evg-studio .studio-create-style-chip-wrap--segment .studio-create-segment__btn {
+  flex: 1;
+}
+
+.evg-studio .studio-create-style-info {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: var(--s1);
+  color: var(--t3);
+  font-family: var(--f-sans);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.evg-studio .studio-create-style-info:hover {
+  color: var(--t1);
+  border-color: var(--line2);
+  background: var(--s2);
+}
+
 .evg-studio .studio-create-page-head__cost {
   font-size: var(--t-12);
   color: var(--t3);
@@ -1698,6 +1745,18 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--m-hyperreal, var(--ac)) 30%, transparent);
 }
 
+.evg-studio .studio-create-chip--photo-style {
+  min-height: 36px;
+  color: var(--t2);
+}
+
+.evg-studio .studio-create-chip--photo-style.is-active {
+  border-color: color-mix(in srgb, var(--ac) 65%, var(--line2));
+  background: color-mix(in srgb, var(--ac) 12%, var(--s1));
+  color: var(--t1);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac) 18%, transparent);
+}
+
 .evg-studio .studio-create-preview-card {
   border: 1px solid var(--line2);
   border-radius: var(--r-lg);
@@ -2175,6 +2234,11 @@
 .evg-studio .studio-create-segment--formats .studio-create-segment__btn {
   flex: 1 1 calc(33.333% - 4px);
   min-width: 0;
+}
+
+.evg-studio .studio-create-segment--photo-style .studio-create-segment__btn {
+  min-width: 0;
+  line-height: 1.25;
 }
 
 .evg-studio .studio-create-segment__btn {

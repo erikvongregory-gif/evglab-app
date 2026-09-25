@@ -233,9 +233,8 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
   const humanRealismPart = buildHumanRealismFragment(input);
   const beerPhysicsPart = buildLiquidPhysicsFragment(input, behaelter);
   const sceneTexturePart = buildSceneTextureAnchors(input.szene);
-  const cameraPart = buildCameraFragment(input.shotType ?? "A", input.aspectRatio);
+  const cameraPart = buildCameraFragment(input.shotType ?? "A", input.aspectRatio, input);
   const drink = beverageDrinkNoun(input);
-  const containerNoun = beverageContainerNoun(input);
   const isBeer = inputProduktKategorie(input) === "bier";
   const productLabelNoun = isBeer ? "beer label" : "product label";
   const shot =
@@ -332,7 +331,7 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
         : "blank unlabelled container, plain label-less bottle or can, missing label, missing can artwork, real existing brewery logo or trademark, floating bottle, unrealistic bottle placement, ";
 
   return `
-${buildHyperrealismLockFragment()}
+${buildHyperrealismLockFragment(input)}
 
 ${input.zusatzWunsch ? `CLIENT INTENT OVERRIDES PRESETS (fulfill exactly — location, action, people): ${input.zusatzWunsch}` : ""}
 
@@ -467,7 +466,15 @@ export function applyClientIntentOverrides(input: HyperrealisticInput): Hyperrea
  * Wichtig: Wenn ein Freitext (`zusatzWunsch`) gesetzt ist, steht die User-Szene ZUERST.
  * Sonst reproduziert images/edits oft 1:1 die Biergarten-Komposition aus Image 1.
  */
-export function buildProductPlacementPrompt(input: HyperrealisticInput): string {
+type ProductPlacementReferenceRole = {
+  index: number;
+  role: "product" | "shape" | "glass" | "scene" | "look";
+};
+
+export function buildProductPlacementPrompt(
+  input: HyperrealisticInput,
+  options?: { referenceRoles?: ProductPlacementReferenceRole[] },
+): string {
   const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
   const personenModus = input.personenModus ?? (input.personImBild ? "D" : "A");
   const scene = SZENE_DESCRIPTIONS[input.szene];
@@ -527,6 +534,17 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
             ? "the bottle from Image 1 plus a poured beer glass beside it"
             : `the bottle from Image 1 plus a poured ${beverageDrinkNoun(input)} glass beside it, no beer foam`;
 
+  const isCampaign =
+    input.photoStyle === "campaign" || (!input.photoStyle && input.contentPreset === "campaign_social");
+  const isPremium = input.photoStyle === "premium";
+  if (isCampaign) {
+    people =
+      "CAMPAIGN PEOPLE: show hands and partial bodies presenting or toasting the customer's product. Faces optional and may be cropped. Product silhouette dominates — never soft-focus couple behind a table bottle.";
+  }
+  const campaignVessel =
+    "CUSTOMER PRODUCT fills the foreground: handoff between hands, cans/bottles mid-toast, low-angle hero on a ledge, or overhead against sky/grass — matching LOOK reference scale. Never a quiet centered bottle on a wooden beer-garden table.";
+  const compositionVessel = isCampaign ? campaignVessel : vessel;
+
   const glassPourRaw =
     behaelter !== "F" && input.glasTyp
       ? glassPourPromptDescription(input.glasTyp, pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter))
@@ -534,7 +552,7 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
   const glassPour = isBeer ? glassPourRaw : withoutBeerFoam(glassPourRaw);
   const bottleLitres = flascheVolumeMl(input.flaschenTyp) / 1000;
   const pourLock =
-    !toasting && !intent?.hasPeople && behaelter === "B" && glassPour
+    !isCampaign && !toasting && !intent?.hasPeople && behaelter === "B" && glassPour
       ? `Beside it: one poured ${glassPour}. The glass is a single pour from this ${bottleLitres} L bottle — never a larger mug than the bottle (no 0.5 L Seidel next to a 0.33 L bottle, no 1 L Maß).`
       : "";
 
@@ -552,58 +570,137 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
         }`
       : stiltreue === "normal"
         ? "Use the product silhouette and brand identity from Image 1 as a faithful reference (logo, core colors, overall layout). Reconstruct it for the new scene with natural lighting and perspective; do not invent a different brand."
-        : "Image 1 is loose product inspiration only — silhouette may guide the vessel, but redesign of label artwork is allowed.";
+        : "Image 1 defines only the vessel type, silhouette, material, and scale. Brand artwork and label text are intentionally unlocked; do not claim exact product or brand identity.";
 
-  const productIntegration = [
-    "PRODUCT INTEGRATION — CRITICAL:",
-    "Use Image 1 as an exact product identity and branding reference, NOT as a flat cutout, sticker, pasted layer, or composited object.",
-    "Photographically reconstruct the product as if the REAL physical bottle or can was present in this environment when the photograph was taken.",
-    "Do NOT preserve the reference image's lighting, reflections, shadows, highlights, white balance, sharpness, background, or photographic conditions.",
-    "The product must inherit the new scene's exact lighting and naturally receive environmental reflections, subtle color contamination, physically plausible glass refraction, ambient occlusion, table bounce light, accurate contact shadow, reflected light from nearby wet surfaces, and realistic interaction between condensation and surrounding light.",
-    "The product must share the SAME camera, lens, focal plane, depth of field, perspective, exposure, white balance, color response, dynamic range, sharpness, and optical characteristics as the rest of the photograph.",
-    "It must appear that the photographer placed the real product in the scene before taking the photograph.",
-    "Never make it cleaner, sharper, brighter, more centered, more perfectly aligned, or more professionally lit than the surrounding scene.",
-    "The product must naturally belong to the photograph, never look like a studio product shot inserted into a lifestyle photograph.",
-  ].join(" ");
+  const productReferenceRule =
+    stiltreue === "hoch"
+      ? "Use Image 1 as the exact product and brand identity reference."
+      : stiltreue === "normal"
+        ? "Use Image 1 as a faithful product reference while allowing small photographic reconstruction differences."
+        : "Use Image 1 only as a vessel and material reference; label artwork may be redesigned.";
 
-  const hyperrealHead = buildHyperrealismLockFragment();
+  const productIntegration = isCampaign || isPremium
+    ? [
+        "PRODUCT INTEGRATION — CRITICAL:",
+        productReferenceRule,
+        "Rebuild the product as if the real bottle or can stood in this scene when the photo was taken — not a flat cutout or pasted layer.",
+        "Inherit the scene's light from the LOOK references and environment. Keep ordinary glass response and sparse irregular condensation.",
+        "Never make the product cleaner, sharper, brighter, or more beauty-lit than the surrounding frame.",
+      ].join(" ")
+    : [
+        "PRODUCT INTEGRATION — CRITICAL:",
+        productReferenceRule,
+        "Reconstruct the referenced object photographically, never as a flat cutout, sticker, pasted layer, or composited object.",
+        "Photographically reconstruct the product as if the REAL physical bottle or can was present in this environment when the photograph was taken.",
+        "Do NOT preserve the reference image's lighting, reflections, shadows, highlights, white balance, sharpness, background, or photographic conditions.",
+        "The product must inherit the new scene's exact lighting and naturally receive environmental reflections, subtle color contamination, physically plausible glass refraction, ambient occlusion, table bounce light, accurate contact shadow, reflected light from nearby wet surfaces, and realistic interaction between condensation and surrounding light.",
+        "The product must share the SAME camera, lens, focal plane, depth of field, perspective, exposure, white balance, color response, dynamic range, sharpness, and optical characteristics as the rest of the photograph.",
+        "It must appear that the photographer placed the real product in the scene before taking the photograph.",
+        "Never make it cleaner, sharper, brighter, more centered, more perfectly aligned, or more professionally lit than the surrounding scene.",
+        "The product must naturally belong to the photograph, never look like a studio product shot inserted into a lifestyle photograph.",
+      ].join(" ");
+
+  const hyperrealHead = buildHyperrealismLockFragment(input);
   const hyperrealTail = [
     buildAuthenticityFragment({ ...input, personenModus: hasPeople ? (personenModus === "A" ? (groupPeople || toasting ? "E" : "D") : personenModus) : personenModus }),
     `NEGATIVE (hyperreal): ${HYPERREALISM_NEGATIVE}`,
   ].join(" ");
 
-  const camera =
-    "Camera: handheld Canon EOS R6, 50mm f/4, Kodak Portra 400, ISO 400, fine analog grain. Slightly muted color. Not centered. Not everything razor-sharp.";
-  const forbidden = toasting
+  const camera = `Camera: ${buildCameraFragment(input.shotType, input.aspectRatio, input)}`;
+  let forbidden = toasting
     ? "Forbidden: floating bottle, floating glass, bottle and glass toasting each other without hands, cutout collage, hard mask edges, recreating Image 1's table packshot, CGI, HDR, plastic foam, sticker condensation."
     : intent?.hasPeople
       ? "Forbidden: empty product table shot with no people, bottle+glass still life only, omitting the people from USER SCENE, recreating Image 1 biergarten packshot, cutout collage, CGI, beauty-filter face, tiny unreadable background figure."
       : "Forbidden: recreating Image 1's background or table layout, catalog packshot, cutout collage, hard mask edges, CGI, HDR, beauty retouch, floating product, plastic foam, sticker condensation.";
+  if (isCampaign) {
+    forbidden =
+      "Forbidden: beer-garden table still life with soft toasting people in bokeh, pretzel/radish props as hero, Maßkrug postcard, quiet catalogue bottle on wood, recreating Image 1 packshot, cutout collage, CGI, HDR bloom, beauty-retouch, wax-smooth hands, uniform sticker condensation, golden-hour stock glow.";
+  } else if (isPremium) {
+    forbidden =
+      "Forbidden: recreating Image 1 packshot, cutout collage, CGI, HDR bloom, beauty-retouch, wax-smooth hands/faces, melted pretzel props, uniform sticker condensation, golden-hour stock glow, beauty rim light on hair, campaign product thrust toward the lens.";
+  }
 
-  const extraRefCount = input.extraReferenceImages?.filter(Boolean).length ?? 0;
-  const extraRefLine =
-    extraRefCount > 0
-      ? `Image 2${extraRefCount > 1 ? `–${1 + extraRefCount}` : ""}: optional context only (crate, location, props, mood). Use for environment cues. Never copy foreign brands/logos/text from these onto the ${isBeer ? "beer" : "product"}. Image 1 remains the only product identity.`
-      : "";
+  const referenceLines = (options?.referenceRoles ?? [])
+    .filter(({ index }) => index > 1)
+    .map(({ index, role }) => {
+      if (role === "glass") {
+        return `Image ${index} defines ONLY the exact glass silhouette and proportions. Do not copy its lighting, background, logos, or text.`;
+      }
+      if (role === "shape") {
+        return `Image ${index} defines ONLY container geometry and proportions. Do not copy its label, text, background, or lighting.`;
+      }
+      if (role === "look") {
+        if (isCampaign) {
+          return `Image ${index} is a LOOK reference and PRIMARY style guide: match product-forward scale, hand gesture, camera angle, contrast, and light character exactly as photographed; invent new people — never copy faces, outfits, logos, or text. Do not upgrade LOOK light into cinematic golden-hour CGI.`;
+        }
+        if (isPremium) {
+          return `Image ${index} is a LOOK reference and PRIMARY style guide: match hospitality bokeh, calm framing, soft available light, and material honesty; invent new people — never copy faces, outfits, logos, or text. Do not upgrade LOOK light into beauty-magazine glow.`;
+        }
+        return `Image ${index} is a LOOK reference and PRIMARY style guide: match flash/candid lighting, energy, and imperfect framing; invent new people — never copy faces, skin tone, hair, caps, tattoos, jewelry, outfits, logos, or text.`;
+      }
+      return `Image ${index} is a SCENE reference only: use its environment or spatial cues; copy no products, logos, or text.`;
+    });
+  const referenceInstructions = referenceLines.length
+    ? `REFERENCE ROLES (do not mix): ${referenceLines.join(" ")}`
+    : "";
   const closureLogic = behaelter === "G" ? "" : buildClosureLogicFragment(input);
+  const imageOneDescription =
+    stiltreue === "frei"
+      ? `Image 1 is ONLY a vessel reference for the real ${containerNoun}. Its branding is not locked.`
+      : `Image 1 is ONLY the product identity reference for the real ${containerNoun} and its printed label.`;
+  const outputIntent = isCampaign
+    ? "Create a bold product-forward campaign still like the LOOK references — shot on a real camera, not a glossy AI ad or hospitality beer-garden postcard."
+    : isPremium
+      ? "Create restrained premium hospitality photography like the LOOK references — real camera, soft optical bokeh, ordinary skin texture, not a glossy AI lifestyle ad."
+      : input.photoStyle === "reportage"
+        ? "Create a candid flash or street-reportage frame like the LOOK references — imperfect crop, harsh light, not a soft beer-garden lifestyle ad."
+        : "Create an authentic real-camera photograph with a clear subject hierarchy.";
 
-  // Freitext-Pfad: User-Szene ist Pflicht — Image 1 nur Produktidentität.
+  const lookAuthority =
+    (isCampaign || isPremium || input.photoStyle === "reportage") &&
+    (options?.referenceRoles ?? []).some(({ role }) => role === "look")
+      ? [
+          "LOOK AUTHORITY (overrides Freitext composition): Images marked LOOK define the photographic grammar — crop, camera height, product scale in frame, light character, contrast, and gesture.",
+          "USER SCENE / Freitext only supplies who and what happens (people, place words, action). It must NOT replace LOOK composition with a beer-garden table postcard, soft couple toast, candle/pretzel still life, or generic stock lifestyle frame.",
+          isCampaign
+            ? "If Freitext conflicts with LOOK: keep LOOK product-forward scale and crop; reinterpret people/action inside that grammar."
+            : isPremium
+              ? "If Freitext conflicts with LOOK: keep LOOK hospitality calm, soft optical bokeh, and product readability; reinterpret people/action inside that grammar."
+              : "If Freitext conflicts with LOOK: keep LOOK flash/candid energy and imperfect framing; reinterpret people/action inside that grammar.",
+        ].join(" ")
+      : "";
+
+  // Freitext-Pfad: User-Szene ist Inhalt — LOOK (wenn vorhanden) bestimmt die Bildsprache.
   if (extra) {
     return [
       hyperrealHead,
-      `USER SCENE (mandatory — fulfill exactly, this is the photograph to create): ${extra}`,
-      isBeer
-        ? "Image 1 is ONLY a product identity reference (the real beer bottle + printed label from the selected beer)."
-        : `Image 1 is ONLY a product identity reference (the real ${containerNoun} + printed label from the selected product).`,
+      lookAuthority,
+      referenceInstructions,
+      lookAuthority
+        ? `USER SCENE (content only — people/action/place words; LOOK owns crop/light/scale): ${extra}`
+        : `USER SCENE (mandatory — fulfill exactly, this is the photograph to create): ${extra}`,
+      imageOneDescription,
       productIntegration,
       "COMPLETELY DISCARD Image 1's background, wooden table, coaster, napkin, glass placement, people, trees, and camera framing. Do not remake Image 1. Invent a wholly new environment for the USER SCENE.",
-      extraRefLine,
       labelLock,
-      `Composition for the NEW scene: ${vessel}.`,
+      `Composition for the NEW scene: ${compositionVessel}.`,
       people,
-      `Fallback location hint (ignore if it conflicts with USER SCENE): ${scene}.`,
-      `Light: ${light}. Match lighting to the NEW scene so the bottle looks physically photographed there — real glass refraction, true contact shadows, physically plausible condensation (irregular, not sticker grid).`,
+      isCampaign
+        ? "Location may use the selected place only as light texture — never as a quiet table still-life composition."
+        : lookAuthority
+          ? "Place words from USER SCENE are optional atmosphere only — do not rebuild a postcard biergarten if LOOK grammar differs."
+          : `Fallback location hint (ignore if it conflicts with USER SCENE): ${scene}.`,
+      `Light: ${
+        isCampaign
+          ? "match LOOK-reference light character and contrast; ordinary outdoor sun is fine — no cinematic sunset wash, no HDR bloom"
+          : isPremium
+            ? "match LOOK-reference hospitality light with soft falloff — no beauty rim glow, no golden-hour HDR wash"
+            : input.photoStyle === "reportage"
+              ? "match LOOK-reference flash or harsh available light — not soft golden-hour hospitality glow"
+              : light
+      }. Match lighting to the NEW scene so the bottle looks physically photographed there — real glass refraction, true contact shadows, sparse irregular condensation (never a sticker grid).`,
       camera,
+      isCampaign || isPremium || input.photoStyle === "reportage" ? outputIntent : "",
       forbidden,
       closureLogic,
       hyperrealTail,
@@ -614,19 +711,26 @@ export function buildProductPlacementPrompt(input: HyperrealisticInput): string 
 
   return [
     hyperrealHead,
-    isBeer
-      ? "Image 1 is a photograph of the real beer bottle from the selected beer variety."
-      : `Image 1 is a photograph of the real ${containerNoun} from the selected product.`,
+    lookAuthority,
+    imageOneDescription,
     productIntegration,
-    extraRefLine,
+    referenceInstructions,
     labelLock,
-    `Composition: ${vessel}.`,
+    `Composition: ${compositionVessel}.`,
     pourLock,
     people,
-    `Setting: ${scene}.`,
-    `Light: ${light}. Large soft source on the packaging (window or overcast sky), not a beauty dish, not rim-light hero glow. Some shadow remains. Real glass refraction and irregular condensation.`,
+    isCampaign
+      ? "Setting: graphic outdoor campaign space (lawn, sky, concrete ledge) matching LOOK-reference grammar — do not default to a quiet beer-garden table postcard even if the UI scene is biergarten."
+      : `Setting: ${scene}.`,
+    isCampaign
+      ? "Light: match LOOK-reference light character and outdoor contrast on the product. Real glass refraction and sparse irregular condensation — never uniform droplet grids or golden-hour CGI glow."
+      : isPremium
+        ? "Light: match LOOK-reference hospitality light with soft falloff on the product. Real glass refraction and sparse irregular condensation — no beauty rim glow, no golden-hour HDR wash."
+        : input.photoStyle === "reportage"
+          ? "Light: match LOOK-reference flash or harsh available light. Real glass refraction and sparse irregular condensation — not soft hospitality glow."
+          : `Light: ${light}. Large soft source on the packaging (window or overcast sky), not a beauty dish, not rim-light hero glow. Some shadow remains. Real glass refraction and irregular condensation.`,
     camera,
-    "This is not an advertisement, not CGI, not cinematic orange glow, not beauty-filtered skin.",
+    outputIntent,
     forbidden,
     closureLogic,
     hyperrealTail,

@@ -19,6 +19,11 @@ export type CompileBriefParams = {
   hasProductPhoto: boolean;
   hasShapeReference: boolean;
   referenceImages?: VisionReferenceImage[];
+  referenceRoles?: Array<{
+    index: number;
+    role: "product" | "label" | "mood" | "shape" | "glass" | "scene" | "look";
+    note?: string;
+  }>;
 };
 
 function extractJsonObject(raw: string): unknown {
@@ -45,6 +50,7 @@ function buildFallbackCompiled(params: CompileBriefParams, pre: ReturnType<typeo
     brandContext: params.brandProfileContext,
     hasProductPhoto: params.hasProductPhoto,
     hasShapeReference: params.hasShapeReference,
+    referenceRoles: params.referenceRoles,
   });
   const bottle = FLASCHEN_TYPEN[params.input.flaschenTyp];
   return compiledBriefSchema.parse({
@@ -58,14 +64,15 @@ function buildFallbackCompiled(params: CompileBriefParams, pre: ReturnType<typeo
     },
     missing_information: pre.missing_information,
     blocking_issues: pre.blocking_issues,
-    reference_roles: params.hasProductPhoto
-      ? [
-          { index: 1, role: "product", note: "Produkt + Etikett" },
-          { index: 1, role: "label", note: "Label 1:1" },
-        ]
-      : params.hasShapeReference
-        ? [{ index: 1, role: "shape", note: bottle.display_name }]
-        : [],
+    reference_roles: params.referenceRoles ??
+      (params.hasProductPhoto
+        ? [
+            { index: 1, role: "product" as const, note: "Produkt + Etikett" },
+            { index: 1, role: "label" as const, note: "Label 1:1" },
+          ]
+        : params.hasShapeReference
+          ? [{ index: 1, role: "shape" as const, note: bottle.display_name }]
+          : []),
     image_prompt,
     preserve_constraints: [...bottle.preserve],
     exclusions: [
@@ -87,7 +94,7 @@ Du antwortest NUR mit einem JSON-Objekt (kein Markdown außerhalb), Schema:
   "normalized_brief": { "scene": "", "action": "", "people": "", "mood": "", "channel": "", "format": "" },
   "missing_information": [],
   "blocking_issues": [],
-  "reference_roles": [{ "index": 1, "role": "product|label|mood|shape", "note": "" }],
+  "reference_roles": [{ "index": 1, "role": "product|label|mood|shape|glass|scene|look", "note": "" }],
   "image_prompt": "vollständiger Master-Prompt",
   "preserve_constraints": [],
   "exclusions": [],
@@ -108,8 +115,10 @@ AUSGABE
 
 Regeln:
 - Kundenbrief (USER SCENE) ist verbindlich für Szene/Aktion.
+- ui_fields.photoStyle ist verbindlich: reportage = candid beobachteter Moment mit available light und natürlichen Unperfektheiten; premium = reales kontrolliertes Set, 85mm, präzise glaubhafte Materialien; campaign = bewusst inszenierte Realfotografie mit klarer Hierarchie und Copy-Space.
 - Bei Anstoßen/Prost/angestoßen: sichtbare Hände mit Gläsern — nie Flasche+Glas die allein „anstoßen“.
 - Referenzbild 1 = nur Produktidentität; Hintergrund der Referenz verwerfen.
+- Nutze referenceRoles als verbindliche Zuordnung. Vermische Produkt-, Form-, Glas-, Szenen- und Look-Referenzen nicht.
 - blocking_issues nur für kritische Lücken (fehlendes Produktfoto bei Marke, fehlende Formreferenz).
 - Schreibe den Master-Prompt auf Englisch in den Abschnitten, Überschriften bleiben Deutsch wie oben.`;
 
@@ -117,6 +126,7 @@ export async function compileBrief(params: CompileBriefParams): Promise<Compiled
   const pre = validateBriefForGeneration({
     input: params.input,
     hasProductPhoto: params.hasProductPhoto,
+    hasShapeReference: params.hasShapeReference,
     hasUsableBrief: hasUsableBrief(params.input),
   });
 
@@ -158,10 +168,12 @@ export async function compileBrief(params: CompileBriefParams): Promise<Compiled
       etikettModus: params.input.etikettModus,
       stiltreue: params.input.stiltreue,
       contentPreset: params.input.contentPreset,
+      photoStyle: params.input.photoStyle,
       beerName: params.input.beerName,
     },
     hasProductPhoto: params.hasProductPhoto,
     hasShapeReference: params.hasShapeReference,
+    referenceRoles: params.referenceRoles,
     seed_master_prompt: fallback.image_prompt,
   };
 
@@ -219,6 +231,7 @@ export async function compileBrief(params: CompileBriefParams): Promise<Compiled
         brandContext: params.brandProfileContext,
         hasProductPhoto: params.hasProductPhoto,
         hasShapeReference: params.hasShapeReference,
+        referenceRoles: params.referenceRoles,
         sceneOverride: compiled.normalized_brief.scene,
         actionOverride: compiled.normalized_brief.action,
         peopleOverride: compiled.normalized_brief.people,

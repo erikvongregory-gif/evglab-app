@@ -28,8 +28,8 @@ describe("media job cards", () => {
     ).toBe(false);
   });
 
-  it("keeps a failed job without images until media exists", () => {
-    expect(shouldShowJobCard({ jobId: "job-1", status: "failed", images: [] }, [])).toBe(true);
+  it("never shows a failed job in the media library", () => {
+    expect(shouldShowJobCard({ jobId: "job-1", status: "failed", images: [] }, [])).toBe(false);
     expect(shouldShowJobCard({ jobId: "job-1", status: "failed", images: [] }, ["gen-job-1-0"])).toBe(false);
   });
 

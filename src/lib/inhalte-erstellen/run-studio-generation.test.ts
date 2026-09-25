@@ -30,6 +30,7 @@ vi.mock("@/lib/brand/reference-image-bytes", () => ({
   resolveReferenceImageForVision: async (raw: string) => ({ mime: "image/png", base64: raw.slice(-8) }),
 }));
 vi.mock("@/lib/openai/bottleShapeReference", () => ({ loadBottleShapeReference: async () => null }));
+vi.mock("@/lib/openai/glassShapeReference", () => ({ loadGlassShapeReference: async () => null }));
 vi.mock("@/lib/dashboard/brandProfile", () => ({
   getBrandProfileFromMetadata: () => ({
     breweryName: "Test",

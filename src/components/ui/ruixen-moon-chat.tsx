@@ -47,11 +47,33 @@ const ASPECT_OPTIONS: { value: Aspect; hint: string }[] = [
 ];
 
 type RequestQuality = "medium" | "high" | "ultra";
+type PhotoStyle = "reportage" | "premium" | "campaign";
 
 const QUALITY_OPTIONS: { value: RequestQuality; label: string; hint: string }[] = [
   { value: "medium", label: "Standard", hint: "1K · weniger Tokens" },
   { value: "high", label: "Hoch", hint: "2K · schärfer" },
   { value: "ultra", label: "4K", hint: "Druck / Detail" },
+];
+
+const PHOTO_STYLE_OPTIONS: Array<{ value: PhotoStyle; label: string; fullLabel: string; hint: string }> = [
+  {
+    value: "reportage",
+    label: "Reportage",
+    fullLabel: "Reportage",
+    hint: "Candid und roh: Blitz oder hartes Available Light, unperfekter Crop, Flasche nur nebenbei — wie ein echtes Snapshot vom Abend.",
+  },
+  {
+    value: "premium",
+    label: "Premium",
+    fullLabel: "Premium-Fotografie",
+    hint: "Ruhige Hospitality-Fotografie: weiches Licht, optisches Bokeh, Flasche lesbar im Vordergrund, Menschen sekundär — Biergarten oder Dining.",
+  },
+  {
+    value: "campaign",
+    label: "Kampagne",
+    fullLabel: "Kampagnenmotiv",
+    hint: "Art-directed Key Visual: Produkt füllt den Frame, enger Crop, Hände reichen oder toasten — keine Biergarten-Stillleben-Postkarte.",
+  },
 ];
 
 const VALID_SZENEN = new Set<string>([
@@ -136,6 +158,7 @@ export default function RuixenMoonChat() {
   const [charactersError, setCharactersError] = useState<string | null>(null);
   const [genBusy, setGenBusy] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [photoStyle, setPhotoStyle] = useState<PhotoStyle>("reportage");
   const [hyperreal, setHyperreal] = useState(false);
   const [aiWatermark, setAiWatermark] = useState(false);
   const router = useRouter();
@@ -284,6 +307,7 @@ export default function RuixenMoonChat() {
       etikettModus: usesProductPhoto ? ("marke" as const) : ("generisch" as const),
       stiltreue: usesProductPhoto ? ("hoch" as const) : ("frei" as const),
       keepLabel: usesProductPhoto,
+      photoStyle,
       hyperreal,
       aiWatermark,
       beerName: selectedBeer?.name?.trim() || undefined,
@@ -319,6 +343,7 @@ export default function RuixenMoonChat() {
     genBusy,
     hyperreal,
     message,
+    photoStyle,
     requestQuality,
     router,
     selectedBeer,
@@ -895,6 +920,52 @@ export default function RuixenMoonChat() {
               </div>
 
               <div className="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:min-w-[13.5rem] sm:items-stretch">
+                <div
+                  className="grid w-full grid-cols-3 gap-1 rounded-xl border border-border bg-muted/40 p-1"
+                  role="radiogroup"
+                  aria-label="Fotostil"
+                >
+                  {PHOTO_STYLE_OPTIONS.map((option) => (
+                    <div key={option.value} className="relative min-w-0">
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={photoStyle === option.value}
+                        aria-label={option.fullLabel}
+                        title={option.fullLabel}
+                        className={cn(
+                          "w-full rounded-lg px-1 py-1.5 pr-5 text-[10px] font-semibold leading-tight transition-colors sm:text-[11px]",
+                          photoStyle === option.value
+                            ? "bg-background text-foreground shadow-sm dark:bg-white/10 dark:text-white"
+                            : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
+                        )}
+                        onClick={() => setPhotoStyle(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={`${option.fullLabel}: Infos`}
+                            className="absolute top-1/2 right-0.5 inline-flex size-3.5 -translate-y-1/2 items-center justify-center rounded-full border border-border/80 text-[9px] font-semibold leading-none text-muted-foreground hover:bg-background hover:text-foreground"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            !
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          side="top"
+                          align="center"
+                          className="w-64 p-3 text-xs leading-relaxed text-muted-foreground"
+                        >
+                          <div className="mb-1 font-semibold text-foreground">{option.fullLabel}</div>
+                          {option.hint}
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  ))}
+                </div>
                 <div className="flex w-full items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5">
                     <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground dark:text-white">
@@ -921,8 +992,8 @@ export default function RuixenMoonChat() {
                         align="start"
                         className="w-64 p-3 text-xs leading-relaxed text-muted-foreground"
                       >
-                        Verstärkt echte Kameraanmutung, plausibles Licht und Materialien sowie natürliche
-                        Unperfektheit — ohne CGI-Look.
+                        Kein eigener Fotostil: verstärkt Flüssigkeit, Glas, Haut und Materialien im gewählten
+                        Stil (Reportage, Premium oder Kampagne).
                       </PopoverContent>
                     </Popover>
                   </div>

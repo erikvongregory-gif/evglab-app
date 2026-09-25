@@ -158,7 +158,7 @@ const SCENE_TEXTURE_ANCHORS: Record<HyperrealisticInput["szene"], string> = {
 };
 
 export const HYPERREALISM_NEGATIVE =
-  "illustration, cartoon, painting, CGI, 3D render, Octane, Unreal Engine, synthetic AI-art look, waxy plastic skin, beauty-filter smoothing, professionally retouched, ultra-detailed 8k, photorealistic commercial product shot, malformed hands, extra fingers, fused fingers, uncanny faces, duplicate limbs, generic stock-photo staging, sterile catalog packshot, studio cyclorama, beauty dish, oversaturated colors, inaccurate beer color, plastic-looking foam, perfectly dome-shaped fake foam, sticker-like condensation droplets, uniform droplet grid, floating bottle, wrong bottle scale, melted glass, gibberish label text, warped typography, mirrored words, AI-glossy hyper-sharpening, unnatural HDR glow, warm amber AI glow washed over the entire frame, teal-and-orange cinematic color grade, model-perfect faces, flawless magazine-ad symmetry, airbrushed advertising perfection, everyone posing and smiling at the camera, staged toast performed for the camera, even flattering studio light on every face";
+  "no CGI or illustration; no floating or misscaled product; no warped label text; no plastic foam or uniform sticker-like condensation; no malformed hands or faces; no beauty-retouched wax skin; no golden-hour HDR bloom or teal-orange grade; no lens-flare stock glow; no unrelated logos or watermarks";
 
 export function resolveBeerPhysics(bierstil: string): BeerPhysicsProfile {
   const key = bierstil.trim().toLowerCase().replace(/\s+/g, "_");
@@ -302,9 +302,17 @@ function aspectRatioFormatLabel(aspectRatio: HyperrealisticInput["aspectRatio"])
 export function buildCameraFragment(
   shotType: NonNullable<HyperrealisticInput["shotType"]> | undefined,
   aspectRatio: HyperrealisticInput["aspectRatio"],
+  input?: Pick<HyperrealisticInput, "contentPreset" | "photoStyle" | "stimmungTrend" | "personenModus" | "personImBild">,
 ): string {
   const shot = shotType ?? "A";
-  return `${CAMERA_BY_SHOT[shot]}. Kodak Portra 400 color, ISO 400, fine analog grain. Final composition framed for ${aspectRatioFormatLabel(aspectRatio)} format. Neutral white balance, slightly muted real-world color — no Instagram filter, no HDR.`;
+  const style = input ? resolvePhotoStyle(input) : "reportage";
+  const camera =
+    style === "campaign"
+      ? "Full-frame camera, 24–35mm lens at f/5.6, ISO 100, low or forced perspective with the product dominant in frame"
+      : style === "premium"
+        ? "Full-frame camera, 85mm lens at f/5.6, ISO 100, controlled product focus with natural optical falloff"
+        : "Handheld compact or full-frame camera, 28–35mm lens at f/2.8–f/5.6, ISO 400–1600, candid snapshot framing with imperfect edges";
+  return `${CAMERA_BY_SHOT[shot]}. ${camera}. Final composition framed for ${aspectRatioFormatLabel(aspectRatio)} format. Neutral white balance and believable dynamic range; no HDR.`;
 }
 
 export function buildSceneTextureAnchors(szene: HyperrealisticInput["szene"]): string {
@@ -504,10 +512,93 @@ export function ensureClosureLogic(prompt: string, input: HyperrealisticInput): 
   return `${closure} ${prompt}`;
 }
 
-export function buildHyperrealismLockFragment(): string {
+export function resolvePhotoStyle(
+  input: Pick<HyperrealisticInput, "contentPreset" | "photoStyle" | "stimmungTrend" | "personenModus" | "personImBild">,
+): NonNullable<HyperrealisticInput["photoStyle"]> {
+  if (input.photoStyle) return input.photoStyle;
+  if (input.contentPreset === "campaign_social") return "campaign";
+  const hasPeople = (input.personenModus ?? (input.personImBild ? "D" : "A")) !== "A";
+  if (!hasPeople && (input.stimmungTrend === "premium" || input.stimmungTrend === "modern")) return "premium";
+  return "reportage";
+}
+
+export const PHOTO_STYLE_LOCK_MARKER = "PHOTO STYLE LOCK (NON-NEGOTIABLE)";
+
+/**
+ * Später, kurzer Stil-Lock für das Bildmodell. Er darf nicht vom allgemeinen
+ * Hyperreal-Layer oder einem vorgelagerten Prompt-Rewrite nivelliert werden.
+ */
+export function buildPhotoStyleLockFragment(input: HyperrealisticInput): string {
+  const style = resolvePhotoStyle(input);
+  if (style === "premium") {
+    return [
+      `${PHOTO_STYLE_LOCK_MARKER}: PREMIUM HOSPITALITY PHOTOGRAPHY.`,
+      "LOOK references own the photographic grammar. Freitext only adds people/action — never override LOOK crop, light, or product scale.",
+      "Shoot a quiet premium lifestyle frame in a real beer garden or hospitality setting — natural available light, soft optical bokeh, ordered calm.",
+      "Keep the customer's product label razor-sharp and readable; people may share the frame but stay secondary to the drink.",
+      "Use an 85–100mm perspective, stable camera, restrained props, and an orderly visual hierarchy — no clutter, no flash snapshot energy.",
+      "LOOK references set only this grammar: soft bokeh, warm daylight, hospitality social calm, crisp glass/bottle materials. Never copy their people, brands, logos, or lettering.",
+      "Match LOOK light as photographed — not an HDR golden-hour stock glow or beauty rim light on hair.",
+      "Forbidden AI-gloss: beauty-retouched wax skin, melted pretzel props, uniform sticker condensation, teal-orange grade, lens-flare bloom, plastic foam, perfect stock-model smiles.",
+      "Forbidden: on-camera direct flash, imperfect street crop, product thrust toward the lens, saturated flat campaign color fields, studio packshot on a pedestal.",
+    ].join(" ");
+  }
+  if (style === "campaign") {
+    return [
+      `${PHOTO_STYLE_LOCK_MARKER}: ART-DIRECTED CAMPAIGN MOTIF.`,
+      "LOOK references own the photographic grammar. Freitext only adds people/action — never override LOOK crop, light, or product scale with a beer-garden toast postcard.",
+      "Match the LOOK references' grammar exactly: product fills a large share of the frame — handoff, can/bottle toast, low-angle hero, or overhead sky toast.",
+      "Copy LOOK light character and contrast as photographed — not an HDR/golden-hour CGI glow. Tight crop on hands and product; faces may be cropped out.",
+      "The customer's labeled product is the only brand in frame and must dominate the silhouette.",
+      "LOOK references: copy only scale, angle, light, gesture, and material honesty. Never copy their people, packages, logos, or lettering.",
+      "Forbidden AI-gloss: beauty-retouched skin, wax-smooth faces/hands, uniform sticker condensation, teal-orange grade, lens bloom, oversaturated sky, plastic foam.",
+      "Forbidden (this is Premium, not Campaign): quiet bottle standing on a wooden beer-garden table, soft-focus toasting couple in the background, pretzel/radish still life, Maßkrug postcard, church-tower hospitality bokeh.",
+    ].join(" ");
+  }
+  return [
+    `${PHOTO_STYLE_LOCK_MARKER}: CANDID REPORTAGE.`,
+    "LOOK references own the photographic grammar. Freitext only adds people/action — never override LOOK flash character or imperfect crop with soft hospitality bokeh.",
+    "Shoot a raw observed nightlife or street-life moment: friends in motion, imperfect crop, someone mid-laugh or mid-stride — not a staged ad.",
+    "Prefer on-camera direct flash or harsh available neon/street light with deep falloff; hard shadows and slight overexposure on faces are welcome.",
+    "The customer's product appears casually in hand, on a messy table, or in the crowd — embedded in the event, never the polished hero of the frame.",
+    "LOOK references set only flash character, candid energy, and imperfect framing. Invent entirely new fictional adults every time — vary age, gender presentation, and appearance.",
+    "Never reuse a face, skin tone, hair, baseball cap, neck tattoo, jewelry, or outfit from LOOK references.",
+    "Forbidden: product thrust toward the lens, saturated flat campaign color fields, quiet catalogue packshot, beauty-retouched skin, controlled studio set, repeating the same person across images.",
+  ].join(" ");
+}
+
+export function buildHyperrealismLockFragment(
+  input?: Pick<HyperrealisticInput, "contentPreset" | "photoStyle" | "stimmungTrend" | "personenModus" | "personImBild">,
+): string {
+  const style = input ? resolvePhotoStyle(input) : "reportage";
+  const intent = style === "campaign"
+    ? "Output must look like a real photographed brand campaign on a physical set — art-directed but shot on camera, never CGI."
+    : style === "premium"
+      ? "Output must look like premium hospitality photography in a real beer garden or dining setting, with soft natural light, restrained precision, and no CGI rendering."
+      : "Output must look like a candid flash or street-reportage photograph from a real night out, with imperfect framing and no CGI rendering.";
+  if (style === "campaign") {
+    return [
+      "HYPERREALISM LOCK:",
+      intent,
+      "Prefer LOOK-reference light and materials over any cinematic grading. Keep ordinary camera response: mild noise, uneven skin, irregular condensation.",
+      "Avoid sterile CGI smoothness, beauty retouch, and stock-ad glow.",
+      "Do not describe this as photorealistic, ultra-detailed, high-fidelity, or professionally retouched — those words produce the AI-ad look.",
+      "Strictly forbid illustration, cartoon, painting, CGI, 3D render, or stylized AI-art aesthetics.",
+    ].join(" ");
+  }
+  if (style === "premium") {
+    return [
+      "HYPERREALISM LOCK:",
+      intent,
+      "Prefer LOOK-reference hospitality light and materials. Keep ordinary camera response: mild noise, visible pores, slight skin unevenness, irregular condensation.",
+      "Quiet premium is still a real photograph — never beauty-magazine retouch or stock-ad glow.",
+      "Do not describe this as photorealistic, ultra-detailed, high-fidelity, or professionally retouched — those words produce the AI-ad look.",
+      "Strictly forbid illustration, cartoon, painting, CGI, 3D render, or stylized AI-art aesthetics.",
+    ].join(" ");
+  }
   return [
     "HYPERREALISM LOCK:",
-    "Output must look like an unretouched photograph from a real camera on location — a brewery snapshot, not a CGI product viz and not a retouched ad.",
+    intent,
     "Enforce physically plausible lighting, real material response, true-to-life reflections, natural shadow penumbra, and subtle real-world imperfections.",
     "Include at least three concrete environmental micro-details and believable surface wear — avoid sterile CGI smoothness.",
     "Do not describe this as photorealistic, ultra-detailed, high-fidelity, or professionally retouched — those words produce the AI-ad look.",
@@ -526,25 +617,48 @@ export const AUTHENTICITY_MARKER = "ANTI-AI AUTHENTICITY (MANDATORY)";
  */
 export function buildAuthenticityFragment(input: HyperrealisticInput): string {
   const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
+  const style = resolvePhotoStyle(input);
+  const campaign = style === "campaign";
+  const premiumProduct = style === "premium";
   const lines = [
     `${AUTHENTICITY_MARKER}:`,
-    "This must read as a candid documentary photograph of a real moment — NOT a polished advertising render.",
-    "Aesthetic: handheld editorial snapshot; slightly imperfect, lived-in, ordinary.",
-    "Color science of Kodak Portra 400. Fine analog grain. Neutral white balance, slightly muted real-world color — never a warm amber glow over the whole frame, never teal-orange grading, never HDR, never beauty-retouch.",
-    "Lighting is a large soft source from the actual scene (sun, overcast sky, window, practical lamps) with true falloff. Some areas stay in shadow. Highlights may clip softly. No beauty dish, no rim-light hero glow.",
-    modus === "A"
-      ? "The product rests on a real surface with a natural contact shadow. Glass reflects this room, not a white studio cove."
-      : "If the product is held or mid-toast: believable grip, scale, and contact shadows on hands/glasses — not a cutout packshot floating in the frame.",
-    "Composition is slightly off: not centered, natural overlaps, things cropped at the frame edge. Not everything is razor-sharp.",
+    campaign
+      ? "This must read as a real camera campaign still from a brand shoot: product-forward and staged, but with ordinary photographic texture — not a glossy AI key visual."
+      : premiumProduct
+        ? "This must read as real hospitality photography from a beer garden or dining set: calm, soft optical bokeh, readable drink — not a glossy AI lifestyle ad."
+        : "This must read as a candid snapshot or street-reportage frame: raw, social, slightly imperfect, and unposed.",
+    "Neutral color response and believable dynamic range — never a warm amber wash, teal-orange grading, HDR, golden-hour bloom, or beauty-retouched skin.",
+    campaign
+      ? "Lighting follows the LOOK references' real light (sun angle, contrast, color temperature) — not a cinematic sunset wash or beauty-dish glow. Mild highlight clip is fine; lens flare bloom is not."
+      : premiumProduct
+        ? "Lighting follows LOOK-reference hospitality light (window, overcast, soft evening practicals) with true falloff and some shadow. No beauty dish, no rim-light hero glow on hair, no cinematic sunset wash."
+        : "Lighting is on-camera direct flash or harsh available street/neon/practical light with deep background falloff. Hard shadows and slight flash hotspots are correct. No soft catalogue beauty dish.",
+    campaign
+      ? "The customer's product dominates the foreground — held toward the camera or filling the lower/center frame. Condensation must be sparse and irregular, never a perfect droplet grid. Not a quiet bottle standing alone on a beer-garden table."
+      : premiumProduct
+        ? modus === "A"
+          ? "The product rests on a real surface with a natural contact shadow. Glass reflects this room, not a white studio cove. Props stay physically real — no melted pretzel mush."
+          : "If the product is held or mid-toast: believable adult hands with knuckles, pores, and a firm grip; contact shadows on glass — not wax CGI hands or a cutout packshot floating in the frame."
+        : "The product is casually present — in a hand, pocket of the crowd, or on a cluttered surface. People and place carry the frame; the bottle is not a centered hero packshot.",
+    campaign || premiumProduct
+      ? "Composition is intentional and clean, with one clear visual hierarchy; depth of field remains physically believable optical bokeh — not uniform CGI circles."
+      : "Composition feels grabbed mid-moment: slight tilt, cut limbs at frame edge, layered bodies, natural overlaps — not carefully art-directed hierarchy.",
   ];
-  if (modus === "B" || modus === "C") {
+  if (!campaign && (modus === "B" || modus === "C")) {
     lines.push(
       "Visible hands are real adult hands: knuckles, pores, veins, slightly imperfect skin, a firm believable grip — not smooth CGI, not beauty-retouched.",
     );
   }
-  if (modus === "D" || modus === "E") {
+  if (!campaign && (modus === "D" || modus === "E")) {
     lines.push(
-      "The people are ordinary real people, not models: uneven skin with visible pores, stray hairs, natural imperfect teeth, asymmetric mid-moment expressions, relaxed unposed body language. They are absorbed in their own moment — nobody performs or poses for the camera unless the brief explicitly asks for it.",
+      premiumProduct
+        ? "People are ordinary guests, not models: visible pores, slight skin unevenness, stray hairs, natural imperfect teeth, asymmetric mid-moment expressions. Soft hospitality light is fine — beauty-filter wax skin and perfect stock smiles are not."
+        : "People look like friends on a night out: uneven flash-lit skin, stray hairs, mid-gesture faces, someone looking away or half out of frame. No beauty-filter, no posed stock-photo smile toward the lens.",
+    );
+  }
+  if (campaign && (modus === "B" || modus === "C" || modus === "D" || modus === "E")) {
+    lines.push(
+      "Hands and people stay physically real: visible knuckles, pores, veins, slight skin unevenness, firm believable grip — never wax-smooth CGI hands or beauty-filter faces. Energetic campaign pose is fine; plastic stock-model skin is not.",
     );
   }
   return lines.join(" ");
@@ -555,7 +669,7 @@ export function ensureHyperrealismDirectives(prompt: string, input: Hyperrealist
   const lower = next.toLowerCase();
 
   if (!/high-fidelity photorealistic|hyperrealism lock|indistinguishable from a real camera/i.test(lower)) {
-    next = `${buildHyperrealismLockFragment()}\n\n${next}`;
+    next = `${buildHyperrealismLockFragment(input)}\n\n${next}`;
   }
 
   if (!/liquid physics|srm \d|approx\. hex/i.test(lower)) {
@@ -573,7 +687,7 @@ export function ensureHyperrealismDirectives(prompt: string, input: Hyperrealist
   }
 
   if (!/shot on.*full-frame|canon eos|35mm|50mm|85mm|100mm/i.test(lower)) {
-    next = `${next}\n\nCAMERA: ${buildCameraFragment(input.shotType, input.aspectRatio)}`;
+    next = `${next}\n\nCAMERA: ${buildCameraFragment(input.shotType, input.aspectRatio, input)}`;
   }
 
   if (!/cgi|3d render|plastic-looking foam|waxy plastic skin/i.test(lower.slice(-600))) {

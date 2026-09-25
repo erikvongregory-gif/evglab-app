@@ -49,6 +49,7 @@ export type StudioDraft = {
   extraReferences: ExtraReference[];
   aspectRatio: Aspect;
   variantCount: VariantCount;
+  photoStyle: NonNullable<HyperrealisticInput["photoStyle"]>;
   hyperreal: boolean;
   aiWatermark: boolean;
   behaelter: NonNullable<HyperrealisticInput["behaelter"]>;

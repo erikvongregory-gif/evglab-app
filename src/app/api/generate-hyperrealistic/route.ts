@@ -102,7 +102,7 @@ export async function POST(req: Request) {
       mode: "hyperrealistic",
       prompt,
       images,
-      model: "gpt-image-2.5-flare",
+      model: "gpt-image-2.5-sunburst",
       userId: guard.userId,
       billing: charge.billing,
     });

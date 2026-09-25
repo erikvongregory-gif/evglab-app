@@ -24,6 +24,9 @@ const mediaSchema = z.object({
   aspectRatio: z.string().max(20),
   resolution: z.enum(["1K", "2K", "4K"]),
   outputFormat: z.enum(["png", "jpg"]),
+  photoStyle: z.enum(["reportage", "premium", "campaign"]).optional(),
+  beerName: z.string().trim().min(1).max(80).optional(),
+  beerId: z.string().trim().min(1).max(64).optional(),
 });
 
 const mediaPatchSchema = z.object({

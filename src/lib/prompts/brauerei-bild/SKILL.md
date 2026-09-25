@@ -61,7 +61,7 @@ Bitte beantworte folgende Fragen (oder gib alles in einem Satz an):
 5. STIMMUNG:
    → Nachhaltig/Rustikal | Modern/Minimalistisch | Nostalgisch/Vintage | Aktiv/Frisch | Premium/Luxus
 
-6. KI-PLATTFORM: Im EvGlab-Dashboard-Modus „Hyperrealistisch" wird IMMER GPT Image 2 (OpenAI gpt-image-2) verwendet.
+6. KI-PLATTFORM: Im EvGlab-Dashboard-Modus „Hyperrealistisch" wird IMMER GPT Image 2.5 Sunburst (OpenAI gpt-image-2.5-sunburst) verwendet.
    → Schreibe ausschließlich natürlichsprachliche, beschreibende englische Prompts (KEINE Midjourney-/Nano-Banana-Parameter wie --ar, --v, --style, --no). Die Nano-Banana-/Midjourney-Plattform-Sektionen weiter unten gelten NUR, falls ein Briefing ausdrücklich ein anderes Modell nennt.
 
 7. ETIKETT/FLASCHE: Soll das Marken-Etikett sichtbar und korrekt dargestellt werden?
@@ -547,7 +547,7 @@ ATMOSPHÄRE: Exklusiv, hochwertig, sophisticated, Genuss-Moment
 ### Plattform-Spezifikationen
 
 <platform_gpt_image_2>
-MODELL: GPT Image 2 (OpenAI / via Higgsfield)
+MODELL: GPT Image 2.5 Sunburst (OpenAI gpt-image-2.5-sunburst)
 EINSATZ: Primäres Dashboard-Modell für BrewAI Modes 1, 3 und 4. Beste Wahl für Etikettreue und komplexe Bildkompositionen.
 
 PROMPT-STIL: Strukturierter Prosa-Absatz in klar definierten Schichten:
@@ -557,15 +557,18 @@ PROMPT-STIL: Strukturierter Prosa-Absatz in klar definierten Schichten:
 4. Technical specs (Objektiv, Aspect Ratio)
 5. Constraints (Negative Prompts als Abschluss)
 
-QUALITÄTS-TRIGGER: NICHT verwenden: `"high-fidelity"`, `"ultra-detailed"`, `"professionally retouched"`, `"photorealistic commercial product shot"` — das erzeugt den KI-Werbe-Look.
-Stattdessen fotografische Anker: `"handheld Canon EOS R6, Kodak Portra 400, ISO 400, fine analog grain"`, `"unretouched photograph"`, `"large soft window light"`, `"natural contact shadow"`.
+FOTOGRAFISCHE REGIE: Waehle die Kamera-/Lichtbeschreibung passend zum Auftrag:
+- authentischer Alltag: candid editorial, available light, natürliche Ueberlappungen
+- Premium-Produkt: kontrolliertes reales Set, 85mm, klare Hierarchie, glaubhafte Materialwirkung
+- Kampagne: art-directed real-camera campaign, bewusster Negativraum und definierte Copy-Space
+Kein pauschaler Analogfilm-, Filmkorn- oder Handheld-Zwang.
 
 TEXT-RENDERING: Überragend — bestes Text-Rendering aller verfügbaren Modelle.
 → Exakten Text in GROSSBUCHSTABEN oder "Anführungszeichen" schreiben
 → Syntax: `"EXACT TEXT on the label reads '[Markenname]' in bold [Schriftbeschreibung]"`
 → Für Etiketten zusätzlich: `"no text modifications, preserve every character exactly as specified"`
 
-REFERENZBILDER: Sehr präzise Übernahme. Bis zu mehrere Referenzbilder möglich.
+REFERENZBILDER: Sehr präzise Übernahme. Jedes Bild per Index und exklusiver Rolle beschreiben: Produkt/Etikett, Form, Glas, Szene oder Look. Keine Eigenschaften zwischen den Rollen vermischen.
 Stärke für Etikett-Treue: **85%**
 Stärke für Stil-Referenz: **60–70%**
 Stärke für kreative Varianten: **40–50%**
@@ -581,13 +584,13 @@ BESONDERHEITEN:
 - Produktkonsistenz: Exzellent bei mehreren Views desselben Produkts
 - Farbtreue: Hochpräzise — nutze SRM-Farbbeschreibung + Hex-Referenz im Prompt
 
-NEGATIVE PROMPTS (GPT Image 2):
+NEGATIVE PROMPTS (GPT Image 2.5 Sunburst):
 Gleiche Prosa-Syntax wie Nano Banana: `"Avoid [X]. Do not include [Y]. Exclude [Z]."`
 → 3-5 Ausschlüsse für beste Ergebnisse
 → Glastyp explizit sichern: `"The glass must be a [korrekter Glastyp]. Do not substitute with other glassware."`
 
-BEISPIEL-SATZ (GPT Image 2 spezifisch):
-`"Unretouched handheld photograph on Kodak Portra 400. EXACT TEXT on the label reads 'BRAUEREI XY' in bold serif. No text modifications. Preserve the real product; invent only the environment."`
+BEISPIEL-SATZ (GPT Image 2.5 Sunburst spezifisch):
+`"Image 1 defines the exact product and printed label. Reconstruct it physically in the new scene and discard the reference background and lighting. Preserve the real product; invent only the environment."`
 </platform_gpt_image_2>
 
 <platform_nano_banana_pro>
@@ -665,7 +668,7 @@ Lege Shot Type, Kamerawinkel, Objektiv, Blende, Schärfentiefe und Seitenverhäl
 → Nutze "Bildausschnitt & Kamerawinkel" + "Kamera und Objektiv"
 
 ### Zusammenführung je Plattform:
-- **GPT Image 2**: Strukturierter Prosa-Absatz (5-8 Sätze) in 5 Schichten (Scene → Subject → Style → Specs → Constraints). Beginne mit `"Unretouched handheld photograph, Kodak Portra 400."` — NICHT mit `"photorealistic commercial product shot"`. Nutze GROSSBUCHSTABEN für exakten Text. **Danach: Negative Prompts als Prosa.** SRM-Farbe + Hex IMMER im Subject-Block nennen.
+- **GPT Image 2.5 Sunburst**: Strukturierter Prosa-Absatz in 5 Schichten (Scene → Subject → Composition → Lighting/Camera → Preserve/Change Constraints). Kamera- und Lichtstil passend zum Motiv wählen. Referenzbilder per Index und exklusiver Rolle benennen. SRM-Farbe + Hex im Subject-Block nennen.
 - **Nano Banana Pro**: Detaillierter fließender englischer Absatz (4-8 Sätze). Beginne mit dem Produkt, ende mit der Kamera. **Danach: Negative Prompts als separater Abschnitt.**
 - **Nano Banana 2**: Kompakterer Absatz (2-4 Sätze). **Danach: Max. 2-3 Negative Prompts.**
 - **Midjourney**: Komma-getrennte Keywords + Parameter inkl. `--no` Liste.
@@ -690,10 +693,10 @@ Lege Shot Type, Kamerawinkel, Objektiv, Blende, Schärfentiefe und Seitenverhäl
 | 12 | ⚠️ PFLICHT: Personen/Gesichter? | Frage 8 MUSS gestellt worden sein. [A/B/C/D/E] korrekt im Prompt umgesetzt. Bei [E]: Gruppentyp + Dynamik [E1–E4] + Setting spezifiziert. |
 | 13 | Shot Type umgesetzt? | Bildausschnitt [A–H] explizit im Prompt. Objektiv-Kombo korrekt. |
 | 14 | ⚠️ Proportionen-Check? | Wenn Flasche + Glas: Kompatibilitätstabelle geprüft? Proportions-Anker-Satz enthalten? |
-| 15 | Negative Prompts vorhanden? | Mindestens 5 Standard-Negatives + situative Negatives. Glastyp-Negative bei Weizen/Hazy. |
+| 15 | Ausschlüsse präzise? | Nur wenige motivbezogene Ausschlüsse; Glastyp und Markenfremdes bei Bedarf explizit sichern. |
 | 16 | Referenzstärke ausgegeben? | Konkreter Referenzstärke-Wert im Plattform-Hinweis angegeben. |
 | 17 | ⚠️ SRM-Farbe verwendet? | Prompt enthält SRM-genaue Farbbeschreibung aus der Farbtabelle. Hex-Referenz erwähnt. KEIN generisches "golden beer" o.ä. |
-| 18 | GPT Image 2 Text-Syntax? | Wenn GPT Image 2: Exakter Label-Text in GROSSBUCHSTABEN oder "Anführungszeichen". Keine Werbe-Trigger (ultra-detailed, professionally retouched). Stattdessen Portra/ISO/handheld. |
+| 18 | GPT Image 2.5 Text-Syntax? | Exakten neuen Text als EXACT/verbatim angeben; bei Produktreferenz vorhandenes Etikett als Preserve-Constraint behandeln. Kamera-/Lichtstil passend zum Auftrag wählen. |
 
 ---
 
