@@ -20,6 +20,8 @@ import {
 
 import { GeistPixelSquare } from "geist/font/pixel";
 
+import { FONT_META, type FontKey } from "./font-meta";
+
 /** Eine Inter-Instanz — doppelte next/font-Calls brechen Turbopack-Builds. */
 export const inter = Inter({
   subsets: ["latin", "latin-ext"],
@@ -113,92 +115,40 @@ export const playfair = Playfair_Display({
   weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],
 });
-const playfairDisplay = playfair;
 
-export const fontRegistry = {
-  geist: {
-    label: "Geist",
-    font: geist,
-  },
-  inter: {
-    label: "Inter",
-    font: inter,
-  },
-  notoSans: {
-    label: "Noto Sans",
-    font: notoSans,
-  },
-  nunitoSans: {
-    label: "Nunito Sans",
-    font: nunitoSans,
-  },
-  figtree: {
-    label: "Figtree",
-    font: figtree,
-  },
-  roboto: {
-    label: "Roboto",
-    font: roboto,
-  },
-  raleway: {
-    label: "Raleway",
-    font: raleway,
-  },
-  dmSans: {
-    label: "DM Sans",
-    font: dmSans,
-  },
-  publicSans: {
-    label: "Public Sans",
-    font: publicSans,
-  },
-  outfit: {
-    label: "Outfit",
-    font: outfit,
-  },
-  geistMono: {
-    label: "Geist Mono",
-    font: geistMono,
-  },
-  geistPixelSquare: {
-    label: "Geist Pixel Square",
-    font: GeistPixelSquare,
-  },
-  jetBrainsMono: {
-    label: "JetBrains Mono",
-    font: jetBrainsMono,
-  },
-  notoSerif: {
-    label: "Noto Serif",
-    font: notoSerif,
-  },
-  robotoSlab: {
-    label: "Roboto Slab",
-    font: robotoSlab,
-  },
-  merriweather: {
-    label: "Merriweather",
-    font: merriweather,
-  },
-  lora: {
-    label: "Lora",
-    font: lora,
-  },
-  playfairDisplay: {
-    label: "Playfair Display",
-    font: playfairDisplay,
-  },
-} as const;
+const fontsByKey = {
+  geist,
+  inter,
+  notoSans,
+  nunitoSans,
+  figtree,
+  roboto,
+  raleway,
+  dmSans,
+  publicSans,
+  outfit,
+  geistMono,
+  geistPixelSquare: GeistPixelSquare,
+  jetBrainsMono,
+  notoSerif,
+  robotoSlab,
+  merriweather,
+  lora,
+  playfairDisplay: playfair,
+} as const satisfies Record<FontKey, { variable: string }>;
 
-export type FontKey = keyof typeof fontRegistry;
+export const fontRegistry = Object.fromEntries(
+  (Object.keys(FONT_META) as FontKey[]).map((key) => [
+    key,
+    { label: FONT_META[key].label, font: fontsByKey[key] },
+  ]),
+) as {
+  [K in FontKey]: { label: (typeof FONT_META)[K]["label"]; font: (typeof fontsByKey)[K] };
+};
 
-export const fontKeys = Object.keys(fontRegistry) as FontKey[];
+export type { FontKey } from "./font-meta";
+export { fontKeys, fontOptions } from "./font-meta";
 
-export const fontVars = Object.values(fontRegistry)
-  .map(({ font }) => font.variable)
+export const fontVars = (Object.keys(FONT_META) as FontKey[])
+  .map((key) => fontsByKey[key].variable)
   .join(" ");
-
-export const fontOptions = fontKeys.map((key) => ({
-  key,
-  label: fontRegistry[key].label,
-}));

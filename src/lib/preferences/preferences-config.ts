@@ -11,7 +11,7 @@
  * Others are flexible and can use any persistence.
  */
 
-import { fontKeys } from "@/lib/fonts/registry";
+import { fontKeys } from "@/lib/fonts/font-meta";
 
 import {
   CONTENT_LAYOUT_VALUES,
