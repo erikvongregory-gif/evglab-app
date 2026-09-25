@@ -204,7 +204,7 @@ html[data-font="lora"] body {
   --font-sans: var(--font-lora);
 }
 html[data-font="playfairDisplay"] body {
-  --font-sans: var(--font-playfair-display);
+  --font-sans: var(--font-serif);
 }
 
 .disable-transitions * {

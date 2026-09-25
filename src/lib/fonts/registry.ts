@@ -20,9 +20,12 @@ import {
 
 import { GeistPixelSquare } from "geist/font/pixel";
 
-const inter = Inter({
-  subsets: ["latin"],
+/** Eine Inter-Instanz — doppelte next/font-Calls brechen Turbopack-Builds. */
+export const inter = Inter({
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
   variable: "--font-inter",
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 const notoSans = Noto_Sans({
@@ -102,10 +105,15 @@ const lora = Lora({
   variable: "--font-lora",
 });
 
-const playfairDisplay = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-playfair-display",
+/** Eine Playfair-Instanz (--font-serif); Preference playfairDisplay mappt darauf. */
+export const playfair = Playfair_Display({
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  variable: "--font-serif",
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
 });
+const playfairDisplay = playfair;
 
 export const fontRegistry = {
   geist: {
