@@ -31,6 +31,7 @@ export type BrandSuggestedBeer = {
   flaschenfarbe: "braun" | "gruen" | "klar";
   glasTyp: string;
   etikettUrl: string;
+  packagingNeedsReview?: boolean;
 };
 
 export type BrandScanSuggestion = {
@@ -159,6 +160,7 @@ function parseSuggestedBeers(value: unknown): BrandSuggestedBeer[] | undefined {
             : "klar",
       glasTyp: typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim() : "willibecher",
       etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",
+      packagingNeedsReview: item.packagingNeedsReview === true,
     });
     if (beers.length >= MAX_MY_BEERS) break;
   }
@@ -375,7 +377,12 @@ export function BrandProfileSetupModal({
   const [error, setError] = useState("");
   const [analysisStepIndex, setAnalysisStepIndex] = useState(0);
   const [review, setReview] = useState<BrandScanSuggestion>(emptyReview);
-  const [sourceMeta, setSourceMeta] = useState<{ confidence?: string; pageTitle?: string } | null>(null);
+  const [sourceMeta, setSourceMeta] = useState<{
+    confidence?: string;
+    pageTitle?: string;
+    reviewHints?: string[];
+    crawlNote?: string | null;
+  } | null>(null);
   const [handledAutoSignal, setHandledAutoSignal] = useState(0);
 
   const filledCount = slots.filter((s) => s.file).length;
@@ -549,7 +556,12 @@ export function BrandProfileSetupModal({
       let data: {
         error?: string;
         suggestion?: Partial<BrandScanSuggestion>;
-        sourceMeta?: { confidence?: string; pageTitle?: string };
+        sourceMeta?: {
+          confidence?: string;
+          pageTitle?: string;
+          reviewHints?: string[];
+          crawlNote?: string | null;
+        };
       };
       try {
         data = (await res.json()) as typeof data;
@@ -694,7 +706,12 @@ export function BrandProfileSetupModal({
       let data: {
         error?: string;
         suggestion?: Partial<BrandScanSuggestion>;
-        sourceMeta?: { confidence?: string; pageTitle?: string };
+        sourceMeta?: {
+          confidence?: string;
+          pageTitle?: string;
+          reviewHints?: string[];
+          crawlNote?: string | null;
+        };
       };
       try {
         data = (await res.json()) as typeof data;

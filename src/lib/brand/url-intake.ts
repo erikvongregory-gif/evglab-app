@@ -73,6 +73,40 @@ export type SafeFetchResult = {
   contentType: string;
 };
 
+/** Tracking/marketing — beim Katalog-URL-Abgleich verwerfen. */
+const TRACKING_QUERY = /^(?:utm_|fbclid|gclid|gbraid|wbraid|mc_|msclk|twclid|_ga|yclid|dclid|ref$|fb_action)/i;
+/** Shop-/Produktfilter — unterscheiden z.B. /produkt?id=123 von ?id=456. */
+const PRODUCT_QUERY =
+  /^(?:id|sku|pid|product(?:[_-]?id)?|produkt(?:[_-]?id)?|article(?:[_-]?id)?|artikel(?:[_-]?(?:nr|nummer|id))?|number|nummer|variant(?:e|[_-]?id)?|p)$/i;
+
+/** Stabile Seiten-Identität: Host+Pfad, Tracking weg, produktrelevante Query behalten. */
+export function catalogPageKey(url: string): string {
+  const parsed = new URL(url);
+  const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+  const path = parsed.pathname.replace(/\/+$/, "");
+  const kept = [...parsed.searchParams.entries()]
+    .filter(([key]) => PRODUCT_QUERY.test(key) && !TRACKING_QUERY.test(key))
+    .sort(([a], [b]) => a.localeCompare(b) || 0);
+  if (!kept.length) return `${host}${path}`;
+  const query = kept.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
+  return `${host}${path}?${query}`;
+}
+
+/** Link-Ziel fuer den Crawler: Hash/Tracking weg, produktrelevante Params behalten. */
+export function normalizeCatalogUrl(url: string): string {
+  const parsed = new URL(url);
+  parsed.hash = "";
+  const kept = [...parsed.searchParams.entries()].filter(
+    ([key]) => PRODUCT_QUERY.test(key) && !TRACKING_QUERY.test(key),
+  );
+  parsed.search = "";
+  for (const [key, value] of kept.sort(([a], [b]) => a.localeCompare(b))) {
+    parsed.searchParams.append(key, value);
+  }
+  if (parsed.pathname.length > 1) parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+  return parsed.toString();
+}
+
 export async function safeFetchHtml(startUrl: string): Promise<SafeFetchResult> {
   assertSafePublicUrl(new URL(startUrl));
   const response = await publicFetch(startUrl, { maxBytes: URL_MAX_BODY_BYTES, timeoutMs: URL_FETCH_TIMEOUT_MS,

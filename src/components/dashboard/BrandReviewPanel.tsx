@@ -20,7 +20,12 @@ import { GETRANKEART_OPTIONS, sanitizeProduktKategorie } from "@/lib/dashboard/m
 
 type BrandReviewPanelProps = {
   review: BrandScanSuggestion;
-  sourceMeta: { confidence?: string; pageTitle?: string } | null;
+  sourceMeta: {
+    confidence?: string;
+    pageTitle?: string;
+    reviewHints?: string[];
+    crawlNote?: string | null;
+  } | null;
   busy: boolean;
   error?: string;
   onChange: (patch: Partial<BrandScanSuggestion>) => void;
@@ -104,6 +109,20 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
           </div>
         ) : null}
 
+        {sourceMeta?.crawlNote ? (
+          <p className="studio-modal-sub" style={{ marginTop: 8 }}>
+            {sourceMeta.crawlNote}
+          </p>
+        ) : null}
+
+        {sourceMeta?.reviewHints && sourceMeta.reviewHints.length > 0 ? (
+          <ul className="studio-modal-sub" style={{ marginTop: 8, paddingLeft: 18 }}>
+            {sourceMeta.reviewHints.slice(0, 5).map((hint) => (
+              <li key={hint}>{hint}</li>
+            ))}
+          </ul>
+        ) : null}
+
         <div className="mt-5">
           <ProfileStrengthProgress
             value={strength.percent}
@@ -165,6 +184,11 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
                     )}
                     <div className="studio-brand-review-beer-copy">
                       <div className="truncate" title={beer.name}>{beer.name}</div>
+                      {beer.packagingNeedsReview ? (
+                        <p className="studio-modal-sub" style={{ margin: "2px 0 0", fontSize: 12 }}>
+                          Verpackung prüfen
+                        </p>
+                      ) : null}
                       <select
                         className="studio-field"
                         value={sanitizeProduktKategorie(beer.produktKategorie)}

@@ -5,6 +5,8 @@ import { matchingReferenceFingerprints, referenceImageFingerprint } from "./refe
 import {
   assertSafePublicUrl,
   BROWSER_USER_AGENT,
+  catalogPageKey,
+  normalizeCatalogUrl,
   resolveAbsoluteUrl,
   URL_FETCH_TIMEOUT_MS,
 } from "@/lib/brand/url-intake";
@@ -932,10 +934,10 @@ export function extractRelevantInternalLinks(html: string, pageUrl: string, maxL
     score -= Math.max(0, path.split("/").length - 2) * 4;
 
     resolved.hash = "";
-    resolved.search = "";
-    const key = resolved.toString();
+    const normalized = normalizeCatalogUrl(resolved.toString());
+    const key = catalogPageKey(normalized);
     const existing = byUrl.get(key);
-    if (!existing || score > existing.score) byUrl.set(key, { url: key, score, label });
+    if (!existing || score > existing.score) byUrl.set(key, { url: normalized, score, label });
   }
 
   return [...byUrl.values()]
@@ -1054,6 +1056,25 @@ export function pickBrandReferenceImages(
     picked.push(...packshotPool.slice(0, Math.min(MAX_REFERENCE_IMAGES - picked.length, packshotBudget)));
   }
   return picked;
+}
+
+/** Heuristik + Vision nach Qualitaet zusammenfuehren; meldet die tatsaechlich genutzte Quelle. */
+export function mergeBrandReferenceSelections(
+  heuristic: DownloadedImage[],
+  vision: DownloadedImage[],
+): { images: DownloadedImage[]; method: "heuristic" | "vision" | "merged" | "text_only" } {
+  if (!heuristic.length && !vision.length) return { images: [], method: "text_only" };
+  if (!vision.length) return { images: heuristic, method: "heuristic" };
+  if (!heuristic.length) return { images: vision, method: "vision" };
+  const images = pickBrandReferenceImages([...heuristic, ...vision]);
+  const fromHeuristic = new Set(heuristic.map((image) => image.url));
+  const fromVision = new Set(vision.map((image) => image.url));
+  const usedHeuristic = images.some((image) => fromHeuristic.has(image.url));
+  const usedVision = images.some((image) => fromVision.has(image.url));
+  if (usedHeuristic && usedVision) return { images, method: "merged" };
+  if (usedVision) return { images, method: "vision" };
+  if (usedHeuristic) return { images, method: "heuristic" };
+  return { images, method: "text_only" };
 }
 
 function sameReferenceImage(a: DownloadedImage, b: DownloadedImage): boolean {

@@ -1,4 +1,4 @@
-import { crawlCatalogPages } from "@/lib/brand/catalog-crawl";
+import { crawlCatalogPages, formatCatalogCrawlNote } from "@/lib/brand/catalog-crawl";
 import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
@@ -6,14 +6,15 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { enforceRateLimitPersistent, enforceSameOrigin } from "@/lib/security/requestGuards";
-import { analyzeWebsiteBrand, computeAnalysisConfidence, selectBeerProductImageIndices } from "@/lib/brand/brand-analysis";
+import { analyzeWebsiteBrand, assessBrandAnalysisFields, selectBeerProductImageIndices } from "@/lib/brand/brand-analysis";
 import { storeBrandReferenceImagesAsUrls } from "@/lib/brand/persist-reference-urls";
-import { fetchWebsiteHtmlForBrandIntake, fetchWebsiteHtmlWithBrowser } from "@/lib/brand/browser-intake";
+import { createBrandIntakeSession } from "@/lib/brand/browser-intake";
 import { looksLikeBlockedGatePage } from "@/lib/brand/consent-gate-dismiss";
-import { isInstagramUrl, normalizeWebsiteUrl, safeFetchHtml } from "@/lib/brand/url-intake";
+import { isInstagramUrl, normalizeWebsiteUrl } from "@/lib/brand/url-intake";
 import { extractBeerVarietiesFromIntake } from "@/lib/brand/beer-catalog-intake";
 import {
   downloadCandidateImages,
+  mergeBrandReferenceSelections,
   mergeParsedWebsitePages,
   parseWebsiteHtml,
   pickBrandReferenceImages,
@@ -29,6 +30,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
+  const session = createBrandIntakeSession();
   try {
     const rateError = await enforceRateLimitPersistent(req, {
       keyPrefix: "brand-analyze-url",
@@ -79,7 +81,7 @@ export async function POST(req: Request) {
 
     let fetched;
     try {
-      fetched = await fetchWebsiteHtmlForBrandIntake(normalizedUrl);
+      fetched = await session.fetchHtml(normalizedUrl);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Website konnte nicht geladen werden.";
       return NextResponse.json({ error: msg }, { status: 502 });
@@ -89,7 +91,7 @@ export async function POST(req: Request) {
     let homepage = parseWebsiteHtml(fetched.html, fetched.finalUrl);
     if (looksLikeBlockedGatePage(fetched.html, homepage.textExcerpt)) {
       try {
-        fetched = await fetchWebsiteHtmlWithBrowser(normalizedUrl);
+        fetched = await session.fetchWithBrowser(normalizedUrl);
         homepage = parseWebsiteHtml(fetched.html, fetched.finalUrl);
       } catch (retryError) {
         const msg = retryError instanceof Error ? retryError.message : "Alters-/Cookie-Gate konnte nicht umgangen werden.";
@@ -107,14 +109,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const { pages: subpages, rawHtmlByUrl } = await crawlCatalogPages(fetched, async (url) => {
-      const result = await safeFetchHtml(url);
-      const page = parseWebsiteHtml(result.html, result.finalUrl);
-      if (looksLikeBlockedGatePage(result.html, page.textExcerpt) || page.textExcerpt.length < 80) {
-        return fetchWebsiteHtmlForBrandIntake(url);
-      }
-      return result;
-    });
+    const { pages: subpages, rawHtmlByUrl, skipped } = await crawlCatalogPages(fetched, (url) => session.fetchHtml(url));
 
     const intake = mergeParsedWebsitePages([homepage, ...subpages]);
     const downloadedImages = await downloadCandidateImages(intake.imageCandidates);
@@ -139,9 +134,10 @@ export async function POST(req: Request) {
         ? pickBrandReferenceImages(pickImagesByIndices(downloadedImages, visionIndices))
         : [];
 
-    // Heuristik zuerst — Vision nur wenn gar nichts Brauchbares gefunden wurde.
-    const referenceImages =
-      heuristicReferences.length > 0 ? heuristicReferences : visionReferences;
+    const { images: referenceImages, method: imageSelection } = mergeBrandReferenceSelections(
+      heuristicReferences,
+      visionReferences,
+    );
 
     // Die KI-Analyse sieht Szenen (Bildsprache) + bis zu 2 Packshots (nur Farbpalette/Etikett).
     const analysisScenes = referenceImages.filter((image) => !image.isPackshot);
@@ -188,11 +184,6 @@ export async function POST(req: Request) {
       }
     }
 
-    const confidence = computeAnalysisConfidence({
-      textExcerpt: intake.textExcerpt,
-      imageCount: analysisImages.length,
-    });
-
     const suggestedBeers = extractBeerVarietiesFromIntake({
       pages: [homepage, ...subpages],
       downloadedImages,
@@ -200,6 +191,21 @@ export async function POST(req: Request) {
       breweryName: scan.breweryName,
       rawHtmlByUrl,
     });
+
+    const assessment = assessBrandAnalysisFields({
+      scan,
+      textExcerpt: intake.textExcerpt,
+      imageCount: analysisImages.length,
+      sceneCount: analysisScenes.length,
+      packshotCount: analysisPackshotCount,
+      beersDetected: suggestedBeers.length,
+    });
+    const packagingReviewCount = suggestedBeers.filter((beer) => beer.packagingNeedsReview).length;
+    if (packagingReviewCount > 0) {
+      assessment.reviewHints.push(
+        `${packagingReviewCount} Sorte${packagingReviewCount === 1 ? "" : "n"}: Verpackung prüfen`,
+      );
+    }
 
     let brandHeadlineFontName = "";
     let brandFontFileUrl = "";
@@ -216,6 +222,9 @@ export async function POST(req: Request) {
     } catch (fontError) {
       console.warn("[brand/analyze-url] font intake failed:", fontError);
     }
+
+    const pagesFetched = 1 + subpages.length;
+    const crawlNote = formatCatalogCrawlNote(pagesFetched, skipped);
 
     return NextResponse.json({
       ok: true,
@@ -239,15 +248,20 @@ export async function POST(req: Request) {
         ...(brandFontFileUrl ? { brandFontFileUrl } : {}),
       },
       sourceMeta: {
-        pagesFetched: 1 + subpages.length,
+        pagesFetched,
+        pagesSkipped: skipped.length,
+        crawlNote,
+        skippedPages: skipped.slice(0, 12),
         imagesScanned: downloadedImages.length,
         imagesAnalyzed: analysisImages.length,
         sceneImages: analysisScenes.length,
         packshotImages: analysisPackshotCount,
         textExcerpt: intake.textExcerpt.slice(0, 500),
-        confidence,
+        confidence: assessment.overall,
+        fieldConfidence: assessment.fields,
+        reviewHints: assessment.reviewHints,
         pageTitle: intake.title,
-        imageSelection: visionReferences.length > 0 ? "vision" : referenceImages.length > 0 ? "heuristic" : "text_only",
+        imageSelection,
         beersDetected: suggestedBeers.length,
         fontDetected: Boolean(brandHeadlineFontName),
         fontUploaded: Boolean(brandFontFileUrl),
@@ -257,5 +271,7 @@ export async function POST(req: Request) {
     console.error("[brand/analyze-url]", e);
     const msg = e instanceof Error ? e.message : "Website-Analyse fehlgeschlagen.";
     return NextResponse.json({ error: msg }, { status: 500 });
+  } finally {
+    await session.close();
   }
 }

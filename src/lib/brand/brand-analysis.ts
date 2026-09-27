@@ -282,3 +282,106 @@ export function computeAnalysisConfidence(params: {
   if (textLen >= 120 || params.imageCount >= 1) return "medium";
   return "low";
 }
+
+export type FieldConfidenceLevel = "high" | "medium" | "low";
+
+export type BrandFieldConfidence = {
+  field: "breweryName" | "brandColors" | "brandTone" | "brandDos" | "referenceImages" | "label";
+  level: FieldConfidenceLevel;
+  source: string;
+  needsReview: boolean;
+  note?: string;
+};
+
+export type BrandAnalysisAssessment = {
+  overall: FieldConfidenceLevel;
+  fields: BrandFieldConfidence[];
+  reviewHints: string[];
+};
+
+function hexColorCount(value: string): number {
+  return [...value.matchAll(/#(?:[0-9a-fA-F]{3}){1,2}\b/g)].length;
+}
+
+/** Pro Feld Quelle + Sicherheit; overall aus Feldmitteln, nicht nur Text-/Bildmenge. */
+export function assessBrandAnalysisFields(params: {
+  scan: BrandScanJson;
+  textExcerpt: string;
+  imageCount: number;
+  sceneCount: number;
+  packshotCount: number;
+  beersDetected?: number;
+}): BrandAnalysisAssessment {
+  const textLen = params.textExcerpt.trim().length;
+  const name = params.scan.breweryName.trim();
+  const nameInText =
+    name.length >= 3 &&
+    params.textExcerpt.toLowerCase().includes(name.toLowerCase().slice(0, Math.min(name.length, 24)));
+  const hexCount = hexColorCount(params.scan.brandColors);
+
+  const breweryName: BrandFieldConfidence = {
+    field: "breweryName",
+    source: nameInText ? "website_text" : params.imageCount > 0 ? "vision" : "weak_text",
+    level: nameInText && textLen >= 120 ? "high" : name ? "medium" : "low",
+    needsReview: !nameInText || name.length < 3,
+    note: !nameInText ? "Markenname nicht klar im Website-Text belegt" : undefined,
+  };
+
+  const brandColors: BrandFieldConfidence = {
+    field: "brandColors",
+    source: params.packshotCount > 0 ? "packshot+vision" : params.imageCount > 0 ? "vision" : "text_only",
+    level: hexCount >= 4 && params.packshotCount > 0 ? "high" : hexCount >= 3 ? "medium" : "low",
+    needsReview: hexCount < 4 || params.packshotCount === 0,
+    note:
+      params.packshotCount === 0
+        ? "Keine Etikett-/Packshot-Referenz für Farben"
+        : hexCount < 4
+          ? "Weniger als 4 Hex-Farben erkannt"
+          : undefined,
+  };
+
+  const brandTone: BrandFieldConfidence = {
+    field: "brandTone",
+    source: textLen >= 200 ? "website_text" : "thin_text",
+    level: textLen >= 400 ? "high" : textLen >= 120 ? "medium" : "low",
+    needsReview: textLen < 200,
+    note: textLen < 200 ? "Wenig Website-Text für Tonalität" : undefined,
+  };
+
+  const brandDos: BrandFieldConfidence = {
+    field: "brandDos",
+    source: params.sceneCount > 0 ? "scene_images" : "text_fallback",
+    level: params.sceneCount >= 2 ? "high" : params.sceneCount === 1 ? "medium" : "low",
+    needsReview: params.sceneCount < 2,
+    note: params.sceneCount < 2 ? "Wenige Szenenbilder für Bildregeln" : undefined,
+  };
+
+  const referenceImages: BrandFieldConfidence = {
+    field: "referenceImages",
+    source: params.sceneCount > 0 ? "scene_images" : params.packshotCount > 0 ? "packshots_only" : "none",
+    level: params.sceneCount >= 2 ? "high" : params.sceneCount === 1 || params.packshotCount >= 2 ? "medium" : "low",
+    needsReview: params.sceneCount < 2,
+    note: params.sceneCount < 2 ? "Referenzbilder prüfen oder ergänzen" : undefined,
+  };
+
+  const label: BrandFieldConfidence = {
+    field: "label",
+    source: params.packshotCount > 0 ? "packshot" : "missing",
+    level: params.packshotCount > 0 ? "high" : "low",
+    needsReview: params.packshotCount === 0,
+    note: params.packshotCount === 0 ? "Kein Etikett-Packshot gefunden" : undefined,
+  };
+
+  const fields = [breweryName, brandColors, brandTone, brandDos, referenceImages, label];
+  const reviewHints = fields.filter((field) => field.needsReview && field.note).map((field) => field.note!);
+  if ((params.beersDetected ?? 0) === 0) {
+    reviewHints.push("Keine Sorten erkannt — Sortiment manuell prüfen");
+  }
+
+  const rank = { high: 2, medium: 1, low: 0 } as const;
+  const avg =
+    fields.reduce((sum, field) => sum + rank[field.level], 0) / Math.max(1, fields.length);
+  const overall: FieldConfidenceLevel = avg >= 1.6 ? "high" : avg >= 0.9 ? "medium" : "low";
+
+  return { overall, fields, reviewHints };
+}

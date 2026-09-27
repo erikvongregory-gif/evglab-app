@@ -3,6 +3,7 @@ import {
   extractBeerVarietiesFromIntake,
   humanizeBeerSlug,
   inferBierstilFromName,
+  inferPackagingFromEvidence,
   mergeSuggestedBeers,
   replaceSuggestedBeers,
   suggestedBeersToDashboard,
@@ -49,6 +50,27 @@ describe("beer-catalog-intake", () => {
     expect(result.find((item) => item.name === "Cola")?.produktKategorie).toBe("limonade");
     expect(result.find((item) => item.name === "Tafelwasser")?.produktKategorie).toBe("tafelwasser");
     expect(result.find((item) => item.name === "Mineralwasser")?.produktKategorie).toBe("mineralwasser");
+    expect(result.find((item) => item.name === "Helles")?.packagingNeedsReview).toBe(true);
+  });
+
+  it("infers packaging from product evidence and marks unknowns for review", () => {
+    expect(inferPackagingFromEvidence("IPA Dose 0,33 l", "bier")).toMatchObject({
+      flaschenTyp: "dose_330",
+      packagingNeedsReview: false,
+    });
+    expect(inferPackagingFromEvidence("Kellerbier Bügelflasche braun 0,5l", "bier")).toMatchObject({
+      flaschenTyp: "buegel_500",
+      flaschenfarbe: "braun",
+      packagingNeedsReview: false,
+    });
+    expect(inferPackagingFromEvidence("Helles", "bier").packagingNeedsReview).toBe(true);
+
+    const result = scan("<h2>IPA Dose 500ml</h2><h2>Pils</h2>");
+    expect(result.find((item) => item.name === "IPA Dose 500ml")).toMatchObject({
+      flaschenTyp: "dose_500",
+      packagingNeedsReview: false,
+    });
+    expect(result.find((item) => item.name === "Pils")?.packagingNeedsReview).toBe(true);
   });
 
   it("recognizes flavours in a lemonade section and keeps their lazy-loaded images local", () => {
@@ -119,18 +141,35 @@ describe("beer-catalog-intake", () => {
     expect(scan("<h2>Willkommen</h2><h2>Getränke</h2>", images)).toEqual([]);
   });
 
-  it("uses item alt text as beer evidence and rejects merchandise despite beer filenames", () => {
+  it("does not create varieties from image alt text or beer filenames alone", () => {
     const images = [
       { ...catalogImage("https://example.com/product-4711.jpg"), alt: "Sonnen Pils" },
       { ...catalogImage("https://example.com/helles.jpg"), alt: "Helles Bierglas" },
     ];
     const result = scan("", images);
-    expect(result.map((beer) => beer.name)).toEqual(["Sonnen Pils"]);
-    expect(result[0].etikettUrl).toContain("product-4711");
+    expect(result).toEqual([]);
+    const confirmed = scan("<h2>Sonnen Pils</h2>", images);
+    expect(confirmed.map((beer) => beer.name)).toEqual(["Sonnen Pils"]);
+    expect(confirmed[0].etikettUrl).toContain("product-4711");
   });
 
   it("does not infer beers from substring matches such as saison or ipa", () => {
     expect(scan("<h2>Saison Angebote</h2><h2>Marzipan</h2><h2>Helles Glas</h2><h2>Lager Verkauf</h2>").map((beer) => beer.name)).toEqual([]);
+  });
+
+  it("keeps confirmed products without turning unrelated website images into varieties", () => {
+    const pageUrl = "https://example.com/biere";
+    const campaign = { ...catalogImage("https://example.com/sommer-bier-freunde.jpg"), alt: "Sommer Bier Freunde" };
+    const result = extractBeerVarietiesFromIntake({
+      pages: [{ pageUrl, title: "Biere", textBlocks: [], textExcerpt: "", imageCandidates: [campaign] }],
+      downloadedImages: [catalogImage("https://example.com/helles-biergarten.jpg")],
+      imageCandidates: [{ ...campaign, url: "https://example.com/pils-party.jpg", alt: "Pils Party" }],
+      breweryName: "Testbrauerei",
+      rawHtmlByUrl: { [pageUrl]: `<article><h2>Natur Pils</h2><img src="/natur-pils.png"></article>
+        <img src="/weissbier-sommer.jpg" alt="Weissbier Sommer">` },
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ name: "Natur Pils", etikettUrl: "https://example.com/natur-pils.png" });
   });
 
   it("maps common beer names to bierstil codes", () => {
@@ -143,7 +182,7 @@ describe("beer-catalog-intake", () => {
     expect(humanizeBeerSlug("pils", "Augustiner-Bräu München")).toBe("Augustiner Pils");
   });
 
-  it("extracts Augustiner sortiment from catalog image filenames", () => {
+  it("does not infer an assortment even from plausible catalog image filenames", () => {
     const varieties = extractBeerVarietiesFromIntake({
       pages: [
         {
@@ -168,11 +207,7 @@ describe("beer-catalog-intake", () => {
       breweryName: "Augustiner-Bräu München",
     });
 
-    const names = varieties.map((beer) => beer.name);
-    expect(names.some((name) => /pils/i.test(name))).toBe(true);
-    expect(names.some((name) => /weissbier|weizen/i.test(name))).toBe(true);
-    expect(names.some((name) => /alkoholfrei/i.test(name))).toBe(true);
-    expect(varieties.every((beer) => beer.etikettUrl.startsWith("https://"))).toBe(true);
+    expect(varieties).toEqual([]);
   });
 
   it("maps long HTML names to shorter product image slugs", () => {
@@ -256,6 +291,7 @@ describe("beer-catalog-intake", () => {
         },
       ],
       breweryName: "Augustiner-Bräu München",
+      rawHtmlByUrl: { "https://www.augustiner-braeu.de/unser-bier/": "<h2>Augustiner Pils</h2>" },
     });
 
     expect(varieties.some((beer) => /pils/i.test(beer.name) && beer.etikettUrl.includes("Augustiner-pils"))).toBe(true);

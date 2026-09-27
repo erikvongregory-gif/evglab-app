@@ -25,7 +25,93 @@ export type SuggestedBeerVariety = {
   flaschenfarbe: "braun" | "gruen" | "klar";
   glasTyp: string;
   etikettUrl: string;
+  /** true = Verpackung nicht belegt, Nutzer soll prüfen. */
+  packagingNeedsReview?: boolean;
 };
+
+export type PackagingGuess = {
+  flaschenTyp: string;
+  flaschenfarbe: "braun" | "gruen" | "klar";
+  packagingNeedsReview: boolean;
+};
+
+/** Verpackung aus Produkttext/URL/Alt — Unbekanntes explizit zur Prüfung markieren. */
+export function inferPackagingFromEvidence(evidence: string, kategorie: ProduktKategorie): PackagingGuess {
+  const token = normalizeToken(evidence);
+  const raw = evidence.toLowerCase();
+
+  const mlMatch =
+    raw.match(/\b(\d{3,4})\s*ml\b/) ??
+    raw.match(/\b0\s*[,.]\s*(33|5|50|75)\s*l\b/) ??
+    raw.match(/\b(33|50|75)\s*cl\b/);
+  let ml = 0;
+  if (mlMatch) {
+    const value = mlMatch[1]!;
+    if (value === "33" || value === "5" || value === "50" || value === "75") {
+      ml = value === "5" || value === "50" ? 500 : value === "75" ? 750 : 330;
+    } else {
+      ml = Number(value);
+    }
+  }
+
+  const isDose = /\b(?:dose|dosen|can|cans)\b/.test(token) || /[-_/](?:dose|can)(?:[-_/]|$)/.test(token);
+  const isBuegel = /buegel|swing-?top|buegelverschluss/.test(token);
+  const isWeizen = /weizenflasch/.test(token);
+  const isLongneck = /longneck|ale-?flasch/.test(token);
+  const isEuro = /euroflasch|steinie|stubbi/.test(token);
+  const isNrw = /\bnrw\b|vichy|mehrwegflasch/.test(token);
+
+  let flaschenTyp = "nrw_500";
+  let formKnown = false;
+  if (isDose) {
+    flaschenTyp = ml >= 450 ? "dose_500" : "dose_330";
+    formKnown = true;
+  } else if (isBuegel) {
+    flaschenTyp = ml >= 700 ? "buegel_750" : ml > 0 && ml <= 350 ? "buegel_330" : "buegel_500";
+    formKnown = true;
+  } else if (isWeizen) {
+    flaschenTyp = "weizen_500";
+    formKnown = true;
+  } else if (isLongneck) {
+    flaschenTyp = "longneck_500";
+    formKnown = true;
+  } else if (isEuro) {
+    flaschenTyp = "vichy_500";
+    formKnown = true;
+  } else if (isNrw || ml === 330) {
+    flaschenTyp = ml > 0 && ml <= 350 ? "nrw_330" : "nrw_500";
+    formKnown = isNrw || ml === 330;
+  } else if (ml === 500) {
+    flaschenTyp = "nrw_500";
+    formKnown = false; // Volumen allein ≠ Form
+  }
+
+  let flaschenfarbe: PackagingGuess["flaschenfarbe"] = kategorie === "bier" ? "braun" : "klar";
+  let colorKnown = false;
+  if (isDose) {
+    flaschenfarbe = "klar";
+    colorKnown = true;
+  } else if (/gruen|green/.test(token) || /grün/.test(raw)) {
+    flaschenfarbe = "gruen";
+    colorKnown = true;
+  } else if (/klar|flint|clear|weissglas|weiss-?glas/.test(token)) {
+    flaschenfarbe = "klar";
+    colorKnown = true;
+  } else if (/braun|amber|brown/.test(token)) {
+    flaschenfarbe = "braun";
+    colorKnown = true;
+  }
+
+  if (kategorie !== "bier" && !isDose && !formKnown) {
+    return { flaschenTyp: "nrw_500", flaschenfarbe: "klar", packagingNeedsReview: true };
+  }
+
+  return {
+    flaschenTyp,
+    flaschenfarbe,
+    packagingNeedsReview: !formKnown || (!isDose && !colorKnown && kategorie === "bier"),
+  };
+}
 
 const FILENAME_SKIP_SLUGS = new Set([
   "euro",
@@ -203,16 +289,19 @@ export function extractBeerVarietiesFromIntake(params: {
   rawHtmlByUrl?: Record<string, string>;
 }): SuggestedBeerVariety[] {
   const brewery = params.breweryName.trim();
-  type Entry = { name: string; kategorie: ProduktKategorie; etikettUrl: string; score: number };
+  type Entry = { name: string; kategorie: ProduktKategorie; etikettUrl: string; score: number; evidence: string };
   const entries = new Map<string, Entry>();
   const images: CatalogImageRef[] = [];
-  const add = (name: string, kategorie: ProduktKategorie, etikettUrl = "", score = 0) => {
+  const add = (name: string, kategorie: ProduktKategorie, etikettUrl = "", score = 0, evidence = "") => {
     const identity = catalogIdentity(name, brewery);
     if (!identity) return;
     const key = `${kategorie}:${identity}`;
     const existing = entries.get(key);
-    if (!existing) entries.set(key, { name, kategorie, etikettUrl, score });
-    else if (etikettUrl && score > existing.score) Object.assign(existing, { etikettUrl, score });
+    if (!existing) entries.set(key, { name, kategorie, etikettUrl, score, evidence });
+    else {
+      if (etikettUrl && score > existing.score) Object.assign(existing, { etikettUrl, score });
+      if (evidence) existing.evidence = `${existing.evidence} ${evidence}`.trim();
+    }
   };
   for (const page of params.pages) {
     for (const product of readCatalogEvidence(params.rawHtmlByUrl?.[page.pageUrl] ?? "", page.pageUrl)) {
@@ -224,7 +313,8 @@ export function extractBeerVarietiesFromIntake(params: {
       const kategorie = detectProduktKategorie(product.name) ?? detectProduktKategorie(category) ?? (flavour && lemonadeContext ? "limonade" : null);
       if (!kategorie) continue;
       const uniqueImage = product.images.length === 1 ? product.images[0] : "";
-      add(product.name, kategorie, uniqueImage, uniqueImage ? 200 : 0);
+      const evidence = [product.name, product.context, category, ...product.images].filter(Boolean).join(" ");
+      add(product.name, kategorie, uniqueImage, uniqueImage ? 200 : 0, evidence);
       for (const url of product.images) images.push({ url, alt: product.images.length === 1 ? product.name : "", kategorie });
     }
   }
@@ -247,7 +337,6 @@ export function extractBeerVarietiesFromIntake(params: {
     if (kategorie) images.push({ url: candidate.url, alt: candidate.alt, kategorie });
   }
   // An image may enrich an existing product. It must not merge two named varieties.
-  const claimedImages = new Set([...entries.values()].map((entry) => entry.etikettUrl).filter(Boolean));
   for (const entry of entries.values()) {
     const ranked = images.filter((image) => image.kategorie === entry.kategorie && (imageUses.get(image.url) ?? 0) <= 1)
       .map((image) => ({ image, score: imageMatchScore(entry.name, image, brewery) }))
@@ -255,26 +344,27 @@ export function extractBeerVarietiesFromIntake(params: {
     for (const match of ranked) {
       const competitors = [...entries.values()].filter((other) => other !== entry && other.kategorie === entry.kategorie && imageMatchScore(other.name, match.image, brewery) >= match.score);
       if (competitors.length) continue;
-      claimedImages.add(match.image.url);
-      if (match.score > entry.score) Object.assign(entry, { etikettUrl: match.image.url, score: match.score });
+      if (match.score > entry.score) {
+        Object.assign(entry, { etikettUrl: match.image.url, score: match.score });
+        entry.evidence = `${entry.evidence} ${match.image.url} ${match.image.alt}`.trim();
+      }
     }
   }
-  for (const image of images) {
-    if (claimedImages.has(image.url) || !image.kategorie || (imageUses.get(image.url) ?? 0) > 1) continue;
-    const slug = extractProductSlugFromImageUrl(image.url);
-    if (!slug) continue;
-    const name = detectProduktKategorie(image.alt) ? image.alt : humanizeBeerSlug(catalogIdentity(slug), brewery);
-    // Ambiguous short filename evidence must not become an additional phantom variety.
-    if ([...entries.values()].some((entry) => entry.kategorie === image.kategorie && imageMatchScore(entry.name, image, brewery) > 0)) continue;
-    add(name, image.kategorie, image.url, 50);
-  }
+  // Filenames and alt text may match images to products, but never establish a
+  // new variety: campaign and lifestyle photos also contain beer names.
   return [...entries.values()].slice(0, MAX_MY_BEERS).map((entry): SuggestedBeerVariety => {
     const bierstil = inferProduktBezeichnung(entry.name, entry.kategorie);
     const style = entry.kategorie === "bier" ? findBeerStyle(bierstil) : undefined;
+    const packaging = inferPackagingFromEvidence(`${entry.evidence} ${entry.name} ${entry.etikettUrl}`, entry.kategorie);
     return {
-      name: entry.name.slice(0, 80), produktKategorie: entry.kategorie, bierstil,
-      flaschenTyp: "nrw_500", flaschenfarbe: entry.kategorie === "bier" ? "braun" : "klar",
-      glasTyp: style?.glasTyp ?? "willibecher", etikettUrl: entry.etikettUrl.slice(0, 1200),
+      name: entry.name.slice(0, 80),
+      produktKategorie: entry.kategorie,
+      bierstil,
+      flaschenTyp: packaging.flaschenTyp,
+      flaschenfarbe: packaging.flaschenfarbe,
+      glasTyp: style?.glasTyp ?? "willibecher",
+      etikettUrl: entry.etikettUrl.slice(0, 1200),
+      packagingNeedsReview: packaging.packagingNeedsReview,
     };
   }).sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
