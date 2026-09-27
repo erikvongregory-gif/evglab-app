@@ -82,7 +82,11 @@ describe.each([["product", product], ["social", social]] as const)("%s image rej
     expect(settled?.code).toBe("provider_content_rejected");
     expect(settled?.error).toContain("keine Tokens berechnet");
     expect(mocks.render).toHaveBeenCalledTimes(1);
-    expect(mocks.render.mock.calls[0][0].prompt).toContain("aged 25 or older");
+    const sentPrompt = mocks.render.mock.calls[0][0].prompt as string;
+    expect(sentPrompt).toContain("aged 25 or older");
+    expect(sentPrompt.endsWith("people baked into objects.")).toBe(true);
+    expect(sentPrompt).toContain("No political content");
+    expect(sentPrompt).toContain("fully inside its own shoe");
     expect(mocks.finish).toHaveBeenCalledWith(
       expect.objectContaining({ id: "job" }), 0,
       expect.objectContaining({ error: settled.error, images: [], billing: { consumed: 0 } }),

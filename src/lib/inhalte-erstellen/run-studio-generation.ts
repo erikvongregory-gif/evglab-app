@@ -19,7 +19,7 @@ import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
 import { compileBrief } from "@/lib/prompts/prompt-compiler";
 import { applyContentPresetPrompt } from "@/lib/image-types/policy";
-import { appendCopySpaceDirective } from "@/lib/social/copy-space-prompt";
+import { COPY_SPACE_DIRECTIVE } from "@/lib/social/copy-space-prompt";
 import { composeSocialTextOverlay, parsePrimaryBrandColor } from "@/lib/social/text-overlay";
 import { applyAiWatermark } from "@/lib/openai/aiWatermark";
 import {
@@ -43,7 +43,7 @@ import {
   cropBufferFaceSafe,
   generateCharacterIdentityImage,
 } from "@/lib/kie/nanoBananaCharacterGenerate";
-import { withAdultSceneContext } from "@/lib/prompts/imageSceneContext";
+import { CUSTOMER_IMAGE_SAFETY_LOCK, withAdultSceneContext } from "@/lib/prompts/imageSceneContext";
 import {
   ProviderError,
   isProviderError,
@@ -432,12 +432,12 @@ async function prepareStudioGeneration(args: {
     prompt = applyContentPresetPrompt(prompt, "hyperreal");
   }
   const photoStyleLock = buildPhotoStyleLockFragment(input);
-  // Style-Lock + Anti-AI nach Truncation wieder anhängen — sonst stirbt der Gloss-Schutz am Prompt-Ende.
-  prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS - photoStyleLock.length - 2);
-  prompt = `${prompt}\n\n${photoStyleLock}`;
-
-  prompt = ensureClosureLogic(prompt, input);
-  if (mode === "social") prompt = appendCopySpaceDirective(prompt);
+  const tail = [photoStyleLock, mode === "social" ? COPY_SPACE_DIRECTIVE : "", CUSTOMER_IMAGE_SAFETY_LOCK]
+    .filter(Boolean)
+    .join("\n\n");
+  // Style-, Copy- und Safety-Lock nach Truncation anhängen — sonst sterben sie am Prompt-Ende.
+  prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS - tail.length - 2);
+  prompt = ensureClosureLogic(`${prompt}\n\n${tail}`, input);
 
   const qualityEnv = process.env.OPENAI_IMAGE_QUALITY?.trim().toLowerCase();
   const requestedQuality =

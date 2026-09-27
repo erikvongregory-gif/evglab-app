@@ -642,7 +642,7 @@ export function buildAuthenticityFragment(input: HyperrealisticInput): string {
         : "The product is casually present — in a hand, pocket of the crowd, or on a cluttered surface. People and place carry the frame; the bottle is not a centered hero packshot.",
     campaign || premiumProduct
       ? "Composition is intentional and clean, with one clear visual hierarchy; depth of field remains physically believable optical bokeh — not uniform CGI circles."
-      : "Composition feels grabbed mid-moment: slight tilt, cut limbs at frame edge, layered bodies, natural overlaps — not carefully art-directed hierarchy.",
+      : "Composition feels grabbed mid-moment: slight tilt, limbs may leave the frame, people may overlap — each body stays intact and separate, not carefully art-directed hierarchy.",
   ];
   if (!campaign && (modus === "B" || modus === "C")) {
     lines.push(
