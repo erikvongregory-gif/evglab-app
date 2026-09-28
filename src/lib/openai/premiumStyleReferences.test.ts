@@ -25,8 +25,8 @@ describe("premium style references", () => {
       2,
     );
     expect(references).toHaveLength(2);
-    expect(references.every((reference) => reference.mime === "image/png")).toBe(true);
-    expect(references.every((reference) => reference.base64.length > 10_000)).toBe(true);
+    expect(references.every((reference) => reference.mime === "image/jpeg")).toBe(true);
+    expect(references.every((reference) => reference.base64.length > 1_000)).toBe(true);
   });
 
   it("does not attach the library to reportage or campaign images", async () => {

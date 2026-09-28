@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GenerationWaitFx } from "@/components/ui/ai-chat-image-generation-1";
 import { cn } from "@/lib/utils";
 
 /** Frosted-Reveal: Wipe erst, wenn das Motiv-Bild geladen ist. */
@@ -119,11 +120,21 @@ function MediaJobRevealThumb({
           }}
         />
       ) : null}
-      {!imageReady && !failed ? (
-        <div className="absolute inset-x-0 bottom-0 z-[1] bg-gradient-to-t from-black/45 to-transparent p-2 pt-8">
-          <p className="text-[11px] font-medium text-white/95">{message}</p>
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {!imageReady && !failed ? (
+          <motion.div
+            key="wait-fx"
+            className="absolute inset-0 z-[1]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.5 } }}
+            transition={{ duration: 0.6 }}
+          >
+            <GenerationWaitFx compact />
+            <span className="sr-only">{message}</span>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

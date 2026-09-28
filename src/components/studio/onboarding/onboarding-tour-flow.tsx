@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, CheckCheck, CircleAlert, Globe2, Loader2, Package, Palette, PencilLine, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCheck, ChevronDown, CircleAlert, Globe2, Loader2, Package, Palette, PencilLine, RotateCcw, Trash2 } from "lucide-react";
 import { EvglabMark } from "@/components/studio/evglab-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,14 +26,43 @@ type SortimentRowBeer = {
   bierstil?: string | null;
 };
 
+const EASE_OUT = [0.22, 1, 0.36, 1] as const;
+const EASE_IN = [0.4, 0, 1, 1] as const;
+
+/** Schrittwechsel: Richtung folgt Vor/Zurück, Inhalte kommen gestaffelt. */
+const stepVariants = {
+  enter: ({ dir, reduce }: { dir: number; reduce: boolean }) =>
+    reduce ? { opacity: 0 } : { opacity: 0, x: dir * 32, filter: "blur(6px)" },
+  center: ({ reduce }: { dir: number; reduce: boolean }) => ({
+    opacity: 1,
+    x: 0,
+    filter: "blur(0px)",
+    transitionEnd: { filter: "none" },
+    transition: reduce
+      ? { duration: 0.15 }
+      : { duration: 0.45, ease: EASE_OUT, staggerChildren: 0.055, delayChildren: 0.04 },
+  }),
+  exit: ({ dir, reduce }: { dir: number; reduce: boolean }) =>
+    reduce
+      ? { opacity: 0, transition: { duration: 0.1 } }
+      : { opacity: 0, x: dir * -24, filter: "blur(4px)", transition: { duration: 0.22, ease: EASE_IN } },
+};
+
+const itemVariants = {
+  enter: { opacity: 0, y: 10 },
+  center: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE_OUT } },
+};
+
 function SortimentBeerRow({
   beer,
+  order,
   canEditCategory,
   reduceMotion,
   onCategoryChange,
   onRemove,
 }: {
   beer: SortimentRowBeer;
+  order: number;
   canEditCategory: boolean;
   reduceMotion: boolean | null;
   onCategoryChange: (produktKategorie: ProduktKategorie) => void;
@@ -66,7 +95,12 @@ function SortimentBeerRow({
   return (
     <motion.li
       layout={!reduceMotion}
-      initial={false}
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        layout: { duration: 0.28, ease: EASE_OUT },
+        default: { duration: 0.35, ease: EASE_OUT, delay: 0.25 + Math.min(order, 8) * 0.045 },
+      }}
       exit={
         reduceMotion
           ? { opacity: 0 }
@@ -170,6 +204,13 @@ const ANALYSIS_HINTS = [
 
 const ANALYSIS_STEP_DURATIONS_MS = [2400, 4200, 6200, 8200, 10500, 12500];
 
+/** Kurzer Moment „alles abgehakt“, bevor das Profil erscheint. */
+const SCAN_DONE_PAUSE_MS = 750;
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+}
+
 function normalizeWebsite(value: string) {
   const raw = value.trim();
   try {
@@ -197,6 +238,9 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState(1);
+  const [editOpen, setEditOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [breweryName, setBreweryName] = useState(bootstrap.settings?.breweryName?.trim() || "");
   const [websiteUrl, setWebsiteUrl] = useState(bootstrap.settings?.brandWebsiteUrl?.trim() || "");
@@ -279,7 +323,8 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
       const delay = ANALYSIS_STEP_DURATIONS_MS[Math.min(index, ANALYSIS_STEP_DURATIONS_MS.length - 1)] ?? 5000;
       timer = window.setTimeout(() => {
         index += 1;
-        setAnalysisStepIndex(index);
+        // Nie hinter „fertig“ zurückspringen, falls die Analyse schneller war.
+        setAnalysisStepIndex((current) => Math.max(current, index));
         schedule();
       }, delay);
     };
@@ -300,6 +345,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
       clearUndoTimer();
       setSortimentUndo(null);
     }
+    setDirection(next >= step ? 1 : -1);
     setStep(next);
   }
 
@@ -373,9 +419,11 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
       setWebsiteUrl(url);
       if (next.breweryName) setBreweryName(next.breweryName);
       return next;
-    } finally {
+    } catch (err) {
       setScanning(false);
+      throw err;
     }
+    // Bei Erfolg bleibt `scanning` aktiv — runAction zeigt kurz den Abschluss und wechselt dann direkt zu Schritt 2.
   }, [breweryName, saveBrewerySettings, websiteUrl]);
 
   const activateProfile = useCallback(async () => {
@@ -459,6 +507,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
       flowVersion: 2, completedAt: new Date().toISOString(), tourVersion: ONBOARDING_TOUR_VERSION,
       welcome: true, checklistDismissed: false, celebrated: false,
     });
+    setLeaving(true);
     router.push(bootstrap.hasActivePlan ? "/inhalte-erstellen" : "/dashboard");
     router.refresh();
   }
@@ -476,6 +525,7 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
           welcome: true, checklistDismissed: true, celebrated: true,
         });
         navigating = true;
+        setLeaving(true);
         router.push("/dashboard");
         router.refresh();
       } else if (step === 0) {
@@ -483,6 +533,9 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
         const url = normalizeWebsite(websiteUrl);
         if (!brandReady || analyzedInput.current.name !== breweryName.trim() || analyzedInput.current.url !== url) {
           await analyzeBrand();
+          setAnalysisStepIndex(ANALYSIS_STEPS.length);
+          if (!reduceMotion) await wait(SCAN_DONE_PAUSE_MS);
+          setScanning(false);
         }
         goToStep(1);
       } else if (step === 1) {
@@ -511,8 +564,10 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
   const previewBeers = brand.suggestedBeers !== undefined
     ? brand.suggestedBeers.map((beer, i) => ({ ...beer, id: `preview-${i}` }))
     : beers;
+  const scanDone = scanning && analysisStepIndex >= ANALYSIS_STEPS.length;
+  const scanProgress = scanDone ? 1 : Math.min((analysisStepIndex + 0.5) / ANALYSIS_STEPS.length, 0.96);
   const headings = [
-    scanning ? "Wir lesen deine Marke ein." : "Verbinde deine Website.",
+    scanDone ? "Marke eingelesen." : scanning ? "Wir lesen deine Marke ein." : "Verbinde deine Website.",
     "Prüfe dein Markenprofil.",
     "Bereit fürs Studio.",
   ];
@@ -527,12 +582,26 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
     ? scanning ? "Wird analysiert …" : activating ? "Wird gespeichert …" : "Einen Moment …"
     : step === 0 ? "Website analysieren" : step === 1 ? "Weiter" : "Studio öffnen";
   const scanTarget = hostnameLabel(websiteUrl.trim() || lastAnalyzedUrl);
+  const reduce = Boolean(reduceMotion);
+  const variantCustom = { dir: direction, reduce };
+  const hint = scanDone
+    ? "Fertig — dein Markenprofil ist bereit."
+    : ANALYSIS_HINTS[Math.min(analysisStepIndex, ANALYSIS_HINTS.length - 1)];
 
   return (
-    <div className="brewai-admin min-h-dvh bg-background text-foreground">
+    <div className="brewai-admin min-h-dvh overflow-x-clip bg-background text-foreground">
       <a href="#onboarding-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-background focus:p-3 focus:ring-2 focus:ring-ring">Zum Inhalt</a>
-      <div className="mx-auto flex min-h-dvh max-w-6xl flex-col px-5 sm:px-8 lg:px-12">
-        <header className="flex min-h-20 items-center justify-between gap-4 border-b border-border/70 py-4">
+      <motion.div
+        className="mx-auto flex min-h-dvh max-w-6xl flex-col px-5 sm:px-8 lg:px-12"
+        animate={leaving && !reduce ? { opacity: 0, scale: 0.985, filter: "blur(4px)" } : { opacity: 1, scale: 1, filter: "blur(0px)" }}
+        transition={{ duration: 0.4, ease: EASE_OUT }}
+      >
+        <motion.header
+          className="flex min-h-20 items-center justify-between gap-4 border-b border-border/70 py-4"
+          initial={reduce ? false : { opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE_OUT }}
+        >
           <div className="flex items-center gap-2.5">
             <EvglabMark size={28} />
             <span className="text-lg font-semibold tracking-tight">BrewAI</span>
@@ -541,10 +610,15 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
           <Button variant="ghost" className="h-11 px-3 text-muted-foreground" disabled={busy} onClick={() => void runAction("skip")}>
             Später <ArrowRight className="size-4" aria-hidden="true" />
           </Button>
-        </header>
+        </motion.header>
 
         <div className="grid flex-1 content-start gap-9 py-8 md:grid-cols-[200px_minmax(0,1fr)] md:gap-10 md:py-12 lg:gap-16">
-          <aside className="min-w-0">
+          <motion.aside
+            className="min-w-0"
+            initial={reduce ? false : { opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.55, ease: EASE_OUT, delay: 0.08 }}
+          >
             <p className="mb-2 text-sm text-muted-foreground">Willkommen{bootstrap.profileName ? `, ${bootstrap.profileName.split(" ")[0]}` : ""}</p>
             <p className="max-w-56 text-xl font-semibold leading-tight tracking-tight">Dein Studio.<br className="hidden md:block" /> Deine Marke.</p>
             <nav aria-label="Einrichtungsschritte" className="mt-7 md:mt-9">
@@ -552,19 +626,39 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
                 {STEPS.map((item, index) => {
                   const Icon = item.icon;
                   const complete = index < step;
+                  const current = step === index;
                   return (
                     <li key={item.title}>
                       <button
                         type="button"
                         disabled={busy || index >= step}
                         onClick={() => goToStep(index)}
-                        aria-current={step === index ? "step" : undefined}
-                        className={cn("flex w-full items-center gap-3 rounded-lg py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default md:p-2", step === index ? "text-foreground" : "text-muted-foreground", complete && "hover:bg-muted")}
+                        aria-current={current ? "step" : undefined}
+                        className={cn("relative flex w-full items-center gap-3 rounded-lg px-1.5 py-2 text-left transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default md:p-2", current ? "text-foreground" : "text-muted-foreground", complete && "hover:bg-muted")}
                       >
-                        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors duration-300", step === index ? "border-primary bg-primary text-primary-foreground" : complete ? "border-border bg-muted text-foreground" : "border-border bg-background")}>
-                          {complete ? <Check className="size-4" aria-hidden="true" /> : <Icon className="size-4" aria-hidden="true" />}
+                        {current ? (
+                          <motion.span
+                            layoutId="onboarding-step-active"
+                            aria-hidden="true"
+                            className="absolute inset-0 rounded-lg bg-muted/70"
+                            transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 34 }}
+                          />
+                        ) : null}
+                        <span className={cn("relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border transition-colors duration-300", current ? "border-primary bg-primary text-primary-foreground" : complete ? "border-border bg-background text-foreground" : "border-border bg-background")}>
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.span
+                              key={complete ? "done" : "icon"}
+                              className="flex"
+                              initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.4, rotate: complete ? -45 : 0 }}
+                              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                              exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.4 }}
+                              transition={reduce ? { duration: 0.1 } : { type: "spring", stiffness: 520, damping: 24 }}
+                            >
+                              {complete ? <Check className="size-4" aria-hidden="true" /> : <Icon className="size-4" aria-hidden="true" />}
+                            </motion.span>
+                          </AnimatePresence>
                         </span>
-                        <span className="min-w-0">
+                        <span className="relative min-w-0">
                           <span className="block text-xs font-medium sm:text-sm">{item.title}</span>
                           <span className="mt-0.5 hidden text-xs text-muted-foreground md:block">{item.description}</span>
                           {complete ? <span className="sr-only">Abgeschlossen</span> : null}
@@ -580,37 +674,87 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
                 <span className="font-medium tabular-nums text-foreground">{tokens.toLocaleString("de-DE")}</span> Tokens
               </p>
             ) : null}
-          </aside>
+          </motion.aside>
 
           <main id="onboarding-main" className="min-w-0" aria-label="Studio einrichten">
-            <div className="mb-5 flex items-center gap-3" aria-label={`Schritt ${step + 1} von 3`}>
-              <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">0{step + 1} / 03</span>
+            <motion.div
+              className="mb-5 flex items-center gap-3"
+              aria-label={`Schritt ${step + 1} von 3`}
+              initial={reduce ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+            >
+              <span className="relative inline-flex shrink-0 overflow-hidden text-xs font-medium tabular-nums text-muted-foreground">
+                <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+                  <motion.span
+                    key={step}
+                    custom={direction}
+                    variants={{
+                      enter: (dir: number) => ({ y: reduce ? 0 : dir * 12, opacity: 0 }),
+                      center: { y: 0, opacity: 1 },
+                      exit: (dir: number) => ({ y: reduce ? 0 : dir * -12, opacity: 0 }),
+                    }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.3, ease: EASE_OUT }}
+                  >
+                    0{step + 1}
+                  </motion.span>
+                </AnimatePresence>
+                <span>&nbsp;/ 03</span>
+              </span>
               <div className="flex flex-1 gap-1.5" aria-hidden="true">
-                {STEPS.map((item, index) => <span key={item.title} className={cn("h-1 flex-1 rounded-full transition-colors duration-300 motion-reduce:transition-none", index <= step ? "bg-primary" : "bg-muted")} />)}
+                {STEPS.map((item, index) => (
+                  <span key={item.title} className="relative h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                    <motion.span
+                      className="absolute inset-0 origin-left rounded-full bg-primary"
+                      initial={false}
+                      animate={{ scaleX: index <= step ? 1 : 0 }}
+                      transition={reduce ? { duration: 0 } : { duration: 0.6, ease: EASE_OUT }}
+                    />
+                  </span>
+                ))}
               </div>
-            </div>
-            <AnimatePresence mode="wait" initial={false}>
+            </motion.div>
+            <AnimatePresence mode="wait" initial={false} custom={variantCustom}>
               <motion.section
                 key={scanning ? "scanning" : step}
-                initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: reduceMotion ? 0 : -6 }}
-                transition={{ duration: reduceMotion ? 0 : 0.2, ease: "easeOut" }}
-                onAnimationComplete={() => {
+                custom={variantCustom}
+                variants={stepVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                onAnimationComplete={(definition) => {
+                  if (definition !== "center") return;
                   if (step > 0 || document.activeElement?.tagName === "BODY") headingRef.current?.focus({ preventScroll: true });
                 }}
                 aria-labelledby="onboarding-heading"
               >
-                <h1 id="onboarding-heading" ref={headingRef} tabIndex={-1} className="text-balance text-3xl font-semibold leading-tight tracking-tight outline-none sm:text-[2rem]">{headings[step]}</h1>
-                <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">{descriptions[step]}</p>
+                <motion.h1 variants={itemVariants} id="onboarding-heading" ref={headingRef} tabIndex={-1} className="text-balance text-3xl font-semibold leading-tight tracking-tight outline-none sm:text-[2rem]">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={headings[step]}
+                      className="inline-block"
+                      initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8, filter: "blur(4px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                      transition={{ duration: 0.35, ease: EASE_OUT }}
+                    >
+                      {headings[step]}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.h1>
+                <motion.p variants={itemVariants} className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">{descriptions[step]}</motion.p>
 
                 <form className="mt-6" onSubmit={(event) => { event.preventDefault(); void runAction("next"); }} aria-busy={busy}>
                   <fieldset disabled={busy && !scanning} className="min-w-0 space-y-5">
                     <legend className="sr-only">{STEPS[step].title}</legend>
 
                     {step === 0 && scanning ? (
-                      <div
-                        className="rounded-xl border border-border bg-card p-5 sm:p-6"
+                      <motion.div
+                        variants={itemVariants}
+                        className="relative overflow-hidden rounded-xl border border-border bg-card p-5 sm:p-6"
                         style={{
                           ["--t1" as string]: "var(--foreground)",
                           ["--t2" as string]: "var(--foreground)",
@@ -620,65 +764,173 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
                           ["--err" as string]: "var(--destructive)",
                         }}
                       >
-                        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
-                          <Globe2 className="size-3.5" aria-hidden="true" />
-                          <span>{scanTarget || "Website"}</span>
+                        <div className="absolute inset-x-0 top-0 h-0.5 bg-muted" aria-hidden="true">
+                          <motion.div
+                            className="absolute inset-0 origin-left bg-primary"
+                            initial={{ scaleX: 0 }}
+                            animate={{ scaleX: scanProgress }}
+                            transition={reduce ? { duration: 0 } : { duration: 0.9, ease: EASE_OUT }}
+                          />
+                          {!reduce && !scanDone ? (
+                            <motion.div
+                              className="absolute inset-y-0 w-1/4 bg-gradient-to-r from-transparent via-primary/70 to-transparent"
+                              initial={{ left: "-25%" }}
+                              animate={{ left: "100%" }}
+                              transition={{ duration: 1.8, ease: "easeInOut", repeat: Infinity, repeatDelay: 0.3 }}
+                            />
+                          ) : null}
+                        </div>
+                        <div className="mb-5 flex items-center justify-between gap-3">
+                          <div className="inline-flex min-w-0 items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+                            <span className="relative flex size-3.5 shrink-0 items-center justify-center">
+                              {!reduce && !scanDone ? (
+                                <motion.span
+                                  className="absolute inset-0 rounded-full bg-primary/40"
+                                  animate={{ scale: [1, 2.2], opacity: [0.6, 0] }}
+                                  transition={{ duration: 1.4, ease: "easeOut", repeat: Infinity }}
+                                  aria-hidden="true"
+                                />
+                              ) : null}
+                              <Globe2 className="relative size-3.5" aria-hidden="true" />
+                            </span>
+                            <span className="truncate">{scanTarget || "Website"}</span>
+                          </div>
+                          <AnimatePresence initial={false}>
+                            {scanDone ? (
+                              <motion.span
+                                key="scan-done"
+                                className="flex shrink-0 items-center gap-1.5 rounded-md bg-[var(--ok-dim)] px-2 py-1 text-xs font-medium text-[var(--ok)]"
+                                initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={reduce ? { duration: 0.1 } : { type: "spring", stiffness: 520, damping: 22 }}
+                              >
+                                <Check className="size-3.5" aria-hidden="true" /> Fertig
+                              </motion.span>
+                            ) : (
+                              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                {Math.round(scanProgress * 100)} %
+                              </span>
+                            )}
+                          </AnimatePresence>
                         </div>
                         <TaskSteps steps={taskSteps} current={analysisStepIndex} label="Analyse-Fortschritt" />
-                        <p className="mt-5 text-sm leading-6 text-muted-foreground" role="status" aria-live="polite">
-                          {ANALYSIS_HINTS[Math.min(analysisStepIndex, ANALYSIS_HINTS.length - 1)]}
-                        </p>
+                        <div className="relative mt-5 min-h-12" role="status" aria-live="polite">
+                          <AnimatePresence mode="wait" initial={false}>
+                            <motion.p
+                              key={hint}
+                              className="text-sm leading-6 text-muted-foreground"
+                              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                              transition={{ duration: 0.28, ease: EASE_OUT }}
+                            >
+                              {hint}
+                            </motion.p>
+                          </AnimatePresence>
+                        </div>
                         <p className="mt-3 text-xs text-muted-foreground">Dauert meist unter einer Minute — Fenster offen lassen.</p>
-                      </div>
+                      </motion.div>
                     ) : null}
 
                     {step === 0 && !scanning ? (
                       <>
-                        <div className="space-y-2">
+                        <motion.div variants={itemVariants} className="space-y-2">
                           <Label htmlFor="onboarding-brewery">Name deiner Brauerei</Label>
-                          <Input id="onboarding-brewery" name="breweryName" required maxLength={BRAND_SETTINGS_LIMITS.breweryName} autoComplete="organization" placeholder="Wie heißt deine Brauerei?" value={breweryName} onChange={(event) => setBreweryName(event.target.value)} className="h-12 px-3.5" />
-                        </div>
-                        <div className="space-y-2">
+                          <Input id="onboarding-brewery" name="breweryName" required maxLength={BRAND_SETTINGS_LIMITS.breweryName} autoComplete="organization" placeholder="Wie heißt deine Brauerei?" value={breweryName} onChange={(event) => setBreweryName(event.target.value)} className="h-12 px-3.5 transition-shadow duration-200" />
+                        </motion.div>
+                        <motion.div variants={itemVariants} className="space-y-2">
                           <Label htmlFor="onboarding-website">Website</Label>
                           <div className="relative">
                             <Globe2 className="pointer-events-none absolute left-3.5 top-4 size-4 text-muted-foreground" aria-hidden="true" />
-                            <Input id="onboarding-website" name="website" required maxLength={2000} inputMode="url" autoComplete="url" autoCapitalize="none" spellCheck={false} placeholder="deine-brauerei.de" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} className="h-12 pl-10 pr-3.5" />
+                            <Input id="onboarding-website" name="website" required maxLength={2000} inputMode="url" autoComplete="url" autoCapitalize="none" spellCheck={false} placeholder="deine-brauerei.de" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} className="h-12 pl-10 pr-3.5 transition-shadow duration-200" />
                           </div>
                           <p className="text-xs text-muted-foreground">Nur die öffentliche URL — keine Zugangsdaten nötig.</p>
-                        </div>
+                        </motion.div>
                       </>
                     ) : null}
 
                     {step === 1 ? (
                       <>
-                        <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+                        <motion.div variants={itemVariants} className="rounded-xl border border-border bg-card p-5 sm:p-6">
                           <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0"><p className="text-xs text-muted-foreground">Erkanntes Markenprofil</p><h2 className="mt-1 break-words text-lg font-semibold tracking-tight">{brand.breweryName || breweryName}</h2></div>
-                            <span className="flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs"><Check className="size-3.5" aria-hidden="true" /> Bereit</span>
+                            <motion.span
+                              className="flex shrink-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs"
+                              initial={reduce ? false : { opacity: 0, scale: 0.7 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ type: "spring", stiffness: 480, damping: 24, delay: 0.35 }}
+                            >
+                              <Check className="size-3.5" aria-hidden="true" /> Bereit
+                            </motion.span>
                           </div>
                           <p className="mt-4 whitespace-pre-line text-sm leading-6 text-muted-foreground">{brand.brandTone}</p>
-                          {swatches.length ? <div className="mt-5 flex flex-wrap gap-3" aria-label="Erkannte Markenfarben">{swatches.map((color, index) => <div key={`${color}-${index}`} className="flex items-center gap-2 text-xs text-muted-foreground"><span className="size-7 rounded-md ring-1 ring-inset ring-foreground/10" style={{ backgroundColor: color }} /><span className="font-mono">{color.toUpperCase()}</span></div>)}</div> : null}
-                          <details className="mt-5 border-t border-border pt-4">
-                            <summary className="cursor-pointer rounded text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">Texte anpassen</summary>
-                            <div className="mt-4 space-y-4">
-                              {([
-                                ["brandTone", "Tonalität"], ["brandColors", "Markenfarben"], ["brandDos", "Das passt"], ["brandDonts", "Das vermeiden"],
-                              ] as const).map(([key, label]) => <div key={key} className="space-y-2"><Label htmlFor={`onboarding-${key}`}>{label}</Label><Textarea id={`onboarding-${key}`} value={brand[key]} maxLength={BRAND_SETTINGS_LIMITS[key]} onChange={(event) => updateBrand({ [key]: event.target.value })} className="min-h-20 resize-y text-sm" /></div>)}
+                          {swatches.length ? (
+                            <div className="mt-5 flex flex-wrap gap-3" aria-label="Erkannte Markenfarben">
+                              {swatches.map((color, index) => (
+                                <motion.div
+                                  key={`${color}-${index}`}
+                                  className="flex items-center gap-2 text-xs text-muted-foreground"
+                                  initial={reduce ? false : { opacity: 0, y: 6 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.35, ease: EASE_OUT, delay: 0.3 + index * 0.06 }}
+                                >
+                                  <motion.span
+                                    className="size-7 rounded-md ring-1 ring-inset ring-foreground/10"
+                                    style={{ backgroundColor: color }}
+                                    initial={reduce ? false : { scale: 0.4, rotate: -12 }}
+                                    animate={{ scale: 1, rotate: 0 }}
+                                    transition={{ type: "spring", stiffness: 420, damping: 18, delay: 0.3 + index * 0.06 }}
+                                  />
+                                  <span className="font-mono">{color.toUpperCase()}</span>
+                                </motion.div>
+                              ))}
                             </div>
-                          </details>
-                        </div>
-                        <section aria-labelledby="onboarding-products-title">
+                          ) : null}
+                          <div className="mt-5 border-t border-border pt-4">
+                            <button
+                              type="button"
+                              aria-expanded={editOpen}
+                              aria-controls="onboarding-brand-edit"
+                              onClick={() => setEditOpen((open) => !open)}
+                              className="flex items-center gap-1.5 rounded text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              Texte anpassen
+                              <ChevronDown className={cn("size-4 text-muted-foreground transition-transform duration-300", editOpen && "rotate-180")} aria-hidden="true" />
+                            </button>
+                            <AnimatePresence initial={false}>
+                              {editOpen ? (
+                                <motion.div
+                                  id="onboarding-brand-edit"
+                                  key="brand-edit"
+                                  className="overflow-hidden"
+                                  initial={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                                  animate={reduce ? { opacity: 1 } : { height: "auto", opacity: 1 }}
+                                  exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.32, ease: EASE_OUT }}
+                                >
+                                  <div className="space-y-4 px-0.5 pb-0.5 pt-4">
+                                    {([
+                                      ["brandTone", "Tonalität"], ["brandColors", "Markenfarben"], ["brandDos", "Das passt"], ["brandDonts", "Das vermeiden"],
+                                    ] as const).map(([key, label]) => <div key={key} className="space-y-2"><Label htmlFor={`onboarding-${key}`}>{label}</Label><Textarea id={`onboarding-${key}`} value={brand[key]} maxLength={BRAND_SETTINGS_LIMITS[key]} onChange={(event) => updateBrand({ [key]: event.target.value })} className="min-h-20 resize-y text-sm" /></div>)}
+                                  </div>
+                                </motion.div>
+                              ) : null}
+                            </AnimatePresence>
+                          </div>
+                        </motion.div>
+                        <motion.section variants={itemVariants} aria-labelledby="onboarding-products-title">
                           <div className="mb-3 flex items-center justify-between gap-3">
                             <h2 id="onboarding-products-title" className="text-sm font-medium">Sortiment</h2>
                             <span className="text-xs tabular-nums text-muted-foreground">{previewBeers.length}</span>
                           </div>
                           {previewBeers.length ? (
                             <ul className="max-h-80 space-y-2 overflow-y-auto rounded-xl border border-border p-2" aria-label="Erkannte Produkte">
-                              <AnimatePresence initial={false}>
-                                {previewBeers.map((beer) => (
+                              <AnimatePresence>
+                                {previewBeers.map((beer, order) => (
                                   <SortimentBeerRow
                                     key={beer.id}
                                     beer={beer}
+                                    order={order}
                                     canEditCategory={brand.suggestedBeers !== undefined}
                                     reduceMotion={reduceMotion}
                                     onCategoryChange={(produktKategorie) => {
@@ -777,39 +1029,120 @@ export function OnboardingTourFlow({ bootstrap }: { bootstrap: OnboardingBootstr
                               </motion.div>
                             ) : null}
                           </AnimatePresence>
-                        </section>
+                        </motion.section>
                       </>
                     ) : null}
 
                     {step === 2 ? (
-                      <div className="overflow-hidden rounded-xl border border-border bg-card">
-                        <div className="flex items-center gap-3 border-b border-border bg-muted/30 p-5"><span className="flex size-10 items-center justify-center rounded-full border border-border bg-background"><CheckCheck className="size-5" aria-hidden="true" /></span><div><h2 className="text-sm font-medium">Alles bereit</h2><p className="mt-1 text-xs text-muted-foreground">Marke und Sortiment sind vorbereitet.</p></div></div>
+                      <motion.div variants={itemVariants} className="overflow-hidden rounded-xl border border-border bg-card">
+                        <div className="flex items-center gap-3 border-b border-border bg-muted/30 p-5">
+                          <span className="relative flex size-10 items-center justify-center">
+                            {!reduce ? (
+                              <motion.span
+                                className="absolute inset-0 rounded-full bg-[#2F7A4A]/20"
+                                initial={{ scale: 0.6, opacity: 0 }}
+                                animate={{ scale: [0.6, 1.6], opacity: [0.7, 0] }}
+                                transition={{ duration: 1.1, ease: "easeOut", delay: 0.35 }}
+                                aria-hidden="true"
+                              />
+                            ) : null}
+                            <motion.span
+                              className="relative flex size-10 items-center justify-center rounded-full border border-border bg-background"
+                              initial={reduce ? false : { scale: 0.5, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ type: "spring", stiffness: 420, damping: 18, delay: 0.2 }}
+                            >
+                              <CheckCheck className="size-5" aria-hidden="true" />
+                            </motion.span>
+                          </span>
+                          <div><h2 className="text-sm font-medium">Alles bereit</h2><p className="mt-1 text-xs text-muted-foreground">Marke und Sortiment sind vorbereitet.</p></div>
+                        </div>
                         <dl className="divide-y divide-border px-5">
-                          <div className="py-4"><dt className="text-xs text-muted-foreground">Brauerei</dt><dd className="mt-1 break-words text-sm font-medium">{brand.breweryName || breweryName}</dd></div>
-                          <div className="py-4"><dt className="text-xs text-muted-foreground">Markenprofil</dt><dd className="mt-1 text-sm">Farben, Ton & Bildregeln</dd></div>
-                          <div className="py-4"><dt className="text-xs text-muted-foreground">Sortiment</dt><dd className="mt-1 text-sm">{previewBeers.length ? `${previewBeers.length} Produkte` : "Später ergänzen"}</dd></div>
+                          {[
+                            ["Brauerei", <span key="b" className="break-words font-medium">{brand.breweryName || breweryName}</span>],
+                            ["Markenprofil", "Farben, Ton & Bildregeln"],
+                            ["Sortiment", previewBeers.length ? `${previewBeers.length} Produkte` : "Später ergänzen"],
+                          ].map(([term, value], index) => (
+                            <motion.div
+                              key={String(term)}
+                              className="py-4"
+                              initial={reduce ? false : { opacity: 0, x: 10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.4, ease: EASE_OUT, delay: 0.3 + index * 0.08 }}
+                            >
+                              <dt className="text-xs text-muted-foreground">{term}</dt>
+                              <dd className="mt-1 text-sm">{value}</dd>
+                            </motion.div>
+                          ))}
                         </dl>
                         <div className="flex items-start gap-2 border-t border-border bg-muted/30 p-5 text-xs leading-5 text-muted-foreground"><PencilLine className="mt-0.5 size-4 shrink-0" aria-hidden="true" />Alles später im Dashboard editierbar.</div>
-                      </div>
+                      </motion.div>
                     ) : null}
                   </fieldset>
 
-                  {error ? <div ref={errorRef} tabIndex={-1} role="alert" className="mt-5 flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/5 p-4 text-sm leading-6 text-destructive outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"><CircleAlert className="mt-1 size-4 shrink-0" aria-hidden="true" /><p>{error}</p></div> : null}
+                  <AnimatePresence initial={false}>
+                    {error ? (
+                      <motion.div
+                        key="onboarding-error"
+                        className="overflow-hidden"
+                        initial={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                        animate={reduce ? { opacity: 1 } : { height: "auto", opacity: 1 }}
+                        exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
+                        transition={{ duration: 0.28, ease: EASE_OUT }}
+                      >
+                        <motion.div
+                          ref={errorRef}
+                          tabIndex={-1}
+                          role="alert"
+                          className="mt-5 flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/5 p-4 text-sm leading-6 text-destructive outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
+                          initial={reduce ? false : { x: 0 }}
+                          animate={reduce ? undefined : { x: [0, -6, 5, -3, 0] }}
+                          transition={{ duration: 0.4, delay: 0.1 }}
+                        >
+                          <CircleAlert className="mt-1 size-4 shrink-0" aria-hidden="true" /><p>{error}</p>
+                        </motion.div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
 
                   {!scanning ? (
-                    <div className="mt-7 flex flex-col-reverse gap-3 border-t border-border/70 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                      {step > 0 ? <Button type="button" variant="ghost" className="h-11 px-3" disabled={busy} onClick={() => goToStep(step - 1)}><ArrowLeft aria-hidden="true" />Zurück</Button> : <p className="text-center text-xs text-muted-foreground sm:text-left">Keine Website? Oben rechts „Später“.</p>}
-                      <Button type="submit" className="h-12 gap-2 px-5 sm:ml-auto" disabled={busy}>
-                        {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}{primaryLabel}{!busy ? <ArrowRight className="size-4" aria-hidden="true" /> : null}
+                    <motion.div variants={itemVariants} className="mt-7 flex flex-col-reverse gap-3 border-t border-border/70 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                      {step > 0 ? <Button type="button" variant="ghost" className="group h-11 px-3" disabled={busy} onClick={() => goToStep(step - 1)}><ArrowLeft className="transition-transform duration-200 group-hover:-translate-x-0.5" aria-hidden="true" />Zurück</Button> : <p className="text-center text-xs text-muted-foreground sm:text-left">Keine Website? Oben rechts „Später“.</p>}
+                      <Button type="submit" className="group h-12 gap-2 px-5 transition-transform duration-150 active:scale-[0.98] sm:ml-auto" disabled={busy}>
+                        {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}{primaryLabel}{!busy ? <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" /> : null}
                       </Button>
-                    </div>
+                    </motion.div>
                   ) : null}
                 </form>
               </motion.section>
             </AnimatePresence>
           </main>
         </div>
-      </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {leaving ? (
+          <motion.div
+            key="onboarding-leaving"
+            className="fixed inset-0 z-50 grid place-items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35, ease: EASE_OUT, delay: reduce ? 0 : 0.15 }}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+              <motion.div
+                animate={reduce ? undefined : { scale: [1, 1.08, 1] }}
+                transition={{ duration: 1.4, ease: "easeInOut", repeat: Infinity }}
+              >
+                <EvglabMark size={40} />
+              </motion.div>
+              Dein Studio wird geöffnet …
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

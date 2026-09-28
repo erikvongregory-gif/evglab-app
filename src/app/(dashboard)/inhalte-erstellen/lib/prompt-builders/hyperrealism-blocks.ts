@@ -537,7 +537,7 @@ export function buildPhotoStyleLockFragment(input: HyperrealisticInput): string 
       "Shoot a quiet premium lifestyle frame in a real beer garden or hospitality setting — natural available light, soft optical bokeh, ordered calm.",
       "Keep the customer's product label razor-sharp and readable; people may share the frame but stay secondary to the drink.",
       "Use an 85–100mm perspective, stable camera, restrained props, and an orderly visual hierarchy — no clutter, no flash snapshot energy.",
-      "LOOK references set only this grammar: soft bokeh, warm daylight, hospitality social calm, crisp glass/bottle materials. Never copy their people, brands, logos, or lettering.",
+      "LOOK references set only this grammar: soft bokeh, warm daylight, hospitality social calm, crisp glass/bottle materials. Invent new adults. Never reproduce a face, hair, age, or outfit from a LOOK reference, and never copy their brands, logos, or lettering.",
       "Match LOOK light as photographed — not an HDR golden-hour stock glow or beauty rim light on hair.",
       "Forbidden AI-gloss: beauty-retouched wax skin, melted pretzel props, uniform sticker condensation, teal-orange grade, lens-flare bloom, plastic foam, perfect stock-model smiles.",
       "Forbidden: on-camera direct flash, imperfect street crop, product thrust toward the lens, saturated flat campaign color fields, studio packshot on a pedestal.",

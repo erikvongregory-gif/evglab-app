@@ -1,5 +1,6 @@
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import type { OpenAiReferenceImage } from "@/lib/openai/generateImage";
+import { blurLookReference } from "@/lib/openai/blurLookReference";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -30,9 +31,9 @@ async function loadFile(fileName: string): Promise<OpenAiReferenceImage | null> 
   if (cache.has(fileName)) return cache.get(fileName) ?? null;
   try {
     const file = path.join(process.cwd(), "assets", "premium-references", fileName);
-    const buffer = await readFile(file);
-    const reference = buffer.byteLength
-      ? { base64: buffer.toString("base64"), mime: "image/png" }
+    const buffer = await blurLookReference(await readFile(file));
+    const reference = buffer?.byteLength
+      ? { base64: buffer.toString("base64"), mime: "image/jpeg" }
       : null;
     cache.set(fileName, reference);
     return reference;

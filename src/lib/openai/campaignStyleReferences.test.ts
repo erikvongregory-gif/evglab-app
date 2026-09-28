@@ -25,7 +25,7 @@ describe("campaign style references", () => {
       2,
     );
     expect(references).toHaveLength(2);
-    expect(references.every((reference) => reference.mime === "image/png" || reference.mime === "image/jpeg")).toBe(true);
+    expect(references.every((reference) => reference.mime === "image/jpeg")).toBe(true);
     expect(references.every((reference) => reference.base64.length > 10_000)).toBe(true);
   });
 

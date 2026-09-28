@@ -37,12 +37,12 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico?v=20260917", sizes: "any" },
-      { url: "/icon.svg?v=20260917", type: "image/svg+xml" },
-      { url: "/icon.png?v=20260917", sizes: "180x180", type: "image/png" },
+      { url: "/favicon.ico?v=20260928", sizes: "any" },
+      { url: "/icon.svg?v=20260928", type: "image/svg+xml" },
+      { url: "/icon.png?v=20260928", sizes: "180x180", type: "image/png" },
     ],
-    shortcut: ["/favicon.ico?v=20260917"],
-    apple: [{ url: "/icon.png?v=20260917", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicon.ico?v=20260928"],
+    apple: [{ url: "/icon.png?v=20260928", sizes: "180x180", type: "image/png" }],
   },
 };
 

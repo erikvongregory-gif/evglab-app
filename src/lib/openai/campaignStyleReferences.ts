@@ -1,5 +1,6 @@
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import type { OpenAiReferenceImage } from "@/lib/openai/generateImage";
+import { blurLookReference } from "@/lib/openai/blurLookReference";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -12,12 +13,6 @@ const CAMPAIGN_REFERENCE_FILES = [
 ] as const;
 
 const cache = new Map<string, OpenAiReferenceImage | null>();
-
-function mimeFor(fileName: string): string {
-  return fileName.toLowerCase().endsWith(".jpg") || fileName.toLowerCase().endsWith(".jpeg")
-    ? "image/jpeg"
-    : "image/png";
-}
 
 function stableHash(value: string): number {
   let hash = 2166136261;
@@ -41,9 +36,9 @@ async function loadFile(fileName: string): Promise<OpenAiReferenceImage | null> 
   if (cache.has(fileName)) return cache.get(fileName) ?? null;
   try {
     const file = path.join(process.cwd(), "assets", "campaign-references", fileName);
-    const buffer = await readFile(file);
-    const reference = buffer.byteLength
-      ? { base64: buffer.toString("base64"), mime: mimeFor(fileName) }
+    const buffer = await blurLookReference(await readFile(file));
+    const reference = buffer?.byteLength
+      ? { base64: buffer.toString("base64"), mime: "image/jpeg" }
       : null;
     cache.set(fileName, reference);
     return reference;
