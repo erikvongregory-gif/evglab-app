@@ -95,6 +95,7 @@ export default async function StudioDashboardLayout({ children }: { children: Re
     >
       <BrewAiAdminShell
         userEmail={user.email}
+        userId={user.id}
         initialProfileName={profileName}
         initialBreweryName={breweryName}
         initialAvatarUrl={profileAvatarUrl}

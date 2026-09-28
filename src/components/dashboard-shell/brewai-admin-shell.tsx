@@ -111,6 +111,7 @@ function BrewAiSidebar({
 export function BrewAiAdminShell({
   children,
   userEmail,
+  userId,
   initialProfileName,
   initialBreweryName,
   initialAvatarUrl,
@@ -121,6 +122,8 @@ export function BrewAiAdminShell({
 }: {
   children: ReactNode;
   userEmail?: string;
+  /** Für die nutzerbezogene lokale Tour-Markierung (geteilte Browser). */
+  userId?: string;
   initialProfileName?: string;
   initialBreweryName?: string;
   initialAvatarUrl?: string;
@@ -272,7 +275,7 @@ export function BrewAiAdminShell({
             <LumaBar />
           </SidebarProvider>
           <Toaster />
-          <DashboardProductTour initialSeen={uiTourSeen} firstName={profileName} />
+          <DashboardProductTour initialSeen={uiTourSeen} firstName={profileName} userId={userId} />
         </div>
       </StudioShellContext.Provider>
       </BillingCreditsProvider>

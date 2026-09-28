@@ -21,7 +21,6 @@ import { EvglabMark } from "@/components/studio/evglab-mark";
 import { UI_TOUR_VERSION } from "@/lib/dashboard/onboarding";
 import { patchOnboarding } from "@/components/studio/onboarding/onboarding-tour-types";
 
-const STORAGE_KEY = `brewai-ui-tour-v${UI_TOUR_VERSION}`;
 
 /** Event, mit dem sich der Rundgang von überall erneut starten lässt (z. B. Konto-Menü). */
 export const START_TOUR_EVENT = "brewai:start-tour";
@@ -143,11 +142,15 @@ type Phase = "idle" | "intro" | "tour" | "outro";
 export function DashboardProductTour({
   initialSeen,
   firstName,
+  userId,
 }: {
   initialSeen: boolean;
   firstName?: string;
+  userId?: string;
 }) {
-  const tour = useTour(STORAGE_KEY);
+  // Lokale Markierung nur pro Nutzer — sonst verschluckt ein geteilter Browser den Rundgang für neue Accounts.
+  // Ohne userId entscheidet allein der Server-Flag.
+  const tour = useTour(userId ? `brewai-ui-tour-v${UI_TOUR_VERSION}:${userId}` : undefined);
   const reduce = useReducedMotion() === true;
   const [phase, setPhase] = React.useState<Phase>("idle");
   const [steps, setSteps] = React.useState<TourStep[]>(ALL_STEPS);
@@ -163,7 +166,7 @@ export function DashboardProductTour({
       return;
     }
     if (tour.seen()) {
-      // lokal schon gesehen → Server nachziehen, falls Flag fehlt
+      // Dieser Nutzer hat ihn hier schon gesehen, nur das Speichern am Server fehlte → nachziehen
       void patchOnboarding({ uiTourVersion: UI_TOUR_VERSION }).catch(() => {});
       return;
     }
