@@ -26,6 +26,8 @@ export interface MemberSelectorProps {
   emptyLabel?: string;
   /** When set, + opens create flow instead of the pick-dropdown */
   onAddClick?: () => void;
+  /** When set, clicking a visible member calls this instead of toggling selection */
+  onMemberClick?: (id: string) => void;
 }
 
 function getInitials(name: string): string {
@@ -316,6 +318,7 @@ const MemberSelector = React.forwardRef<HTMLDivElement, MemberSelectorProps>(
       searchPlaceholder = "Search members...",
       emptyLabel = "No members found",
       onAddClick,
+      onMemberClick,
     },
     ref,
   ) => {
@@ -374,7 +377,13 @@ const MemberSelector = React.forwardRef<HTMLDivElement, MemberSelectorProps>(
                 key={member.id}
                 member={member}
                 isSelected={selected.includes(member.id)}
-                onClick={() => toggleMember(member.id)}
+                onClick={() => {
+                  if (onMemberClick) {
+                    onMemberClick(member.id);
+                    return;
+                  }
+                  toggleMember(member.id);
+                }}
               />
             ))}
 

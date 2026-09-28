@@ -9,7 +9,7 @@ import {
   StudioUiDialogHeader,
   StudioUiDialogTitle,
 } from "@/components/studio/ui/dialog";
-import { BeerCreatePanel, type BeerCreateDraft } from "@/components/studio/beers/beer-create-panel";
+import { BeerCreatePanel, type BeerCreateDraft, type BeerCreateInitial } from "@/components/studio/beers/beer-create-panel";
 import type { ProduktKategorie } from "@/lib/dashboard/metadata";
 import {
   OCCASION_TEMPLATES,
@@ -22,33 +22,45 @@ export function BeerCreateDialog({
   open,
   error,
   initialKategorie = "bier",
+  initial,
+  mode = "create",
   onOpenChange,
   onSave,
+  onDelete,
 }: {
   open: boolean;
   error: string;
   initialKategorie?: ProduktKategorie;
+  initial?: BeerCreateInitial;
+  mode?: "create" | "edit";
   onOpenChange: (open: boolean) => void;
   onSave: (draft: BeerCreateDraft) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }) {
+  const title = mode === "edit" ? "Sorte bearbeiten" : "Neue Sorte anlegen";
+  const description =
+    mode === "edit"
+      ? "Merkmale der Sorte anpassen — danach in jedem Motiv verfügbar."
+      : "Foto, Getränkeart und Flasche einmal hinterlegen — danach in jedem Motiv verfügbar.";
   return (
     <StudioUiDialog open={open} onOpenChange={onOpenChange}>
       <StudioUiDialogContent
         sheetOnMobile
         className="stu-dialog--beer"
-        aria-label="Neue Sorte anlegen"
+        aria-label={title}
       >
         {/* Panel bringt eigenen Titel — Dialog-Title nur für a11y. */}
-        <StudioUiDialogTitle className="sr-only">Neue Sorte anlegen</StudioUiDialogTitle>
-        <StudioUiDialogDescription className="sr-only">
-          Foto, Getränkeart und Flasche einmal hinterlegen — danach in jedem Motiv verfügbar.
-        </StudioUiDialogDescription>
+        <StudioUiDialogTitle className="sr-only">{title}</StudioUiDialogTitle>
+        <StudioUiDialogDescription className="sr-only">{description}</StudioUiDialogDescription>
         <BeerCreatePanel
-          key={`${open}-${initialKategorie}`}
+          key={`${open}-${mode}-${initial?.name ?? ""}-${initialKategorie}`}
           error={error}
           initialKategorie={initialKategorie}
+          initial={initial}
+          mode={mode}
           onSave={onSave}
           onCancel={() => onOpenChange(false)}
+          onDelete={onDelete}
         />
       </StudioUiDialogContent>
     </StudioUiDialog>

@@ -53,6 +53,17 @@ export type BeerCreateDraft = {
   etikettDataUrl: string;
 };
 
+export type BeerCreateInitial = {
+  name?: string;
+  produktKategorie?: ProduktKategorie;
+  bierstil?: string;
+  flaschenTyp?: string;
+  flaschenfarbe?: "braun" | "gruen" | "klar";
+  glasTyp?: string;
+  /** Bestehende HTTPS-URL — wird als Vorschau gezeigt, bis ein neues Foto kommt. */
+  etikettUrl?: string;
+};
+
 type SavePhase = "idle" | "saving" | "success";
 
 function BottleIcon({ className }: { className?: string }) {
@@ -100,40 +111,59 @@ export function BeerCreatePanel({
   brandTone = "",
   error = "",
   initialKategorie = "bier",
+  initial,
+  mode = "create",
   reducedMotion: reducedMotionProp,
   onSave,
   onCancel,
+  onDelete,
 }: {
   brandTone?: string;
   error?: string;
   initialKategorie?: ProduktKategorie;
+  initial?: BeerCreateInitial;
+  mode?: "create" | "edit";
   reducedMotion?: boolean;
   onSave: (draft: BeerCreateDraft) => Promise<void>;
   onCancel: () => void;
+  onDelete?: () => Promise<void>;
 }) {
   const reducedMotionHook = useReducedMotion() ?? false;
   const reducedMotion = reducedMotionProp ?? reducedMotionHook;
   const fileInputId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const startKategorie = sanitizeProduktKategorie(initial?.produktKategorie ?? initialKategorie);
   const [manualOnly, setManualOnly] = useState(false);
-  const [name, setName] = useState("");
-  const [produktKategorie, setProduktKategorie] = useState<ProduktKategorie>(() => sanitizeProduktKategorie(initialKategorie));
-  const [bierstil, setBierstil] = useState(sanitizeProduktKategorie(initialKategorie) === "bier" ? "helles" : sanitizeProduktKategorie(initialKategorie));
-  const [flaschenTyp, setFlaschenTyp] = useState("nrw_500");
-  const [flaschenfarbe, setFlaschenfarbe] = useState<"braun" | "gruen" | "klar">(sanitizeProduktKategorie(initialKategorie) === "bier" ? "braun" : "klar");
-  const [glasTyp, setGlasTyp] = useState<GlasTyp>(findBeerStyle("helles")?.glasTyp ?? "willibecher");
+  const [name, setName] = useState(initial?.name?.trim() ?? "");
+  const [produktKategorie, setProduktKategorie] = useState<ProduktKategorie>(startKategorie);
+  const [bierstil, setBierstil] = useState(
+    initial?.bierstil?.trim() || (startKategorie === "bier" ? "helles" : startKategorie),
+  );
+  const [flaschenTyp, setFlaschenTyp] = useState(initial?.flaschenTyp?.trim() || "nrw_500");
+  const [flaschenfarbe, setFlaschenfarbe] = useState<"braun" | "gruen" | "klar">(
+    initial?.flaschenfarbe ?? (startKategorie === "bier" ? "braun" : "klar"),
+  );
+  const [glasTyp, setGlasTyp] = useState<GlasTyp>(
+    (initial?.glasTyp?.trim() as GlasTyp | undefined) ||
+      findBeerStyle(initial?.bierstil?.trim() || "helles")?.glasTyp ||
+      "willibecher",
+  );
   const [etikettDataUrl, setEtikettDataUrl] = useState("");
+  const [existingEtikettUrl] = useState(initial?.etikettUrl?.trim() || "");
   const [dragOver, setDragOver] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [localError, setLocalError] = useState("");
   const [phase, setPhase] = useState<SavePhase>("idle");
   const [previewKey, setPreviewKey] = useState(0);
+  const [deleting, setDeleting] = useState(false);
 
+  const previewImage = etikettDataUrl || existingEtikettUrl;
+  const isEdit = mode === "edit";
   const showDose = isDoseTyp(flaschenTyp as keyof typeof FLASCHEN_TYPEN);
   const preview = buildPromptPreview({ name, produktKategorie, bierstil, flaschenTyp, flaschenfarbe, glasTyp, brandTone });
   const displayError = localError || error || uploadError;
-  const busy = phase === "saving" || phase === "success";
+  const busy = phase === "saving" || phase === "success" || deleting;
 
   const acceptFile = async (file: File | undefined) => {
     if (!file || busy) return;
@@ -179,6 +209,20 @@ export function BeerCreatePanel({
     }
   };
 
+  const handleDelete = async () => {
+    if (!onDelete || busy) return;
+    if (!window.confirm(`Sorte „${name.trim() || "ohne Namen"}“ wirklich löschen?`)) return;
+    setLocalError("");
+    setDeleting(true);
+    try {
+      await onDelete();
+      onCancel();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Löschen fehlgeschlagen.");
+      setDeleting(false);
+    }
+  };
+
   const stagger = (delayMs: number) =>
     reducedMotion
       ? { initial: false as const, animate: { opacity: 1 }, transition: { duration: 0 } }
@@ -198,10 +242,11 @@ export function BeerCreatePanel({
     >
       <motion.header className="studio-beer-create-header" {...stagger(0)}>
         <div className="studio-beer-create-header-copy">
-          <h3 className="studio-beer-create-title">Neue Sorte anlegen</h3>
+          <h3 className="studio-beer-create-title">{isEdit ? "Sorte bearbeiten" : "Neue Sorte anlegen"}</h3>
           <p className="studio-beer-create-lead">
-            Hinterlege die wichtigsten Merkmale deiner Sorte. BrewAI verwendet sie später automatisch
-            bei der Motiverstellung.
+            {isEdit
+              ? "Passe Name, Getränkeart oder Flasche an — BrewAI übernimmt die Änderungen bei der Motiverstellung."
+              : "Hinterlege die wichtigsten Merkmale deiner Sorte. BrewAI verwendet sie später automatisch bei der Motiverstellung."}
           </p>
         </div>
         <button
@@ -230,7 +275,7 @@ export function BeerCreatePanel({
               }}
             >
               <div
-                className={`studio-beer-create-drop${dragOver ? " is-drag" : ""}${etikettDataUrl ? " has-preview" : ""}`}
+                className={`studio-beer-create-drop${dragOver ? " is-drag" : ""}${previewImage ? " has-preview" : ""}`}
                 onDragEnter={(e) => {
                   e.preventDefault();
                   setDragOver(true);
@@ -250,7 +295,7 @@ export function BeerCreatePanel({
                 }}
               >
                 <AnimatePresence mode="wait">
-                  {etikettDataUrl ? (
+                  {previewImage ? (
                     <motion.div
                       key="preview"
                       className="studio-beer-create-drop-preview"
@@ -259,7 +304,7 @@ export function BeerCreatePanel({
                       exit={reducedMotion ? undefined : { opacity: 0, scale: 0.985 }}
                       transition={{ duration: reducedMotion ? 0 : 0.22, ease: EASE }}
                     >
-                      <img src={etikettDataUrl} alt="Flaschenfoto Vorschau" />
+                      <img src={previewImage} alt="Flaschenfoto Vorschau" />
                       <button
                         type="button"
                         className="studio-beer-create-drop-change"
@@ -489,6 +534,8 @@ export function BeerCreatePanel({
                 </>
               ) : phase === "success" ? (
                 "✓ Sorte gespeichert"
+              ) : isEdit ? (
+                "Änderungen speichern"
               ) : (
                 "Sorte übernehmen"
               )}
@@ -501,7 +548,18 @@ export function BeerCreatePanel({
             >
               Abbrechen
             </button>
-            <span className="studio-beer-create-actions-hint">Danach immer vorausgefüllt</span>
+            {isEdit && onDelete ? (
+              <button
+                type="button"
+                className="studio-beer-create-cancel"
+                disabled={busy}
+                onClick={() => void handleDelete()}
+              >
+                {deleting ? "Wird gelöscht …" : "Sorte löschen"}
+              </button>
+            ) : (
+              <span className="studio-beer-create-actions-hint">Danach immer vorausgefüllt</span>
+            )}
           </motion.div>
         </motion.div>
       </div>

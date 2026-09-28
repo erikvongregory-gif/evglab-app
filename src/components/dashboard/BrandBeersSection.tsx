@@ -25,8 +25,9 @@ export function BrandBeersSection() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createError, setCreateError] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingBeer, setEditingBeer] = useState<DashboardBeer | null>(null);
+  const [dialogError, setDialogError] = useState("");
 
   const reload = useCallback(async () => {
     setError(null);
@@ -60,8 +61,24 @@ export function BrandBeersSection() {
 
   const selectedIds = useMemo(() => beers.map((beer) => beer.id), [beers]);
 
-  async function handleCreate(draft: BeerCreateDraft) {
-    setCreateError("");
+  function openCreate() {
+    if (saving || beers.length >= MAX_MY_BEERS) return;
+    setEditingBeer(null);
+    setDialogError("");
+    setDialogOpen(true);
+  }
+
+  function openEdit(id: string) {
+    if (saving) return;
+    const target = beers.find((beer) => beer.id === id);
+    if (!target) return;
+    setEditingBeer(target);
+    setDialogError("");
+    setDialogOpen(true);
+  }
+
+  async function handleSave(draft: BeerCreateDraft) {
+    setDialogError("");
     setSaving(true);
     try {
       const payload = draft.etikettDataUrl ? splitDataUrl(draft.etikettDataUrl) : null;
@@ -72,17 +89,18 @@ export function BrandBeersSection() {
           : undefined;
       const beer = {
         id:
-          typeof crypto !== "undefined" && "randomUUID" in crypto
+          editingBeer?.id ??
+          (typeof crypto !== "undefined" && "randomUUID" in crypto
             ? crypto.randomUUID()
-            : `beer-${Date.now()}`,
+            : `beer-${Date.now()}`),
         name: draft.name,
         produktKategorie: draft.produktKategorie,
         bierstil: draft.bierstil,
         flaschenTyp: draft.flaschenTyp,
         flaschenfarbe: draft.flaschenfarbe,
         glasTyp: draft.glasTyp,
-        etikettUrl: "",
-        createdAt: new Date().toISOString(),
+        etikettUrl: editingBeer?.etikettUrl ?? "",
+        createdAt: editingBeer?.createdAt || new Date().toISOString(),
         ...(etikettPayload ? { etikettPayload } : {}),
       };
       const res = await fetch("/api/dashboard/my-beers", {
@@ -95,31 +113,24 @@ export function BrandBeersSection() {
       if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen.");
       setBeers(data.beers ?? []);
       setRevision(typeof data.revision === "string" ? data.revision : "");
-      setCreateOpen(false);
-      setCreateError("");
+      setDialogOpen(false);
+      setEditingBeer(null);
+      setDialogError("");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Speichern fehlgeschlagen.";
-      setCreateError(message);
+      setDialogError(message);
       throw e instanceof Error ? e : new Error(message);
     } finally {
       setSaving(false);
     }
   }
 
-  async function onSelectionChange(nextSelected: string[]) {
-    if (saving) return;
-    const removed = selectedIds.filter((id) => !nextSelected.includes(id));
-    if (removed.length === 0) return;
-    const id = removed[0];
-    const target = beers.find((beer) => beer.id === id);
-    if (!target) return;
-    const confirmed = window.confirm(`Sorte „${target.name}“ wirklich löschen?`);
-    if (!confirmed) return;
-
+  async function handleDelete() {
+    if (!editingBeer || saving) return;
     setSaving(true);
     setError(null);
     try {
-      const next = beers.filter((beer) => beer.id !== id);
+      const next = beers.filter((beer) => beer.id !== editingBeer.id);
       const res = await fetch("/api/dashboard/my-beers", {
         method: "PUT",
         credentials: "include",
@@ -130,9 +141,12 @@ export function BrandBeersSection() {
       if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen.");
       setBeers(data.beers ?? next);
       setRevision(typeof data.revision === "string" ? data.revision : "");
+      setDialogOpen(false);
+      setEditingBeer(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
-      await reload();
+      const message = e instanceof Error ? e.message : "Löschen fehlgeschlagen.";
+      setDialogError(message);
+      throw e instanceof Error ? e : new Error(message);
     } finally {
       setSaving(false);
     }
@@ -145,7 +159,7 @@ export function BrandBeersSection() {
       </div>
       <p className="text-sm leading-relaxed text-muted-foreground">
         Biersorten und andere Getränke manuell anlegen — z.&nbsp;B. wenn der Website-Scan etwas übersehen
-        hat. Danach beim Bildgenerieren als Produktreferenz wählbar.
+        hat. Tippe auf eine Sorte, um sie zu bearbeiten.
       </p>
 
       {error ? (
@@ -160,29 +174,44 @@ export function BrandBeersSection() {
         <MemberSelector
           members={members}
           selected={selectedIds}
-          onChange={(next) => void onSelectionChange(next)}
+          onChange={() => {}}
           max={MAX_MY_BEERS}
           maxVisible={MAX_MY_BEERS}
           addLabel="Neue Sorte"
           searchPlaceholder="Sorte suchen…"
           emptyLabel="Noch keine Sorten — über „Neue Sorte“ anlegen"
-          onAddClick={() => {
-            if (saving || beers.length >= MAX_MY_BEERS) return;
-            setCreateError("");
-            setCreateOpen(true);
-          }}
+          onAddClick={openCreate}
+          onMemberClick={openEdit}
         />
       )}
 
       <BeerCreateDialog
-        open={createOpen}
-        error={createError}
+        open={dialogOpen}
+        error={dialogError}
+        mode={editingBeer ? "edit" : "create"}
+        initial={
+          editingBeer
+            ? {
+                name: editingBeer.name,
+                produktKategorie: sanitizeProduktKategorie(editingBeer.produktKategorie),
+                bierstil: editingBeer.bierstil,
+                flaschenTyp: editingBeer.flaschenTyp,
+                flaschenfarbe: editingBeer.flaschenfarbe,
+                glasTyp: editingBeer.glasTyp,
+                etikettUrl: editingBeer.etikettUrl,
+              }
+            : undefined
+        }
         onOpenChange={(open) => {
           if (saving && !open) return;
-          setCreateOpen(open);
-          if (!open) setCreateError("");
+          setDialogOpen(open);
+          if (!open) {
+            setEditingBeer(null);
+            setDialogError("");
+          }
         }}
-        onSave={handleCreate}
+        onSave={handleSave}
+        onDelete={editingBeer ? handleDelete : undefined}
       />
     </div>
   );
