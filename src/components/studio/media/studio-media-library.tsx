@@ -1208,6 +1208,14 @@ export function StudioMediaLibrary({
                     </div>
                     {titleError ? <p className="text-destructive text-sm">{titleError}</p> : null}
                     {titleSaving ? <p className="text-muted-foreground text-sm">Titel wird gespeichert …</p> : null}
+                    {selectedItem.prompt?.trim() ? (
+                      <div className="space-y-1.5">
+                        <p className="text-muted-foreground text-xs font-medium">Prompt</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {selectedItem.prompt.trim()}
+                        </p>
+                      </div>
+                    ) : null}
                     {downloadError ? <p className="text-destructive text-sm">{downloadError}</p> : null}
                     {deleteError && !selecting ? <p className="text-destructive text-sm">{deleteError}</p> : null}
                     <div className="mt-auto flex flex-wrap gap-2">

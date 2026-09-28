@@ -173,8 +173,60 @@ export function resolveBeerPhysics(bierstil: string): BeerPhysicsProfile {
   );
 }
 
-export function buildBeerPhysicsFragment(bierstil: string, behaelter: NonNullable<HyperrealisticInput["behaelter"]>): string {
+/** Freitext verlangt naturtrübes / unfiltriertes Bier. */
+export function wantsUnfilteredFromText(zusatzWunsch?: string | null): boolean {
+  return /naturtr[uü]b|unfiltriert|unfiltered|\btr[uü]b\b|yeast.?haze|cloudy|hazy(?!\s*ipa)/i.test(
+    zusatzWunsch?.trim() ?? "",
+  );
+}
+
+/** Freitext verlangt klar filtriertes Bier — nicht „unfiltriert“ matchen. */
+export function wantsFilteredFromText(zusatzWunsch?: string | null): boolean {
+  const text = zusatzWunsch?.trim() ?? "";
+  if (!text || /unfiltriert|naturtr[uü]b/i.test(text)) return false;
+  return /\bfiltriert\b|crystal.?clear|glasklar/i.test(text);
+}
+
+/**
+ * Bierklarheit für die Generierung:
+ * Freitext schlägt Sortenfeld; sonst filtrierung; sonst Stil-Default (Hefe/Keller/NEIPA → trüb).
+ */
+export function resolveBeerClarity(
+  input: Pick<HyperrealisticInput, "filtrierung" | "zusatzWunsch" | "bierstil">,
+): "trueb" | "klar" {
+  if (wantsUnfilteredFromText(input.zusatzWunsch)) return "trueb";
+  if (wantsFilteredFromText(input.zusatzWunsch)) return "klar";
+  if (input.filtrierung === "unfiltriert") return "trueb";
+  if (input.filtrierung === "filtriert") return "klar";
+  const stil = input.bierstil.trim().toLowerCase().replace(/\s+/g, "_");
+  if (/hefeweizen|kellerbier|neipa|zwickel|rauchbier/.test(stil)) return "trueb";
+  return "klar";
+}
+
+/** @deprecated Prefer resolveBeerClarity — bleibt für kurze Freitext-Checks. */
+export function wantsUnfilteredBeer(
+  zusatzWunsch?: string | null,
+  filtrierung?: HyperrealisticInput["filtrierung"],
+): boolean {
+  if (filtrierung === "unfiltriert") return true;
+  if (filtrierung === "filtriert") return false;
+  return wantsUnfilteredFromText(zusatzWunsch);
+}
+
+export function buildBeerPhysicsFragment(
+  bierstil: string,
+  behaelter: NonNullable<HyperrealisticInput["behaelter"]>,
+  options?: { clarity?: "trueb" | "klar" },
+): string {
   const profile = resolveBeerPhysics(bierstil);
+  const clarity = options?.clarity ?? "klar";
+  // Bei trüb KEINE Stil-Wörter wie „crystal-clear Helles“ stehen lassen — die ziehen das Modell zurück.
+  const liquid =
+    clarity === "trueb"
+      ? `visibly NATURTRÜB / UNFILTERED beer in ${profile.hex} gold — dense soft yeast haze, milky-cloudy opacity like Kellerbier or Hefeweizen, light scatters in the body so you cannot see sharp detail through the liquid, NEVER crystal-clear filtered lager`
+      : /hazy|cloudy|turbid|opaque|yeast/i.test(profile.liquid)
+        ? "crystal-clear filtered beer matching the style color — brilliant see-through body, NO yeast haze, NO naturtrüb cloudiness"
+        : profile.liquid;
   const vessel =
     behaelter === "G"
       ? "poured beer in glass"
@@ -183,7 +235,8 @@ export function buildBeerPhysicsFragment(bierstil: string, behaelter: NonNullabl
         : "poured beer in glass and bottle liquid color consistency";
   return [
     `LIQUID PHYSICS (${vessel}):`,
-    `Color SRM ${profile.srm}, approx. hex ${profile.hex} — ${profile.liquid}.`,
+    `Clarity: ${clarity === "trueb" ? "UNFILTERED / naturtrüb (MANDATORY)" : "FILTERED / crystal-clear (MANDATORY)"}.`,
+    `Color SRM ${profile.srm}, approx. hex ${profile.hex} — ${liquid}.`,
     `Foam: ${profile.foam}.`,
     `Carbonation: ${profile.carbonation}.`,
     "Glass: ordinary real glass. Highlights come from this room (window, sky, lamps), not a studio HDRI. Reflections show the actual setting. Condensation only if the drink is cold — sparse, irregular, some droplets already slid.",
@@ -263,7 +316,11 @@ function waterCarbonationFromName(input: HyperrealisticInput): string {
 
 export function buildLiquidPhysicsFragment(input: HyperrealisticInput, behaelter: NonNullable<HyperrealisticInput["behaelter"]>): string {
   const kategorie = inputProduktKategorie(input);
-  if (kategorie === "bier") return buildBeerPhysicsFragment(input.bierstil, behaelter);
+  if (kategorie === "bier") {
+    return buildBeerPhysicsFragment(input.bierstil, behaelter, {
+      clarity: resolveBeerClarity(input),
+    });
+  }
   const drink = beverageDrinkNoun(input);
   const vessel =
     behaelter === "G"
@@ -387,17 +444,25 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
 
 const GLASS_FORBIDDEN: Record<NonNullable<HyperrealisticInput["glasTyp"]>, string> = {
   willibecher:
-    "NOT a stemmed Pilsner flute or tulip, NOT a curvy Weizen vase, NOT a Maßkrug with handle, NOT a Teku, NOT a Stange",
-  pils_tulpe: "NOT a stemless Willibecher tumbler, NOT a Weizen vase, NOT a Maßkrug, NOT a Teku",
-  weizen: "NOT a Willibecher tumbler, NOT a stemmed Pilsner flute, NOT a Maßkrug, NOT a Stange",
+    "NOT a stemmed Pilsner flute or tulip, NOT a curvy Weizen vase, NOT a Maßkrug with handle, NOT a Teku, NOT a Kölsch Stange, NOT an American shaker pint, NOT a straight highball/water tumbler",
+  pils_tulpe:
+    "NOT a stemless Willibecher tumbler, NOT a Weizen vase, NOT a Maßkrug, NOT a Teku, NOT a shaker pint, NOT a cylindrical water glass",
+  weizen: "NOT a Willibecher tumbler, NOT a stemmed Pilsner flute, NOT a Maßkrug, NOT a Stange, NOT a shaker pint",
   masskrug: "NOT a Willibecher, NOT a Pilsner flute, NOT a Weizen vase, NOT a stemless tumbler without handle",
-  ipa_teku: "NOT a Willibecher, NOT a Weizen vase, NOT a Maßkrug, NOT a Pilsner flute",
-  schwenker: "NOT a Willibecher, NOT a Weizen vase, NOT a Maßkrug, NOT a Pilsner flute",
-  stange: "NOT a Willibecher (too wide), NOT a Pilsner flute, NOT a Weizen vase, NOT a Maßkrug",
+  ipa_teku: "NOT a Willibecher, NOT a Weizen vase, NOT a Maßkrug, NOT a Pilsner flute, NOT a shaker pint",
+  schwenker: "NOT a Willibecher, NOT a Weizen vase, NOT a Maßkrug, NOT a Pilsner flute, NOT a shaker pint",
+  stange: "NOT a Willibecher (too wide), NOT a Pilsner flute, NOT a Weizen vase, NOT a Maßkrug, NOT a shaker pint",
 };
 
 /** Marker, damit der Etikett-Lock nicht doppelt angehängt wird. */
 export const LABEL_LOCK_MARKER = "LABEL LOCK 1:1 (MANDATORY)";
+
+/**
+ * Physikalische Etikett-Ausrichtung relativ zu Boden/Hals — nicht relativ zur Kamera.
+ * Vorn anhängen (siehe ensureProductGeometryLocks), sonst wird der Lock bei langen Prompts abgeschnitten.
+ */
+export const LABEL_ORIENTATION_LOCK =
+  "LABEL ORIENTATION (PHYSICAL, MANDATORY — INVALID IF VIOLATED): Treat the label as already glued on the real bottle from Image 1. Anchor A = the label edge that faces the NECK/shoulder on the reference; Anchor B = the label edge that faces the HEEL/base on the reference. In EVERY pose (standing, tilted, pouring) Anchor A stays toward the neck and Anchor B toward the base — the printed artwork rotates with the glass body, never independently. During pouring the brand text MAY appear upside-down or sideways to the camera; that is REQUIRED and correct. FORBIDDEN: flipping/rotating the label so text reads upright to the camera while the bottle is tilted; upside-down label relative to the bottle base; mirrored label. Prefer a pour tilt of about 45–70° from upright (not a full base-to-sky invert) so orientation stays unambiguous.";
 
 export function buildLabelLockFragment(input: HyperrealisticInput): string {
   if ((input.etikettModus ?? "marke") !== "marke") return "";
@@ -409,10 +474,13 @@ export function buildLabelLockFragment(input: HyperrealisticInput): string {
     `Copy the printed ${noun} artwork 1:1 — same logo, same crest, same typography, same colors, same layout, same words.`,
     "Do not redesign, restyle, recolor, translate, abbreviate, or invent a variant (no new names, no extra badges, no swapped colorways).",
     "Every letter that is readable on the reference must appear the same on the generated label.",
+    isDoseTyp(input.flaschenTyp) ? "" : LABEL_ORIENTATION_LOCK,
     inputProduktKategorie(input) === "bier"
       ? "The result is a new photograph of that same physical product in a new scene — not a collage and not a different beer."
       : "The result is a new photograph of that same physical product in a new scene — not a collage and not a different drink.",
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 export const GLASS_SHAPE_LOCK_MARKER = "GLASS SHAPE LOCK (MANDATORY)";
 
@@ -431,16 +499,67 @@ export function buildGlassShapeLockFragment(input: HyperrealisticInput): string 
       ? `POUR VOLUME: the glass is a single pour from this ${bottleMl / 1000} L bottle/can (${fillMl} ml). It must look like it was filled from that one container — never a larger mug.`
       : "";
   return [
-    `${GLASS_SHAPE_LOCK_MARKER}:`,
+    `${GLASS_SHAPE_LOCK_MARKER} — INVALID IF WRONG GLASS:`,
+    `Selected glass type code: ${input.glasTyp} (${glas.label}).`,
     isBeer
-      ? `Every beer glass in frame MUST be ${pour}.`
-      : `Every glass in frame MUST be ${withoutBeerFoam(pour)}. Liquid is ${drink}; do not render beer foam or hop haze.`,
+      ? `Every beer glass in frame MUST be exactly ${pour}.`
+      : `Every glass in frame MUST be exactly ${withoutBeerFoam(pour)}. Liquid is ${drink}; do not render beer foam or hop haze.`,
     `${GLASS_FORBIDDEN[input.glasTyp]}.`,
+    input.glasTyp !== "willibecher"
+      ? "ANTI-DEFAULT: Models often fall back to a German Willibecher / conical tumbler for beer pours — that is FORBIDDEN here. Match the selected glass silhouette instead."
+      : "",
     volumeLock,
-    "Do not substitute a different glass type.",
+    "If a glass-shape reference image is attached, copy that silhouette and proportions exactly (stem, foot, bowl, height). Do not substitute any other glass type.",
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+export const UNFILTERED_LIQUID_LOCK_MARKER = "LIQUID CLARITY LOCK (MANDATORY)";
+
+export function buildUnfilteredLiquidLockFragment(input: HyperrealisticInput): string {
+  if (inputProduktKategorie(input) !== "bier") return "";
+  const clarity = resolveBeerClarity(input);
+  if (clarity === "trueb") {
+    return [
+      `${UNFILTERED_LIQUID_LOCK_MARKER} — INVALID IF CLEAR:`,
+      "Sorten-Filtrierung = unfiltriert. Every poured beer in frame MUST be densely NATURTRÜB.",
+      "Look: cloudy Kellerbier / Zwickelbier — milky-golden yeast haze, soft turbidity, nearly opaque body like unfiltered wheat beer.",
+      "Light scatters inside the liquid; the far glass wall and background must NOT read sharply through the beer.",
+      "IMAGE-1 LIQUID OVERRIDE (MANDATORY): The product photo may show clear beer through bottle glass — IGNORE that completely.",
+      "Do NOT copy Image 1 bottle-liquid clarity, transparency, or filtered-lager look into the poured glass.",
+      "Poured beer clarity is locked by this text (and by any LIQUID reference image), never by Image 1.",
+      "Style words like Helles/Lager must NOT make the pour crystal-clear — this pour is unfiltered and cloudy.",
+      "FORBIDDEN: crystal-clear filtered lager, water-like transparency, brilliant see-through gold, Pils clarity, reading bubbles as sharp dots through the full glass depth.",
+    ].join(" ");
+  }
+  return [
+    `${UNFILTERED_LIQUID_LOCK_MARKER} — INVALID IF CLOUDY:`,
+    "Sorten-Filtrierung = filtriert. The poured beer MUST look crystal-clear and filtered.",
+    "FORBIDDEN: naturtrüb cloudiness, milky opacity, unfiltered haze.",
+  ].join(" ");
+}
+
+/**
+ * Kritische Produkt-Geometrie vorn anhängen — Prompt-Kürzung am Ende darf
+ * Etikett-Orientierung, Glasform und Naturtrüb nicht streichen.
+ * Klarheit immer STICKY vorn, auch wenn sie schon mitten im Prompt steht.
+ */
+export function ensureProductGeometryLocks(prompt: string, input: HyperrealisticInput): string {
+  const heads: string[] = [];
+  const clarity = buildUnfilteredLiquidLockFragment(input);
+  if (clarity) heads.push(clarity);
+  if (!prompt.includes(GLASS_SHAPE_LOCK_MARKER)) {
+    const glass = buildGlassShapeLockFragment(input);
+    if (glass) heads.push(glass);
+  }
+  const needsOrientation =
+    (input.etikettModus ?? "marke") === "marke" && !isDoseTyp(input.flaschenTyp);
+  if (needsOrientation && !prompt.includes("LABEL ORIENTATION (PHYSICAL")) {
+    heads.push(LABEL_ORIENTATION_LOCK);
+  }
+  if (!heads.length) return prompt;
+  return `${heads.join("\n\n")}\n\n${prompt}`;
 }
 
 /** Marker, damit die Verschluss-Logik nicht doppelt angehängt wird. */

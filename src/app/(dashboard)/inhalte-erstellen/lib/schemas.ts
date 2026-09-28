@@ -103,6 +103,8 @@ export const hyperrealisticSchema = z.object({
   produktKategorie: produktKategorieSchema.optional().default("bier"),
   bierstil: z.string().trim().min(1),
   glasTyp: glasTypSchema.optional(),
+  /** Sorten-Filtrierung: unfiltriert → naturtrüb, filtriert → klar. */
+  filtrierung: z.enum(["filtriert", "unfiltriert"]).optional(),
   szene: z.enum([
     "biergarten_sommer",
     "wirtshaus_innen",

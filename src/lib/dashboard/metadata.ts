@@ -84,6 +84,11 @@ export type DashboardBeer = {
   flaschenfarbe: "braun" | "gruen" | "klar";
   /** Bevorzugtes Servierglas, z. B. "masskrug", "willibecher" (siehe GLAS_TYPEN). */
   glasTyp?: string;
+  /**
+   * Filtrierung der Sorte — steuert die Bierklarheit in der Bildgenerierung.
+   * `unfiltriert` → naturtrüb; `filtriert` → klar. Fehlt bei Altbestand.
+   */
+  filtrierung?: "filtriert" | "unfiltriert";
   /** HTTPS-URL des Sorten-Etiketts (nie Base64 — JWT/Cookie-Limit). */
   etikettUrl: string;
   createdAt: string;
@@ -187,6 +192,8 @@ export function sanitizeDashboardBeers(value: unknown): DashboardBeer[] {
             : "klar",
       glasTyp:
         typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim().slice(0, 40) : undefined,
+      filtrierung:
+        item.filtrierung === "unfiltriert" || item.filtrierung === "filtriert" ? item.filtrierung : undefined,
       etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",
       createdAt: typeof item.createdAt === "string" ? item.createdAt.slice(0, 40) : "",
     });
@@ -256,7 +263,7 @@ export function getDashboardMetadata(userMetadata: unknown): DashboardMetadata {
     : [];
   const mediaLibrary = rawMedia
     .map((item) => {
-      const prompt = String(item.prompt ?? "").slice(0, 240);
+      const prompt = String(item.prompt ?? "").slice(0, 800);
       const titleRaw = String(item.title ?? "").trim().slice(0, 120);
       return {
         ...item,

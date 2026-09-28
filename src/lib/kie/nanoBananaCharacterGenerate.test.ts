@@ -37,6 +37,24 @@ describe("assembleGenerationReferences", () => {
     expect(assembled.campaignRefCount).toBe(0);
   });
 
+  it("places naturtrüb liquid clarity after glass on the product path", () => {
+    const assembled = assembleGenerationReferences({
+      useCharacterIdentity: false,
+      characterRefs: [],
+      visionReference: ref("bottle"),
+      extraRefs: [],
+      shapeReference: null,
+      glassReference: ref("glass"),
+      liquidReference: ref("trueb"),
+    });
+    expect(assembled.references.map((item) => item.base64)).toEqual(["bottle", "glass", "trueb"]);
+    expect(assembled.roles).toEqual([
+      { index: 1, role: "product" },
+      { index: 2, role: "glass" },
+      { index: 3, role: "liquid" },
+    ]);
+  });
+
   it("adds internal campaign images as look-only references without displacing user refs", () => {
     const assembled = assembleGenerationReferences({
       useCharacterIdentity: true,

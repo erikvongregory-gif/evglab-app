@@ -21,7 +21,7 @@ export type CompileBriefParams = {
   referenceImages?: VisionReferenceImage[];
   referenceRoles?: Array<{
     index: number;
-    role: "product" | "label" | "mood" | "shape" | "glass" | "scene" | "look";
+    role: "product" | "label" | "mood" | "shape" | "glass" | "liquid" | "scene" | "look";
     note?: string;
   }>;
 };
@@ -94,7 +94,7 @@ Du antwortest NUR mit einem JSON-Objekt (kein Markdown außerhalb), Schema:
   "normalized_brief": { "scene": "", "action": "", "people": "", "mood": "", "channel": "", "format": "" },
   "missing_information": [],
   "blocking_issues": [],
-  "reference_roles": [{ "index": 1, "role": "product|label|mood|shape|glass|scene|look", "note": "" }],
+  "reference_roles": [{ "index": 1, "role": "product|label|mood|shape|glass|liquid|scene|look", "note": "" }],
   "image_prompt": "vollständiger Master-Prompt",
   "preserve_constraints": [],
   "exclusions": [],

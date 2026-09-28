@@ -28,7 +28,7 @@ export type MasterPromptContext = {
   moodOverride?: string;
   referenceRoles?: Array<{
     index: number;
-    role: "product" | "label" | "mood" | "shape" | "glass" | "scene" | "look";
+    role: "product" | "label" | "mood" | "shape" | "glass" | "liquid" | "scene" | "look";
     note?: string;
   }>;
 };
@@ -76,9 +76,11 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
             ? "use only container geometry; copy no label, text, background, or lighting"
             : reference.role === "glass"
               ? "use only the glass silhouette and proportions; copy no logo, text, background, or lighting"
-              : reference.role === "look" || reference.role === "mood"
-                ? "use only lighting character, energy, and framing mood; invent new people — copy no faces, outfits, logos, or text"
-                : "use only environment and spatial cues; copy no products, logos, or text";
+              : reference.role === "liquid"
+                ? "use only poured-beer clarity and haze density (naturtrüb); copy no glass silhouette, foam style, logos, or lighting from it; overrides clear liquid in the product photo"
+                : reference.role === "look" || reference.role === "mood"
+                  ? "use only lighting character, energy, and framing mood; invent new people — copy no faces, outfits, logos, or text"
+                  : "use only environment and spatial cues; copy no products, logos, or text";
       refs.push(`Image ${reference.index} (${reference.role}): ${rule}.${reference.note ? ` ${reference.note}` : ""}`);
     }
   } else if (ctx.hasProductPhoto) {

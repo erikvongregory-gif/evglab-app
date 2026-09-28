@@ -1,3 +1,4 @@
+import { resolveGlasTyp } from "../beer-styles";
 import { FLASCHEN_TYPEN, GLAS_TYPEN, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 import {
@@ -10,10 +11,13 @@ import {
   buildAuthenticityFragment,
   buildLiquidPhysicsFragment,
   buildSceneTextureAnchors,
+  buildUnfilteredLiquidLockFragment,
   beverageContainerNoun,
   beverageDrinkNoun,
   bottleGeometryPrompt,
   inputProduktKategorie,
+  LABEL_ORIENTATION_LOCK,
+  resolveBeerClarity,
   withoutBeerFoam,
   HYPERREALISM_NEGATIVE,
 } from "./hyperrealism-blocks";
@@ -416,43 +420,84 @@ export function detectPeopleIntent(raw: string): {
 }
 
 /** Erkennt Handlungs-/Ort-Wünsche im Freitext und korrigiert Defaults, die dagegen arbeiten. */
+/** Freitext beschreibt Einschenken / Pour → Flasche+Glas. */
+function wantsPourServing(raw: string): boolean {
+  return /einschenk|eingesch[aeä]nk|eingeschenkt|pour(?:ed|ing)?|zapf(?:t|en)?|ins?\s+glas|in\s+(?:ein|das)\s+glas|into\s+(?:a\s+)?glass/i.test(
+    raw,
+  );
+}
+
+/** Freitext verlangt Nur-Glas. */
+function wantsGlassOnly(raw: string): boolean {
+  return /nur\s+glas|glass\s*only|kein(?:e)?\s+flasche|ohne\s+flasche|no\s+bottle/i.test(raw);
+}
+
 export function applyClientIntentOverrides(input: HyperrealisticInput): HyperrealisticInput {
   const raw = input.zusatzWunsch?.trim();
-  if (!raw) return input;
-
   const next: HyperrealisticInput = { ...input };
-  const mountain = /berg|gipfel|alpen|mountain|hütte|huette|\balm\b/i.test(raw);
-  const breweryPlace = /brauerei|sudhaus|braukessel|copper kettle|brewery/i.test(raw);
-  const intent = detectPeopleIntent(raw);
 
-  if (intent.toasting) {
-    next.personenModus = "E";
-    next.personImBild = true;
-    next.gruppenAnzahl = input.gruppenAnzahl ?? intent.groupCount ?? "2";
-    next.gruppenTyp = input.gruppenTyp ?? (intent.maleLean ? "maenner" : "gemischt");
-    next.gruppenDynamik = input.gruppenDynamik ?? "E2";
-  } else if (intent.hasPeople && (intent.group || intent.groupCount)) {
-    next.personenModus = "E";
-    next.personImBild = true;
-    next.gruppenAnzahl = input.gruppenAnzahl ?? intent.groupCount ?? "2";
-    next.gruppenTyp = input.gruppenTyp ?? (intent.maleLean ? "maenner" : "gemischt");
-    next.gruppenDynamik = input.gruppenDynamik ?? "E3";
-    if (intent.older) next.personAlter = input.personAlter ?? "aelter";
-    if (intent.maleLean) next.personGender = input.personGender ?? "maennlich";
-  } else if (intent.hasPeople) {
-    next.personenModus = "D";
-    next.personImBild = true;
-    const laughing = /lacht|lachen|grinst|freut|schlapp|jubel|feier/i.test(raw);
-    next.personMood = input.personMood ?? (laughing ? "lachend" : "entspannt");
-    next.shotType = input.shotType === "A" ? "B" : input.shotType;
-    if (intent.older) next.personAlter = input.personAlter ?? "aelter";
-    if (intent.maleLean) next.personGender = input.personGender ?? "maennlich";
+  // Glastyp aus Sorte/Stil verdrahten, sobald ein Glas im Motiv vorkommen kann.
+  if (raw) {
+    const mountain = /berg|gipfel|alpen|mountain|hütte|huette|\balm\b/i.test(raw);
+    const breweryPlace = /brauerei|sudhaus|braukessel|copper kettle|brewery/i.test(raw);
+    const intent = detectPeopleIntent(raw);
+
+    if (intent.toasting) {
+      next.personenModus = "E";
+      next.personImBild = true;
+      next.gruppenAnzahl = input.gruppenAnzahl ?? intent.groupCount ?? "2";
+      next.gruppenTyp = input.gruppenTyp ?? (intent.maleLean ? "maenner" : "gemischt");
+      next.gruppenDynamik = input.gruppenDynamik ?? "E2";
+    } else if (intent.hasPeople && (intent.group || intent.groupCount)) {
+      next.personenModus = "E";
+      next.personImBild = true;
+      next.gruppenAnzahl = input.gruppenAnzahl ?? intent.groupCount ?? "2";
+      next.gruppenTyp = input.gruppenTyp ?? (intent.maleLean ? "maenner" : "gemischt");
+      next.gruppenDynamik = input.gruppenDynamik ?? "E3";
+      if (intent.older) next.personAlter = input.personAlter ?? "aelter";
+      if (intent.maleLean) next.personGender = input.personGender ?? "maennlich";
+    } else if (intent.hasPeople) {
+      next.personenModus = "D";
+      next.personImBild = true;
+      const laughing = /lacht|lachen|grinst|freut|schlapp|jubel|feier/i.test(raw);
+      next.personMood = input.personMood ?? (laughing ? "lachend" : "entspannt");
+      next.shotType = input.shotType === "A" ? "B" : input.shotType;
+      if (intent.older) next.personAlter = input.personAlter ?? "aelter";
+      if (intent.maleLean) next.personGender = input.personGender ?? "maennlich";
+    }
+
+    if (mountain) {
+      next.szene = "alpenpanorama";
+    } else if (breweryPlace || /brauer|braumeister|brewer/i.test(raw)) {
+      next.szene = "brauereihof";
+    }
+
+    if (wantsGlassOnly(raw)) {
+      next.behaelter = "G";
+    } else if (wantsPourServing(raw) || intent.toasting) {
+      next.behaelter = "B";
+    }
   }
 
-  if (mountain) {
-    next.szene = "alpenpanorama";
-  } else if (breweryPlace || /brauer|braumeister|brewer/i.test(raw)) {
-    next.szene = "brauereihof";
+  const needsGlass = (next.behaelter ?? (next.glasTyp ? "B" : "F")) !== "F";
+  if (needsGlass || next.glasTyp) {
+    next.glasTyp = resolveGlasTyp(next.bierstil, next.glasTyp);
+  }
+
+  // Sorten-Filtrierung in den Freitext spiegeln, damit jeder Prompt-Zweig sie sieht.
+  if (inputProduktKategorie(next) === "bier") {
+    const clarity = resolveBeerClarity(next);
+    if (clarity === "trueb" && !/naturtr[uü]b|unfiltriert/i.test(next.zusatzWunsch ?? "")) {
+      next.zusatzWunsch = [next.zusatzWunsch?.trim(), "Bier naturtrüb unfiltriert mit Hefetrübung"]
+        .filter(Boolean)
+        .join(". ")
+        .slice(0, 800);
+    } else if (clarity === "klar" && next.filtrierung === "filtriert" && !/filtriert|glasklar/i.test(next.zusatzWunsch ?? "")) {
+      next.zusatzWunsch = [next.zusatzWunsch?.trim(), "Bier filtriert klar"]
+        .filter(Boolean)
+        .join(". ")
+        .slice(0, 800);
+    }
   }
 
   return next;
@@ -468,7 +513,7 @@ export function applyClientIntentOverrides(input: HyperrealisticInput): Hyperrea
  */
 type ProductPlacementReferenceRole = {
   index: number;
-  role: "product" | "shape" | "glass" | "scene" | "look";
+  role: "product" | "shape" | "glass" | "liquid" | "scene" | "look";
 };
 
 export function buildProductPlacementPrompt(
@@ -549,7 +594,12 @@ export function buildProductPlacementPrompt(
     behaelter !== "F" && input.glasTyp
       ? glassPourPromptDescription(input.glasTyp, pouredGlassFillMl(input.glasTyp, input.flaschenTyp, behaelter))
       : "";
-  const glassPour = isBeer ? glassPourRaw : withoutBeerFoam(glassPourRaw);
+  const beerClarity = isBeer ? resolveBeerClarity(input) : "klar";
+  const glassPourWithClarity =
+    isBeer && beerClarity === "trueb" && glassPourRaw
+      ? `${glassPourRaw} — beer inside is NATURTRÜB / cloudy unfiltered (milky-golden yeast haze), NEVER crystal-clear`
+      : glassPourRaw;
+  const glassPour = isBeer ? glassPourWithClarity : withoutBeerFoam(glassPourRaw);
   const bottleLitres = flascheVolumeMl(input.flaschenTyp) / 1000;
   const pourLock =
     !isCampaign && !toasting && !intent?.hasPeople && behaelter === "B" && glassPour
@@ -561,16 +611,20 @@ export function buildProductPlacementPrompt(
   const identityBits = poured
     ? "bottle or can shape and proportions, glass color, and the entire printed label"
     : "bottle or can shape and proportions, glass color, cap design, and the entire printed label";
+  const labelOrientation = isDoseTyp(input.flaschenTyp) ? "" : ` ${LABEL_ORIENTATION_LOCK}`;
   const labelLock =
     stiltreue === "hoch"
-      ? `IDENTITY REFERENCE — PRESERVE EXACTLY: ${identityBits} — artwork, logo, crest, typography, colors, layout, label proportions, and every recognizable branding detail. Reconstruct these identity details faithfully; do not invent a different brand.${
+      ? `IDENTITY REFERENCE — PRESERVE EXACTLY: ${identityBits} — artwork, logo, crest, typography, colors, layout, label proportions, and every recognizable branding detail. Reconstruct these identity details faithfully; do not invent a different brand.${labelOrientation}${
           poured
             ? " The glass is already poured, so do NOT copy a sealed crown cap from Image 1 onto the bottle mouth — bottle must be open, cap off."
             : ""
         }`
       : stiltreue === "normal"
-        ? "Use the product silhouette and brand identity from Image 1 as a faithful reference (logo, core colors, overall layout). Reconstruct it for the new scene with natural lighting and perspective; do not invent a different brand."
+        ? `Use the product silhouette and brand identity from Image 1 as a faithful reference (logo, core colors, overall layout). Reconstruct it for the new scene with natural lighting and perspective; do not invent a different brand.${labelOrientation}`
         : "Image 1 defines only the vessel type, silhouette, material, and scale. Brand artwork and label text are intentionally unlocked; do not claim exact product or brand identity.";
+  const glassShapeLock = buildGlassShapeLockFragment(input);
+  const liquidClarityLock = isBeer ? buildUnfilteredLiquidLockFragment(input) : "";
+  const liquidPhysics = isBeer ? buildLiquidPhysicsFragment(input, behaelter) : "";
 
   const productReferenceRule =
     stiltreue === "hoch"
@@ -624,7 +678,10 @@ export function buildProductPlacementPrompt(
     .filter(({ index }) => index > 1)
     .map(({ index, role }) => {
       if (role === "glass") {
-        return `Image ${index} defines ONLY the exact glass silhouette and proportions. Do not copy its lighting, background, logos, or text.`;
+        return `Image ${index} defines ONLY the exact glass silhouette and proportions (stem/foot/bowl if present). Match that glass shape exactly in the photograph. Do not copy its lighting, background, logos, or text. NEVER replace it with a Willibecher unless Image ${index} itself is a Willibecher.`;
+      }
+      if (role === "liquid") {
+        return `Image ${index} defines ONLY poured-beer CLARITY and haze density (naturtrüb / cloudy body). Match that milky-golden turbidity in every poured glass. Do not copy its glass silhouette, foam style, lighting, or background. This overrides any clear liquid visible in Image 1.`;
       }
       if (role === "shape") {
         return `Image ${index} defines ONLY container geometry and proportions. Do not copy its label, text, background, or lighting.`;
@@ -648,6 +705,10 @@ export function buildProductPlacementPrompt(
     stiltreue === "frei"
       ? `Image 1 is ONLY a vessel reference for the real ${containerNoun}. Its branding is not locked.`
       : `Image 1 is ONLY the product identity reference for the real ${containerNoun} and its printed label.`;
+  const imageOneLiquidOverride =
+    isBeer && beerClarity === "trueb"
+      ? " Image 1 does NOT lock poured-beer clarity: ignore clear beer visible through the bottle; the poured glass must be densely naturtrüb / cloudy."
+      : "";
   const outputIntent = isCampaign
     ? "Create a bold product-forward campaign still like the LOOK references — shot on a real camera, not a glossy AI ad or hospitality beer-garden postcard."
     : isPremium
@@ -679,10 +740,13 @@ export function buildProductPlacementPrompt(
       lookAuthority
         ? `USER SCENE (content only — people/action/place words; LOOK owns crop/light/scale): ${extra}`
         : `USER SCENE (mandatory — fulfill exactly, this is the photograph to create): ${extra}`,
-      imageOneDescription,
+      `${imageOneDescription}${imageOneLiquidOverride}`,
       productIntegration,
       "COMPLETELY DISCARD Image 1's background, wooden table, coaster, napkin, glass placement, people, trees, and camera framing. Do not remake Image 1. Invent a wholly new environment for the USER SCENE.",
       labelLock,
+      glassShapeLock,
+      liquidClarityLock,
+      liquidPhysics,
       `Composition for the NEW scene: ${compositionVessel}.`,
       people,
       isCampaign
@@ -712,10 +776,13 @@ export function buildProductPlacementPrompt(
   return [
     hyperrealHead,
     lookAuthority,
-    imageOneDescription,
+    `${imageOneDescription}${imageOneLiquidOverride}`,
     productIntegration,
     referenceInstructions,
     labelLock,
+    glassShapeLock,
+    liquidClarityLock,
+    liquidPhysics,
     `Composition: ${compositionVessel}.`,
     pourLock,
     people,

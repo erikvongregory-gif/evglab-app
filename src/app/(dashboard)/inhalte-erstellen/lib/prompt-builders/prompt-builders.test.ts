@@ -492,6 +492,69 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(prompt).not.toMatch(/No people and no hands/);
   });
 
+  it("maps pour freitext to Flasche+Glas and wires the selected glass type", () => {
+    const next = applyClientIntentOverrides({
+      aiWatermark: false,
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "euro_longneck_330",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      // Client hat glasTyp vergessen — Stil-Default greift
+      szene: "biergarten_sommer",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "mittag",
+      stimmung: "gesellig",
+      zusatzWunsch: "hanseat wird ins glas eingeschenkt naturtrüb",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(next.behaelter).toBe("B");
+    expect(next.glasTyp).toBe("willibecher");
+
+    const withCustomGlass = applyClientIntentOverrides({
+      ...next,
+      glasTyp: "pils_tulpe",
+      zusatzWunsch: "hanseat wird eingeschenkt",
+    });
+    expect(withCustomGlass.glasTyp).toBe("pils_tulpe");
+    expect(withCustomGlass.behaelter).toBe("B");
+
+    const prompt = buildProductPlacementPrompt(withCustomGlass);
+    expect(prompt).toMatch(/GLASS SHAPE LOCK/i);
+    expect(prompt).toMatch(/Pilstulpe|stemmed German Pilstulpe/i);
+    expect(prompt).toMatch(/LABEL ORIENTATION/i);
+    expect(prompt).toMatch(/Anchor A|NECK\/shoulder|upright standing bottle/i);
+  });
+
+  it("forces cloudy liquid for helles when filtrierung is unfiltriert", () => {
+    const next = applyClientIntentOverrides({
+      aiWatermark: false,
+      etikettBild: "https://example.com/etikett.png",
+      flaschenTyp: "euro_longneck_330",
+      flaschenfarbe: "braun",
+      bierstil: "helles",
+      filtrierung: "unfiltriert",
+      glasTyp: "ipa_teku",
+      szene: "biergarten_sommer",
+      behaelter: "B",
+      personImBild: false,
+      personenModus: "A",
+      tageszeit: "mittag",
+      stimmung: "gesellig",
+      zusatzWunsch: "eingeschenkt",
+      aspectRatio: "4:5",
+      quality: "medium",
+      variantCount: 1,
+    });
+    expect(next.zusatzWunsch).toMatch(/naturtrüb|unfiltriert/i);
+    const prompt = buildProductPlacementPrompt(next);
+    expect(prompt).toMatch(/NATURTRÜB|yeast haze|milky-cloudy|INVALID IF CLEAR/i);
+    expect(prompt).toMatch(/IMAGE-1 LIQUID OVERRIDE/i);
+    expect(prompt).not.toMatch(/crystal-clear pale golden lager with warm glow-through/i);
+  });
+
   it("haelt das Glas auf Flaschenvolumen (kein 0,5-l-Krug neben 0,33 l)", () => {
     const prompt = buildProductPlacementPrompt({
       aiWatermark: false, stimmung: "entspannt", etikettBild: "https://example.com/etikett.png",

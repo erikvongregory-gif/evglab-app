@@ -2,7 +2,14 @@ import { after, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { applyClientIntentOverrides, buildProductPlacementPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
-import { buildPhotoStyleLockFragment, ensureClosureLogic } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
+import {
+  buildPhotoStyleLockFragment,
+  ensureClosureLogic,
+  ensureProductGeometryLocks,
+  inputProduktKategorie,
+  resolveBeerClarity,
+} from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
+import { enforceHyperrealisticPromptConstraints } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/enforce-prompt-constraints";
 import { hyperrealisticSchema, socialPostSchema, type HyperrealisticInput, type SocialPostInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
 import {
@@ -31,6 +38,7 @@ import {
 import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
 import { loadGlassShapeReference } from "@/lib/openai/glassShapeReference";
+import { loadLiquidClarityReference } from "@/lib/openai/liquidClarityReference";
 import { loadCampaignStyleReferences } from "@/lib/openai/campaignStyleReferences";
 import { loadPremiumStyleReferences } from "@/lib/openai/premiumStyleReferences";
 import { loadReportageStyleReferences } from "@/lib/openai/reportageStyleReferences";
@@ -67,7 +75,7 @@ import {
   type GenerationSnapshot,
   type StudioMode,
 } from "@/lib/inhalte-erstellen/studio-config";
-import { buildStudioMediaTitle } from "@/lib/inhalte-erstellen/media-title";
+import { buildStudioMediaTitle, buildStudioMediaPrompt } from "@/lib/inhalte-erstellen/media-title";
 
 const MAX_PROMPT_CHARS = 12_000;
 const OUTPUT_FORMAT = "png" as const;
@@ -320,13 +328,20 @@ async function prepareStudioGeneration(args: {
   const hasShapeReference = Boolean(shapeReference);
   const glassReference =
     input.behaelter === "F" ? null : await loadGlassShapeReference(input.glasTyp);
+  const liquidReference =
+    inputProduktKategorie(input) === "bier" && resolveBeerClarity(input) === "trueb"
+      ? await loadLiquidClarityReference("trueb")
+      : null;
 
   // Look-Refs vor Extra-Uploads reservieren — sonst fallen Campaign/Reportage/Premium-Looks still weg.
   // Charakter-Pfad bleibt bei 4 Slots (Gesicht + Produkt + Extras); Produktpfad darf 6 für Style-Looks.
   const REF_BUDGET = useCharacterIdentity ? 4 : 6;
   const coreReferenceCount = useCharacterIdentity
-    ? characterRefs.length + (visionReference ? 1 : 0)
-    : (visionReference ? 1 : 0) + (shapeReference ? 1 : 0) + (glassReference ? 1 : 0);
+    ? characterRefs.length + (visionReference ? 1 : 0) + (liquidReference ? 1 : 0)
+    : (visionReference ? 1 : 0) +
+      (shapeReference ? 1 : 0) +
+      (glassReference ? 1 : 0) +
+      (liquidReference ? 1 : 0);
   const styleLookLimit = Math.min(2, Math.max(0, REF_BUDGET - coreReferenceCount));
   const styleLookReferences =
     input.photoStyle === "campaign"
@@ -348,6 +363,7 @@ async function prepareStudioGeneration(args: {
     campaignRefs: styleLookReferences,
     shapeReference,
     glassReference,
+    liquidReference,
   });
   const compilerReferenceRoles = assembled.roles.flatMap(({ index, role }) =>
     role === "character" ? [] : [{ index, role, note: "" }],
@@ -431,13 +447,17 @@ async function prepareStudioGeneration(args: {
   if (input.hyperreal === true || input.contentPreset === "hyperreal") {
     prompt = applyContentPresetPrompt(prompt, "hyperreal");
   }
+  prompt = enforceHyperrealisticPromptConstraints(prompt, input, brandProfile.breweryName);
   const photoStyleLock = buildPhotoStyleLockFragment(input);
   const tail = [photoStyleLock, mode === "social" ? COPY_SPACE_DIRECTIVE : "", CUSTOMER_IMAGE_SAFETY_LOCK]
     .filter(Boolean)
     .join("\n\n");
   // Style-, Copy- und Safety-Lock nach Truncation anhängen — sonst sterben sie am Prompt-Ende.
   prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS - tail.length - 2);
-  prompt = ensureClosureLogic(`${prompt}\n\n${tail}`, input);
+  prompt = `${prompt}\n\n${tail}`;
+  // Geometrie + Verschluss VORN — Truncation darf Etikett/Glas/Naturtrüb nicht streichen.
+  prompt = ensureProductGeometryLocks(prompt, input);
+  prompt = ensureClosureLogic(prompt, input);
 
   const qualityEnv = process.env.OPENAI_IMAGE_QUALITY?.trim().toLowerCase();
   const requestedQuality =
@@ -524,6 +544,7 @@ async function prepareStudioGeneration(args: {
       characterName: input.characterName,
       headline: social?.headline,
       breweryName: brandProfile.breweryName,
+      zusatzWunsch: input.zusatzWunsch,
     }),
   };
 }
@@ -677,8 +698,11 @@ async function executeStudioGeneration(args: {
     images,
     thumbs,
     title: prepared.mediaTitle,
-    // ponytail: Prompt nur für Suche/Metadaten, nie als Anzeige-Titel
-    prompt: (prepared.input.zusatzWunsch?.trim() || prepared.mediaTitle).slice(0, 240),
+    // User-Freitext für Lightbox/Suche — nie der englische Master-Prompt
+    prompt: buildStudioMediaPrompt({
+      zusatzWunsch: prepared.input.zusatzWunsch,
+      fallbackTitle: prepared.mediaTitle,
+    }),
     aspectRatio: prepared.aspectRatio,
     resolution: prepared.billingResolution,
     outputFormat: OUTPUT_FORMAT,

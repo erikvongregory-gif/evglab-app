@@ -194,38 +194,43 @@ export const GLAS_TYPEN = {
   pils_tulpe: {
     label: "Pilstulpe",
     promptDescription:
-      "stemmed German Pilstulpe: tall slender tulip bowl on a thin stem with a foot, narrow opening, fine white foam ~2 cm — NOT a stemless Willibecher tumbler",
+      "STEMMED German Pilstulpe: tall slender tulip bowl on a thin stem with a round foot (stem+foot MANDATORY), narrow opening, fine white foam ~2 cm — NEVER a stemless Willibecher tumbler, NEVER a conical beer tumbler without stem",
     bierstile: ["pils", "helles_lager"],
   },
   weizen: {
     label: "Weizenglas",
-    promptDescription: "tall curvy 500ml Weizen glass (vase shape), thick foam crown 3-4cm, hazy golden-amber color",
+    promptDescription:
+      "tall curvy 0.5 L Weizen glass (vase silhouette), NO stem, thick foam crown 3-4 cm, hazy golden-amber color — NEVER a Willibecher tumbler, NEVER a stemmed Teku",
     bierstile: ["hefeweizen", "kristallweizen", "dunkles_weizen"],
   },
   willibecher: {
     label: "Willibecher",
     promptDescription:
-      "classic German Willibecher: handle-less 0.5 L straight-sided slightly conical tumbler (wider at the rim than a Stange), thick sham bottom, NO stem, NO foot, NO waist, NO vase curve, modest white foam cap",
+      "classic German Willibecher: handle-less ~0.3–0.5 L slightly conical beer tumbler, clearly WIDER at the rim than at the thick sham bottom, short-to-medium height (not a tall highball), NO stem, NO foot, NO waist, NO vase curve, modest white foam cap — the everyday German serving tumbler, not an American pint",
     bierstile: ["helles", "export", "kellerbier"],
   },
   masskrug: {
     label: "Maßkrug",
-    promptDescription: "1-liter glass Maßkrug beer mug with handle and dimpled facets",
+    promptDescription:
+      "1-liter glass Maßkrug beer mug with one handle and dimpled facets — NEVER a stemless Willibecher without handle",
     bierstile: ["helles", "festbier", "maerzen"],
   },
   ipa_teku: {
     label: "Teku / IPA Tulpe",
-    promptDescription: "stemmed Teku tasting glass, slightly bulbous body, narrow rim concentrating aroma",
+    promptDescription:
+      "STEMMED Italian Teku tasting glass: thin stem and round foot are MANDATORY and clearly visible, bulbous bowl that flares then pinches to a narrow aroma rim — NEVER a stemless Willibecher, NEVER a conical tumbler without stem, NEVER a shaker pint",
     bierstile: ["ipa", "neipa", "double_ipa", "saison"],
   },
   schwenker: {
     label: "Schwenker / Snifter",
-    promptDescription: "stemmed snifter glass for strong beers, bulbous bowl",
+    promptDescription:
+      "STEMMED snifter glass: thin stem and round foot MANDATORY, wide bulbous bowl narrowing toward the rim — NEVER a stemless Willibecher tumbler",
     bierstile: ["barley_wine", "imperial_stout", "doppelbock"],
   },
   stange: {
     label: "Stange",
-    promptDescription: "tall narrow cylindrical 200ml Kölsch/Alt Stange glass",
+    promptDescription:
+      "tall narrow cylindrical 0.2 L Kölsch/Alt Stange glass, NO stem — NEVER a wider Willibecher tumbler",
     bierstile: ["koelsch", "altbier"],
   },
 } as const;
@@ -305,7 +310,7 @@ export function glassPourPromptDescription(
       if (fillMl >= 1000) return GLAS_TYPEN.masskrug.promptDescription;
       return `a small ${litres} litre dimpled glass beer mug (Seidel) with one handle and modest foam — a single pour from the bottle beside it. ${tooBig}`;
     case "willibecher":
-      return `classic German Willibecher: handle-less ${litres} litre straight-sided slightly conical tumbler (wider at the rim than a Stange), thick sham bottom, NO stem, NO foot, NO waist, modest white foam cap. ${tooBig}`;
+      return `classic German Willibecher: handle-less ${litres} litre slightly conical beer tumbler, WIDER at the rim than at the thick sham bottom, short-to-medium height (not a tall highball), NO stem, NO foot, NO waist, modest white foam cap — NOT an American shaker pint. ${tooBig}`;
     case "weizen":
       if (fillMl < 500) {
         return `a smaller ${litres} litre wheat-beer tumbler, not the tall 0.5 L Weizen vase, modest foam. ${tooBig}`;

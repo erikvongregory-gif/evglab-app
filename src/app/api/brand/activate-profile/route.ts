@@ -48,6 +48,7 @@ const bodySchema = z.object({
         flaschenTyp: z.string().min(1).max(60),
         flaschenfarbe: z.enum(["braun", "gruen", "klar"]),
         glasTyp: z.string().min(1).max(40),
+        filtrierung: z.enum(["filtriert", "unfiltriert"]).optional(),
         etikettUrl: z.string().max(1200).optional().default(""),
       }),
     )

@@ -1,5 +1,6 @@
 import type { DashboardMediaItem } from "@/lib/dashboard/metadata";
 import { writeDashboardMedia } from "@/lib/dashboard/media-store";
+import { MEDIA_PROMPT_MAX } from "@/lib/inhalte-erstellen/media-title";
 
 /** Speichert fertige Generierungen serverseitig in der Mediathek (Upsert, idempotent). */
 export async function persistGeneratedMediaItems(input: {
@@ -20,7 +21,7 @@ export async function persistGeneratedMediaItems(input: {
   if (!input.images.length) return [];
   const createdAt = new Date().toISOString();
   const title = input.title.trim().slice(0, 120) || "Motiv";
-  const prompt = input.prompt.trim().slice(0, 240) || title;
+  const prompt = input.prompt.trim().slice(0, MEDIA_PROMPT_MAX) || title;
   const beerName = input.beerName?.trim().slice(0, 80) || undefined;
   const beerId = input.beerId?.trim().slice(0, 64) || undefined;
   const items: DashboardMediaItem[] = input.images.map((imageUrl, index) => {

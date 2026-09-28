@@ -1,3 +1,4 @@
+import { GLAS_TYPEN, type GlasTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 
 /**
@@ -7,7 +8,7 @@ import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/li
 export type BeerStyleOption = {
   label: string;
   bierstil: string;
-  glasTyp: HyperrealisticInput["glasTyp"];
+  glasTyp: NonNullable<HyperrealisticInput["glasTyp"]>;
 };
 
 export const BEER_STYLE_OPTIONS: BeerStyleOption[] = [
@@ -35,4 +36,14 @@ export function findBeerStyle(bierstil: string): BeerStyleOption | undefined {
 
 export function beerStyleLabel(bierstil: string): string {
   return findBeerStyle(bierstil)?.label ?? bierstil;
+}
+
+/** User-Glastyp aus der Sorte, sonst Stil-Default — nie stillschweigend weglassen. */
+export function resolveGlasTyp(
+  bierstil: string,
+  glasTyp?: string | null,
+): NonNullable<HyperrealisticInput["glasTyp"]> {
+  const trimmed = glasTyp?.trim();
+  if (trimmed && trimmed in GLAS_TYPEN) return trimmed as GlasTyp;
+  return findBeerStyle(bierstil)?.glasTyp ?? "willibecher";
 }

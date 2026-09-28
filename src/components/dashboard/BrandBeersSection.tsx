@@ -99,6 +99,7 @@ export function BrandBeersSection() {
         flaschenTyp: draft.flaschenTyp,
         flaschenfarbe: draft.flaschenfarbe,
         glasTyp: draft.glasTyp,
+        filtrierung: draft.filtrierung,
         etikettUrl: editingBeer?.etikettUrl ?? "",
         createdAt: editingBeer?.createdAt || new Date().toISOString(),
         ...(etikettPayload ? { etikettPayload } : {}),
@@ -116,6 +117,7 @@ export function BrandBeersSection() {
       setDialogOpen(false);
       setEditingBeer(null);
       setDialogError("");
+      window.dispatchEvent(new CustomEvent("evglab-beers-updated"));
     } catch (e) {
       const message = e instanceof Error ? e.message : "Speichern fehlgeschlagen.";
       setDialogError(message);
@@ -198,6 +200,7 @@ export function BrandBeersSection() {
                 flaschenTyp: editingBeer.flaschenTyp,
                 flaschenfarbe: editingBeer.flaschenfarbe,
                 glasTyp: editingBeer.glasTyp,
+                filtrierung: editingBeer.filtrierung,
                 etikettUrl: editingBeer.etikettUrl,
               }
             : undefined

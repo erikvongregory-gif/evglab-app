@@ -15,7 +15,8 @@ import {
 import { StudioIcon } from "@/components/studio/icons";
 import { MagneticText } from "@/components/ui/morphing-cursor";
 import { cn } from "@/lib/utils";
-import { beerStyleLabel } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
+import { beerStyleLabel, resolveGlasTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
+import { GLAS_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import {
   OCCASION_TEMPLATES,
   sortTemplatesForDate,
@@ -134,8 +135,17 @@ function beerInitials(name: string) {
 
 function beerMeta(beer: DashboardBeer) {
   const kategorie = sanitizeProduktKategorie(beer.produktKategorie);
-  if (kategorie === "bier") return beerStyleLabel(beer.bierstil);
-  return produktKategorieLabel(kategorie);
+  if (kategorie !== "bier") return produktKategorieLabel(kategorie);
+  const stil = beerStyleLabel(beer.bierstil);
+  const glasKey = resolveGlasTyp(beer.bierstil, beer.glasTyp);
+  const glas = GLAS_TYPEN[glasKey]?.label;
+  const filtr =
+    beer.filtrierung === "unfiltriert"
+      ? "unfiltriert"
+      : beer.filtrierung === "filtriert"
+        ? "filtriert"
+        : null;
+  return [stil, filtr, glas].filter(Boolean).join(" · ");
 }
 
 export default function RuixenMoonChat() {
@@ -204,6 +214,38 @@ export default function RuixenMoonChat() {
     },
     [selectedCharacter],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadBeers = async () => {
+      try {
+        const response = await fetch("/api/dashboard/my-beers", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        if (!response.ok) throw new Error("beers");
+        const json = (await response.json()) as { beers?: DashboardBeer[] };
+        if (cancelled) return;
+        const next = Array.isArray(json.beers) ? json.beers : [];
+        setBeers(next);
+        setSelectedBeer((current) => {
+          if (!current) return current;
+          return next.find((entry) => entry.id === current.id) ?? current;
+        });
+      } catch {
+        /* keep current list */
+      }
+    };
+
+    const onBeersUpdated = () => {
+      void loadBeers();
+    };
+    window.addEventListener("evglab-beers-updated", onBeersUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("evglab-beers-updated", onBeersUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -284,16 +326,43 @@ export default function RuixenMoonChat() {
     setGenError(null);
     setGenBusy(true);
 
+    // Sorte frisch laden — sonst fehlen gerade geänderte Felder (Filtrierung, Glas).
+    let beer = selectedBeer;
+    try {
+      const beersRes = await fetch("/api/dashboard/my-beers", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (beersRes.ok) {
+        const beersJson = (await beersRes.json()) as { beers?: DashboardBeer[] };
+        const fresh = Array.isArray(beersJson.beers) ? beersJson.beers : [];
+        setBeers(fresh);
+        if (selectedBeer?.id) {
+          beer = fresh.find((entry) => entry.id === selectedBeer.id) ?? selectedBeer;
+          setSelectedBeer(beer);
+        }
+      }
+    } catch {
+      /* Cache-Fallback: weiter mit selectedBeer */
+    }
+
     const preset = activePreset?.preset;
     const szeneRaw = preset?.szene ?? "biergarten_sommer";
     const szene = VALID_SZENEN.has(szeneRaw) ? szeneRaw : "biergarten_sommer";
 
     const intentParts = [prompt, preset?.promptNote].filter(Boolean);
+    const bierstil = beer?.bierstil || "helles";
+    const beerThumb = beer?.etikettUrl?.trim() || "";
     const payload = {
-      etikettBild: selectedThumb || PLACEHOLDER_ETIKETT,
-      flaschenTyp: selectedBeer?.flaschenTyp || "nrw_500",
-      flaschenfarbe: selectedBeer?.flaschenfarbe || "braun",
-      bierstil: selectedBeer?.bierstil || "helles",
+      etikettBild: beerThumb || selectedThumb || PLACEHOLDER_ETIKETT,
+      flaschenTyp: beer?.flaschenTyp || "nrw_500",
+      flaschenfarbe: beer?.flaschenfarbe || "braun",
+      bierstil,
+      glasTyp: resolveGlasTyp(bierstil, beer?.glasTyp),
+      filtrierung:
+        beer?.filtrierung === "unfiltriert" || beer?.filtrierung === "filtriert"
+          ? beer.filtrierung
+          : undefined,
       szene,
       tageszeit: preset?.tageszeit ?? "goldene_stunde",
       stimmungTrend: preset?.stimmungTrend,
@@ -310,7 +379,7 @@ export default function RuixenMoonChat() {
       photoStyle,
       hyperreal,
       aiWatermark,
-      beerName: selectedBeer?.name?.trim() || undefined,
+      beerName: beer?.name?.trim() || undefined,
       zusatzWunsch: intentParts.join(". ").slice(0, 800),
       characterName: selectedCharacter?.name?.trim() || undefined,
       characterRole: selectedCharacter?.role?.trim() || undefined,

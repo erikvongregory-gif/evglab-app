@@ -217,17 +217,22 @@ export function assembleGenerationReferences(input: {
   campaignRefs?: OpenAiReferenceImage[];
   shapeReference: OpenAiReferenceImage | null;
   glassReference?: OpenAiReferenceImage | null;
+  liquidReference?: OpenAiReferenceImage | null;
 }): {
   references: OpenAiReferenceImage[];
   extraRefCount: number;
   campaignRefCount: number;
-  roles: Array<{ index: number; role: "character" | "product" | "shape" | "glass" | "scene" | "look" }>;
+  roles: Array<{
+    index: number;
+    role: "character" | "product" | "shape" | "glass" | "liquid" | "scene" | "look";
+  }>;
 } {
   if (!input.useCharacterIdentity) {
     const ordered = [
       input.visionReference ? { image: input.visionReference, role: "product" as const } : null,
       input.shapeReference ? { image: input.shapeReference, role: "shape" as const } : null,
       input.glassReference ? { image: input.glassReference, role: "glass" as const } : null,
+      input.liquidReference ? { image: input.liquidReference, role: "liquid" as const } : null,
       // Style-Looks vor User-Extras — Kampagnen-Grammatik hat Vorrang vor Szene-Uploads.
       ...(input.campaignRefs ?? []).map((image) => ({ image, role: "look" as const })),
       ...input.extraRefs.map((image, index) => ({
@@ -236,7 +241,7 @@ export function assembleGenerationReferences(input: {
       })),
     ].filter(Boolean) as Array<{
       image: OpenAiReferenceImage;
-      role: "product" | "shape" | "glass" | "scene" | "look";
+      role: "product" | "shape" | "glass" | "liquid" | "scene" | "look";
     }>;
     return {
       references: ordered.map(({ image }) => image),
@@ -246,18 +251,23 @@ export function assembleGenerationReferences(input: {
     };
   }
   const identity = [...input.characterRefs, input.visionReference].filter(Boolean) as OpenAiReferenceImage[];
-  const extras = input.extraRefs.slice(0, Math.max(0, 4 - identity.length));
-  const campaigns = (input.campaignRefs ?? []).slice(0, Math.max(0, 4 - identity.length - extras.length));
+  // Naturtrüb-Liquid-Ref vor Extras/Looks — Klarheit schlägt Szene-Upload.
+  const liquidSlot = input.liquidReference ? 1 : 0;
+  const extras = input.extraRefs.slice(0, Math.max(0, 4 - identity.length - liquidSlot));
+  const afterExtras = identity.length + extras.length + liquidSlot;
+  const campaigns = (input.campaignRefs ?? []).slice(0, Math.max(0, 4 - afterExtras));
   const roles = [
     ...input.characterRefs.map(() => "character" as const),
     ...(input.visionReference ? (["product"] as const) : []),
+    ...(input.liquidReference ? (["liquid"] as const) : []),
     ...extras.map((_, index) =>
       input.extraRefRoles?.[index] === "look" ? ("look" as const) : ("scene" as const),
     ),
     ...campaigns.map(() => "look" as const),
   ].map((role, index) => ({ index: index + 1, role }));
+  const liquidRefs = input.liquidReference ? [input.liquidReference] : [];
   return {
-    references: [...identity, ...extras, ...campaigns],
+    references: [...identity, ...liquidRefs, ...extras, ...campaigns],
     extraRefCount: extras.length,
     campaignRefCount: campaigns.length,
     roles,

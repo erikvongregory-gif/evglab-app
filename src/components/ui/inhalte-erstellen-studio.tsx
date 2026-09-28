@@ -694,6 +694,10 @@ export function InhalteErstellenStudio({
         flaschenfarbe,
         bierstil: was.bierstil,
         glasTyp: behaelter === "F" ? undefined : was.glasTyp,
+        filtrierung:
+          selectedBeer?.filtrierung === "unfiltriert" || selectedBeer?.filtrierung === "filtriert"
+            ? selectedBeer.filtrierung
+            : undefined,
         szene: wo.szene,
         behaelter,
         personImBild: personenModus === "D" || personenModus === "E",
@@ -872,6 +876,10 @@ export function InhalteErstellenStudio({
         flaschenfarbe,
         bierstil: was.bierstil,
         glasTyp: behaelter === "F" ? undefined : was.glasTyp,
+        filtrierung:
+          selectedBeer?.filtrierung === "unfiltriert" || selectedBeer?.filtrierung === "filtriert"
+            ? selectedBeer.filtrierung
+            : undefined,
         szene: wo.szene,
         behaelter,
         personImBild: personenModus === "D" || personenModus === "E",
@@ -1049,7 +1057,7 @@ export function InhalteErstellenStudio({
       setVariantProgress(resultImages.map(() => 100));
       setPreviewIndex(0);
 
-      const mediaPromptLabel = (userPrompt.trim() || activePreset?.title || was.label).slice(0, 120);
+      const mediaPromptLabel = (userPrompt.trim() || activePreset?.title || was.label).slice(0, 800);
       if (!data.mediaPersisted) {
         try {
           const mediaTitle = buildStudioMediaTitle({
@@ -1061,6 +1069,7 @@ export function InhalteErstellenStudio({
             behaelter,
             flaschenTyp,
             breweryName: brandLabel,
+            zusatzWunsch: userPrompt.trim() || activePreset?.title || undefined,
           });
           for (const [index, img] of resultImages.entries()) {
             await persistMediaItem({

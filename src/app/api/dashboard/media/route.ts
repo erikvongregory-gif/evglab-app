@@ -19,7 +19,7 @@ const mediaSchema = z.object({
   imageUrl: z.string().url().max(2000),
   thumbUrl: z.string().url().max(2000).optional(),
   title: z.string().min(1).max(120).optional(),
-  prompt: z.string().min(1).max(240),
+  prompt: z.string().min(1).max(800),
   createdAt: z.string().datetime(),
   aspectRatio: z.string().max(20),
   resolution: z.enum(["1K", "2K", "4K"]),
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
   const item: DashboardMediaItem = {
     ...payload,
     title: (payload.title?.trim() || payload.prompt.trim()).slice(0, 120),
-    prompt: payload.prompt.trim().slice(0, 240),
+    prompt: payload.prompt.trim().slice(0, 800),
   };
 
   try {

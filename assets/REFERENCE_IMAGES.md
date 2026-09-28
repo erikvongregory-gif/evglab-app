@@ -13,7 +13,8 @@ background, lighting, logos, and text from leaking into the result.
 - `assets/premium-references/*` (bundled hospitality/beer-garden look library)
 
 Local development uses the same filenames below `assets/bottle-references/` and
-`assets/glass-references/` as a fallback.
+`assets/glass-references/` as a fallback. Silhouette PNGs for every glass type
+live in `assets/glass-references/` (regenerate via `node scripts/generate-glass-references.mjs`).
 
 Supported glass filenames are:
 

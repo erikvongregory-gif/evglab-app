@@ -263,6 +263,7 @@ export function buildHyperrealisticClaudeUserMessage(
       input.beerName?.trim()
         ? `  A-PRODUKT: Das Foto IST die Sorte „${input.beerName.trim()}“. Der Bild-Prompt muss LABEL LOCK 1:1 enthalten: identisches Etikett, keine Variante, kein erfundenes Logo.`
         : "  A-PRODUKT: Das Foto IST das Produkt. LABEL LOCK 1:1: identisches Etikett, keine Variante.",
+      "  A-ORIENTIERUNG: Etikett physisch zur stehenden Flasche ausrichten (Hals oben / Boden unten). Beim Einschenken darf Text kameraseitig kopfüber wirken — Etikett nie relativ zur Flasche drehen.",
       "  B) Integriere ALLE klar lesbaren Texte als `EXACT TEXT '...'` im englischen Prompt.",
       "  C) `preserve the exact label design from the reference image, no text modifications, no logo alterations`.",
       "  D) Glas-Logo nur, wenn im Referenzbild am Glas sichtbar — sonst nicht erfinden.",

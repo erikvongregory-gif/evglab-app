@@ -4,6 +4,7 @@ import {
   enforceHyperrealisticPromptConstraints,
   shouldUseImageReferenceForGeneration,
 } from "./enforce-prompt-constraints";
+import { ensureProductGeometryLocks } from "./hyperrealism-blocks";
 import { buildHyperrealisticPrompt } from "./hyperrealistic";
 
 const baseInput: HyperrealisticInput = {
@@ -60,6 +61,8 @@ describe("enforceHyperrealisticPromptConstraints", () => {
     expect(out).toMatch(/NOT a stemmed Pilsner/i);
     expect(out).toMatch(/LABEL LOCK 1:1/i);
     expect(out).toMatch(/ABK Hell/i);
+    expect(out).toMatch(/LABEL ORIENTATION/i);
+    expect(out).toMatch(/Anchor A|NECK\/shoulder|upright standing bottle/i);
     expect(out).toMatch(/CLOSURE LOGIC/i);
     expect(out).toMatch(/crown cap must NEVER sit on the bottle mouth/i);
     expect(out).toMatch(/OPEN SERVING/i);
@@ -78,6 +81,24 @@ describe("enforceHyperrealisticPromptConstraints", () => {
   it("skips image reference for glass-only generation", () => {
     expect(shouldUseImageReferenceForGeneration(baseInput)).toBe(false);
     expect(shouldUseImageReferenceForGeneration({ ...baseInput, behaelter: "B" })).toBe(true);
+  });
+});
+
+describe("ensureProductGeometryLocks", () => {
+  it("puts clarity lock first even when already mid-prompt", () => {
+    const longBody = `SCENE BODY MARKER ${"x".repeat(120)} LIQUID CLARITY LOCK (MANDATORY) stale mid`;
+    const out = ensureProductGeometryLocks(longBody, {
+      ...baseInput,
+      behaelter: "B",
+      glasTyp: "ipa_teku",
+      flaschenTyp: "euro_longneck_330",
+      filtrierung: "unfiltriert",
+      bierstil: "helles",
+      etikettModus: "marke",
+    });
+    expect(out.indexOf("LIQUID CLARITY LOCK")).toBe(0);
+    expect(out).toMatch(/INVALID IF CLEAR/i);
+    expect(out).toMatch(/naturtrüb|Kellerbier|yeast haze/i);
   });
 });
 

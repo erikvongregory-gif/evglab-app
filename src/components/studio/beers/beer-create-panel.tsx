@@ -50,6 +50,7 @@ export type BeerCreateDraft = {
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
   glasTyp: string;
+  filtrierung: "filtriert" | "unfiltriert";
   etikettDataUrl: string;
 };
 
@@ -60,6 +61,7 @@ export type BeerCreateInitial = {
   flaschenTyp?: string;
   flaschenfarbe?: "braun" | "gruen" | "klar";
   glasTyp?: string;
+  filtrierung?: "filtriert" | "unfiltriert";
   /** Bestehende HTTPS-URL — wird als Vorschau gezeigt, bis ein neues Foto kommt. */
   etikettUrl?: string;
 };
@@ -80,6 +82,10 @@ function BottleIcon({ className }: { className?: string }) {
   );
 }
 
+function defaultFiltrierung(bierstil: string): "filtriert" | "unfiltriert" {
+  return /hefeweizen|kellerbier|neipa|zwickel|rauchbier/i.test(bierstil) ? "unfiltriert" : "filtriert";
+}
+
 function buildPromptPreview(parts: {
   name: string;
   produktKategorie: ProduktKategorie;
@@ -87,6 +93,7 @@ function buildPromptPreview(parts: {
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
   glasTyp: string;
+  filtrierung: "filtriert" | "unfiltriert";
   brandTone: string;
 }): string {
   const segments: string[] = [];
@@ -94,6 +101,9 @@ function buildPromptPreview(parts: {
     ? beerStyleLabel(parts.bierstil)
     : GETRANKEART_OPTIONS.find((option) => option.id === parts.produktKategorie)?.label;
   if (style) segments.push(style);
+  if (parts.produktKategorie === "bier") {
+    segments.push(parts.filtrierung === "unfiltriert" ? "unfiltriert / naturtrüb" : "filtriert / klar");
+  }
   const vessel = FLASCHEN_CHOICES.find((f) => f.code === parts.flaschenTyp)?.label;
   if (vessel) segments.push(vessel);
   if (!isDoseTyp(parts.flaschenTyp as keyof typeof FLASCHEN_TYPEN)) {
@@ -149,6 +159,11 @@ export function BeerCreatePanel({
       findBeerStyle(initial?.bierstil?.trim() || "helles")?.glasTyp ||
       "willibecher",
   );
+  const [filtrierung, setFiltrierung] = useState<"filtriert" | "unfiltriert">(
+    initial?.filtrierung === "unfiltriert" || initial?.filtrierung === "filtriert"
+      ? initial.filtrierung
+      : defaultFiltrierung(initial?.bierstil?.trim() || "helles"),
+  );
   const [etikettDataUrl, setEtikettDataUrl] = useState("");
   const [existingEtikettUrl] = useState(initial?.etikettUrl?.trim() || "");
   const [dragOver, setDragOver] = useState(false);
@@ -161,7 +176,16 @@ export function BeerCreatePanel({
   const previewImage = etikettDataUrl || existingEtikettUrl;
   const isEdit = mode === "edit";
   const showDose = isDoseTyp(flaschenTyp as keyof typeof FLASCHEN_TYPEN);
-  const preview = buildPromptPreview({ name, produktKategorie, bierstil, flaschenTyp, flaschenfarbe, glasTyp, brandTone });
+  const preview = buildPromptPreview({
+    name,
+    produktKategorie,
+    bierstil,
+    flaschenTyp,
+    flaschenfarbe,
+    glasTyp,
+    filtrierung,
+    brandTone,
+  });
   const displayError = localError || error || uploadError;
   const busy = phase === "saving" || phase === "success" || deleting;
 
@@ -199,6 +223,7 @@ export function BeerCreatePanel({
         flaschenTyp,
         flaschenfarbe,
         glasTyp,
+        filtrierung: produktKategorie === "bier" ? filtrierung : "filtriert",
         etikettDataUrl,
       });
       setPhase("success");
@@ -383,7 +408,10 @@ export function BeerCreatePanel({
                       setProduktKategorie(opt.id);
                       setBierstil(opt.id === "bier" ? "helles" : opt.id);
                       setFlaschenfarbe(opt.id === "bier" ? "braun" : "klar");
-                      if (opt.id === "bier") setGlasTyp(findBeerStyle("helles")?.glasTyp ?? "willibecher");
+                      if (opt.id === "bier") {
+                        setGlasTyp(findBeerStyle("helles")?.glasTyp ?? "willibecher");
+                        setFiltrierung(defaultFiltrierung("helles"));
+                      }
                       setPreviewKey((k) => k + 1);
                     }}
                   >
@@ -410,6 +438,7 @@ export function BeerCreatePanel({
                     onClick={() => {
                       setBierstil(opt.bierstil);
                       if (opt.glasTyp) setGlasTyp(opt.glasTyp);
+                      setFiltrierung(defaultFiltrierung(opt.bierstil));
                       setPreviewKey((k) => k + 1);
                     }}
                   >
@@ -494,6 +523,35 @@ export function BeerCreatePanel({
                       disabled={busy}
                       onClick={() => {
                         setGlasTyp(opt.code);
+                        setPreviewKey((k) => k + 1);
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="studio-beer-create-field">
+              <span className="studio-beer-create-label">Filtrierung</span>
+              <div className="studio-beer-create-chips" role="group" aria-label="Filtrierung">
+                {(
+                  [
+                    { code: "filtriert" as const, label: "Filtriert (klar)" },
+                    { code: "unfiltriert" as const, label: "Unfiltriert (trüb)" },
+                  ] as const
+                ).map((opt) => {
+                  const on = filtrierung === opt.code;
+                  return (
+                    <button
+                      key={opt.code}
+                      type="button"
+                      className={`studio-beer-create-chip${on ? " is-on" : ""}`}
+                      aria-pressed={on}
+                      disabled={busy}
+                      onClick={() => {
+                        setFiltrierung(opt.code);
                         setPreviewKey((k) => k + 1);
                       }}
                     >

@@ -30,6 +30,7 @@ export type BrandSuggestedBeer = {
   flaschenTyp: string;
   flaschenfarbe: "braun" | "gruen" | "klar";
   glasTyp: string;
+  filtrierung?: "filtriert" | "unfiltriert";
   etikettUrl: string;
   packagingNeedsReview?: boolean;
 };
@@ -159,6 +160,8 @@ function parseSuggestedBeers(value: unknown): BrandSuggestedBeer[] | undefined {
             ? "braun"
             : "klar",
       glasTyp: typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim() : "willibecher",
+      filtrierung:
+        item.filtrierung === "unfiltriert" || item.filtrierung === "filtriert" ? item.filtrierung : undefined,
       etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",
       packagingNeedsReview: item.packagingNeedsReview === true,
     });
