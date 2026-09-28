@@ -14,6 +14,12 @@ export type TourStep = {
   padding?: number;
   /** Spotlight-Feld bleibt klickbar (z. B. Eingaben während der Tour). */
   interactWithTarget?: boolean;
+  /** Optionales Icon links neben dem Titel. */
+  icon?: React.ReactNode;
+  /** Kleine Zeile über dem Titel (z. B. Bereich). */
+  eyebrow?: string;
+  /** Hervorgehobener Tipp unter dem Text. */
+  tip?: React.ReactNode;
 };
 
 export type TourProps = {
@@ -129,6 +135,11 @@ export function Tour({
         return;
       }
       const r = el.getBoundingClientRect();
+      // Versteckte/eingeklappte Ziele (z. B. mobile Sidebar) → mittig statt Spotlight ins Leere.
+      if (r.width < 2 || r.height < 2) {
+        setRect(null);
+        return;
+      }
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     };
 
@@ -330,7 +341,7 @@ export function Tour({
 
             <motion.div
               ref={cardRef}
-              className="pointer-events-auto absolute w-[320px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-2xl shadow-black/20 dark:border-zinc-800 dark:bg-zinc-900"
+              className="pointer-events-auto absolute w-[340px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/95 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.45)] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95"
               initial={reduce ? false : { opacity: 0, scale: 0.94, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0, left, top }}
               exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: 4, transition: { duration: 0.18 } }}
@@ -338,73 +349,115 @@ export function Tour({
               style={{ left, top }}
               onClick={(e) => e.stopPropagation()}
             >
-              <motion.div
-                key={index}
-                initial={reduce ? false : { opacity: 0, x: direction * 12, filter: "blur(3px)" }}
-                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                transition={{ duration: reduce ? 0 : 0.32, ease: EASE_OUT, delay: reduce ? 0 : 0.06 }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-[14px] font-semibold leading-snug text-zinc-900 dark:text-zinc-50">
-                    {step.title}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={skip}
-                    aria-label="Tour schließen"
-                    className="-mr-1 -mt-1 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-                  >
-                    <IconX />
-                  </button>
-                </div>
-
-                <div className="mt-1.5 text-[13px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-                  {step.content}
-                </div>
-              </motion.div>
-
-              <div className="mt-4 flex items-center justify-between">
-                {showProgress ? (
-                  <div className="flex items-center gap-1.5" aria-hidden>
-                    {steps.map((_, i) => (
+              <div className="relative h-1 w-full bg-zinc-100 dark:bg-zinc-800" aria-hidden>
+                <motion.div
+                  className="absolute inset-y-0 left-0 origin-left bg-gradient-to-r from-[#E9A25F] to-[#C7691E]"
+                  style={{ width: "100%" }}
+                  initial={false}
+                  animate={{ scaleX: (index + 1) / count }}
+                  transition={reduce ? { duration: 0 } : { duration: 0.5, ease: EASE_OUT }}
+                />
+              </div>
+              <div className="p-4 pt-3.5">
+                <motion.div
+                  key={index}
+                  initial={reduce ? false : { opacity: 0, x: direction * 14, filter: "blur(3px)" }}
+                  animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                  transition={{ duration: reduce ? 0 : 0.34, ease: EASE_OUT, delay: reduce ? 0 : 0.06 }}
+                >
+                  <div className="flex items-start gap-3">
+                    {step.icon ? (
                       <motion.span
-                        key={i}
-                        className={`h-1.5 rounded-full ${
-                          i <= index ? "bg-zinc-900 dark:bg-zinc-100" : "bg-zinc-200 dark:bg-zinc-700"
-                        }`}
-                        initial={false}
-                        animate={{ width: i === index ? 16 : 6, opacity: i < index ? 0.35 : 1 }}
-                        transition={reduce ? { duration: 0 } : { duration: 0.35, ease: EASE_OUT }}
-                      />
-                    ))}
+                        className="relative mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#F6D2AE] to-[#E9A25F] text-[#5A2D08] shadow-[0_6px_16px_-6px_rgba(199,105,30,0.7)] [&_svg]:size-[18px]"
+                        initial={reduce ? false : { scale: 0.5, rotate: -12, opacity: 0 }}
+                        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                        transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 18, delay: 0.1 }}
+                      >
+                        {step.icon}
+                      </motion.span>
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#C7691E]">
+                          {step.eyebrow ?? "Rundgang"}
+                          <span className="ml-1.5 font-medium tabular-nums text-zinc-400">
+                            {index + 1}/{count}
+                          </span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={skip}
+                          aria-label="Tour schließen"
+                          className="-mr-1.5 -mt-1 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                        >
+                          <IconX />
+                        </button>
+                      </div>
+                      <h3 className="mt-0.5 text-[15px] font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-50">
+                        {step.title}
+                      </h3>
+                      <div className="mt-1 text-[13px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                        {step.content}
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <span className="text-[11px] tabular-nums text-zinc-400">
-                    {index + 1} / {count}
-                  </span>
-                )}
+                  {step.tip ? (
+                    <motion.div
+                      className="mt-3 flex items-start gap-2 rounded-lg bg-[#C7691E]/[0.07] px-3 py-2 text-[12px] leading-snug text-zinc-600 ring-1 ring-inset ring-[#C7691E]/15 dark:text-zinc-300"
+                      initial={reduce ? false : { opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.35, ease: EASE_OUT, delay: reduce ? 0 : 0.2 }}
+                    >
+                      <span aria-hidden className="mt-px text-[#C7691E]">✦</span>
+                      <span>{step.tip}</span>
+                    </motion.div>
+                  ) : null}
+                </motion.div>
 
-                <div className="flex items-center gap-1.5">
-                  {!isFirst && (
+                <div className="mt-4 flex items-center justify-between gap-2">
+                  {showProgress ? (
+                    <div className="flex items-center gap-1" aria-hidden>
+                      {steps.map((_, i) => (
+                        <motion.span
+                          key={i}
+                          className={`h-1.5 rounded-full ${
+                            i <= index ? "bg-[#C7691E]" : "bg-zinc-200 dark:bg-zinc-700"
+                          }`}
+                          initial={false}
+                          animate={{ width: i === index ? 16 : 6, opacity: i < index ? 0.4 : 1 }}
+                          transition={reduce ? { duration: 0 } : { duration: 0.35, ease: EASE_OUT }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="hidden text-[11px] text-zinc-400 sm:inline">
+                      <kbd className="rounded border border-zinc-200 px-1 font-sans dark:border-zinc-700">←</kbd>{" "}
+                      <kbd className="rounded border border-zinc-200 px-1 font-sans dark:border-zinc-700">→</kbd> navigieren
+                    </span>
+                  )}
+
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {!isFirst && (
+                      <button
+                        type="button"
+                        onClick={back}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                      >
+                        <IconArrow className="rotate-180" />
+                        Zurück
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={back}
-                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                      data-tour-primary
+                      onClick={next}
+                      disabled={primaryDisabled}
+                      className="group inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3.5 py-1.5 text-[12.5px] font-medium text-white shadow-sm transition-[background-color,transform] duration-150 hover:bg-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C7691E] focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:focus-visible:ring-offset-zinc-900"
                     >
-                      <IconArrow className="rotate-180" />
-                      Zurück
+                      {nextLabel}
+                      {!isLast && <IconArrow className="transition-transform duration-200 group-hover:translate-x-0.5" />}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    data-tour-primary
-                    onClick={next}
-                    disabled={primaryDisabled}
-                    className="group inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[12.5px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white dark:focus-visible:ring-zinc-100 dark:focus-visible:ring-offset-zinc-900"
-                  >
-                    {nextLabel}
-                    {!isLast && <IconArrow className="transition-transform duration-200 group-hover:translate-x-0.5" />}
-                  </button>
+                  </div>
                 </div>
               </div>
             </motion.div>

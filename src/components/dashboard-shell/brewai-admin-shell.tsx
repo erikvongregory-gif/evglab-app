@@ -272,7 +272,7 @@ export function BrewAiAdminShell({
             <LumaBar />
           </SidebarProvider>
           <Toaster />
-          <DashboardProductTour initialSeen={uiTourSeen} />
+          <DashboardProductTour initialSeen={uiTourSeen} firstName={profileName} />
         </div>
       </StudioShellContext.Provider>
       </BillingCreditsProvider>

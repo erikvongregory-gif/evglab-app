@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { BadgeCheck, CreditCard, LogOut, Settings2 } from "lucide-react";
+import { BadgeCheck, Compass, CreditCard, LogOut, Settings2 } from "lucide-react";
+
+import { startDashboardTour } from "@/components/dashboard-shell/dashboard-product-tour";
 
 import { TokenAvatarRing } from "@/components/dashboard-shell/token-avatar-ring";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -96,6 +98,10 @@ export function AccountSwitcher({
               <Settings2 className="group-hover/dropdown-menu-item:rotate-45 group-focus/dropdown-menu-item:rotate-45" />
               Einstellungen
             </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => startDashboardTour()}>
+            <Compass className="group-hover/dropdown-menu-item:rotate-45 group-focus/dropdown-menu-item:rotate-45" />
+            Rundgang starten
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

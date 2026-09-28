@@ -6,7 +6,7 @@ export type OnboardingFlowStep = 1 | 2 | 3 | 4 | 5;
 export const ONBOARDING_TOUR_VERSION = 1;
 
 /** Dashboard-UI-Rundgang (Sidebar/Shell) — unabhängig vom Marken-Onboarding. */
-export const UI_TOUR_VERSION = 1;
+export const UI_TOUR_VERSION = 2;
 
 /**
  * Nur kompakte Flags — landet in `user_metadata.dashboard.onboarding` und darf
