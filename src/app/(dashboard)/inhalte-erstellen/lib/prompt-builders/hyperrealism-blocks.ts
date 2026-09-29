@@ -432,8 +432,12 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
     `The ${noun} MUST be ${bottleGeometryPrompt(input, flasche.promptDescription)}${colorClause}.`,
     `${nounCap} shape and size are defined by this specification — ${flasche.forbidden}.`,
     openServing,
+    poured
+      ? `EXACTLY ONE ${noun} of this product in the frame: the ${noun} being poured from (or standing open next to the glass) IS the product — never add a second, extra ${noun} beside it.`
+      : "",
     `If a bottle-shape reference photo is attached, copy that silhouette, neck length, shoulder and proportions exactly.`,
     `Label/artwork photos only supply printed graphics to apply onto this ${noun} — they must not replace the ${noun} with a different type.`,
+    `Bottles, cans or glasses visible in LOOK/style references are NOT this product — never copy their shape, neck or shoulder.`,
     `Render the ${noun} at physically correct real-world scale so its ${litres} L size is unmistakable.`,
   ]
     .filter(Boolean)

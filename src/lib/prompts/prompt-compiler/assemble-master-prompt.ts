@@ -80,13 +80,13 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
               : reference.role === "liquid"
                 ? "use only poured-beer clarity and haze density (naturtrüb); copy no glass silhouette, foam style, logos, or lighting from it; overrides clear liquid in the product photo"
                 : reference.role === "look" || reference.role === "mood"
-                  ? "use only lighting character, energy, and framing mood; invent new people — copy no faces, outfits, logos, or text"
+                  ? "use only lighting character, energy, and framing mood; invent new people — copy no faces, outfits, logos, or text, and never copy any bottle, can, or glass shape from it"
                   : "use only environment and spatial cues; copy no products, logos, or text";
       refs.push(`Image ${reference.index} (${reference.role}): ${rule}.${reference.note ? ` ${reference.note}` : ""}`);
     }
   } else if (ctx.hasProductPhoto) {
     refs.push(
-      "Image 1: binding product and geometry reference (exact container and printed label). Discard its background and lighting.",
+      "Image 1: binding product reference (printed label, glass color). Container shape and size come from the selected bottle type, not from this photo. Discard its background and lighting.",
     );
     refs.push(
       "Image 1 also defines the label and logo; preserve recognizable artwork and lettering.",

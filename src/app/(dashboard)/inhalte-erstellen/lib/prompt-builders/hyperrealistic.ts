@@ -614,19 +614,24 @@ export function buildProductPlacementPrompt(
   const stiltreue = input.stiltreue ?? (input.etikettModus === "generisch" ? "frei" : "hoch");
   const poured = behaelter === "B";
   const identityBits = poured
-    ? "bottle or can shape and proportions, glass color, and the entire printed label"
-    : "bottle or can shape and proportions, glass color, cap design, and the entire printed label";
+    ? "glass color and the entire printed label"
+    : "glass color, cap design, and the entire printed label";
   const labelOrientation = isDoseTyp(input.flaschenTyp) ? "" : ` ${LABEL_ORIENTATION_LOCK}`;
+  // Form kommt aus dem gewählten Flaschentyp (BOTTLE SHAPE LOCK), nie aus dem Produktfoto —
+  // sonst übernimmt das Modell die Silhouette einer anders geformten Flasche auf dem Foto.
+  const shapeFromSpec = isDoseTyp(input.flaschenTyp)
+    ? " The can's size and proportions come from the BOTTLE SHAPE LOCK specification, not from Image 1."
+    : " The bottle's silhouette, neck length, shoulder, height and volume come ONLY from the BOTTLE SHAPE LOCK specification — Image 1's label goes onto that one bottle; never show the Image 1 bottle as an additional, separate bottle.";
   const labelLock =
     stiltreue === "hoch"
-      ? `IDENTITY REFERENCE — PRESERVE EXACTLY: ${identityBits} — artwork, logo, crest, typography, colors, layout, label proportions, and every recognizable branding detail. Reconstruct these identity details faithfully; do not invent a different brand.${labelOrientation}${
+      ? `IDENTITY REFERENCE — PRESERVE EXACTLY: ${identityBits} — artwork, logo, crest, typography, colors, layout, label proportions, and every recognizable branding detail. Reconstruct these identity details faithfully; do not invent a different brand.${shapeFromSpec}${labelOrientation}${
           poured
             ? ` The glass is already poured, so do NOT copy a sealed ${FLASCHEN_TYPEN[input.flaschenTyp]?.closure === "schraub" ? "screw cap" : "crown cap"} from Image 1 onto the bottle mouth — bottle must be open, cap off.`
             : ""
         }`
       : stiltreue === "normal"
-        ? `Use the product silhouette and brand identity from Image 1 as a faithful reference (logo, core colors, overall layout). Reconstruct it for the new scene with natural lighting and perspective; do not invent a different brand.${labelOrientation}`
-        : "Image 1 defines only the vessel type, silhouette, material, and scale. Brand artwork and label text are intentionally unlocked; do not claim exact product or brand identity.";
+        ? `Use the brand identity from Image 1 as a faithful reference (logo, core colors, overall layout). Reconstruct it for the new scene with natural lighting and perspective; do not invent a different brand.${shapeFromSpec}${labelOrientation}`
+        : `Image 1 defines only the container material and glass color. Brand artwork and label text are intentionally unlocked; do not claim exact product or brand identity.${shapeFromSpec}`;
   const glassShapeLock = buildGlassShapeLockFragment(input);
   const liquidClarityLock = isBeer ? buildUnfilteredLiquidLockFragment(input) : "";
   const liquidPhysics = isBeer ? buildLiquidPhysicsFragment(input, behaelter) : "";
@@ -692,13 +697,15 @@ export function buildProductPlacementPrompt(
         return `Image ${index} defines ONLY container geometry and proportions. Do not copy its label, text, background, or lighting.`;
       }
       if (role === "look") {
+        // Stilbilder zeigen fremde Flaschen/Gläser — deren Form darf nie ins Motiv wandern.
+        const lookNoContainers = ` Never copy any bottle, can, or glass from Image ${index}: their shape, neck length, shoulder, size, and labels are irrelevant — containers come ONLY from Image 1 and the BOTTLE SHAPE LOCK / GLASS SHAPE LOCK.`;
         if (isCampaign) {
-          return `Image ${index} is a LOOK reference and PRIMARY style guide: match product-forward scale, hand gesture, camera angle, contrast, and light character exactly as photographed; invent new people — never copy faces, outfits, logos, or text. Do not upgrade LOOK light into cinematic golden-hour CGI.`;
+          return `Image ${index} is a LOOK reference and PRIMARY style guide: match product-forward scale, hand gesture, camera angle, contrast, and light character exactly as photographed; invent new people — never copy faces, outfits, logos, or text. Do not upgrade LOOK light into cinematic golden-hour CGI.${lookNoContainers}`;
         }
         if (isPremium) {
-          return `Image ${index} is a LOOK reference and PRIMARY style guide: match hospitality bokeh, calm framing, soft available light, and material honesty; invent new people — never copy faces, outfits, logos, or text. Do not upgrade LOOK light into beauty-magazine glow.`;
+          return `Image ${index} is a LOOK reference and PRIMARY style guide: match hospitality bokeh, calm framing, soft available light, and material honesty; invent new people — never copy faces, outfits, logos, or text. Do not upgrade LOOK light into beauty-magazine glow.${lookNoContainers}`;
         }
-        return `Image ${index} is a LOOK reference and PRIMARY style guide: match flash/candid lighting, energy, and imperfect framing; invent new people — never copy faces, skin tone, hair, caps, tattoos, jewelry, outfits, logos, or text.`;
+        return `Image ${index} is a LOOK reference and PRIMARY style guide: match flash/candid lighting, energy, and imperfect framing; invent new people — never copy faces, skin tone, hair, caps, tattoos, jewelry, outfits, logos, or text.${lookNoContainers}`;
       }
       return `Image ${index} is a SCENE reference only: use its environment or spatial cues; copy no products, logos, or text.`;
     });
