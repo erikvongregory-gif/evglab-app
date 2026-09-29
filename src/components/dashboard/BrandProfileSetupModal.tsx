@@ -611,7 +611,7 @@ export function BrandProfileSetupModal({
           {step === "review"
             ? "Passe den KI-Vorschlag an, bevor du dein Markenprofil aktivierst."
             : step === "analyzing"
-              ? analysisSteps[analysisStepIndex]
+              ? ANALYSIS_STEPS[analysisStepIndex]
               : "Ein Link genügt — BrewAI erkennt Tonalität, Farben und Bildsprache deiner Marke."}
         </DialogDescription>
 
