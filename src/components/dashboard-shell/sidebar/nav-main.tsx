@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { ChevronRight, PlusCircleIcon } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -43,12 +45,15 @@ interface NavItemProps {
   readonly isItemActive: (item: NavMainItem) => boolean;
   readonly isSubItemActive: (url: string) => boolean;
   readonly isSubmenuOpen: (item: NavMainParentItem) => boolean;
+  readonly mediaUnseen: number;
 }
 
 interface NavLinkItemProps {
   readonly item: NavMainLinkItem;
   readonly isActive: boolean;
   readonly showIconFallback: boolean;
+  /** Neue, noch nicht angesehene Motive (nur Mediathek). */
+  readonly unseen?: number;
 }
 
 interface NavLinkIconProps {
@@ -88,6 +93,8 @@ export function NavMain({ items }: NavMainProps) {
   const closeMobileNav = () => {
     if (isMobile) setOpenMobile(false);
   };
+
+  const mediaUnseen = useMediaUnseen(path);
 
   const isItemActive = (item: NavMainItem) => {
     if (hasSubItems(item)) {
@@ -146,6 +153,7 @@ export function NavMain({ items }: NavMainProps) {
                   isItemActive={isItemActive}
                   isSubItemActive={isSubItemActive}
                   isSubmenuOpen={isSubmenuOpen}
+                  mediaUnseen={mediaUnseen}
                 />
               ))}
             </SidebarMenu>
@@ -156,12 +164,19 @@ export function NavMain({ items }: NavMainProps) {
   );
 }
 
-function NavItem({ item, isItemActive, isSubItemActive, isSubmenuOpen }: NavItemProps) {
+function NavItem({ item, isItemActive, isSubItemActive, isSubmenuOpen, mediaUnseen }: NavItemProps) {
   const { state, isMobile } = useSidebar();
   const isCollapsedDesktop = state === "collapsed" && !isMobile;
 
   if (!hasSubItems(item)) {
-    return <NavLinkItem item={item} isActive={isItemActive(item)} showIconFallback={isCollapsedDesktop} />;
+    return (
+      <NavLinkItem
+        item={item}
+        isActive={isItemActive(item)}
+        showIconFallback={isCollapsedDesktop}
+        unseen={item.id === "media" ? mediaUnseen : 0}
+      />
+    );
   }
 
   if (isCollapsedDesktop) {
@@ -178,7 +193,76 @@ function NavItem({ item, isItemActive, isSubItemActive, isSubmenuOpen }: NavItem
   );
 }
 
-function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
+/** Aktiver Eintrag: eine gemeinsame Fläche gleitet zwischen den Nav-Punkten. */
+const NAV_PILL_SPRING = { type: "spring", stiffness: 520, damping: 40, mass: 0.8 } as const;
+const NAV_BUTTON_OVER_PILL = "relative z-[1] data-active:bg-transparent";
+
+function NavActivePill({ className }: { className?: string }) {
+  return (
+    <motion.span
+      aria-hidden
+      layoutId="sidebar-nav-active"
+      transition={NAV_PILL_SPRING}
+      className={cn("pointer-events-none absolute inset-0 z-0 rounded-md bg-sidebar-accent", className)}
+    />
+  );
+}
+
+const MEDIA_PATH = "/dashboard/media";
+
+/** Zählt fertige Motive aus „Bild erstellen“, bis man die Mediathek öffnet. */
+function useMediaUnseen(path: string) {
+  const [unseen, setUnseen] = useState(0);
+  const onMedia = path.startsWith(MEDIA_PATH);
+
+  useEffect(() => {
+    const onAdded = (event: Event) => {
+      if (window.location.pathname.startsWith(MEDIA_PATH)) return;
+      const count = (event as CustomEvent<{ count?: number }>).detail?.count ?? 1;
+      setUnseen((n) => n + count);
+    };
+    window.addEventListener("brewai-media-added", onAdded);
+    return () => window.removeEventListener("brewai-media-added", onAdded);
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Zähler beim Öffnen der Mediathek zurücksetzen
+    if (onMedia) setUnseen(0);
+  }, [onMedia]);
+
+  return onMedia ? 0 : unseen;
+}
+
+function NavUnseenBadge({ count }: { count: number }) {
+  return (
+    <AnimatePresence>
+      {count > 0 ? (
+        <motion.span
+          key="badge"
+          aria-label={`${count} neue Motive`}
+          className="pointer-events-none absolute top-1.5 right-1.5 z-[2] flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 font-medium text-[10px] text-primary-foreground tabular-nums group-data-[collapsible=icon]:top-0.5 group-data-[collapsible=icon]:right-0.5 group-data-[collapsible=icon]:h-3.5 group-data-[collapsible=icon]:min-w-3.5 group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:text-[8px]"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 520, damping: 22 }}
+        >
+          <motion.span
+            key={count}
+            className="relative"
+            initial={{ scale: 1.6 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 520, damping: 18 }}
+          >
+            {count}
+          </motion.span>
+          <span className="absolute inset-0 animate-ping rounded-full bg-primary/50 [animation-iteration-count:2] motion-reduce:hidden" />
+        </motion.span>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function NavLinkItem({ item, isActive, showIconFallback, unseen = 0 }: NavLinkItemProps) {
   const { isMobile, setOpenMobile } = useSidebar();
   const closeMobile = () => {
     if (isMobile) setOpenMobile(false);
@@ -186,7 +270,14 @@ function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild aria-disabled={item.disabled} tooltip={item.title} isActive={isActive}>
+      {isActive ? <NavActivePill /> : null}
+      <SidebarMenuButton
+        asChild
+        aria-disabled={item.disabled}
+        tooltip={item.title}
+        isActive={isActive}
+        className={NAV_BUTTON_OVER_PILL}
+      >
         <Link
           id={`tour-nav-${item.id}`}
           prefetch={false}
@@ -200,6 +291,7 @@ function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
         </Link>
       </SidebarMenuButton>
       <NavItemBadge badge={item.badge} />
+      <NavUnseenBadge count={unseen} />
     </SidebarMenuItem>
   );
 }
@@ -298,7 +390,12 @@ function NavDropdownItem({ item, isActive, isSubItemActive }: NavDropdownItemPro
     <SidebarMenuItem>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuButton tooltip={item.title} isActive={isActive} disabled={item.disabled}>
+          <SidebarMenuButton
+            tooltip={item.title}
+            isActive={isActive}
+            disabled={item.disabled}
+            className={NAV_BUTTON_OVER_PILL}
+          >
             {Icon ? (
               <Icon className={navIconClass(item.id)} />
             ) : (
@@ -347,8 +444,14 @@ function NavCollapsibleItem({ item, isActive, defaultOpen, isSubItemActive }: Na
   return (
     <Collapsible asChild defaultOpen={defaultOpen} className="group/collapsible">
       <SidebarMenuItem>
+        {isActive ? <NavActivePill className="h-8 bottom-auto" /> : null}
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton tooltip={item.title} isActive={isActive} disabled={item.disabled}>
+          <SidebarMenuButton
+            tooltip={item.title}
+            isActive={isActive}
+            disabled={item.disabled}
+            className={NAV_BUTTON_OVER_PILL}
+          >
             {Icon ? (
               <Icon className={navIconClass(item.id)} />
             ) : null}

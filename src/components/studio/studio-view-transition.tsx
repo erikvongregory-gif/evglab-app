@@ -12,14 +12,23 @@ type StudioViewTransitionProps = {
   variant?: StudioViewTransitionVariant;
 };
 
-/** Kein Remount/Exit-Stack — Inhalte bleiben sichtbar, Navigation nicht durch Fade blockiert. */
+/**
+ * Nur Enter-Animation (kein Exit-Stack) — Navigation wird nie durch ein Fade blockiert.
+ * Der key startet die CSS-Animation bei jedem View-Wechsel neu.
+ */
 export function StudioViewTransition({
   viewKey,
   children,
   className,
+  variant = "route",
 }: StudioViewTransitionProps) {
   return (
-    <div className={cn("studio-view-transition", className)} data-view={viewKey}>
+    <div
+      key={viewKey}
+      className={cn("studio-view-transition", className)}
+      data-view={viewKey}
+      data-variant={variant}
+    >
       {children}
     </div>
   );

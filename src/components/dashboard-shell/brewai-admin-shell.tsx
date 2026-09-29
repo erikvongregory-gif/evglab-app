@@ -7,10 +7,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { MotionConfig } from "framer-motion";
 import { useShallow } from "zustand/react/shallow";
 import { EvglabMark } from "@/components/studio/evglab-mark";
 import { AccountSwitcher } from "@/components/dashboard-shell/header/account-switcher";
@@ -163,6 +166,28 @@ export function BrewAiAdminShell({
     setContentPadding(undefined);
   }, [pathname]);
 
+  // Bereichswechsel sanft einblenden. Dashboard-Tabs animiert StudioViewTransition selbst,
+  // daher zählt /dashboard/* als ein Bereich. Web Animations statt key → kein Remount.
+  const contentRef = useRef<HTMLDivElement>(null);
+  const routeKey = pathname.startsWith("/dashboard") ? "/dashboard" : pathname;
+  const prevRouteKey = useRef(routeKey);
+  useLayoutEffect(() => {
+    if (prevRouteKey.current === routeKey) return;
+    prevRouteKey.current = routeKey;
+    const el = contentRef.current;
+    if (!el?.animate) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.animate(
+      reduce
+        ? [{ opacity: 0 }, { opacity: 1 }]
+        : [
+            { opacity: 0, transform: "translateY(8px)", filter: "blur(2px)" },
+            { opacity: 1, transform: "none", filter: "none" },
+          ],
+      { duration: reduce ? 160 : 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    );
+  }, [routeKey]);
+
   useEffect(() => {
     setProfileName(initialProfileName ?? "");
   }, [initialProfileName]);
@@ -206,6 +231,8 @@ export function BrewAiAdminShell({
   }, [router]);
 
   return (
+    // reducedMotion="user": alle Framer-Animationen respektieren die Systemeinstellung.
+    <MotionConfig reducedMotion="user">
     <TooltipProvider>
       <BillingCreditsProvider>
       <StudioShellContext.Provider value={shellApi}>
@@ -260,6 +287,7 @@ export function BrewAiAdminShell({
                 </div>
               </header>
               <div
+                ref={contentRef}
                 className={cn(
                   "min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 pb-24 md:p-6 xl:px-8 xl:pt-7 2xl:px-10 2xl:pt-8",
                   "has-data-[content-padding=false]:px-0 has-data-[content-padding=false]:pt-0 has-data-[content-padding=false]:pb-24",
@@ -280,6 +308,7 @@ export function BrewAiAdminShell({
       </StudioShellContext.Provider>
       </BillingCreditsProvider>
     </TooltipProvider>
+    </MotionConfig>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useBillingCredits } from "@/components/dashboard-shell/billing-credits-provider";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,16 @@ type TokenAvatarRingProps = {
 export function TokenAvatarRing({ children, className, size = 36 }: TokenAvatarRingProps) {
   const snapshot = useBillingTokens();
   const progress = tokenRingProgress(snapshot);
+  const remaining = snapshot && !snapshot.unlimited ? snapshot.remaining : null;
+  // Verbrauch sichtbar machen: bei sinkendem Stand schwebt „−N“ kurz über dem Ring.
+  const [prevRemaining, setPrevRemaining] = useState(remaining);
+  const [spent, setSpent] = useState<{ amount: number; key: number } | null>(null);
+  if (remaining !== prevRemaining) {
+    setPrevRemaining(remaining);
+    if (prevRemaining != null && remaining != null && remaining < prevRemaining) {
+      setSpent((current) => ({ amount: prevRemaining - remaining, key: (current?.key ?? 0) + 1 }));
+    }
+  }
   // viewBox 40: Stroke liegt innen, kein Clipping am Rand
   const vb = 40;
   const stroke = 3;
@@ -87,9 +98,24 @@ export function TokenAvatarRing({ children, className, size = 36 }: TokenAvatarR
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={dashOffset}
-          className="transition-[stroke-dashoffset] duration-500 ease-out"
+          className="transition-[stroke-dashoffset] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
         />
       </svg>
+      <AnimatePresence>
+        {spent ? (
+          <motion.span
+            key={spent.key}
+            aria-hidden
+            className="pointer-events-none absolute top-full left-1/2 z-20 mt-1 rounded-full bg-foreground px-1.5 py-0.5 font-medium text-[10px] text-background tabular-nums whitespace-nowrap shadow-sm"
+            initial={{ opacity: 0, y: -6, x: "-50%", scale: 0.8 }}
+            animate={{ opacity: [0, 1, 1, 0], y: [-6, 0, 0, 6], x: "-50%", scale: 1 }}
+            transition={{ duration: 2.2, times: [0, 0.12, 0.8, 1], ease: "easeOut" }}
+            onAnimationComplete={() => setSpent(null)}
+          >
+            −{spent.amount.toLocaleString("de-DE")}
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
       {/* Avatar etwas kleiner als der Ring, damit der Bogen freiliegt */}
       <span className="relative z-10 flex size-[78%] items-center justify-center overflow-hidden rounded-full bg-background">
         {children}

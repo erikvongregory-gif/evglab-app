@@ -10,6 +10,7 @@ import {
   ComposedChart,
   XAxis,
 } from "recharts";
+import { motion } from "framer-motion";
 import {
   Coins,
   FolderOpen,
@@ -46,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CountUp } from "@/components/ui/count-up";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -124,6 +126,28 @@ function MetricCardSkeleton() {
   );
 }
 
+/** Füllstand der verfügbaren Tokens; unter 15 % in Warnfarbe. */
+function TokenMeter({ pct }: { pct: number }) {
+  const clamped = Math.min(100, Math.max(0, pct));
+  return (
+    <div
+      className="my-1 h-1.5 overflow-hidden rounded-full bg-muted"
+      role="meter"
+      aria-label="Verfügbare Tokens"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(clamped)}
+    >
+      <motion.div
+        className={clamped < 15 ? "h-full origin-left rounded-full bg-destructive" : "h-full origin-left rounded-full bg-primary"}
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: clamped / 100 }}
+        transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+      />
+    </div>
+  );
+}
+
 function BrewAiMetricCards({
   summary,
   summaryLoaded,
@@ -189,11 +213,11 @@ function BrewAiMetricCards({
     : "—";
 
   return (
-    <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:origin-center *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs *:data-[slot=card]:transition-[transform,box-shadow,ring-color] *:data-[slot=card]:duration-700 *:data-[slot=card]:ease-[cubic-bezier(0.22,1,0.36,1)] *:data-[slot=card]:hover:scale-[1.02] *:data-[slot=card]:hover:shadow-sm *:data-[slot=card]:hover:ring-foreground/15 motion-reduce:*:data-[slot=card]:transition-none motion-reduce:*:data-[slot=card]:hover:scale-100 xl:grid-cols-4 dark:*:data-[slot=card]:bg-card">
+    <div className="dash-rise-group grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs *:data-[slot=card]:transition-[translate,box-shadow,ring-color] *:data-[slot=card]:duration-200 *:data-[slot=card]:ease-[cubic-bezier(0.22,1,0.36,1)] *:data-[slot=card]:hover:-translate-y-0.5 *:data-[slot=card]:hover:shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_28px_-14px_rgb(0_0_0/0.25)] *:data-[slot=card]:hover:ring-foreground/15 motion-reduce:*:data-[slot=card]:transition-none motion-reduce:*:data-[slot=card]:hover:translate-y-0 xl:grid-cols-4 dark:*:data-[slot=card]:bg-card">
       <Card>
         <CardHeader>
           <CardTitle>
-            <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:border-foreground/15 group-hover/card:bg-background group-hover/card:text-foreground">
+            <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:border-foreground/15 group-hover/card:bg-background group-hover/card:text-foreground">
               <Coins className="size-4" />
             </div>
           </CardTitle>
@@ -202,10 +226,11 @@ function BrewAiMetricCards({
         <CardContent className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <div className="font-medium text-3xl tabular-nums leading-none tracking-tight">
-              {unlimited ? "∞" : formatCompactNumber(remaining)}
+              {unlimited ? "∞" : <CountUp value={remaining} format={formatCompactNumber} />}
             </div>
             {availablePct != null ? <Badge variant="secondary">{Math.round(availablePct)}% frei</Badge> : null}
           </div>
+          {!unlimited && availablePct != null ? <TokenMeter pct={availablePct} /> : null}
           <p className="text-muted-foreground text-sm">
             {unlimited
               ? "Unbegrenztes Kontingent"
@@ -218,7 +243,7 @@ function BrewAiMetricCards({
       <Card>
         <CardHeader>
           <CardTitle>
-            <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:border-foreground/15 group-hover/card:bg-background group-hover/card:text-foreground">
+            <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:border-foreground/15 group-hover/card:bg-background group-hover/card:text-foreground">
               <FolderOpen className="size-4" />
             </div>
           </CardTitle>
@@ -227,7 +252,11 @@ function BrewAiMetricCards({
         <CardContent className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <div className="font-medium text-3xl tabular-nums leading-none tracking-tight">
-              {summary?.postsThisMonth == null ? "—" : formatDeNumber(summary.postsThisMonth)}
+              {summary?.postsThisMonth == null ? (
+                "—"
+              ) : (
+                <CountUp value={summary.postsThisMonth} format={formatDeNumber} delay={0.06} />
+              )}
             </div>
           </div>
           <p className="text-muted-foreground text-sm">
@@ -241,7 +270,7 @@ function BrewAiMetricCards({
       <Card>
         <CardHeader>
           <CardTitle>
-            <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:border-foreground/15 group-hover/card:bg-background group-hover/card:text-foreground">
+            <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:border-foreground/15 group-hover/card:bg-background group-hover/card:text-foreground">
               <Users className="size-4" />
             </div>
           </CardTitle>
@@ -250,7 +279,7 @@ function BrewAiMetricCards({
         <CardContent className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <div className="font-medium text-3xl tabular-nums leading-none tracking-tight">
-              {formatDeNumber(summary?.teamMembers ?? 0)}
+              <CountUp value={summary?.teamMembers ?? 0} format={formatDeNumber} delay={0.12} />
             </div>
             {(summary?.openInvites ?? 0) > 0 ? (
               <Badge variant="secondary">{summary?.openInvites} offen</Badge>
@@ -263,7 +292,7 @@ function BrewAiMetricCards({
       <Card>
         <CardHeader>
           <CardTitle>
-            <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:border-foreground/15 group-hover/card:bg-background group-hover/card:text-foreground">
+            <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground transition-colors duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:border-foreground/15 group-hover/card:bg-background group-hover/card:text-foreground">
               <Palette className="size-4" />
             </div>
           </CardTitle>
@@ -548,7 +577,7 @@ export function AdminHomeView({
   initialTokenRange,
 }: AdminHomeViewProps) {
   return (
-    <div className="@container/main flex flex-col gap-4 md:gap-6">
+    <div className="dash-rise-stack @container/main flex flex-col gap-4 md:gap-6">
       <BrewAiMetricCards
         summary={summary}
         summaryLoaded={summaryLoaded}

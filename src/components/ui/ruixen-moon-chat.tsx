@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,10 @@ import {
   type DashboardCharacter,
 } from "@/lib/dashboard/metadata";
 import { estimateStudioImageTokenCost } from "@/lib/billing/generationTokenCost";
-import { startStudioGeneration, mediaLibraryHref } from "@/lib/inhalte-erstellen/start-studio-generation";
+import { startStudioGeneration } from "@/lib/inhalte-erstellen/start-studio-generation";
+import { clearActiveGeneration, readActiveGeneration } from "@/lib/inhalte-erstellen/active-generation";
+import { pollGenerationJob } from "@/lib/inhalte-erstellen/poll-generation-job";
+import { CreateResultStage, type CreateRun } from "@/components/ui/create-result-stage";
 import {
   CHARACTER_ASPECTS,
   effectiveAspectRatio,
@@ -171,7 +173,10 @@ export default function RuixenMoonChat() {
   const [photoStyle, setPhotoStyle] = useState<PhotoStyle>("reportage");
   const [hyperreal, setHyperreal] = useState(false);
   const [aiWatermark, setAiWatermark] = useState(false);
-  const router = useRouter();
+  const [runs, setRuns] = useState<CreateRun[]>([]);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const runPayloads = useRef(new Map<string, unknown>());
+  const pollers = useRef(new Map<string, AbortController>());
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 48,
     maxHeight: 150,
@@ -312,11 +317,95 @@ export default function RuixenMoonChat() {
     requestedQuality: requestQuality,
   });
 
-  const canGenerate = (Boolean(message.trim()) || Boolean(activePreset)) && !genBusy;
+  const runInFlight = runs.some((run) => run.status === "starting" || run.status === "running");
+  const canGenerate = (Boolean(message.trim()) || Boolean(activePreset)) && !genBusy && !runInFlight;
+
+  const patchRun = useCallback((id: string, patch: Partial<CreateRun>) => {
+    setRuns((current) => current.map((run) => (run.id === id ? { ...run, ...patch } : run)));
+  }, []);
+
+  /** Pollt den Job im Hintergrund; verlässt man die Seite, läuft er als Karte in der Mediathek weiter. */
+  const trackJob = useCallback(
+    (runId: string, jobId: string) => {
+      pollers.current.get(runId)?.abort();
+      const ac = new AbortController();
+      pollers.current.set(runId, ac);
+      void pollGenerationJob({ jobId, expectedVariants: 1, signal: ac.signal }).then((result) => {
+        if (ac.signal.aborted) return;
+        pollers.current.delete(runId);
+        const imageUrl = result.images?.[0]?.imageUrl?.trim();
+        if (imageUrl && !result.error) {
+          patchRun(runId, { status: "done", imageUrl });
+          clearActiveGeneration();
+          window.dispatchEvent(new CustomEvent("brewai-media-added", { detail: { count: 1 } }));
+          return;
+        }
+        if (result.pending) {
+          patchRun(runId, { status: "slow" });
+          return;
+        }
+        clearActiveGeneration();
+        patchRun(runId, { status: "failed", error: result.error || "Generierung fehlgeschlagen." });
+      });
+    },
+    [patchRun],
+  );
+
+  const launchRun = useCallback(
+    async (payload: unknown, prompt: string, aspect: string, fresh: boolean) => {
+      const id = crypto.randomUUID();
+      runPayloads.current.set(id, payload);
+      setRuns((current) => [{ id, prompt, aspectRatio: aspect, status: "starting", startedAt: Date.now() }, ...current]);
+      setActiveRunId(id);
+      // "Nochmal" mit identischem Entwurf braucht einen neuen Idempotency-Key, sonst kommt derselbe Job zurück.
+      if (fresh) clearActiveGeneration();
+      const outcome = await startStudioGeneration({ url: "/api/inhalte-erstellen/create-task", payload });
+      if (outcome.action !== "open_media") {
+        patchRun(id, { status: "failed", error: outcome.error });
+        return;
+      }
+      patchRun(id, { status: "running", jobId: outcome.jobId });
+      trackJob(id, outcome.jobId);
+    },
+    [patchRun, trackJob],
+  );
+
+  // Laufenden Auftrag nach Reload/Rückkehr wieder aufnehmen.
+  useEffect(() => {
+    const active = readActiveGeneration();
+    const pollerMap = pollers.current;
+    if (active?.jobId) {
+      const id = crypto.randomUUID();
+      const jobId = active.jobId;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- einmalige Wiederaufnahme aus sessionStorage
+      setRuns([{ id, jobId, prompt: "", aspectRatio: active.aspectRatio || "4:5", status: "running", startedAt: active.startedAt }]);
+      setActiveRunId(id);
+      trackJob(id, jobId);
+    }
+    return () => {
+      for (const ac of pollerMap.values()) ac.abort();
+      pollerMap.clear();
+    };
+  }, [trackJob]);
+
+  const regenerate = useCallback(
+    (run: CreateRun) => {
+      const payload = runPayloads.current.get(run.id);
+      if (!payload || runInFlight) return;
+      void launchRun(payload, run.prompt, run.aspectRatio, true);
+    },
+    [launchRun, runInFlight],
+  );
+
+  const resetStage = useCallback(() => {
+    setRuns([]);
+    setActiveRunId(null);
+    textareaRef.current?.focus();
+  }, [textareaRef]);
 
   const handleGenerate = useCallback(async () => {
     const prompt = message.trim() || activePreset?.motifLine || "";
-    if (!prompt || genBusy) return;
+    if (!prompt || genBusy || runInFlight) return;
 
     if (selectedCharacter && !selectedThumb) {
       setGenError("Charakter braucht eine Sorte mit Flaschenfoto.");
@@ -390,20 +479,13 @@ export default function RuixenMoonChat() {
       variantCount: 1,
     };
 
+    // Ergebnis entsteht hier auf der Bühne; Prompt und Einstellungen bleiben zum Iterieren stehen.
     try {
-      const outcome = await startStudioGeneration({
-        url: "/api/inhalte-erstellen/create-task",
-        payload,
-      });
-      if (outcome.action !== "open_media") {
-        throw new Error(outcome.error);
-      }
-
-      // Sofort in die Mediathek — Reveal/Polling läuft dort.
-      router.push(mediaLibraryHref(outcome.jobId));
+      await launchRun(payload, prompt, aspectRatio, false);
     } catch (err) {
-      setGenBusy(false);
       setGenError(err instanceof Error ? err.message : "Generierung fehlgeschlagen.");
+    } finally {
+      setGenBusy(false);
     }
   }, [
     activePreset,
@@ -411,10 +493,11 @@ export default function RuixenMoonChat() {
     aspectRatio,
     genBusy,
     hyperreal,
+    launchRun,
     message,
     photoStyle,
     requestQuality,
-    router,
+    runInFlight,
     selectedBeer,
     selectedCharacter,
     selectedThumb,
@@ -424,6 +507,17 @@ export default function RuixenMoonChat() {
   return (
     <div className="relative isolate flex h-full min-h-0 w-full flex-1 flex-col items-center bg-white dark:bg-black">
       <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-col items-center">
+        {runs.length > 0 ? (
+          <div className="flex min-h-0 w-full flex-1 flex-col items-center px-4 pt-4 pb-2 sm:pt-6">
+            <CreateResultStage
+              runs={runs}
+              activeRunId={activeRunId}
+              onSelectRun={setActiveRunId}
+              onRegenerate={regenerate}
+              onNew={resetStage}
+            />
+          </div>
+        ) : (
         <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center px-4 py-6 sm:py-8">
           <div className="text-center">
             <h1 className="sr-only">BrewAI</h1>
@@ -437,6 +531,7 @@ export default function RuixenMoonChat() {
             </p>
           </div>
         </div>
+        )}
 
         <div className="mb-3 flex w-full max-w-3xl shrink-0 flex-col gap-3 px-4 md:mb-[clamp(1rem,5vh,3.5rem)] 2xl:max-w-4xl">
           {genError ? (
@@ -1103,6 +1198,9 @@ export default function RuixenMoonChat() {
                   onClick={() => void handleGenerate()}
                   showIcon={false}
                   label={
+                    runInFlight ? (
+                      "Wird erstellt …"
+                    ) : (
                     <>
                       Generieren
                       <span className="font-normal opacity-90">
@@ -1116,6 +1214,7 @@ export default function RuixenMoonChat() {
                         </span>
                       </span>
                     </>
+                    )
                   }
                 />
               </div>

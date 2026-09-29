@@ -185,6 +185,11 @@ export function mediaMatchesBeer(
 const STUDIO_EASE = [0.22, 0.68, 0.2, 1] as const;
 const MEDIA_LIGHTBOX_SPRING = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.85 };
 
+/** Bereits gecachte Bilder feuern onLoad evtl. vor der Hydration — dann sofort sichtbar schalten. */
+function markMediaImgLoaded(img: HTMLImageElement | null) {
+  if (img?.complete && img.naturalWidth > 0) img.dataset.loaded = "1";
+}
+
 function clampText(v: string, max: number) {
   const s = (v ?? "").trim();
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
@@ -746,6 +751,7 @@ export function StudioMediaLibrary({
     [visibleItems, seen],
   );
   const hasAny = visibleJobs.length > 0 || items.length > 0;
+  const freshJobPrefixes = useMemo(() => jobs.map((job) => `gen-${job.jobId}-`), [jobs]);
 
   const createHref = !canWriteMedia ? null : hasActivePlan ? "/inhalte-erstellen" : "/dashboard/pricing";
   const createLabel = !canWriteMedia ? "Nur Lesen" : hasActivePlan ? "Motiv generieren" : "Tarif wählen";
@@ -979,7 +985,7 @@ export function StudioMediaLibrary({
           ) : visibleJobs.length === 0 && visibleItems.length === 0 ? (
             <p className="text-muted-foreground text-sm">Keine Motive passen zur Suche.</p>
           ) : (
-            <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
+            <div className="media-grid columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
               {visibleJobs.map((job) => {
                 const message = jobProgressMessage({
                   phase: job.phase,
@@ -991,7 +997,7 @@ export function StudioMediaLibrary({
                 return (
                   <Card
                     key={`job-${job.jobId}`}
-                    className="mb-3 break-inside-avoid gap-0 overflow-hidden border-0 py-0 shadow-sm"
+                    className="media-tile mb-3 break-inside-avoid gap-0 overflow-hidden border-0 py-0 shadow-sm"
                     aria-busy={job.status === "reserved" || undefined}
                     aria-label={message}
                   >
@@ -1017,13 +1023,16 @@ export function StudioMediaLibrary({
               })}
               {[...leading, ...restItems].map((it) => {
                 const isSelected = selectedIds.includes(it.id);
+                // Frisch aus einem Job übernommen: kein Einflug, sondern Übergabe + kurzer Glanz.
+                const isFresh = freshJobPrefixes.some((prefix) => it.id.startsWith(prefix));
                 return (
                   <button
                     key={it.id}
                     type="button"
                     className={cn(
-                      "relative mb-3 w-full break-inside-avoid overflow-hidden rounded-xl border-0 bg-card text-left shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-0",
+                      "media-tile group/tile relative mb-3 w-full break-inside-avoid overflow-hidden rounded-xl border-0 bg-card text-left shadow-sm outline-none transition-[background-color,box-shadow,translate] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-muted/40 hover:shadow-[0_1px_2px_rgb(0_0_0/0.05),0_14px_30px_-16px_rgb(0_0_0/0.3)] focus-visible:ring-2 focus-visible:ring-primary/50 motion-reduce:hover:translate-y-0",
                       focusedJobId && it.id.startsWith(`gen-${focusedJobId}-`) && !selecting && "ring-2 ring-primary/50",
+                      isFresh && "media-tile--fresh",
                     )}
                     onClick={() => {
                       if (selecting) {
@@ -1039,10 +1048,20 @@ export function StudioMediaLibrary({
                         : `${getMediaDisplayTitle(it)} in Großansicht öffnen`
                     }
                   >
-                    <div className="relative w-full overflow-hidden bg-transparent" style={jobAspectStyle(it.aspectRatio)}>
-                      <motion.img
+                    <div className="relative w-full overflow-hidden bg-muted" style={jobAspectStyle(it.aspectRatio)}>
+                      <div
                         className={cn(
-                          "block h-full w-full object-cover transition-[filter,opacity] duration-200",
+                          "size-full transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                          !selecting && "group-hover/tile:scale-[1.04] motion-reduce:group-hover/tile:scale-100",
+                        )}
+                      >
+                      <motion.img
+                        ref={markMediaImgLoaded}
+                        onLoad={(event) => {
+                          event.currentTarget.dataset.loaded = "1";
+                        }}
+                        className={cn(
+                          "media-tile-img block h-full w-full object-cover transition-[filter,opacity] duration-500",
                           selecting && isSelected && "blur-[2.5px] opacity-90",
                         )}
                         layoutId={reduceMotion || selecting ? undefined : `studio-media-${it.id}`}
@@ -1052,6 +1071,7 @@ export function StudioMediaLibrary({
                         decoding="async"
                         transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
                       />
+                      </div>
                       {selecting && isSelected ? (
                         <span aria-hidden className="pointer-events-none absolute inset-0 bg-white/25 backdrop-blur-[2px]" />
                       ) : null}
@@ -1059,7 +1079,8 @@ export function StudioMediaLibrary({
                         <span
                           aria-hidden
                           className={cn(
-                            "absolute top-2 right-2 flex size-6 items-center justify-center rounded-full border-0 shadow-none backdrop-blur-md",
+                            "absolute top-2 right-2 flex size-6 items-center justify-center rounded-full border-0 shadow-none backdrop-blur-md transition-[background-color,color,scale] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+                            isSelected ? "scale-110" : "scale-100",
                             isSelected
                               ? "bg-primary/90 text-primary-foreground"
                               : "bg-white/55 text-transparent",
@@ -1156,7 +1177,12 @@ export function StudioMediaLibrary({
                       transition={reduceMotion ? { duration: 0 } : MEDIA_LIGHTBOX_SPRING}
                     />
                   </div>
-                  <aside className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:max-w-sm md:p-6">
+                  <motion.aside
+                    className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:max-w-sm md:p-6"
+                    initial={reduceMotion ? false : { opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.32, delay: reduceMotion ? 0 : 0.1, ease: STUDIO_EASE }}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 space-y-2">
                         <label htmlFor={`media-title-${selectedItem.id}`} className="text-muted-foreground text-xs font-medium">
@@ -1240,7 +1266,7 @@ export function StudioMediaLibrary({
                         Schließen
                       </Button>
                     </div>
-                  </aside>
+                  </motion.aside>
                 </motion.div>
               </motion.div>
             ) : null}
