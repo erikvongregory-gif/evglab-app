@@ -16,7 +16,6 @@ import {
 import { BrandingCard } from "@/components/ui/branding-card";
 import { ColorPaletteCard } from "@/components/ui/color-palette-card";
 import FileUpload from "@/components/ui/file-upload";
-import { GradientCard } from "@/components/ui/gradient-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProfileStrengthProgress } from "@/components/ui/profile-strength-progress";
@@ -27,10 +26,10 @@ import { StudioButton, StudioPageHeader } from "@/components/studio/ui";
 import {
   computeProfileStrength,
   formatDomain,
-  parseBildregeln,
   parseHexSwatches,
   parseToneTags,
 } from "@/lib/brand/brand-profile-display";
+import { BrandImageRules } from "@/components/dashboard/BrandImageRules";
 import { BrandBeersSection } from "@/components/dashboard/BrandBeersSection";
 import { BrandCharactersSection } from "@/components/dashboard/BrandCharactersSection";
 
@@ -245,7 +244,6 @@ export function BrandProfileView({
   const swatches = parseHexSwatches(value.brandColors);
   const hexOnly = swatches.map((c) => c.replace(/^#/, ""));
   const tags = parseToneTags(value.brandTone);
-  const rules = parseBildregeln(value.brandDos, value.brandDonts);
   const domain = value.brandWebsiteUrl
     ? formatDomain(value.brandWebsiteUrl)
     : value.breweryName || "beispiel.de";
@@ -388,50 +386,16 @@ export function BrandProfileView({
               <h2>Bildregeln</h2>
               <span className="studio-brand-sec__note">Abgeleitet · anpassbar</span>
             </div>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {(
-                [
-                  {
-                    key: "Bildlicht",
-                    val: rules.bildlicht,
-                    badgeText: "Licht",
-                    badgeColor: "#C7691E",
-                    gradient: "orange" as const,
-                    imageUrl:
-                      "https://images.unsplash.com/photo-1566633806327-68e152aaf26d?auto=format&fit=crop&w=640&h=640&q=80",
-                  },
-                  {
-                    key: "Komposition",
-                    val: rules.komposition,
-                    badgeText: "Szene",
-                    badgeColor: "#0F766E",
-                    gradient: "green" as const,
-                    imageUrl:
-                      "https://images.unsplash.com/photo-1600788886242-5c96aabe3757?auto=format&fit=crop&w=640&h=640&q=80",
-                  },
-                  {
-                    key: "Tabu",
-                    val: rules.tabu,
-                    badgeText: "Vermeiden",
-                    badgeColor: "#64748B",
-                    gradient: "gray" as const,
-                    imageUrl:
-                      "https://images.unsplash.com/photo-1608270586620-248524c67de9?auto=format&fit=crop&w=640&h=640&q=80",
-                  },
-                ] as const
-              ).map((rule) => (
-                <GradientCard
-                  key={rule.key}
-                  badgeText={rule.badgeText}
-                  badgeColor={rule.badgeColor}
-                  title={rule.key}
-                  description={rule.val}
-                  imageUrl={rule.imageUrl}
-                  gradient={rule.gradient}
-                  className="min-h-[260px]"
-                />
-              ))}
-            </div>
+            <BrandImageRules
+              dos={value.brandDos}
+              donts={value.brandDonts}
+              referenceImageUrls={value.brandReferenceImageUrls}
+              swatches={swatches}
+              onSave={async (patch) => {
+                onChange(patch);
+                await onSave(patch);
+              }}
+            />
           </section>
 
           <BrandReferenceGallery urls={value.brandReferenceImageUrls} />

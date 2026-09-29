@@ -23,15 +23,6 @@ export function parseRuleSentences(text: string): string[] {
     .filter(Boolean);
 }
 
-export function parseBildregeln(dos: string, donts: string) {
-  const dosLines = parseRuleSentences(dos);
-  return {
-    bildlicht: dosLines[0] ?? dos.trim() ?? "—",
-    komposition: dosLines[1] ?? (dosLines.length > 1 ? dosLines.slice(1).join(" ") : "—"),
-    tabu: donts.trim() || "—",
-  };
-}
-
 export function formatDomain(url: string): string {
   try {
     const u = new URL(url.startsWith("http") ? url : `https://${url}`);
