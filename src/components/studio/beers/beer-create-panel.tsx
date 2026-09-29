@@ -1,8 +1,8 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useId, useRef, useState } from "react";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion, type Transition } from "framer-motion";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   BEER_STYLE_OPTIONS,
   beerStyleLabel,
@@ -18,11 +18,28 @@ import { readAndCompressImage } from "@/lib/images/compress-image";
 import { GETRANKEART_OPTIONS, sanitizeProduktKategorie, type ProduktKategorie } from "@/lib/dashboard/metadata";
 
 const EASE = [0.2, 0.7, 0.2, 1] as const;
+const PILL_SPRING: Transition = { type: "spring", stiffness: 520, damping: 38, mass: 0.7 };
+const INSTANT: Transition = { duration: 0 };
+const noopSubscribe = () => () => {};
 
 const FLASCHEN_CHOICES = Object.entries(FLASCHEN_TYPEN).map(([code, item]) => ({
   code,
   label: item.pillLabel,
 }));
+
+/** Flaschentypen nach Füllmenge gruppieren — „Longneck 0,33 l“ → Gruppe „0,33 l“, Chip „Longneck“. */
+const FLASCHEN_GROUPS = FLASCHEN_CHOICES.reduce<{ volume: string; items: { code: string; label: string }[] }[]>(
+  (groups, choice) => {
+    const match = choice.label.match(/^(.*?)\s+(\d+(?:,\d+)?\s*l)$/);
+    const volume = match?.[2] ?? "Weitere";
+    const label = match?.[1] ?? choice.label;
+    const group = groups.find((g) => g.volume === volume);
+    if (group) group.items.push({ code: choice.code, label });
+    else groups.push({ volume, items: [{ code: choice.code, label }] });
+    return groups;
+  },
+  [],
+);
 
 const GLAS_CHOICES = (Object.entries(GLAS_TYPEN) as [GlasTyp, (typeof GLAS_TYPEN)[GlasTyp]][]).map(
   ([code, item]) => ({
@@ -42,6 +59,13 @@ const FARBE_LABEL: Record<(typeof FARBE_CHOICES)[number]["code"], string> = {
   gruen: "Grüne Flasche",
   klar: "Klare Flasche",
 };
+
+const FILTRIERUNG_CHOICES = [
+  { code: "filtriert" as const, label: "Filtriert · klar" },
+  { code: "unfiltriert" as const, label: "Unfiltriert · trüb" },
+];
+
+const DOSE_SWATCH = "linear-gradient(145deg, #c9c9c9, #6e6e6e)";
 
 export type BeerCreateDraft = {
   name: string;
@@ -82,11 +106,41 @@ function BottleIcon({ className }: { className?: string }) {
   );
 }
 
+function ReplaceIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7M20 4v4.7h-4.7M20 12a8 8 0 0 1-13.7 5.6L4 15.3M4 20v-4.7h4.7"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function defaultFiltrierung(bierstil: string): "filtriert" | "unfiltriert" {
   return /hefeweizen|kellerbier|neipa|zwickel|rauchbier/i.test(bierstil) ? "unfiltriert" : "filtriert";
 }
 
-function buildPromptPreview(parts: {
+type PromptToken = { key: string; label: string; strong?: boolean };
+
+function buildPromptTokens(parts: {
   name: string;
   produktKategorie: ProduktKategorie;
   bierstil: string;
@@ -95,26 +149,139 @@ function buildPromptPreview(parts: {
   glasTyp: string;
   filtrierung: "filtriert" | "unfiltriert";
   brandTone: string;
-}): string {
-  const segments: string[] = [];
+}): PromptToken[] {
+  const tokens: PromptToken[] = [];
+  if (parts.name.trim()) tokens.push({ key: "name", label: parts.name.trim(), strong: true });
   const style = parts.produktKategorie === "bier"
     ? beerStyleLabel(parts.bierstil)
     : GETRANKEART_OPTIONS.find((option) => option.id === parts.produktKategorie)?.label;
-  if (style) segments.push(style);
+  if (style) tokens.push({ key: "style", label: style });
   if (parts.produktKategorie === "bier") {
-    segments.push(parts.filtrierung === "unfiltriert" ? "unfiltriert / naturtrüb" : "filtriert / klar");
+    tokens.push({
+      key: "filter",
+      label: parts.filtrierung === "unfiltriert" ? "unfiltriert / naturtrüb" : "filtriert / klar",
+    });
   }
   const vessel = FLASCHEN_CHOICES.find((f) => f.code === parts.flaschenTyp)?.label;
-  if (vessel) segments.push(vessel);
+  if (vessel) tokens.push({ key: "vessel", label: vessel });
   if (!isDoseTyp(parts.flaschenTyp as keyof typeof FLASCHEN_TYPEN)) {
-    segments.push(FARBE_LABEL[parts.flaschenfarbe]);
+    tokens.push({ key: "color", label: FARBE_LABEL[parts.flaschenfarbe] });
   }
   const glass = GLAS_CHOICES.find((g) => g.code === parts.glasTyp)?.label;
-  if (glass) segments.push(glass);
+  if (glass) tokens.push({ key: "glass", label: glass });
   const tone = parts.brandTone.trim();
-  if (tone) segments.push(`Markenstil „${tone}“`);
-  if (parts.name.trim()) segments.unshift(parts.name.trim());
-  return segments.join(" · ");
+  if (tone) tokens.push({ key: "tone", label: `Markenstil „${tone}“` });
+  return tokens;
+}
+
+/** Chip mit gleitender Auswahl-Pille (shared layout). */
+function Chip({
+  on,
+  pillId,
+  disabled,
+  reducedMotion,
+  onClick,
+  children,
+  className = "",
+}: {
+  on: boolean;
+  pillId: string;
+  disabled?: boolean;
+  reducedMotion: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`studio-beer-create-chip${on ? " is-on" : ""}${className ? ` ${className}` : ""}`}
+      aria-pressed={on}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {on ? (
+        <motion.span
+          layoutId={pillId}
+          className="studio-beer-create-chip-pill"
+          transition={reducedMotion ? INSTANT : PILL_SPRING}
+          aria-hidden="true"
+        />
+      ) : null}
+      <span className="studio-beer-create-chip-label">{children}</span>
+    </button>
+  );
+}
+
+function Section({
+  index,
+  title,
+  aside,
+  motionProps,
+  children,
+}: {
+  index: string;
+  title: string;
+  aside?: ReactNode;
+  motionProps: object;
+  children: ReactNode;
+}) {
+  return (
+    <motion.section className="studio-beer-create-section" {...motionProps}>
+      <header className="studio-beer-create-section-head">
+        <span className="studio-beer-create-section-index">{index}</span>
+        <span className="studio-beer-create-section-title">{title}</span>
+        <span className="studio-beer-create-section-rule" aria-hidden="true" />
+        {aside}
+      </header>
+      {children}
+    </motion.section>
+  );
+}
+
+function PromptPreview({
+  tokens,
+  swatch,
+  reducedMotion,
+}: {
+  tokens: PromptToken[];
+  swatch: string | undefined;
+  reducedMotion: boolean;
+}) {
+  return (
+    <div className="studio-beer-create-preview">
+      <div className="studio-beer-create-preview-head">
+        <span className="studio-beer-create-preview-label">So geht die Sorte in den Prompt</span>
+        <motion.span
+          className="studio-beer-create-preview-swatch"
+          animate={{ background: swatch }}
+          transition={{ duration: reducedMotion ? 0 : 0.25, ease: EASE }}
+          aria-hidden="true"
+        />
+      </div>
+      <div className="studio-beer-create-preview-tokens" aria-live="polite">
+        {tokens.length === 0 ? (
+          <span className="studio-beer-create-preview-empty">Name, Stil und Flasche erscheinen hier.</span>
+        ) : (
+          <AnimatePresence initial={false} mode="popLayout">
+            {tokens.map((token) => (
+              <motion.span
+                key={`${token.key}:${token.label}`}
+                layout={reducedMotion ? false : "position"}
+                className={`studio-beer-create-token${token.strong ? " is-strong" : ""}`}
+                initial={reducedMotion ? false : { opacity: 0, y: 6, scale: 0.94, filter: "blur(3px)" }}
+                animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                exit={reducedMotion ? undefined : { opacity: 0, scale: 0.92, filter: "blur(2px)" }}
+                transition={reducedMotion ? INSTANT : { duration: 0.24, ease: EASE }}
+              >
+                {token.label}
+              </motion.span>
+            ))}
+          </AnimatePresence>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function BeerCreatePanel({
@@ -140,7 +307,9 @@ export function BeerCreatePanel({
 }) {
   const reducedMotionHook = useReducedMotion() ?? false;
   const reducedMotion = reducedMotionProp ?? reducedMotionHook;
-  const fileInputId = useId();
+  const uid = useId();
+  const fileInputId = `${uid}-file`;
+  const nameInputId = `${uid}-name`;
   const fileRef = useRef<HTMLInputElement>(null);
 
   const startKategorie = sanitizeProduktKategorie(initial?.produktKategorie ?? initialKategorie);
@@ -167,16 +336,40 @@ export function BeerCreatePanel({
   const [etikettDataUrl, setEtikettDataUrl] = useState("");
   const [existingEtikettUrl] = useState(initial?.etikettUrl?.trim() || "");
   const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [localError, setLocalError] = useState("");
   const [phase, setPhase] = useState<SavePhase>("idle");
-  const [previewKey, setPreviewKey] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const saveShortcut = useSyncExternalStore(
+    noopSubscribe,
+    () => (/Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent) ? "⌘↵" : "Strg ↵"),
+    () => "Strg ↵",
+  );
+
+  // Snapshot der Ausgangswerte — für „Ungespeicherte Änderungen“.
+  const [baseline] = useState(() => ({
+    name: initial?.name?.trim() ?? "",
+    produktKategorie,
+    bierstil,
+    flaschenTyp,
+    flaschenfarbe,
+    glasTyp,
+    filtrierung,
+  }));
+
+  useEffect(() => {
+    if (!confirmDelete) return;
+    const t = window.setTimeout(() => setConfirmDelete(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [confirmDelete]);
 
   const previewImage = etikettDataUrl || existingEtikettUrl;
   const isEdit = mode === "edit";
+  const isBier = produktKategorie === "bier";
   const showDose = isDoseTyp(flaschenTyp as keyof typeof FLASCHEN_TYPEN);
-  const preview = buildPromptPreview({
+  const tokens = buildPromptTokens({
     name,
     produktKategorie,
     bierstil,
@@ -186,12 +379,22 @@ export function BeerCreatePanel({
     filtrierung,
     brandTone,
   });
+  const previewSwatch = showDose ? DOSE_SWATCH : FARBE_CHOICES.find((f) => f.code === flaschenfarbe)?.swatch;
   const displayError = localError || error || uploadError;
   const busy = phase === "saving" || phase === "success" || deleting;
+  const dirty =
+    name.trim() !== baseline.name ||
+    produktKategorie !== baseline.produktKategorie ||
+    (isBier && (bierstil !== baseline.bierstil || filtrierung !== baseline.filtrierung)) ||
+    flaschenTyp !== baseline.flaschenTyp ||
+    (!showDose && flaschenfarbe !== baseline.flaschenfarbe) ||
+    glasTyp !== baseline.glasTyp ||
+    Boolean(etikettDataUrl);
 
   const acceptFile = async (file: File | undefined) => {
     if (!file || busy) return;
     setUploadError("");
+    setUploading(true);
     try {
       if (!file.type.startsWith("image/")) {
         throw new Error("Bitte ein Bild auswählen (PNG, JPG, WEBP).");
@@ -203,6 +406,8 @@ export function BeerCreatePanel({
       setEtikettDataUrl(dataUrl);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload fehlgeschlagen.");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -211,23 +416,25 @@ export function BeerCreatePanel({
     const trimmed = name.trim();
     if (!trimmed) {
       setLocalError("Bitte gib deiner Sorte einen Namen.");
+      document.getElementById(nameInputId)?.focus();
       return;
     }
     setLocalError("");
+    setConfirmDelete(false);
     setPhase("saving");
     try {
       await onSave({
         name: trimmed.slice(0, 80),
         produktKategorie,
-        bierstil: produktKategorie === "bier" ? bierstil : produktKategorie,
+        bierstil: isBier ? bierstil : produktKategorie,
         flaschenTyp,
         flaschenfarbe,
         glasTyp,
-        filtrierung: produktKategorie === "bier" ? filtrierung : "filtriert",
+        filtrierung: isBier ? filtrierung : "filtriert",
         etikettDataUrl,
       });
       setPhase("success");
-      window.setTimeout(() => onCancel(), reducedMotion ? 40 : 400);
+      window.setTimeout(() => onCancel(), reducedMotion ? 40 : 650);
     } catch (err) {
       setPhase("idle");
       setLocalError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
@@ -236,7 +443,11 @@ export function BeerCreatePanel({
 
   const handleDelete = async () => {
     if (!onDelete || busy) return;
-    if (!window.confirm(`Sorte „${name.trim() || "ohne Namen"}“ wirklich löschen?`)) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setConfirmDelete(false);
     setLocalError("");
     setDeleting(true);
     try {
@@ -248,59 +459,93 @@ export function BeerCreatePanel({
     }
   };
 
-  const stagger = (delayMs: number) =>
+  const reveal = (delayMs: number) =>
     reducedMotion
-      ? { initial: false as const, animate: { opacity: 1 }, transition: { duration: 0 } }
+      ? { initial: false as const, animate: { opacity: 1 }, transition: INSTANT }
       : {
-          initial: { opacity: 0, y: 6 },
+          initial: { opacity: 0, y: 10 },
           animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.22, delay: delayMs / 1000, ease: EASE },
+          transition: { duration: 0.32, delay: delayMs / 1000, ease: EASE },
         };
+
+  const collapse = reducedMotion
+    ? { initial: false as const, animate: { opacity: 1, height: "auto" }, exit: { opacity: 0, height: 0 }, transition: INSTANT }
+    : {
+        initial: { opacity: 0, height: 0 },
+        animate: { opacity: 1, height: "auto" },
+        exit: { opacity: 0, height: 0 },
+        transition: { duration: 0.26, ease: EASE },
+      };
+
+  const pill = (group: string) => `${uid}-pill-${group}`;
+
+  const selectKategorie = (id: ProduktKategorie) => {
+    setProduktKategorie(id);
+    setBierstil(id === "bier" ? "helles" : id);
+    setFlaschenfarbe(id === "bier" ? "braun" : "klar");
+    if (id === "bier") {
+      setGlasTyp(findBeerStyle("helles")?.glasTyp ?? "willibecher");
+      setFiltrierung(defaultFiltrierung("helles"));
+    }
+  };
+
+  const title = name.trim();
+  const preview = <PromptPreview tokens={tokens} swatch={previewSwatch} reducedMotion={reducedMotion} />;
 
   return (
     <motion.div
       className={`studio-beer-create${manualOnly ? " studio-beer-create--manual" : ""}`}
-      initial={reducedMotion ? false : { opacity: 0, scale: 0.992, y: 8 }}
+      initial={reducedMotion ? false : { opacity: 0, scale: 0.985, y: 12 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={reducedMotion ? undefined : { opacity: 0, scale: 0.992, y: -3 }}
-      transition={{ duration: reducedMotion ? 0.08 : 0.24, ease: EASE }}
+      exit={reducedMotion ? undefined : { opacity: 0, scale: 0.99, y: -4 }}
+      transition={{ duration: reducedMotion ? 0.08 : 0.34, ease: EASE }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          void handleSave();
+        }
+      }}
     >
-      <motion.header className="studio-beer-create-header" {...stagger(0)}>
+      <motion.header className="studio-beer-create-header" {...reveal(0)}>
         <div className="studio-beer-create-header-copy">
-          <h3 className="studio-beer-create-title">{isEdit ? "Sorte bearbeiten" : "Neue Sorte anlegen"}</h3>
+          <span className="studio-beer-create-eyebrow">
+            <span className="studio-beer-create-eyebrow-dot" aria-hidden="true" />
+            {isEdit ? "Sortiment · Sorte bearbeiten" : "Sortiment · Neue Sorte"}
+          </span>
+          <h3 className={`studio-beer-create-title${title ? "" : " is-placeholder"}`}>
+            {title || (isEdit ? "Unbenannte Sorte" : "Neue Sorte anlegen")}
+          </h3>
           <p className="studio-beer-create-lead">
             {isEdit
-              ? "Passe Name, Getränkeart oder Flasche an — BrewAI übernimmt die Änderungen bei der Motiverstellung."
+              ? "Passe Name, Getränkeart oder Gebinde an — BrewAI übernimmt die Änderungen bei der Motiverstellung."
               : "Hinterlege die wichtigsten Merkmale deiner Sorte. BrewAI verwendet sie später automatisch bei der Motiverstellung."}
           </p>
         </div>
-        <button
-          type="button"
-          className="studio-beer-create-manual-btn"
-          onClick={() => setManualOnly((v) => !v)}
-          disabled={busy}
-        >
-          {manualOnly ? "Mit Foto" : "Manuell anlegen"}
-        </button>
+        {!isEdit ? (
+          <button
+            type="button"
+            className="studio-beer-create-manual-btn"
+            onClick={() => setManualOnly((v) => !v)}
+            disabled={busy}
+          >
+            {manualOnly ? "Mit Foto" : "Ohne Foto"}
+          </button>
+        ) : null}
       </motion.header>
 
       <div className="studio-beer-create-body">
         <AnimatePresence initial={false} mode="popLayout">
           {!manualOnly ? (
-            <motion.div
-              key="dropzone-col"
+            <motion.aside
+              key="media-col"
               className="studio-beer-create-media"
-              initial={reducedMotion ? false : { opacity: 0, x: -8 }}
+              initial={reducedMotion ? false : { opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={reducedMotion ? undefined : { opacity: 0, x: -8 }}
-              transition={{
-                duration: reducedMotion ? 0 : 0.2,
-                delay: reducedMotion ? 0 : 0.04,
-                ease: EASE,
-              }}
+              exit={reducedMotion ? undefined : { opacity: 0, x: -12 }}
+              transition={{ duration: reducedMotion ? 0 : 0.3, delay: reducedMotion ? 0 : 0.06, ease: EASE }}
             >
               <div
-                className={`studio-beer-create-drop${dragOver ? " is-drag" : ""}${previewImage ? " has-preview" : ""}`}
+                className={`studio-beer-create-drop${dragOver ? " is-drag" : ""}${previewImage ? " has-preview" : ""}${uploading ? " is-uploading" : ""}`}
                 onDragEnter={(e) => {
                   e.preventDefault();
                   setDragOver(true);
@@ -319,46 +564,53 @@ export function BeerCreatePanel({
                   void acceptFile(e.dataTransfer.files?.[0]);
                 }}
               >
-                <AnimatePresence mode="wait">
+                <AnimatePresence mode="popLayout" initial={false}>
                   {previewImage ? (
                     <motion.div
-                      key="preview"
+                      key={previewImage}
                       className="studio-beer-create-drop-preview"
-                      initial={reducedMotion ? false : { opacity: 0, scale: 1.015 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={reducedMotion ? undefined : { opacity: 0, scale: 0.985 }}
-                      transition={{ duration: reducedMotion ? 0 : 0.22, ease: EASE }}
+                      initial={reducedMotion ? false : { opacity: 0, scale: 1.06, filter: "blur(8px)" }}
+                      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                      exit={reducedMotion ? undefined : { opacity: 0, scale: 0.97 }}
+                      transition={{ duration: reducedMotion ? 0 : 0.45, ease: EASE }}
                     >
                       <img src={previewImage} alt="Flaschenfoto Vorschau" />
+                      <span className="studio-beer-create-drop-shade" aria-hidden="true" />
+                      <span className="studio-beer-create-drop-badge">
+                        {etikettDataUrl ? "Neues Foto" : "Etikett"}
+                      </span>
                       <button
                         type="button"
                         className="studio-beer-create-drop-change"
                         onClick={() => fileRef.current?.click()}
-                        disabled={busy}
+                        disabled={busy || uploading}
                       >
-                        Anderes Bild
+                        <ReplaceIcon />
+                        Bild ersetzen
                       </button>
                     </motion.div>
                   ) : (
-                    <motion.div
+                    <motion.label
                       key="empty"
+                      htmlFor={fileInputId}
                       className="studio-beer-create-drop-empty"
-                      initial={reducedMotion ? false : { opacity: 0, scale: 0.985 }}
+                      initial={reducedMotion ? false : { opacity: 0, scale: 0.97 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      exit={reducedMotion ? undefined : { opacity: 0, scale: 0.985 }}
-                      transition={{ duration: reducedMotion ? 0 : 0.12, ease: EASE }}
+                      exit={reducedMotion ? undefined : { opacity: 0, scale: 0.97 }}
+                      transition={{ duration: reducedMotion ? 0 : 0.2, ease: EASE }}
                     >
-                      <BottleIcon className="studio-beer-create-bottle" />
-                      <p className="studio-beer-create-drop-title">Flaschenfoto hierher ziehen</p>
-                      <p className="studio-beer-create-drop-hint">
-                        Ein Bild reicht. Etikett sollte lesbar sein.
-                      </p>
-                      <label htmlFor={fileInputId} className="studio-beer-create-file-btn">
-                        Datei wählen
-                      </label>
-                    </motion.div>
+                      <span className="studio-beer-create-bottle-wrap">
+                        <BottleIcon className="studio-beer-create-bottle" />
+                      </span>
+                      <span className="studio-beer-create-drop-title">
+                        {dragOver ? "Loslassen zum Hochladen" : "Flaschenfoto hierher ziehen"}
+                      </span>
+                      <span className="studio-beer-create-drop-hint">Ein Bild reicht. Etikett sollte lesbar sein.</span>
+                      <span className="studio-beer-create-file-btn">Datei wählen</span>
+                    </motion.label>
                   )}
                 </AnimatePresence>
+                {uploading ? <span className="studio-beer-create-drop-scan" aria-hidden="true" /> : null}
                 <input
                   ref={fileRef}
                   id={fileInputId}
@@ -372,103 +624,156 @@ export function BeerCreatePanel({
                   }}
                 />
               </div>
-            </motion.div>
+              {preview}
+            </motion.aside>
           ) : null}
         </AnimatePresence>
 
-        <motion.div className="studio-beer-create-form" {...stagger(65)}>
-          <label className="studio-beer-create-field">
-            <span className="studio-beer-create-label">Name der Sorte</span>
-            <input
-              className="studio-beer-create-input"
-              value={name}
-              maxLength={80}
-              placeholder="z. B. Falter Hell"
-              disabled={busy}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.preventDefault();
-              }}
-            />
-          </label>
-
-          <div className="studio-beer-create-field">
-            <span className="studio-beer-create-label">Getränkeart</span>
-            <div className="studio-beer-create-chips" role="group" aria-label="Getränkeart">
-              {GETRANKEART_OPTIONS.map((opt) => {
-                const on = produktKategorie === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`studio-beer-create-chip${on ? " is-on" : ""}`}
-                    aria-pressed={on}
+        <LayoutGroup id={uid}>
+          <div className="studio-beer-create-form">
+            <Section index="01" title="Produkt" motionProps={reveal(60)}>
+              <div className="studio-beer-create-field">
+                <label className="studio-beer-create-label" htmlFor={nameInputId}>
+                  Name der Sorte
+                </label>
+                <div className="studio-beer-create-input-wrap">
+                  <input
+                    id={nameInputId}
+                    className="studio-beer-create-input"
+                    value={name}
+                    maxLength={80}
+                    placeholder="z. B. Falter Hell"
                     disabled={busy}
-                    onClick={() => {
-                      setProduktKategorie(opt.id);
-                      setBierstil(opt.id === "bier" ? "helles" : opt.id);
-                      setFlaschenfarbe(opt.id === "bier" ? "braun" : "klar");
-                      if (opt.id === "bier") {
-                        setGlasTyp(findBeerStyle("helles")?.glasTyp ?? "willibecher");
-                        setFiltrierung(defaultFiltrierung("helles"));
-                      }
-                      setPreviewKey((k) => k + 1);
+                    aria-invalid={Boolean(localError && !name.trim())}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (localError) setLocalError("");
                     }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {produktKategorie === "bier" ? (
-          <div className="studio-beer-create-field">
-            <span className="studio-beer-create-label">Bierstil</span>
-            <div className="studio-beer-create-chips" role="group" aria-label="Bierstil">
-              {BEER_STYLE_OPTIONS.map((opt) => {
-                const on = bierstil === opt.bierstil;
-                return (
-                  <button
-                    key={opt.bierstil}
-                    type="button"
-                    className={`studio-beer-create-chip${on ? " is-on" : ""}`}
-                    aria-pressed={on}
-                    disabled={busy}
-                    onClick={() => {
-                      setBierstil(opt.bierstil);
-                      if (opt.glasTyp) setGlasTyp(opt.glasTyp);
-                      setFiltrierung(defaultFiltrierung(opt.bierstil));
-                      setPreviewKey((k) => k + 1);
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) e.preventDefault();
                     }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          ) : (
-            <p className="studio-beer-create-label">{GETRANKEART_OPTIONS.find((option) => option.id === produktKategorie)?.label}</p>
-          )}
+                  />
+                  <span className="studio-beer-create-input-count" aria-hidden="true">
+                    {name.length}/80
+                  </span>
+                </div>
+              </div>
 
-          <div className="studio-beer-create-attrs">
-            <div className="studio-beer-create-field">
-              <span className="studio-beer-create-label">Flaschenfarbe</span>
-              <div className="studio-beer-create-chips" role="group" aria-label="Flaschenfarbe">
-                {FARBE_CHOICES.map((opt) => {
-                  const on = flaschenfarbe === opt.code;
-                  return (
-                    <button
+              <div className="studio-beer-create-field">
+                <span className="studio-beer-create-label">Getränkeart</span>
+                <div className="studio-beer-create-segmented" role="group" aria-label="Getränkeart">
+                  {GETRANKEART_OPTIONS.map((opt) => (
+                    <Chip
+                      key={opt.id}
+                      on={produktKategorie === opt.id}
+                      pillId={pill("kategorie")}
+                      disabled={busy}
+                      reducedMotion={reducedMotion}
+                      onClick={() => selectKategorie(opt.id)}
+                    >
+                      {opt.label}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+
+              <AnimatePresence initial={false}>
+                {isBier ? (
+                  <motion.div key="bier-fields" className="studio-beer-create-collapse" {...collapse}>
+                    <div className="studio-beer-create-field">
+                      <span className="studio-beer-create-label">Bierstil</span>
+                      <div className="studio-beer-create-chips" role="group" aria-label="Bierstil">
+                        {BEER_STYLE_OPTIONS.map((opt) => (
+                          <Chip
+                            key={opt.bierstil}
+                            on={bierstil === opt.bierstil}
+                            pillId={pill("stil")}
+                            disabled={busy}
+                            reducedMotion={reducedMotion}
+                            onClick={() => {
+                              setBierstil(opt.bierstil);
+                              if (opt.glasTyp) setGlasTyp(opt.glasTyp);
+                              setFiltrierung(defaultFiltrierung(opt.bierstil));
+                            }}
+                          >
+                            {opt.label}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="studio-beer-create-field">
+                      <span className="studio-beer-create-label">Filtrierung</span>
+                      <div
+                        className="studio-beer-create-segmented studio-beer-create-segmented--half"
+                        role="group"
+                        aria-label="Filtrierung"
+                      >
+                        {FILTRIERUNG_CHOICES.map((opt) => (
+                          <Chip
+                            key={opt.code}
+                            on={filtrierung === opt.code}
+                            pillId={pill("filter")}
+                            disabled={busy}
+                            reducedMotion={reducedMotion}
+                            onClick={() => setFiltrierung(opt.code)}
+                          >
+                            <span
+                              className={`studio-beer-create-liquid${opt.code === "unfiltriert" ? " is-cloudy" : ""}`}
+                              aria-hidden="true"
+                            />
+                            {opt.label}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </Section>
+
+            <Section index="02" title="Gebinde" motionProps={reveal(120)}>
+              <div className="studio-beer-create-field">
+                <span className="studio-beer-create-label">Flaschentyp</span>
+                <div className="studio-beer-create-vessels" role="group" aria-label="Flaschentyp">
+                  {FLASCHEN_GROUPS.map((group) => (
+                    <div key={group.volume} className="studio-beer-create-vessel-row">
+                      <span className="studio-beer-create-vessel-volume">{group.volume}</span>
+                      <div className="studio-beer-create-chips">
+                        {group.items.map((opt) => (
+                          <Chip
+                            key={opt.code}
+                            on={flaschenTyp === opt.code}
+                            pillId={pill("flasche")}
+                            disabled={busy}
+                            reducedMotion={reducedMotion}
+                            onClick={() => setFlaschenTyp(opt.code)}
+                          >
+                            {opt.label}
+                          </Chip>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="studio-beer-create-field">
+                <span className="studio-beer-create-label">Flaschenfarbe</span>
+                <div
+                  className={`studio-beer-create-chips${showDose ? " is-muted" : ""}`}
+                  role="group"
+                  aria-label="Flaschenfarbe"
+                >
+                  {FARBE_CHOICES.map((opt) => (
+                    <Chip
                       key={opt.code}
-                      type="button"
-                      className={`studio-beer-create-chip studio-beer-create-chip--swatch${on ? " is-on" : ""}`}
-                      aria-pressed={on}
+                      on={!showDose && flaschenfarbe === opt.code}
+                      pillId={pill("farbe")}
                       disabled={busy || showDose}
-                      onClick={() => {
-                        setFlaschenfarbe(opt.code);
-                        setPreviewKey((k) => k + 1);
-                      }}
+                      reducedMotion={reducedMotion}
+                      className="studio-beer-create-chip--swatch"
+                      onClick={() => setFlaschenfarbe(opt.code)}
                     >
                       <span
                         className="studio-beer-create-swatch"
@@ -476,173 +781,146 @@ export function BeerCreatePanel({
                         aria-hidden="true"
                       />
                       {opt.label}
-                    </button>
-                  );
-                })}
+                    </Chip>
+                  ))}
+                </div>
+                <AnimatePresence initial={false}>
+                  {showDose ? (
+                    <motion.p key="dose-note" className="studio-beer-create-note" {...collapse}>
+                      Bei Dosen entfällt die Flaschenfarbe.
+                    </motion.p>
+                  ) : null}
+                </AnimatePresence>
               </div>
-              {showDose ? (
-                <p className="studio-beer-create-note">Bei Dosen entfällt die Flaschenfarbe.</p>
-              ) : null}
-            </div>
+            </Section>
 
-            <div className="studio-beer-create-field">
-              <span className="studio-beer-create-label">Flaschentyp</span>
-              <div className="studio-beer-create-chips" role="group" aria-label="Flaschentyp">
-                {FLASCHEN_CHOICES.map((opt) => {
-                  const on = flaschenTyp === opt.code;
-                  return (
-                    <button
+            <Section index="03" title="Glas" motionProps={reveal(180)}>
+              <div className="studio-beer-create-field">
+                <span className="studio-beer-create-label">Glastyp</span>
+                <div className="studio-beer-create-chips" role="group" aria-label="Glastyp">
+                  {GLAS_CHOICES.map((opt) => (
+                    <Chip
                       key={opt.code}
-                      type="button"
-                      className={`studio-beer-create-chip${on ? " is-on" : ""}`}
-                      aria-pressed={on}
+                      on={glasTyp === opt.code}
+                      pillId={pill("glas")}
                       disabled={busy}
-                      onClick={() => {
-                        setFlaschenTyp(opt.code);
-                        setPreviewKey((k) => k + 1);
-                      }}
+                      reducedMotion={reducedMotion}
+                      onClick={() => setGlasTyp(opt.code)}
                     >
                       {opt.label}
-                    </button>
-                  );
-                })}
+                    </Chip>
+                  ))}
+                </div>
               </div>
-            </div>
+            </Section>
 
-            <div className="studio-beer-create-field">
-              <span className="studio-beer-create-label">Glastyp</span>
-              <div className="studio-beer-create-chips" role="group" aria-label="Glastyp">
-                {GLAS_CHOICES.map((opt) => {
-                  const on = glasTyp === opt.code;
-                  return (
-                    <button
-                      key={opt.code}
-                      type="button"
-                      className={`studio-beer-create-chip${on ? " is-on" : ""}`}
-                      aria-pressed={on}
-                      disabled={busy}
-                      onClick={() => {
-                        setGlasTyp(opt.code);
-                        setPreviewKey((k) => k + 1);
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="studio-beer-create-field">
-              <span className="studio-beer-create-label">Filtrierung</span>
-              <div className="studio-beer-create-chips" role="group" aria-label="Filtrierung">
-                {(
-                  [
-                    { code: "filtriert" as const, label: "Filtriert (klar)" },
-                    { code: "unfiltriert" as const, label: "Unfiltriert (trüb)" },
-                  ] as const
-                ).map((opt) => {
-                  const on = filtrierung === opt.code;
-                  return (
-                    <button
-                      key={opt.code}
-                      type="button"
-                      className={`studio-beer-create-chip${on ? " is-on" : ""}`}
-                      aria-pressed={on}
-                      disabled={busy}
-                      onClick={() => {
-                        setFiltrierung(opt.code);
-                        setPreviewKey((k) => k + 1);
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {manualOnly ? preview : null}
           </div>
+        </LayoutGroup>
+      </div>
 
-          <AnimatePresence>
-            {displayError ? (
-              <motion.p
-                className="studio-beer-create-error"
-                role="alert"
-                initial={reducedMotion ? false : { opacity: 0, y: 3 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: reducedMotion ? 0 : 0.14 }}
-              >
-                {displayError}
-              </motion.p>
-            ) : null}
-          </AnimatePresence>
+      <motion.footer className="studio-beer-create-footer" {...reveal(220)}>
+        <AnimatePresence>
+          {displayError ? (
+            <motion.p
+              className="studio-beer-create-error"
+              role="alert"
+              {...collapse}
+            >
+              {displayError}
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
 
-          <motion.div className="studio-beer-create-actions" {...stagger(115)}>
-            <button
-              type="button"
-              className={`studio-beer-create-save${phase === "success" ? " is-success" : ""}`}
-              disabled={busy}
-              onClick={() => void handleSave()}
-            >
-              {phase === "saving" ? (
-                <>
-                  <span className="studio-beer-create-spinner" aria-hidden="true" />
-                  Wird gespeichert …
-                </>
-              ) : phase === "success" ? (
-                "✓ Sorte gespeichert"
-              ) : isEdit ? (
-                "Änderungen speichern"
-              ) : (
-                "Sorte übernehmen"
-              )}
-            </button>
-            <button
-              type="button"
-              className="studio-beer-create-cancel"
-              disabled={busy}
-              onClick={onCancel}
-            >
-              Abbrechen
-            </button>
+        <div className="studio-beer-create-actions">
+          <div className="studio-beer-create-actions-start">
             {isEdit && onDelete ? (
               <button
                 type="button"
-                className="studio-beer-create-cancel"
+                className={`studio-beer-create-delete${confirmDelete ? " is-confirm" : ""}`}
                 disabled={busy}
                 onClick={() => void handleDelete()}
               >
-                {deleting ? "Wird gelöscht …" : "Sorte löschen"}
+                <TrashIcon />
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={deleting ? "deleting" : confirmDelete ? "confirm" : "idle"}
+                    initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reducedMotion ? undefined : { opacity: 0, y: -6 }}
+                    transition={{ duration: reducedMotion ? 0 : 0.16, ease: EASE }}
+                  >
+                    {deleting ? "Wird gelöscht …" : confirmDelete ? "Wirklich löschen?" : "Sorte löschen"}
+                  </motion.span>
+                </AnimatePresence>
               </button>
-            ) : (
-              <span className="studio-beer-create-actions-hint">Danach immer vorausgefüllt</span>
-            )}
-          </motion.div>
-        </motion.div>
-      </div>
+            ) : null}
+            <span className={`studio-beer-create-status${isEdit && dirty ? " is-dirty" : ""}`}>
+              {isEdit ? (
+                <>
+                  <span className="studio-beer-create-status-dot" aria-hidden="true" />
+                  {dirty ? "Ungespeicherte Änderungen" : "Keine Änderungen"}
+                </>
+              ) : (
+                "Danach immer vorausgefüllt"
+              )}
+            </span>
+          </div>
 
-      <motion.footer className="studio-beer-create-preview" {...stagger(140)}>
-        <span className="studio-beer-create-preview-label">So geht die Sorte in den Prompt</span>
-        <div className="studio-beer-create-preview-surface">
-          <span
-            className="studio-beer-create-preview-swatch"
-            style={{
-              background: showDose
-                ? "linear-gradient(145deg, #b8b8b8, #6e6e6e)"
-                : FARBE_CHOICES.find((f) => f.code === flaschenfarbe)?.swatch,
-            }}
-            aria-hidden="true"
-          />
-          <motion.p
-            key={previewKey}
-            className="studio-beer-create-preview-text"
-            initial={reducedMotion ? false : { opacity: 0.55 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: reducedMotion ? 0 : 0.12 }}
-          >
-            {preview || "Name, Stil und Flasche erscheinen hier."}
-          </motion.p>
+          <div className="studio-beer-create-actions-end">
+            <button type="button" className="studio-beer-create-cancel" disabled={busy} onClick={onCancel}>
+              Abbrechen
+            </button>
+            <motion.button
+              type="button"
+              layout={!reducedMotion}
+              className={`studio-beer-create-save${phase === "success" ? " is-success" : ""}`}
+              disabled={busy}
+              onClick={() => void handleSave()}
+              transition={{ layout: { duration: 0.22, ease: EASE } }}
+            >
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={phase}
+                  className="studio-beer-create-save-inner"
+                  initial={reducedMotion ? false : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reducedMotion ? undefined : { opacity: 0, y: -10 }}
+                  transition={{ duration: reducedMotion ? 0 : 0.2, ease: EASE }}
+                >
+                  {phase === "saving" ? (
+                    <>
+                      <span className="studio-beer-create-spinner" aria-hidden="true" />
+                      Wird gespeichert …
+                    </>
+                  ) : phase === "success" ? (
+                    <>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <motion.path
+                          d="M5 12.5l4.5 4.5L19 7.5"
+                          stroke="currentColor"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          initial={reducedMotion ? false : { pathLength: 0 }}
+                          animate={{ pathLength: 1 }}
+                          transition={{ duration: reducedMotion ? 0 : 0.34, delay: 0.05, ease: EASE }}
+                        />
+                      </svg>
+                      Gespeichert
+                    </>
+                  ) : (
+                    <>
+                      {isEdit ? "Änderungen speichern" : "Sorte übernehmen"}
+                      <kbd className="studio-beer-create-kbd" aria-hidden="true">
+                        {saveShortcut}
+                      </kbd>
+                    </>
+                  )}
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
+          </div>
         </div>
       </motion.footer>
     </motion.div>

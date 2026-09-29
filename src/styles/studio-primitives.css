@@ -703,12 +703,29 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
 }
+/* Panel füllt den Dialog; nur der Formular-Body scrollt, Kopf + Footer bleiben stehen. */
 .stu-dialog.evg-studio.stu-dialog--beer .studio-beer-create {
+  flex: 1 1 auto;
+  min-height: 0;
   margin-inline: 0;
   max-width: none;
-  box-shadow: var(--sh-modal);
+  box-shadow: 0 24px 64px -16px rgba(24, 20, 15, 0.32), 0 2px 6px rgba(24, 20, 15, 0.06);
+}
+.stu-dialog.evg-studio.stu-dialog--beer .stu-dialog__close {
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  background: var(--s1);
+  border: 1px solid var(--line);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), transform 260ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.stu-dialog.evg-studio.stu-dialog--beer .stu-dialog__close:hover {
+  transform: rotate(90deg);
 }
 .stu-dialog.evg-studio[data-state="closed"] {
   animation: stu-modal-out var(--dur-page-out) var(--ease);
