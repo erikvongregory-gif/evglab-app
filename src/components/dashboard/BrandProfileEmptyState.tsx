@@ -92,7 +92,7 @@ export function BrandProfileEmptyState({
           <div className={styles.alternative}>
             <Button type="button" variant="ghost" onClick={onOpenBrandSetup} className="h-auto min-h-11 justify-start gap-3 whitespace-normal px-2 py-2 text-left">
               <span className={styles.alternativeIcon}><Images size={17} aria-hidden="true" /></span>
-              <span><span className="block text-sm font-medium">Keine Website? Geht auch anders.</span><span className="mt-0.5 block text-xs font-normal text-muted-foreground">Instagram, Screenshots oder manuell starten</span></span>
+              <span><span className="block text-sm font-medium">Keine Website? Geht auch anders.</span><span className="mt-0.5 block text-xs font-normal text-muted-foreground">Screenshots oder manuell starten</span></span>
               <ArrowRight size={15} className="ml-auto" aria-hidden="true" />
             </Button>
           </div>

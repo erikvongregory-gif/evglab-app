@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { BrandReviewPanel } from "@/components/dashboard/BrandReviewPanel";
 import { StudioIcon } from "@/components/studio/icons";
@@ -62,15 +61,7 @@ type Slot = {
 };
 
 type ModalStep = "input" | "analyzing" | "review";
-type InputTab = "url" | "instagram" | "manual";
-
-type InstagramStatus = {
-  configured: boolean;
-  connected: boolean;
-  username?: string;
-  profileUrl?: string;
-  expired?: boolean;
-};
+type InputTab = "url" | "manual";
 
 const EMPTY_SLOTS: Slot[] = Array.from({ length: 5 }, () => ({ file: null, preview: null }));
 
@@ -81,13 +72,6 @@ const ANALYSIS_STEPS = [
   "Texte & Tonalität werden erkannt…",
   "Typografie wird übernommen…",
   "Bilder werden ausgewertet…",
-  "Markenprofil wird erstellt…",
-];
-
-const INSTAGRAM_ANALYSIS_STEPS = [
-  "Instagram-Posts werden geladen…",
-  "Bilder werden heruntergeladen…",
-  "Bildsprache wird ausgewertet…",
   "Markenprofil wird erstellt…",
 ];
 
@@ -365,17 +349,10 @@ export function BrandProfileSetupModal({
   initialWebsiteUrl,
   autoAnalyzeSignal,
 }: BrandProfileSetupModalProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [inputTab, setInputTab] = useState<InputTab>("url");
   const [step, setStep] = useState<ModalStep>("input");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [slots, setSlots] = useState<Slot[]>(EMPTY_SLOTS);
-  const [instagramUrl, setInstagramUrl] = useState("");
-  const [instagramStatus, setInstagramStatus] = useState<InstagramStatus>({ configured: false, connected: false });
-  const [instagramNotice, setInstagramNotice] = useState("");
-  const [instagramStatusLoading, setInstagramStatusLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [analysisStepIndex, setAnalysisStepIndex] = useState(0);
@@ -390,55 +367,18 @@ export function BrandProfileSetupModal({
 
   const filledCount = slots.filter((s) => s.file).length;
   const modalTitle = title ?? "Marke einlesen";
-  const analysisSteps = inputTab === "instagram" ? INSTAGRAM_ANALYSIS_STEPS : ANALYSIS_STEPS;
   const taskSteps: TaskStep[] = useMemo(
-    () => analysisSteps.map((label, i) => ({ id: `step-${i}`, label })),
-    [analysisSteps],
+    () => ANALYSIS_STEPS.map((label, i) => ({ id: `step-${i}`, label })),
+    [],
   );
-  const instagramNeedsConnect = !instagramStatus.connected || instagramStatus.expired;
   const analysisTargetLabel =
-    inputTab === "url"
-      ? formatDomain(websiteUrl)
-      : inputTab === "instagram"
-        ? `@${instagramStatus.username ?? "instagram"}`
-        : `${filledCount} Screenshot${filledCount === 1 ? "" : "s"}`;
-
-  const loadInstagramStatus = useCallback(async () => {
-    setInstagramStatusLoading(true);
-    try {
-      const res = await fetch("/api/brand/instagram/status", { cache: "no-store", credentials: "include" });
-      if (!res.ok) return;
-      const data = (await res.json()) as InstagramStatus & { ok?: boolean };
-      setInstagramStatus({
-        configured: Boolean(data.configured),
-        connected: Boolean(data.connected),
-        username: typeof data.username === "string" ? data.username : undefined,
-        profileUrl: typeof data.profileUrl === "string" ? data.profileUrl : undefined,
-        expired: Boolean(data.expired),
-      });
-    } catch {
-      /* ignore */
-    } finally {
-      setInstagramStatusLoading(false);
-    }
-  }, []);
-
-  const clearInstagramQueryParams = useCallback(() => {
-    const p = new URLSearchParams(searchParams.toString());
-    p.delete("instagram");
-    p.delete("instagramError");
-    p.delete("brandInput");
-    const qs = p.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams]);
+    inputTab === "url" ? formatDomain(websiteUrl) : `${filledCount} Screenshot${filledCount === 1 ? "" : "s"}`;
 
   const resetForm = useCallback(() => {
     setInputTab("url");
     setStep("input");
     setWebsiteUrl("");
     setSlots(EMPTY_SLOTS.map(() => ({ file: null, preview: null })));
-    setInstagramUrl("");
-    setInstagramNotice("");
     setError("");
     setAnalysisStepIndex(0);
     setReview(emptyReview());
@@ -458,7 +398,7 @@ export function BrandProfileSetupModal({
     let timer: number | undefined;
     let index = 0;
     const schedule = () => {
-      if (cancelled || index >= analysisSteps.length - 1) return;
+      if (cancelled || index >= ANALYSIS_STEPS.length - 1) return;
       const delay = ANALYSIS_STEP_DURATIONS_MS[Math.min(index, ANALYSIS_STEP_DURATIONS_MS.length - 1)] ?? 5000;
       timer = window.setTimeout(() => {
         index += 1;
@@ -471,42 +411,7 @@ export function BrandProfileSetupModal({
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [step, analysisSteps.length]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (searchParams.get("brandInput") === "instagram") {
-      setInputTab("instagram");
-    }
-    const igResult = searchParams.get("instagram");
-    if (!igResult) return;
-
-    if (igResult === "connected") {
-      setInputTab("instagram");
-      setInstagramNotice("Instagram erfolgreich verbunden. Du kannst jetzt deine Posts analysieren.");
-      setError("");
-      void loadInstagramStatus();
-    } else if (igResult === "denied") {
-      setInputTab("instagram");
-      setError("Instagram-Verbindung abgebrochen.");
-    } else if (igResult === "config") {
-      setInputTab("instagram");
-      setError("Instagram-OAuth ist auf dem Server noch nicht konfiguriert.");
-    } else if (igResult === "state") {
-      setInputTab("instagram");
-      setError("Instagram-Verbindung ungueltig (Sitzung abgelaufen). Bitte erneut verbinden.");
-    } else if (igResult === "error") {
-      setInputTab("instagram");
-      const detail = searchParams.get("instagramError")?.trim();
-      setError(detail || "Instagram-Verbindung fehlgeschlagen.");
-    }
-    clearInstagramQueryParams();
-  }, [open, searchParams, loadInstagramStatus, clearInstagramQueryParams]);
-
-  useEffect(() => {
-    if (!open || inputTab !== "instagram") return;
-    void loadInstagramStatus();
-  }, [open, inputTab, loadInstagramStatus]);
+  }, [step]);
 
   const setSlotFile = (index: number, file: File | null) => {
     setSlots((prev) => {
@@ -546,8 +451,7 @@ export function BrandProfileSetupModal({
       return;
     }
     if (/instagram\.com/i.test(url)) {
-      setInputTab("instagram");
-      setError("Bitte verbinde dein Instagram-Konto im Tab „Instagram“.");
+      setError("Instagram-Links können wir nicht einlesen. Bitte die Website oder Screenshots verwenden.");
       return;
     }
 
@@ -614,7 +518,7 @@ export function BrandProfileSetupModal({
 
   const runManualScan = async () => {
     if (filledCount < 1) {
-      setError("Bitte mindestens 1 Screenshot deiner Instagram-Posts auswaehlen.");
+      setError("Bitte mindestens 1 Screenshot auswählen.");
       return;
     }
     setBusy(true);
@@ -625,8 +529,6 @@ export function BrandProfileSetupModal({
       for (const slot of slots) {
         if (slot.file) fd.append("image", slot.file);
       }
-      if (instagramUrl.trim()) fd.append("instagramUrl", instagramUrl.trim());
-
       const res = await fetch("/api/brand/scan-instagram-posts", {
         method: "POST",
         body: fd,
@@ -652,88 +554,11 @@ export function BrandProfileSetupModal({
         brandDos: s.brandDos,
         brandDonts: s.brandDonts,
         referenceImageUrls: Array.isArray(s.referenceImageUrls) ? s.referenceImageUrls : [],
-        brandInstagramUrl: typeof s.brandInstagramUrl === "string" ? s.brandInstagramUrl : instagramUrl.trim(),
+        brandInstagramUrl: typeof s.brandInstagramUrl === "string" ? s.brandInstagramUrl : "",
         brandWebsiteUrl: "",
         brandProfileSource: "manual",
       });
       setSourceMeta(null);
-    } catch (e) {
-      setStep("input");
-      setError(formatAnalysisError(e, "analyze"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const connectInstagram = () => {
-    const returnTo = `${pathname}?tab=brand&openBrand=1&brandInput=instagram`;
-    window.location.href = `/api/brand/instagram/connect?returnTo=${encodeURIComponent(returnTo)}`;
-  };
-
-  const disconnectInstagram = async () => {
-    setBusy(true);
-    setError("");
-    setInstagramNotice("");
-    try {
-      const res = await fetch("/api/brand/instagram/disconnect", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Trennen fehlgeschlagen.");
-      setInstagramStatus({ configured: instagramStatus.configured, connected: false });
-      setInstagramNotice("Instagram-Verbindung getrennt.");
-    } catch (e) {
-      setError(formatAnalysisError(e, "analyze"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const runInstagramScan = async () => {
-    if (!instagramStatus.connected || instagramStatus.expired) {
-      setError("Bitte Instagram zuerst verbinden.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    setInstagramNotice("");
-    setStep("analyzing");
-    try {
-      const res = await fetchWithRetry(
-        "/api/brand/instagram/scan",
-        { method: "POST", credentials: "include", cache: "no-store" },
-        { retries: 1, baseDelayMs: 1500 },
-      );
-      let data: {
-        error?: string;
-        suggestion?: Partial<BrandScanSuggestion>;
-        sourceMeta?: {
-          confidence?: string;
-          pageTitle?: string;
-          reviewHints?: string[];
-          crawlNote?: string | null;
-        };
-      };
-      try {
-        data = (await res.json()) as typeof data;
-      } catch {
-        throw new Error(res.ok ? "Ungueltige Server-Antwort." : `Analyse fehlgeschlagen (HTTP ${res.status}).`);
-      }
-      if (!res.ok) throw new Error(data.error ?? `Analyse fehlgeschlagen (HTTP ${res.status}).`);
-
-      const s = data.suggestion;
-      if (!s?.breweryName || !s?.brandTone || !s?.brandColors || !s?.brandDos || !s?.brandDonts) {
-        throw new Error("Ungueltige Server-Antwort.");
-      }
-
-      const suggestion = suggestionFromPartial(s, {
-        brandInstagramUrl: typeof s.brandInstagramUrl === "string" ? s.brandInstagramUrl : instagramStatus.profileUrl ?? "",
-        brandProfileSource: "instagram",
-      });
-      setSourceMeta(data.sourceMeta ?? null);
-      applySuggestion(suggestion);
     } catch (e) {
       setStep("input");
       setError(formatAnalysisError(e, "analyze"));
@@ -850,7 +675,7 @@ export function BrandProfileSetupModal({
                   onValueChange={(v) => setInputTab(v as InputTab)}
                   className="mb-6 gap-0 sm:mb-8"
                 >
-                  <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
+                  <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
                     <TabsTrigger
                       value="url"
                       className="gap-1.5 rounded-lg px-2 py-2.5 text-xs font-medium data-active:bg-white data-active:text-neutral-900 data-active:shadow-sm sm:text-sm dark:data-active:bg-neutral-700 dark:data-active:text-neutral-100"
@@ -858,13 +683,6 @@ export function BrandProfileSetupModal({
                       <StudioIcon name="globe" size={15} />
                       <span className="hidden sm:inline">Website</span>
                       <span className="sm:hidden">Web</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="instagram"
-                      className="gap-1.5 rounded-lg px-2 py-2.5 text-xs font-medium data-active:bg-white data-active:text-neutral-900 data-active:shadow-sm sm:text-sm dark:data-active:bg-neutral-700 dark:data-active:text-neutral-100"
-                    >
-                      <StudioIcon name="media" size={15} />
-                      <span>Instagram</span>
                     </TabsTrigger>
                     <TabsTrigger
                       value="manual"
@@ -938,57 +756,6 @@ export function BrandProfileSetupModal({
                     </p>
                   </TabsContent>
 
-                  <TabsContent value="instagram" className="mt-6 space-y-4">
-                    {!instagramStatus.configured ? (
-                      <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
-                        Instagram-Verbindung ist auf diesem Server noch nicht eingerichtet (META_APP_ID /
-                        META_APP_SECRET).
-                      </p>
-                    ) : instagramStatusLoading ? (
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400">Verbindungsstatus wird geladen…</p>
-                    ) : instagramStatus.connected && !instagramStatus.expired ? (
-                      <div className="space-y-3">
-                        <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-                          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                            @{instagramStatus.username ?? "instagram"}
-                          </p>
-                          <p className="mt-1 text-xs leading-relaxed text-neutral-600 dark:text-neutral-400">
-                            Verbunden — BrewAI liest deine letzten Posts über die Meta Graph API aus.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          className="text-xs text-neutral-500 underline underline-offset-3 hover:text-neutral-700 disabled:opacity-50"
-                          disabled={busy}
-                          onClick={() => void disconnectInstagram()}
-                        >
-                          Verbindung trennen
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-6 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
-                        <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                          <StudioIcon name="media" size={22} />
-                        </div>
-                        <h3 className="mb-2 text-base font-medium text-neutral-900 dark:text-neutral-100">
-                          Instagram verbinden
-                        </h3>
-                        <p className="mx-auto mb-4 max-w-sm text-sm text-neutral-600 dark:text-neutral-400">
-                          Business- oder Creator-Konto (an eine Facebook-Seite gekoppelt). Danach analysieren wir
-                          automatisch deine letzten Posts.
-                        </p>
-                        {instagramStatus.expired ? (
-                          <p className="mb-3 text-xs text-amber-600 dark:text-amber-400">
-                            Deine Verbindung ist abgelaufen — bitte erneut verbinden.
-                          </p>
-                        ) : null}
-                      </div>
-                    )}
-                    {instagramNotice ? (
-                      <p className="text-sm text-emerald-700 dark:text-emerald-400">{instagramNotice}</p>
-                    ) : null}
-                  </TabsContent>
-
                   <TabsContent value="manual" className="mt-6 space-y-4">
                     <div className="rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 p-6 text-center dark:border-neutral-700 dark:bg-neutral-900/50">
                       <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
@@ -998,7 +765,7 @@ export function BrandProfileSetupModal({
                         Screenshots ablegen
                       </h3>
                       <p className="mb-4 text-sm text-neutral-600 dark:text-neutral-400">
-                        1–5 Instagram-Posts als JPEG, PNG oder WebP
+                        1–5 Screenshots als JPEG, PNG oder WebP
                       </p>
                       <div className="mx-auto grid max-w-sm grid-cols-5 gap-2">
                         {slots.map((slot, i) => (
@@ -1035,22 +802,6 @@ export function BrandProfileSetupModal({
                         {filledCount} / 5 Bilder
                         {filledCount > 0 && filledCount < 3 ? " — mehr Bilder = präziseres Profil" : ""}
                       </p>
-                    </div>
-                    <div>
-                      <Label
-                        htmlFor="brand-instagram-url"
-                        className="text-sm font-medium text-neutral-900 dark:text-neutral-100"
-                      >
-                        Instagram-Profil (optional)
-                      </Label>
-                      <Input
-                        id="brand-instagram-url"
-                        value={instagramUrl}
-                        onChange={(e) => setInstagramUrl(e.target.value)}
-                        disabled={busy}
-                        placeholder="https://www.instagram.com/deinemarke/"
-                        className="mt-2 h-12 rounded-xl border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900"
-                      />
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -1099,15 +850,11 @@ export function BrandProfileSetupModal({
                   disabled={
                     busy ||
                     (inputTab === "manual" && filledCount < 1) ||
-                    (inputTab === "url" && !websiteUrl.trim()) ||
-                    (inputTab === "instagram" && (!instagramStatus.configured || instagramStatusLoading))
+                    (inputTab === "url" && !websiteUrl.trim())
                   }
                   onClick={() => {
                     if (inputTab === "url") void runUrlAnalysis(websiteUrl);
-                    else if (inputTab === "instagram") {
-                      if (instagramNeedsConnect) connectInstagram();
-                      else void runInstagramScan();
-                    } else void runManualScan();
+                    else void runManualScan();
                   }}
                   className="h-12 rounded-xl bg-neutral-900 px-8 font-medium text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
                 >
@@ -1118,18 +865,6 @@ export function BrandProfileSetupModal({
                       <StudioIcon name="spark" size={15} />
                       Website analysieren
                     </>
-                  ) : inputTab === "instagram" ? (
-                    instagramNeedsConnect ? (
-                      <>
-                        <StudioIcon name="media" size={15} />
-                        Instagram verbinden
-                      </>
-                    ) : (
-                      <>
-                        <StudioIcon name="spark" size={15} />
-                        Posts analysieren
-                      </>
-                    )
                   ) : (
                     "Auswerten"
                   )}
