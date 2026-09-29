@@ -1,4 +1,4 @@
-import { FLASCHEN_TYPEN, GLAS_TYPEN, isDoseTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
+import { FLASCHEN_TYPEN, GLAS_TYPEN, isDoseTyp, isPetTyp } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import {
   beverageDrinkNoun,
@@ -199,7 +199,7 @@ export function hyperrealisticInputToBrauereiBrief(
     flaschenTyp: behaelter === "G" ? null : flasche.label,
     flaschenForm: behaelter === "G" ? null : flasche.promptDescription,
     flaschenFormVerbot: behaelter === "G" ? null : flasche.forbidden,
-    gebindeMaterial: behaelter === "G" ? null : isDoseTyp(input.flaschenTyp) ? "Aluminium-Dose" : "Glasflasche",
+    gebindeMaterial: behaelter === "G" ? null : isDoseTyp(input.flaschenTyp) ? "Aluminium-Dose" : isPetTyp(input.flaschenTyp) ? "PET-Flasche" : "Glasflasche",
     flaschenfarbe: behaelter === "G" || isDoseTyp(input.flaschenTyp) ? null : input.flaschenfarbe,
     glasTyp: glas?.label ?? null,
     markenname: options?.breweryName?.trim() || "generisch",

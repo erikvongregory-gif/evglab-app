@@ -1,6 +1,7 @@
 import { catalogIdentity, catalogToken, readCatalogEvidence, readCatalogImages } from "./catalog-products";
 import { randomUUID } from "node:crypto";
 import { BEER_STYLE_OPTIONS, findBeerStyle } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
+import { flascheForKategorie } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import {
   MAX_MY_BEERS,
   sanitizeDashboardBeers,
@@ -102,8 +103,15 @@ export function inferPackagingFromEvidence(evidence: string, kategorie: ProduktK
     colorKnown = true;
   }
 
-  if (kategorie !== "bier" && !isDose && !formKnown) {
-    return { flaschenTyp: "nrw_500", flaschenfarbe: "klar", packagingNeedsReview: true };
+  if (kategorie !== "bier") {
+    if (isLongneck && kategorie === "limonade") {
+      flaschenTyp = "euro_longneck_330";
+      formKnown = true;
+    }
+    const allowed = flascheForKategorie(kategorie, flaschenTyp);
+    if (allowed !== flaschenTyp) {
+      return { flaschenTyp: allowed, flaschenfarbe: "klar", packagingNeedsReview: true };
+    }
   }
 
   return {

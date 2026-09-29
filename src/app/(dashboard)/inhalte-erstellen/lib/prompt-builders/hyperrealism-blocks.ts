@@ -1,4 +1,4 @@
-import { FLASCHEN_TYPEN, GLAS_TYPEN, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
+import { FLASCHEN_TYPEN, GLAS_TYPEN, containerMaterialPhrase, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 import { sanitizeProduktKategorie, type ProduktKategorie } from "@/lib/dashboard/metadata";
 
@@ -394,12 +394,6 @@ export function buildHumanRealismFragment(input: HyperrealisticInput): string {
 /** Eindeutiger Marker, damit der Lock nicht doppelt angehängt wird. */
 export const BOTTLE_SHAPE_LOCK_MARKER = "BOTTLE SHAPE LOCK (MANDATORY)";
 
-const FLASCHENFARBE_TEXT: Record<HyperrealisticInput["flaschenfarbe"], string> = {
-  braun: "amber-brown glass",
-  gruen: "green glass",
-  klar: "clear flint glass",
-};
-
 /** Eingeschenktes Glas neben Flasche/Dose — der Verschluss darf dann nicht mehr drauf sein. */
 export function isPouredGlassServing(input: HyperrealisticInput): boolean {
   const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
@@ -418,16 +412,20 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
   const flasche = FLASCHEN_TYPEN[input.flaschenTyp];
   if (!flasche) return "";
   const istDose = isDoseTyp(input.flaschenTyp);
+  const istSchraub = flasche.closure === "schraub";
   const noun = istDose ? "aluminium beverage can" : "bottle";
   const nounCap = istDose ? "Can" : "Bottle";
-  const colorClause = istDose ? "" : `, made of ${FLASCHENFARBE_TEXT[input.flaschenfarbe]}`;
+  const colorClause = istDose ? "" : `, made of ${containerMaterialPhrase(input.flaschenTyp, input.flaschenfarbe)}`;
   const poured = isPouredGlassServing(input);
   const drink = beverageDrinkNoun(input);
   const isBeer = inputProduktKategorie(input) === "bier";
+  const litres = flascheVolumeMl(input.flaschenTyp) / 1000;
   const openServing = poured
     ? istDose
       ? `OPEN SERVING (overrides any catalog 'sealed' wording): ${isBeer ? "beer" : drink} is already poured, so the can MUST be opened with the stay-tab pulled — never an unopened sealed can next to a full glass.`
-      : `OPEN SERVING (overrides any catalog 'sealed with crown cap' wording): ${isBeer ? "beer" : drink} is already poured into a glass, so the bottle mouth MUST be uncapped — no crown cap, no cork, no foil on the mouth. The crown cap may rest on the table, never on the bottle.`
+      : istSchraub
+        ? `OPEN SERVING (overrides any catalog 'sealed' wording): ${isBeer ? "beer" : drink} is already poured into a glass, so the bottle mouth MUST be uncapped — no screw cap on the mouth. The screw cap may rest on the table, never on the bottle.`
+        : `OPEN SERVING (overrides any catalog 'sealed with crown cap' wording): ${isBeer ? "beer" : drink} is already poured into a glass, so the bottle mouth MUST be uncapped — no crown cap, no cork, no foil on the mouth. The crown cap may rest on the table, never on the bottle.`
     : "";
   return [
     `${BOTTLE_SHAPE_LOCK_MARKER}:`,
@@ -436,7 +434,7 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
     openServing,
     `If a bottle-shape reference photo is attached, copy that silhouette, neck length, shoulder and proportions exactly.`,
     `Label/artwork photos only supply printed graphics to apply onto this ${noun} — they must not replace the ${noun} with a different type.`,
-    `Render the ${noun} at physically correct real-world scale so its size class (0.33 L vs 0.5 L) is unmistakable.`,
+    `Render the ${noun} at physically correct real-world scale so its ${litres} L size is unmistakable.`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -577,17 +575,25 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
   if (behaelter === "G") return "";
   const istDose = isDoseTyp(input.flaschenTyp);
   const istBuegel = input.flaschenTyp.startsWith("buegel");
+  const istSchraub = FLASCHEN_TYPEN[input.flaschenTyp]?.closure === "schraub";
   const noun = istDose ? "can" : "bottle";
   const closureWord = istDose
     ? "stay-tab still unopened"
     : istBuegel
       ? "swing-top porcelain stopper still clamped shut"
-      : "crown cap still on the mouth";
+      : istSchraub
+        ? "screw cap still tightened on"
+        : "crown cap still on the mouth";
   const openState = istDose
     ? "the stay-tab popped open at the top of the can"
     : istBuegel
       ? "the swing-top closure OPEN with the porcelain/ceramic stopper and its metal wire bail neatly flipped back and resting tidily against the bottle neck (clean, natural, intact mechanism — NOT dangling messily, NOT tangled, NOT floating in mid-air, NOT covering the label)"
-      : "the crown cap removed — no cap on the bottle mouth";
+      : istSchraub
+        ? "the screw cap removed — no cap on the bottle mouth"
+        : "the crown cap removed — no cap on the bottle mouth";
+  const capNever = istSchraub
+    ? "a screw cap must NEVER sit on the bottle mouth — not even copied from a sealed product photo. The screw cap may lie on the table beside the bottle; the bottle lip is open and empty."
+    : "a crown cap must NEVER sit on the bottle mouth — not even copied from a sealed product photo. The metal crown cap may lie on the table beside the bottle; the bottle lip is open and empty.";
 
   const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
   const pluralNoun = istDose ? "cans" : "bottles";
@@ -601,9 +607,7 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
       isBeer
         ? `The adjacent beer glass is already poured, therefore the ${noun} MUST be shown ALREADY OPENED with ${openState}.`
         : `The adjacent glass is already poured, therefore the ${noun} MUST be shown ALREADY OPENED with ${openState}.`,
-      isBeer
-        ? `HARD RULE: once beer has been poured into a glass, a crown cap must NEVER sit on the bottle mouth — not even copied from a sealed product photo. The metal crown cap may lie on the table beside the bottle; the bottle lip is open and empty.`
-        : `HARD RULE: once ${drink} has been poured into a glass, a crown cap must NEVER sit on the bottle mouth — not even copied from a sealed product photo. The metal crown cap may lie on the table beside the bottle; the bottle lip is open and empty.`,
+      `HARD RULE: once ${isBeer ? "beer" : drink} has been poured into a glass, ${capNever}`,
       `Never show a sealed ${noun} (${closureWord}) standing next to a full poured glass.`,
     );
   }

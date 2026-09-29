@@ -12,6 +12,7 @@ import { MASTER_PROMPT_SECTIONS } from "./schema";
 const CLOSURE_LABEL: Record<string, string> = {
   kronkorken: "Kronkorken",
   buegel: "Bügelverschluss",
+  schraub: "Schraubverschluss",
   ring_pull: "Stay-Tab / Ring-Pull",
 };
 

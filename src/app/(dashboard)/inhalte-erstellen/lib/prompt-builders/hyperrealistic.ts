@@ -1,5 +1,5 @@
 import { resolveGlasTyp } from "../beer-styles";
-import { FLASCHEN_TYPEN, GLAS_TYPEN, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
+import { FLASCHEN_TYPEN, GLAS_TYPEN, containerMaterialPhrase, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, isPetTyp, pouredGlassFillMl } from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 import {
   buildBottleShapeLockFragment,
@@ -224,14 +224,11 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
   const etikettModus = input.etikettModus ?? "marke";
   const brandLock = buildBrandLockFragment(input, options?.breweryName);
 
-  const flaschenfarbeText = {
-    braun: "amber-brown glass",
-    gruen: "green glass",
-    klar: "clear flint glass",
-  }[input.flaschenfarbe];
   const istDose = isDoseTyp(input.flaschenTyp);
+  const istPet = isPetTyp(input.flaschenTyp);
+  const istSchraub = !istDose && flasche.closure === "schraub";
   const gebindeNoun = istDose ? "can" : "bottle";
-  const materialClause = istDose ? "" : `, made of ${flaschenfarbeText}`;
+  const materialClause = istDose ? "" : `, made of ${containerMaterialPhrase(input.flaschenTyp, input.flaschenfarbe)}`;
 
   const personPart = buildPersonFragment(input, behaelter);
   const humanRealismPart = buildHumanRealismFragment(input);
@@ -298,18 +295,26 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
       ? ""
       : istDose
         ? "glass bottle, crown-cap bottle, swing-top bottle, bottle neck, wrong container shape, wrong container size, slim tall energy-drink can, mismatched can volume, "
-        : "wrong bottle shape, wrong bottle size, short stubby Steinie when a tall bottle is required, tall bottle when a stubby Steinie is required, swing-top closure when a crown cap is required, crown cap when a swing-top is required, aluminium can, mismatched bottle volume, ";
+        : istPet
+          ? "glass bottle, crown cap, swing-top closure, beer bottle, aluminium can, wrong bottle size, "
+          : istSchraub
+            ? "PET plastic, crown cap, swing-top closure, aluminium can, wrong bottle size, "
+            : "wrong bottle shape, wrong bottle size, short stubby Steinie when a tall bottle is required, tall bottle when a stubby Steinie is required, swing-top closure when a crown cap is required, crown cap when a swing-top is required, aluminium can, mismatched bottle volume, ";
 
   // Unlogische Verschluss-Situationen verbieten (versiegelt trotz vollem Glas / beim Trinken / beim Anstoßen).
   const closureBase =
     behaelter === "B"
       ? istDose
         ? "sealed unopened can with stay-tab still closed next to a full poured glass, "
-        : "sealed bottle with crown cap still on next to a full poured glass, capped bottle beside an already poured glass, "
+        : istSchraub
+          ? "sealed bottle with the screw cap still on next to a full poured glass, capped bottle beside an already poured glass, "
+          : "sealed bottle with crown cap still on next to a full poured glass, capped bottle beside an already poured glass, "
       : behaelter === "F" && personenModus !== "A"
         ? istDose
           ? "person drinking from a sealed unopened can, "
-          : "person drinking from a sealed bottle with the crown cap still on, capped bottle held to the mouth, "
+          : istSchraub
+            ? "person drinking from a sealed bottle with the screw cap still on, capped bottle held to the mouth, "
+            : "person drinking from a sealed bottle with the crown cap still on, capped bottle held to the mouth, "
         : "";
   const toastNegative =
     personenModus === "E" && behaelter !== "G"
@@ -616,7 +621,7 @@ export function buildProductPlacementPrompt(
     stiltreue === "hoch"
       ? `IDENTITY REFERENCE — PRESERVE EXACTLY: ${identityBits} — artwork, logo, crest, typography, colors, layout, label proportions, and every recognizable branding detail. Reconstruct these identity details faithfully; do not invent a different brand.${labelOrientation}${
           poured
-            ? " The glass is already poured, so do NOT copy a sealed crown cap from Image 1 onto the bottle mouth — bottle must be open, cap off."
+            ? ` The glass is already poured, so do NOT copy a sealed ${FLASCHEN_TYPEN[input.flaschenTyp]?.closure === "schraub" ? "screw cap" : "crown cap"} from Image 1 onto the bottle mouth — bottle must be open, cap off.`
             : ""
         }`
       : stiltreue === "normal"

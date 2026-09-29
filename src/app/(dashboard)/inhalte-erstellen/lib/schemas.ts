@@ -19,6 +19,17 @@ export const flaschenTypSchema = z.enum([
   // Dosen
   "dose_330",
   "dose_500",
+  // AfG / Wasser
+  "gastro_250",
+  "glas_500",
+  "perle_700",
+  "brunnen_750",
+  "glas_750",
+  "glas_1000",
+  "pet_500",
+  "pet_750",
+  "pet_1000",
+  "pet_1500",
 ]);
 
 export const glasTypSchema = z.enum(["pils_tulpe", "weizen", "willibecher", "masskrug", "ipa_teku", "schwenker", "stange"]);

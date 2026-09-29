@@ -1,4 +1,6 @@
-export type BottleClosure = "kronkorken" | "buegel" | "ring_pull";
+import type { ProduktKategorie } from "@/lib/dashboard/metadata";
+
+export type BottleClosure = "kronkorken" | "buegel" | "schraub" | "ring_pull";
 
 export const BOTTLE_PRESERVE = [
   "Silhouette",
@@ -179,11 +181,137 @@ export const FLASCHEN_TYPEN = {
     geometry_profile: "höhere Aluminiumdose, Stay-Tab, Vollflächen-Artwork",
     closure: "ring_pull",
   }),
+  // ------------------------------------------------- AfG / Wasser (GDB, Handel)
+  gastro_250: bottle({
+    label: "Glas 0,25 l",
+    pillLabel: "Glas 0,25 l",
+    promptDescription:
+      "a small 0.25 litre clear glass single-serve bottle (German Gastroflasche for mineral water, table water or lemonade): short slim cylinder, short neck, sealed with a 26 mm metal crown cap, total height roughly 18 cm",
+    forbidden:
+      "NOT a beer Steinie/Stubbi, NOT a 0.33 L longneck, NOT a 0.5 L bottle, NOT a PET bottle, NOT a swing-top, NOT a can",
+    typicalColors: ["klar"],
+    geometry_profile: "kurze schlanke Gastroflasche, kurzer Hals, Kronkorken",
+    closure: "kronkorken",
+  }),
+  glas_500: bottle({
+    label: "Glas-Mehrweg 0,5 l",
+    pillLabel: "Glas 0,5 l",
+    promptDescription:
+      "a 0.5 litre clear glass returnable mineral-water bottle (German Brunnen-Mehrweg, GDB style): medium height, gently rounded shoulder, shorter and rounder than a beer longneck, sealed with a metal crown cap, total height roughly 23 cm",
+    forbidden:
+      "NOT a beer NRW bottle, NOT an ale longneck, NOT a PET bottle, NOT the 0.7 L Perlenflasche, NOT a can",
+    typicalColors: ["klar"],
+    geometry_profile: "runde Mineralwasser-Glasflasche, kurze Schulter, Kronkorken",
+    closure: "kronkorken",
+  }),
+  perle_700: bottle({
+    label: "Perlenflasche 0,7 l",
+    pillLabel: "Perle 0,7 l",
+    promptDescription:
+      "the classic German 0.7 litre GDB Glas-Perlenflasche: clear glass, bulbous pearl-shaped body narrowing into a medium neck, metal crown cap, total height roughly 28 cm — the standard returnable for natural mineral water and mineral-water-based soft drinks",
+    forbidden:
+      "NOT a beer bottle, NOT the green 0.75 L Brunnenflasche, NOT a slim longneck, NOT a PET bottle, NOT a can",
+    typicalColors: ["klar"],
+    geometry_profile: "bauchige Perlenflasche, mittellanger Hals, Kronkorken",
+    closure: "kronkorken",
+  }),
+  brunnen_750: bottle({
+    label: "Brunnenflasche 0,75 l",
+    pillLabel: "Brunnen 0,75 l",
+    promptDescription:
+      "a 0.75 litre green glass German Brunnen-Einheitsflasche for still mineral water: tall returnable with a rounded shoulder and metal crown cap, emerald-green glass, total height roughly 29 cm",
+    forbidden:
+      "NOT clear glass, NOT a beer bottle, NOT the clear 0.7 L Perlenflasche, NOT a PET bottle, NOT a can",
+    typicalColors: ["grün"],
+    geometry_profile: "hohe grüne Brunnenflasche, runde Schulter, Kronkorken",
+    closure: "kronkorken",
+  }),
+  glas_750: bottle({
+    label: "Glas-Mehrweg 0,75 l",
+    pillLabel: "Glas 0,75 l",
+    promptDescription:
+      "a 0.75 litre clear glass returnable bottle for lemonade or table water: tall straight body, rounded shoulder, metal crown cap, total height roughly 29 cm",
+    forbidden:
+      "NOT the green still-water Brunnenflasche, NOT a beer bottle, NOT a PET bottle, NOT a 0.33 L longneck, NOT a can",
+    typicalColors: ["klar"],
+    geometry_profile: "hohe klare Glas-Mehrwegflasche, runde Schulter, Kronkorken",
+    closure: "kronkorken",
+  }),
+  glas_1000: bottle({
+    label: "Glas-Mehrweg 1,0 l",
+    pillLabel: "Glas 1,0 l",
+    promptDescription:
+      "a large 1.0 litre clear glass returnable bottle (German Mehrweg-Großgebinde for lemonade or mineral water): tall broad body, plastic screw cap, total height roughly 31 cm",
+    forbidden:
+      "NOT a crown-cap beer bottle, NOT the 0.7 L Perlenflasche, NOT a PET bottle, NOT a can — the screw cap MUST be visible",
+    typicalColors: ["klar"],
+    geometry_profile: "großes klares Glas, Schraubverschluss",
+    closure: "schraub",
+  }),
+  pet_500: bottle({
+    label: "PET 0,5 l",
+    pillLabel: "PET 0,5 l",
+    promptDescription:
+      "a 0.5 litre returnable PET plastic bottle: slim tall body, plastic screw cap, clear or pale blue, total height roughly 22 cm — plastic, NOT glass",
+    forbidden: "NOT glass, NOT a crown cap, NOT a 1.0 or 1.5 L bottle, NOT a can",
+    typicalColors: ["klar"],
+    geometry_profile: "schlanke PET-Flasche, Schraubverschluss",
+    closure: "schraub",
+  }),
+  pet_750: bottle({
+    label: "PET 0,75 l",
+    pillLabel: "PET 0,75 l",
+    promptDescription:
+      "a 0.75 litre clear PET returnable bottle for soft drinks: taller than the 0.5 L PET, rounded shoulder, plastic screw cap, total height roughly 26 cm — plastic, NOT glass",
+    forbidden: "NOT glass, NOT a crown cap, NOT the 0.7 L glass Perlenflasche, NOT a can",
+    typicalColors: ["klar"],
+    geometry_profile: "klare PET-Flasche 0,75 l, Schraubverschluss",
+    closure: "schraub",
+  }),
+  pet_1000: bottle({
+    label: "PET 1,0 l",
+    pillLabel: "PET 1,0 l",
+    promptDescription:
+      "a 1.0 litre returnable PET bottle (the standard German Getränkemarkt bottle): broad tall body, plastic screw cap, clear for lemonade or pale blue for mineral water, total height roughly 28 cm — plastic, NOT glass",
+    forbidden: "NOT glass, NOT a crown cap, NOT a 0.5 L bottle, NOT a 1.5 L family bottle, NOT a can",
+    typicalColors: ["klar"],
+    geometry_profile: "große PET-Mehrwegflasche, Schraubverschluss",
+    closure: "schraub",
+  }),
+  pet_1500: bottle({
+    label: "PET 1,5 l",
+    pillLabel: "PET 1,5 l",
+    promptDescription:
+      "a large 1.5 litre PET bottle (German family size, Einweg or Mehrweg): very tall broad plastic body, plastic screw cap, clear or pale blue, total height roughly 33 cm — NOT glass",
+    forbidden: "NOT glass, NOT a crown cap, NOT a 1.0 L bottle, NOT a can",
+    typicalColors: ["klar"],
+    geometry_profile: "große PET-Familienflasche, Schraubverschluss",
+    closure: "schraub",
+  }),
 } as const;
 
 /** Aluminium-Dose statt Glasflasche — beeinflusst Material/Wording/Farbe im Prompt. */
 export function isDoseTyp(flaschenTyp: keyof typeof FLASCHEN_TYPEN): boolean {
   return flaschenTyp === "dose_330" || flaschenTyp === "dose_500";
+}
+
+export function isPetTyp(flaschenTyp: string): boolean {
+  return flaschenTyp.startsWith("pet_");
+}
+
+/** Materialphrase für Bildprompts. Dosen rufen das nicht auf. */
+export function containerMaterialPhrase(
+  flaschenTyp: string,
+  farbe: "braun" | "gruen" | "klar",
+): string {
+  if (isPetTyp(flaschenTyp)) {
+    if (farbe === "gruen") return "green-tinted PET plastic";
+    if (farbe === "braun") return "amber-tinted PET plastic";
+    return "clear PET plastic";
+  }
+  if (farbe === "gruen") return "green glass";
+  if (farbe === "braun") return "amber-brown glass";
+  return "clear flint glass";
 }
 
 export function getBottleCatalogEntry(flaschenTyp: keyof typeof FLASCHEN_TYPEN) {
@@ -255,10 +383,86 @@ export type Bierstil = keyof typeof STUDIO_PROPS_BY_BIERSTIL;
 export type FlaschenTyp = keyof typeof FLASCHEN_TYPEN;
 export type GlasTyp = keyof typeof GLAS_TYPEN;
 
+/** Gebinde, die im Sortiment je Getränkeart wählbar sind. */
+export const FLASCHEN_NACH_KATEGORIE = {
+  bier: [
+    "euro_longneck_330",
+    "euro_steinie_330",
+    "vichy_330",
+    "buegel_330",
+    "longneck_500",
+    "nrw_500",
+    "vichy_500",
+    "weizen_500",
+    "buegel_500",
+    "buegel_750",
+    "belgien_750",
+    "dose_330",
+    "dose_500",
+  ],
+  limonade: [
+    "gastro_250",
+    "euro_longneck_330",
+    "dose_330",
+    "glas_500",
+    "dose_500",
+    "pet_500",
+    "perle_700",
+    "glas_750",
+    "pet_750",
+    "glas_1000",
+    "pet_1000",
+    "pet_1500",
+  ],
+  tafelwasser: ["gastro_250", "glas_500", "pet_500", "glas_750", "glas_1000", "pet_1000", "pet_1500"],
+  mineralwasser: [
+    "gastro_250",
+    "glas_500",
+    "pet_500",
+    "perle_700",
+    "glas_750",
+    "brunnen_750",
+    "glas_1000",
+    "pet_1000",
+    "pet_1500",
+  ],
+} as const satisfies Record<ProduktKategorie, readonly FlaschenTyp[]>;
+
+export const DEFAULT_FLASCHE: Record<ProduktKategorie, FlaschenTyp> = {
+  bier: "nrw_500",
+  limonade: "pet_1000",
+  tafelwasser: "pet_1500",
+  mineralwasser: "perle_700",
+};
+
+export function flascheForKategorie(kategorie: ProduktKategorie, current?: string): FlaschenTyp {
+  const allowed = FLASCHEN_NACH_KATEGORIE[kategorie] as readonly string[];
+  if (current && allowed.includes(current)) return current as FlaschenTyp;
+  return DEFAULT_FLASCHE[kategorie];
+}
+
+/** Flaschentypen einer Getränkeart, nach Füllmenge gruppiert. Chip-Label ohne Literangabe. */
+export function flaschenGruppen(kategorie: ProduktKategorie) {
+  const groups: { volume: string; ml: number; items: { code: FlaschenTyp; label: string }[] }[] = [];
+  for (const code of FLASCHEN_NACH_KATEGORIE[kategorie]) {
+    const pill = FLASCHEN_TYPEN[code].pillLabel;
+    const match = pill.match(/^(.*?)\s+(\d+(?:,\d+)?\s*l)$/);
+    const volume = match?.[2] ?? "Weitere";
+    const label = match?.[1] ?? pill;
+    let group = groups.find((entry) => entry.volume === volume);
+    if (!group) {
+      group = { volume, ml: flascheVolumeMl(code), items: [] };
+      groups.push(group);
+    }
+    group.items.push({ code, label });
+  }
+  groups.sort((a, b) => a.ml - b.ml);
+  return groups;
+}
+
 export function flascheVolumeMl(flaschenTyp: string): number {
-  if (flaschenTyp.includes("750")) return 750;
-  if (flaschenTyp.includes("500")) return 500;
-  return 330;
+  const ml = Number(flaschenTyp.match(/_(\d+)$/)?.[1]);
+  return ml > 0 ? ml : 330;
 }
 
 const GLAS_NOMINAL_ML: Record<GlasTyp, number> = {

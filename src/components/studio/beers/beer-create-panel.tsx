@@ -10,8 +10,11 @@ import {
 } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
 import {
   FLASCHEN_TYPEN,
+  flascheForKategorie,
+  flaschenGruppen,
   GLAS_TYPEN,
   isDoseTyp,
+  type FlaschenTyp,
   type GlasTyp,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { readAndCompressImage } from "@/lib/images/compress-image";
@@ -21,25 +24,6 @@ const EASE = [0.2, 0.7, 0.2, 1] as const;
 const PILL_SPRING: Transition = { type: "spring", stiffness: 520, damping: 38, mass: 0.7 };
 const INSTANT: Transition = { duration: 0 };
 const noopSubscribe = () => () => {};
-
-const FLASCHEN_CHOICES = Object.entries(FLASCHEN_TYPEN).map(([code, item]) => ({
-  code,
-  label: item.pillLabel,
-}));
-
-/** Flaschentypen nach Füllmenge gruppieren — „Longneck 0,33 l“ → Gruppe „0,33 l“, Chip „Longneck“. */
-const FLASCHEN_GROUPS = FLASCHEN_CHOICES.reduce<{ volume: string; items: { code: string; label: string }[] }[]>(
-  (groups, choice) => {
-    const match = choice.label.match(/^(.*?)\s+(\d+(?:,\d+)?\s*l)$/);
-    const volume = match?.[2] ?? "Weitere";
-    const label = match?.[1] ?? choice.label;
-    const group = groups.find((g) => g.volume === volume);
-    if (group) group.items.push({ code: choice.code, label });
-    else groups.push({ volume, items: [{ code: choice.code, label }] });
-    return groups;
-  },
-  [],
-);
 
 const GLAS_CHOICES = (Object.entries(GLAS_TYPEN) as [GlasTyp, (typeof GLAS_TYPEN)[GlasTyp]][]).map(
   ([code, item]) => ({
@@ -162,7 +146,10 @@ function buildPromptTokens(parts: {
       label: parts.filtrierung === "unfiltriert" ? "unfiltriert / naturtrüb" : "filtriert / klar",
     });
   }
-  const vessel = FLASCHEN_CHOICES.find((f) => f.code === parts.flaschenTyp)?.label;
+  const vessel =
+    parts.flaschenTyp in FLASCHEN_TYPEN
+      ? FLASCHEN_TYPEN[parts.flaschenTyp as FlaschenTyp].pillLabel
+      : undefined;
   if (vessel) tokens.push({ key: "vessel", label: vessel });
   if (!isDoseTyp(parts.flaschenTyp as keyof typeof FLASCHEN_TYPEN)) {
     tokens.push({ key: "color", label: FARBE_LABEL[parts.flaschenfarbe] });
@@ -319,7 +306,9 @@ export function BeerCreatePanel({
   const [bierstil, setBierstil] = useState(
     initial?.bierstil?.trim() || (startKategorie === "bier" ? "helles" : startKategorie),
   );
-  const [flaschenTyp, setFlaschenTyp] = useState(initial?.flaschenTyp?.trim() || "nrw_500");
+  const [flaschenTyp, setFlaschenTyp] = useState(
+    flascheForKategorie(startKategorie, initial?.flaschenTyp?.trim()),
+  );
   const [flaschenfarbe, setFlaschenfarbe] = useState<"braun" | "gruen" | "klar">(
     initial?.flaschenfarbe ?? (startKategorie === "bier" ? "braun" : "klar"),
   );
@@ -368,6 +357,7 @@ export function BeerCreatePanel({
   const previewImage = etikettDataUrl || existingEtikettUrl;
   const isEdit = mode === "edit";
   const isBier = produktKategorie === "bier";
+  const flaschenGroups = flaschenGruppen(produktKategorie);
   const showDose = isDoseTyp(flaschenTyp as keyof typeof FLASCHEN_TYPEN);
   const tokens = buildPromptTokens({
     name,
@@ -482,6 +472,7 @@ export function BeerCreatePanel({
   const selectKategorie = (id: ProduktKategorie) => {
     setProduktKategorie(id);
     setBierstil(id === "bier" ? "helles" : id);
+    setFlaschenTyp((current) => flascheForKategorie(id, current));
     setFlaschenfarbe(id === "bier" ? "braun" : "klar");
     if (id === "bier") {
       setGlasTyp(findBeerStyle("helles")?.glasTyp ?? "willibecher");
@@ -736,7 +727,7 @@ export function BeerCreatePanel({
               <div className="studio-beer-create-field">
                 <span className="studio-beer-create-label">Flaschentyp</span>
                 <div className="studio-beer-create-vessels" role="group" aria-label="Flaschentyp">
-                  {FLASCHEN_GROUPS.map((group) => (
+                  {flaschenGroups.map((group) => (
                     <div key={group.volume} className="studio-beer-create-vessel-row">
                       <span className="studio-beer-create-vessel-volume">{group.volume}</span>
                       <div className="studio-beer-create-chips">
@@ -747,7 +738,11 @@ export function BeerCreatePanel({
                             pillId={pill("flasche")}
                             disabled={busy}
                             reducedMotion={reducedMotion}
-                            onClick={() => setFlaschenTyp(opt.code)}
+                            onClick={() => {
+                              setFlaschenTyp(opt.code);
+                              if (opt.code === "brunnen_750") setFlaschenfarbe("gruen");
+                              else if (flaschenTyp === "brunnen_750") setFlaschenfarbe("klar");
+                            }}
                           >
                             {opt.label}
                           </Chip>
