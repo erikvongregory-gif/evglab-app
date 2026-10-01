@@ -39,6 +39,31 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+/** Bild mit Rückfall auf Initialen, wenn die URL nicht lädt (z. B. 404 einer Fremd-Website). */
+function MemberPicture({
+  member,
+  imageClassName,
+  fallbackClassName,
+}: {
+  member: Member;
+  imageClassName?: string;
+  fallbackClassName?: string;
+}) {
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
+  if (member.avatar && failedSrc !== member.avatar) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={member.avatar}
+        alt={member.name}
+        className={imageClassName}
+        onError={() => setFailedSrc(member.avatar ?? null)}
+      />
+    );
+  }
+  return <div className={fallbackClassName}>{getInitials(member.name)}</div>;
+}
+
 interface AvatarProps {
   member: Member;
   isSelected: boolean;
@@ -63,26 +88,14 @@ function Avatar({ member, isSelected, onClick }: AvatarProps) {
           !isSelected && "opacity-50 hover:opacity-75",
         )}
       >
-        {member.avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={member.avatar}
-            alt={member.name}
-            className={cn(
-              "h-full w-full object-cover transition-all duration-200",
-              !isSelected && "grayscale",
-            )}
-          />
-        ) : (
-          <div
-            className={cn(
-              "flex h-full w-full items-center justify-center text-sm font-medium transition-colors duration-200",
-              isSelected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-            )}
-          >
-            {getInitials(member.name)}
-          </div>
-        )}
+        <MemberPicture
+          member={member}
+          imageClassName={cn("h-full w-full object-cover transition-all duration-200", !isSelected && "grayscale")}
+          fallbackClassName={cn(
+            "flex h-full w-full items-center justify-center text-sm font-medium transition-colors duration-200",
+            isSelected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+          )}
+        />
       </div>
 
       <AnimatePresence>
@@ -246,19 +259,14 @@ function Dropdown({
                     !isSelected && "opacity-60 grayscale",
                   )}
                 >
-                  {member.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={member.avatar} alt={member.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <div
-                      className={cn(
-                        "flex h-full w-full items-center justify-center text-xs font-medium",
-                        isSelected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {getInitials(member.name)}
-                    </div>
-                  )}
+                  <MemberPicture
+                    member={member}
+                    imageClassName="h-full w-full object-cover"
+                    fallbackClassName={cn(
+                      "flex h-full w-full items-center justify-center text-xs font-medium",
+                      isSelected ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+                    )}
+                  />
                 </div>
 
                 <div className="min-w-0 flex-1 text-left">

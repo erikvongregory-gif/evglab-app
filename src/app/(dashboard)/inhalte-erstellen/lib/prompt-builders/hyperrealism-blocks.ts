@@ -380,7 +380,7 @@ export function buildHumanRealismFragment(input: HyperrealisticInput): string {
   const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
   if (modus === "A") return "";
   if (modus === "B" || modus === "C") {
-    return "HUMAN REALISM: Real adult hands — visible knuckles, pores, veins, slight dryness or tan lines, correct finger count, believable grip pressure on glass and bottle. Not smooth CGI hands, not beauty-retouched skin.";
+    return `HUMAN REALISM: Real adult hands — visible knuckles, pores, veins, slight dryness or tan lines, correct finger count, believable grip pressure on glass and bottle. Not smooth CGI hands, not beauty-retouched skin. ${HAND_BOTTLE_CONTACT}`;
   }
   return [
     "HUMAN REALISM:",
@@ -574,6 +574,20 @@ export const CLOSURE_LOGIC_MARKER = "CLOSURE LOGIC (MANDATORY)";
  * - Eine versiegelte Flasche neben einem vollen Glas oder jemand, der aus einer
  *   verschlossenen Flasche trinkt, ist unlogisch und wird verboten.
  */
+/**
+ * Offener Bügelverschluss als echte Mechanik beschreiben — vage Angaben („flipped back“) führten zu
+ * doppelten, verknoteten Drahtbügeln und schwebenden Porzellanköpfen.
+ */
+const SWING_TOP_OPEN = [
+  "the swing-top OPEN, built exactly like a real German Bügelverschluss: ONE thin wire ring clamped around the neck just below the lip, TWO thin parallel wire arms hinged on that ring, and at their end ONE white porcelain stopper with its rubber gasket",
+  "— in the open state the arms are swung back over the lip and the stopper hangs down against the side of the neck by gravity (on a tilted pouring bottle it dangles below the neck, beside the beer stream, never in it)",
+  "— the round bottle mouth is completely free; wires are smooth, symmetric and attached; NO second wire loop, NO extra stopper, NO twisted, tangled or doubled wire, NO stopper standing upright on top of the bottle, NOT covering the neck label",
+].join(" ");
+
+/** Hand an Flasche: Finger liegen außen am Glas — nie durch das Glas sichtbar oder im Etikett „versunken“. */
+export const HAND_BOTTLE_CONTACT =
+  "HAND–BOTTLE CONTACT: any hand holding the bottle wraps its fingers and thumb around the OUTSIDE of the bottle body and rests on the glass surface, in front of or beside the label. The bottle glass is solid and opaque to the hand: no finger, thumb or part of a hand is ever inside the bottle or seen through the glass, nothing merges or fuses into the bottle, and the label is never printed over, under or through a finger. Natural five-finger pouring grip with contact shadows.";
+
 export function buildClosureLogicFragment(input: HyperrealisticInput): string {
   const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
   if (behaelter === "G") return "";
@@ -591,7 +605,7 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
   const openState = istDose
     ? "the stay-tab popped open at the top of the can"
     : istBuegel
-      ? "the swing-top closure OPEN with the porcelain/ceramic stopper and its metal wire bail neatly flipped back and resting tidily against the bottle neck (clean, natural, intact mechanism — NOT dangling messily, NOT tangled, NOT floating in mid-air, NOT covering the label)"
+      ? SWING_TOP_OPEN
       : istSchraub
         ? "the screw cap removed — no cap on the bottle mouth"
         : "the crown cap removed — no cap on the bottle mouth";
@@ -602,6 +616,8 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
   const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
   const pluralNoun = istDose ? "cans" : "bottles";
   const lines: string[] = [`${CLOSURE_LOGIC_MARKER}, physical drinking consistency:`];
+  // Auch ohne gewählten Personen-Modus: Freitext-Szenen („jemand schenkt ein“) bringen Hände mit.
+  lines.push(HAND_BOTTLE_CONTACT);
 
   // Glas eingeschenkt + Flasche → Gebinde wurde bereits geöffnet.
   if (behaelter === "B") {
@@ -655,18 +671,39 @@ export const PHOTO_STYLE_LOCK_MARKER = "PHOTO STYLE LOCK (NON-NEGOTIABLE)";
  * Später, kurzer Stil-Lock für das Bildmodell. Er darf nicht vom allgemeinen
  * Hyperreal-Layer oder einem vorgelagerten Prompt-Rewrite nivelliert werden.
  */
+/**
+ * Gegen den „reinkopiert“-Look (Flasche wie ein Sticker auf dem Foto): konkrete optische Merkmale,
+ * an denen man ein echt fotografiertes Produkt erkennt. „Not a cutout“ allein reicht dem Modell nicht.
+ */
+export const PRODUCT_INTEGRATION_LOCK = [
+  "PRODUCT IN-CAMERA INTEGRATION (MANDATORY): the bottle/can was physically in this scene when the photo was taken.",
+  "Same light as the scene: identical sun/key-light direction, color temperature and contrast on the product as on the people and table — the product is never brighter, cleaner or more saturated than its surroundings and never evenly front-lit.",
+  "The label is printed paper wrapped around a curved body: it follows the cylinder, text lines bend slightly with perspective, and the label darkens and compresses toward the left and right edges; label colors take on the scene's light and shade.",
+  "Glass shows the environment: soft highlight streak matching the light direction, darker edges, faint reflections of the surroundings, the liquid level visible through the glass.",
+  "Grounded: soft contact shadow and slight reflection where it stands on the surface; condensation drops also sit on top of the label.",
+  "Same lens, focus falloff, grain and white balance as the rest of the frame — no extra-crisp product on a soft background, no hard mask edge or halo, no flat sticker, no collage.",
+].join(" ");
+
 export function buildPhotoStyleLockFragment(input: HyperrealisticInput): string {
+  // Nur-Glas-Motive haben keine Flasche — der Block würde sonst eine ins Bild holen.
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  return behaelter === "G" ? buildPhotoStyleCore(input) : `${buildPhotoStyleCore(input)} ${PRODUCT_INTEGRATION_LOCK}`;
+}
+
+function buildPhotoStyleCore(input: HyperrealisticInput): string {
   const style = resolvePhotoStyle(input);
   if (style === "premium") {
     return [
       `${PHOTO_STYLE_LOCK_MARKER}: PREMIUM HOSPITALITY PHOTOGRAPHY.`,
       "LOOK references own the photographic grammar. Freitext only adds people/action — never override LOOK crop, light, or product scale.",
       "Shoot a quiet premium lifestyle frame in a real beer garden or hospitality setting — natural available light, soft optical bokeh, ordered calm.",
-      "Keep the customer's product label razor-sharp and readable; people may share the frame but stay secondary to the drink.",
+      "Keep the customer's product label in focus and readable — photographed with the same lens and light as the scene, not pasted on top; people may share the frame but stay secondary to the drink.",
       "Use an 85–100mm perspective, stable camera, restrained props, and an orderly visual hierarchy — no clutter, no flash snapshot energy.",
       "LOOK references set only this grammar: soft bokeh, warm daylight, hospitality social calm, crisp glass/bottle materials. Invent new adults. Never reproduce a face, hair, age, or outfit from a LOOK reference, and never copy their brands, logos, or lettering.",
       "Match LOOK light as photographed — not an HDR golden-hour stock glow or beauty rim light on hair.",
-      "Forbidden AI-gloss: beauty-retouched wax skin, melted pretzel props, uniform sticker condensation, teal-orange grade, lens-flare bloom, plastic foam, perfect stock-model smiles.",
+      "PEOPLE IN PREMIUM are ordinary local guests photographed candidly, not models: mixed ages (20s to 60s), different body types, faces and hair; real skin with pores, wrinkles, redness, uneven beard growth and stray hairs; everyday clothes with creases; relaxed mid-conversation expressions — a half smile, a glance away, mouth mid-word — never everyone laughing open-mouthed at once.",
+      "Out-of-focus people still keep real optical blur of real faces and fabric — not smooth painted smudges, not a row of look-alike handsome bearded men.",
+      "Forbidden AI-gloss: beauty-retouched wax skin, melted pretzel props, uniform sticker condensation, teal-orange grade, lens-flare bloom, plastic foam, perfect stock-model smiles, symmetrical model faces, identical faces, glowing skin.",
       "Forbidden: on-camera direct flash, imperfect street crop, product thrust toward the lens, saturated flat campaign color fields, studio packshot on a pedestal.",
     ].join(" ");
   }

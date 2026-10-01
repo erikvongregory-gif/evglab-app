@@ -12,6 +12,7 @@ import {
 import { uploadUserImageToStorage } from "@/lib/supabase/storage";
 import { assertSafePublicUrl, BROWSER_USER_AGENT, URL_FETCH_TIMEOUT_MS } from "@/lib/brand/url-intake";
 import { publicFetch } from "@/lib/security/public-fetch";
+import { prepareProductImage } from "@/lib/brand/product-image-prep";
 import {
   type DownloadedImage,
   type ImageCandidate,
@@ -28,6 +29,12 @@ export type SuggestedBeerVariety = {
   etikettUrl: string;
   /** true = Verpackung nicht belegt, Nutzer soll prüfen. */
   packagingNeedsReview?: boolean;
+  /** Alle auf der Website belegten Gebinde der Sorte (Flaschentyp-Codes), erstes = Standard. */
+  gebinde?: string[];
+  /** Weitere passende Bild-Kandidaten — im Prüfschritt mit einem Klick wählbar. */
+  bildAlternativen?: string[];
+  /** Wie sicher das Sortenbild ist: Flasche bestätigt, nur Etikett, ungeprüft oder keins. */
+  bildStatus?: "flasche" | "etikett" | "ungeprueft" | "keins";
 };
 
 export type PackagingGuess = {
@@ -80,7 +87,8 @@ export function inferPackagingFromEvidence(evidence: string, kategorie: ProduktK
     flaschenTyp = "vichy_500";
     formKnown = true;
   } else if (isNrw || ml === 330) {
-    flaschenTyp = ml > 0 && ml <= 350 ? "nrw_330" : "nrw_500";
+    // 0,33-l-NRW heißt im Katalog vichy_330 (kein eigener nrw_330-Typ).
+    flaschenTyp = ml > 0 && ml <= 350 ? "vichy_330" : "nrw_500";
     formKnown = isNrw || ml === 330;
   } else if (ml === 500) {
     flaschenTyp = "nrw_500";
@@ -108,7 +116,8 @@ export function inferPackagingFromEvidence(evidence: string, kategorie: ProduktK
       flaschenTyp = "euro_longneck_330";
       formKnown = true;
     }
-    const allowed = flascheForKategorie(kategorie, flaschenTyp);
+    // Ohne Formbeleg nicht die Bier-Standardflasche annehmen, sondern den Kategorie-Standard.
+    const allowed = flascheForKategorie(kategorie, formKnown ? flaschenTyp : undefined);
     if (allowed !== flaschenTyp) {
       return { flaschenTyp: allowed, flaschenfarbe: "klar", packagingNeedsReview: true };
     }
@@ -458,8 +467,7 @@ export function mergeSuggestedBeers(existing: DashboardBeer[], suggested: Sugges
   return sanitizeDashboardBeers(out);
 }
 
-const ALLOWED_LABEL_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_LABEL_BYTES = 4 * 1024 * 1024;
+const MAX_LABEL_BYTES = 8 * 1024 * 1024;
 
 function isAlreadyPersistedLabelUrl(url: string): boolean {
   try {
@@ -470,7 +478,11 @@ function isAlreadyPersistedLabelUrl(url: string): boolean {
   }
 }
 
-/** Laedt Sortenfoto von der Brauerei-Website und speichert es dauerhaft in Supabase Storage. */
+/**
+ * Laedt Sortenfoto von der Brauerei-Website, stellt Packshots frei und speichert es dauerhaft
+ * in Supabase Storage. Fremd-URLs brechen, sobald die Brauerei ihre Website umbaut.
+ * Rueckgabe "" = Bild existiert nicht (404) — besser kein Bild als ein kaputtes.
+ */
 export async function persistBeerLabelFromUrl(userId: string, sourceUrl: string): Promise<string> {
   const trimmed = sourceUrl.trim();
   if (!trimmed) return "";
@@ -490,18 +502,20 @@ export async function persistBeerLabelFromUrl(userId: string, sourceUrl: string)
       timeoutMs: URL_FETCH_TIMEOUT_MS,
       headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "image/*" },
     });
+    if (response.status === 404 || response.status === 410) return "";
     if (response.status < 200 || response.status >= 300) return trimmed;
-
-    const contentType = (response.headers["content-type"] ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
-    if (!ALLOWED_LABEL_MIME.has(contentType)) return trimmed;
 
     const buffer = response.body;
     if (buffer.byteLength < 32 || buffer.byteLength > MAX_LABEL_BYTES) return trimmed;
 
+    // sharp liest auch AVIF/GIF/falsch deklarierte Dateien; kein Bild → kein Etikett.
+    const prepared = await prepareProductImage(buffer);
+    if (!prepared) return "";
+
     return await uploadUserImageToStorage({
       userId,
-      buffer,
-      mime: contentType,
+      buffer: prepared.buffer,
+      mime: prepared.mime,
       folder: "beer-labels",
     });
   } catch {
@@ -531,13 +545,16 @@ export async function persistSuggestedBeerLabels(
     .map((beer, index) => ({ index, url: beer.etikettUrl }))
     .filter((item) => item.url && !isAlreadyPersistedLabelUrl(item.url));
 
+  // Gebinde-Varianten teilen sich ein Bild — nur einmal laden und hochladen.
+  const byUrl = new Map<string, Promise<string>>();
   let cursor = 0;
   async function worker() {
     while (cursor < pending.length) {
       if (Date.now() >= deadline) return;
       const current = pending[cursor++];
       if (!current) return;
-      const persisted = await persistBeerLabelFromUrl(userId, current.url);
+      if (!byUrl.has(current.url)) byUrl.set(current.url, persistBeerLabelFromUrl(userId, current.url));
+      const persisted = await byUrl.get(current.url)!;
       out[current.index] = {
         ...out[current.index]!,
         etikettUrl: persisted.slice(0, 1200),

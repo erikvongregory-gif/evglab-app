@@ -1,0 +1,52 @@
+import sharp from "sharp";
+import { describe, expect, it } from "vitest";
+import { prepareProductImage } from "./product-image-prep";
+
+async function bottleOn(background: { r: number; g: number; b: number; alpha: number }) {
+  const bottle = await sharp({
+    create: { width: 60, height: 200, channels: 4, background: { r: 90, g: 50, b: 20, alpha: 1 } },
+  })
+    .png()
+    .toBuffer();
+  return sharp({ create: { width: 400, height: 400, channels: 4, background } })
+    .composite([{ input: bottle, left: 170, top: 100 }])
+    .png()
+    .toBuffer();
+}
+
+async function pixel(buffer: Buffer, x: number, y: number) {
+  const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
+  const offset = (y * info.width + x) * info.channels;
+  return [data[offset], data[offset + 1], data[offset + 2]];
+}
+
+describe("prepareProductImage", () => {
+  it("stellt einen Packshot auf farbigem Hintergrund frei und schneidet eng zu", async () => {
+    const prepared = await prepareProductImage(await bottleOn({ r: 230, g: 214, b: 190, alpha: 1 }));
+    expect(prepared?.cutout).toBe(true);
+    // 60 × 200 Flasche + 6 % Rand statt 400 × 400 Leinwand.
+    expect(prepared!.width).toBeLessThan(100);
+    expect(prepared!.height).toBeLessThan(240);
+    expect(await pixel(prepared!.buffer, 2, 2)).toEqual([255, 255, 255]);
+  });
+
+  it("legt transparente PNGs auf Weiß statt Schwarz", async () => {
+    const prepared = await prepareProductImage(await bottleOn({ r: 0, g: 0, b: 0, alpha: 0 }));
+    expect(prepared?.cutout).toBe(true);
+    const [r, g, b] = await pixel(prepared!.buffer, 2, 2);
+    expect(Math.min(r!, g!, b!)).toBeGreaterThan(245);
+  });
+
+  it("lässt echte Fotos mit unruhigem Hintergrund unverändert", async () => {
+    const noise = Buffer.alloc(300 * 300 * 3);
+    for (let i = 0; i < noise.length; i++) noise[i] = (i * 7919) % 251;
+    const photo = await sharp(noise, { raw: { width: 300, height: 300, channels: 3 } }).png().toBuffer();
+    const prepared = await prepareProductImage(photo);
+    expect(prepared?.cutout).toBe(false);
+    expect(prepared?.width).toBe(300);
+  });
+
+  it("liefert null für Dateien, die kein Bild sind", async () => {
+    expect(await prepareProductImage(Buffer.from("<html>404</html>"))).toBeNull();
+  });
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { BrandReviewPanel } from "@/components/dashboard/BrandReviewPanel";
 import { StudioIcon } from "@/components/studio/icons";
@@ -32,6 +32,22 @@ export type BrandSuggestedBeer = {
   filtrierung?: "filtriert" | "unfiltriert";
   etikettUrl: string;
   packagingNeedsReview?: boolean;
+  /** Gebinde der Sorte laut Website (Flaschentyp-Codes). */
+  gebinde?: string[];
+  /** Weitere Bild-Kandidaten von der Website — im Prüfschritt wählbar. */
+  bildAlternativen?: string[];
+  bildStatus?: "flasche" | "etikett" | "ungeprueft" | "keins";
+};
+
+export type BrandScanSourceMeta = {
+  confidence?: string;
+  pageTitle?: string;
+  reviewHints?: string[];
+  crawlNote?: string | null;
+  /** hersteller | gastro | handel | sonstiges */
+  siteKind?: string;
+  /** Bessere Scan-Adresse (z. B. Brauerei statt Wirtshaus). */
+  suggestedUrl?: string;
 };
 
 export type BrandScanSuggestion = {
@@ -65,13 +81,14 @@ type InputTab = "url" | "manual";
 
 const EMPTY_SLOTS: Slot[] = Array.from({ length: 5 }, () => ({ file: null, preview: null }));
 
+/** Reihenfolge = Schritt-Index der Fortschrittsmeldungen von /api/brand/analyze-url. */
 const ANALYSIS_STEPS = [
   "Website wird geladen…",
   "Unterseiten werden gelesen…",
   "Sortiment wird erkannt…",
-  "Texte & Tonalität werden erkannt…",
-  "Typografie wird übernommen…",
-  "Bilder werden ausgewertet…",
+  "Texte, Farben & Bildsprache werden erkannt…",
+  "Produktbilder werden geprüft…",
+  "Sortenbilder werden gespeichert…",
   "Markenprofil wird erstellt…",
 ];
 
@@ -148,6 +165,19 @@ function parseSuggestedBeers(value: unknown): BrandSuggestedBeer[] | undefined {
         item.filtrierung === "unfiltriert" || item.filtrierung === "filtriert" ? item.filtrierung : undefined,
       etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",
       packagingNeedsReview: item.packagingNeedsReview === true,
+      gebinde: Array.isArray(item.gebinde)
+        ? item.gebinde.filter((code): code is string => typeof code === "string").slice(0, 3)
+        : undefined,
+      bildAlternativen: Array.isArray(item.bildAlternativen)
+        ? item.bildAlternativen.filter((url): url is string => typeof url === "string" && /^https?:/i.test(url)).slice(0, 5)
+        : undefined,
+      bildStatus:
+        item.bildStatus === "flasche" ||
+        item.bildStatus === "etikett" ||
+        item.bildStatus === "ungeprueft" ||
+        item.bildStatus === "keins"
+          ? item.bildStatus
+          : undefined,
     });
     if (beers.length >= MAX_MY_BEERS) break;
   }
@@ -340,18 +370,78 @@ function formatAnalysisError(error: unknown, phase: "analyze" | "save" = "analyz
   return phase === "save" ? "Speichern fehlgeschlagen." : "Analyse fehlgeschlagen.";
 }
 
-async function postBrandAnalyzeUrl(url: string): Promise<Response> {
-  return fetchWithRetry(
+type AnalyzeUrlResult = {
+  status: number;
+  body: {
+    error?: string;
+    suggestion?: Partial<BrandScanSuggestion>;
+    sourceMeta?: BrandScanSourceMeta;
+  };
+};
+
+/**
+ * Startet die Website-Analyse als Stream: Zwischenstände (Schritt + Text) kommen live,
+ * das Ergebnis als letzte Zeile. Antwortet der Server klassisch mit JSON, wird das genauso gelesen.
+ */
+async function postBrandAnalyzeUrl(
+  url: string,
+  onProgress: (step: number, label: string) => void,
+): Promise<AnalyzeUrlResult> {
+  const res = await fetchWithRetry(
     "/api/brand/analyze-url",
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", accept: "application/x-ndjson, application/json" },
       credentials: "include",
       cache: "no-store",
       body: JSON.stringify({ websiteUrl: url }),
     },
     { retries: 2, baseDelayMs: 1500 },
   );
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("ndjson") || !res.body) {
+    try {
+      return { status: res.status, body: (await res.json()) as AnalyzeUrlResult["body"] };
+    } catch {
+      throw new Error(res.ok ? "Ungueltige Server-Antwort." : `Analyse fehlgeschlagen (HTTP ${res.status}).`);
+    }
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: AnalyzeUrlResult | null = null;
+  const handleLine = (line: string) => {
+    if (!line.trim()) return;
+    let event: { type?: string; step?: unknown; label?: unknown; status?: unknown; body?: unknown };
+    try {
+      event = JSON.parse(line) as typeof event;
+    } catch {
+      return;
+    }
+    if (event.type === "progress" && typeof event.step === "number") {
+      onProgress(event.step, typeof event.label === "string" ? event.label : "");
+    } else if (event.type === "result") {
+      result = {
+        status: typeof event.status === "number" ? event.status : 500,
+        body: (event.body ?? {}) as AnalyzeUrlResult["body"],
+      };
+    }
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newline = buffer.indexOf("\n");
+    while (newline >= 0) {
+      handleLine(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf("\n");
+    }
+  }
+  handleLine(buffer);
+  if (!result) throw new TypeError("Failed to fetch");
+  return result;
 }
 
 export function BrandProfileSetupModal({
@@ -369,13 +459,11 @@ export function BrandProfileSetupModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [analysisStepIndex, setAnalysisStepIndex] = useState(0);
+  const [analysisDetail, setAnalysisDetail] = useState("");
+  /** Sobald der Server echte Schritte meldet, läuft die Checkliste nicht mehr nach Zeit weiter. */
+  const serverProgressRef = useRef(false);
   const [review, setReview] = useState<BrandScanSuggestion>(emptyReview);
-  const [sourceMeta, setSourceMeta] = useState<{
-    confidence?: string;
-    pageTitle?: string;
-    reviewHints?: string[];
-    crawlNote?: string | null;
-  } | null>(null);
+  const [sourceMeta, setSourceMeta] = useState<BrandScanSourceMeta | null>(null);
   const [handledAutoSignal, setHandledAutoSignal] = useState(0);
 
   const filledCount = slots.filter((s) => s.file).length;
@@ -394,6 +482,7 @@ export function BrandProfileSetupModal({
     setSlots(EMPTY_SLOTS.map(() => ({ file: null, preview: null })));
     setError("");
     setAnalysisStepIndex(0);
+    setAnalysisDetail("");
     setReview(emptyReview());
     setSourceMeta(null);
   }, []);
@@ -414,6 +503,7 @@ export function BrandProfileSetupModal({
       if (cancelled || index >= ANALYSIS_STEPS.length - 1) return;
       const delay = ANALYSIS_STEP_DURATIONS_MS[Math.min(index, ANALYSIS_STEP_DURATIONS_MS.length - 1)] ?? 5000;
       timer = window.setTimeout(() => {
+        if (serverProgressRef.current) return;
         index += 1;
         setAnalysisStepIndex(index);
         schedule();
@@ -470,25 +560,16 @@ export function BrandProfileSetupModal({
 
     setBusy(true);
     setError("");
+    setAnalysisDetail("");
+    serverProgressRef.current = false;
     setStep("analyzing");
     try {
-      const res = await postBrandAnalyzeUrl(url);
-      let data: {
-        error?: string;
-        suggestion?: Partial<BrandScanSuggestion>;
-        sourceMeta?: {
-          confidence?: string;
-          pageTitle?: string;
-          reviewHints?: string[];
-          crawlNote?: string | null;
-        };
-      };
-      try {
-        data = (await res.json()) as typeof data;
-      } catch {
-        throw new Error(res.ok ? "Ungueltige Server-Antwort." : `Analyse fehlgeschlagen (HTTP ${res.status}).`);
-      }
-      if (!res.ok) throw new Error(data.error ?? `Analyse fehlgeschlagen (HTTP ${res.status}).`);
+      const { status, body: data } = await postBrandAnalyzeUrl(url, (stepIndex, label) => {
+        serverProgressRef.current = true;
+        setAnalysisStepIndex((current) => Math.max(current, Math.min(stepIndex, ANALYSIS_STEPS.length - 1)));
+        if (label) setAnalysisDetail(label);
+      });
+      if (status < 200 || status >= 300) throw new Error(data.error ?? `Analyse fehlgeschlagen (HTTP ${status}).`);
 
       const s = data.suggestion;
       if (!s?.breweryName || !s?.brandTone || !s?.brandColors || !s?.brandDos || !s?.brandDonts) {
@@ -658,6 +739,10 @@ export function BrandProfileSetupModal({
             onBack={() => {
               setStep("input");
               setError("");
+            }}
+            onRescan={(nextUrl) => {
+              setWebsiteUrl(nextUrl);
+              void runUrlAnalysis(nextUrl);
             }}
             onActivate={() => void saveReview()}
           />
@@ -839,8 +924,13 @@ export function BrandProfileSetupModal({
                   <span>{analysisTargetLabel}</span>
                 </div>
                 <TaskSteps steps={taskSteps} current={analysisStepIndex} label="Analyse-Fortschritt" />
+                {analysisDetail ? (
+                  <p className="mt-4 text-sm text-neutral-700 dark:text-neutral-300" aria-live="polite">
+                    {analysisDetail}
+                  </p>
+                ) : null}
                 <p className="mt-6 text-sm text-neutral-500">
-                  Dauert meist unter einer Minute — bitte Fenster offen lassen.
+                  Dauert meist ein bis zwei Minuten — bitte Fenster offen lassen.
                 </p>
               </div>
             ) : null}

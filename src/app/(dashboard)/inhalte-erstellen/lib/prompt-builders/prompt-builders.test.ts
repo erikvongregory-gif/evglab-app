@@ -3,7 +3,7 @@ import { buildCampaignTextPrompt } from "./campaign-text";
 import { buildHyperrealisticPrompt, buildProductPlacementPrompt, applyClientIntentOverrides } from "./hyperrealistic";
 import { buildProductIsolatePrompt } from "./product-isolate";
 import { DEFAULT_GLAS_BY_STIL, buildProductStudioPrompt, resolveStudioGlas } from "./product-studio";
-import { buildPhotoStyleLockFragment } from "./hyperrealism-blocks";
+import { buildClosureLogicFragment, buildPhotoStyleLockFragment } from "./hyperrealism-blocks";
 import { campaignTextSchema, hyperrealisticSchema, productIsolateSchema, productStudioSchema } from "../schemas";
 import { applyContentPresetPrompt } from "@/lib/image-types/policy";
 
@@ -638,5 +638,70 @@ describe("mode schemas", () => {
     expect(productIsolateSchema.safeParse({}).success).toBe(false);
     expect(productStudioSchema.safeParse({}).success).toBe(false);
     expect(campaignTextSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("Bügelverschluss und Hand an der Flasche", () => {
+  const pour = {
+    aiWatermark: false,
+    etikettBild: "https://example.com/etikett.png",
+    flaschenTyp: "buegel_500" as const,
+    flaschenfarbe: "braun" as const,
+    bierstil: "kellerbier",
+    szene: "biergarten_sommer" as const,
+    personImBild: true,
+    personenModus: "B" as const,
+    behaelter: "B" as const,
+    glasTyp: "willibecher" as const,
+    tageszeit: "goldene_stunde" as const,
+    stimmung: "entspannt" as const,
+    aspectRatio: "4:5" as const,
+    quality: "medium" as const,
+    variantCount: 1 as const,
+  };
+
+  it("beschreibt den offenen Bügelverschluss als eine echte Mechanik", () => {
+    const text = buildClosureLogicFragment(pour);
+    expect(text).toMatch(/ONE thin wire ring/);
+    expect(text).toMatch(/NO second wire loop/);
+    expect(text).toMatch(/hangs down/);
+  });
+
+  it("verbietet Finger in oder hinter der Flasche", () => {
+    expect(buildClosureLogicFragment(pour)).toMatch(/never inside the bottle|ever inside the bottle/);
+  });
+});
+
+describe("Produkt sitzt im Foto statt reinkopiert", () => {
+  const base = {
+    aiWatermark: false,
+    etikettBild: "https://example.com/etikett.png",
+    flaschenTyp: "nrw_500" as const,
+    flaschenfarbe: "braun" as const,
+    bierstil: "helles",
+    szene: "biergarten_sommer" as const,
+    personImBild: false,
+    tageszeit: "goldene_stunde" as const,
+    stimmung: "entspannt" as const,
+    aspectRatio: "4:5" as const,
+    quality: "medium" as const,
+    variantCount: 1 as const,
+    photoStyle: "premium" as const,
+  };
+
+  it("verlangt bei Premium Szenenlicht, gewölbtes Etikett und Kontaktschatten statt Sticker-Schärfe", () => {
+    const lock = buildPhotoStyleLockFragment(base);
+    expect(lock).toMatch(/PRODUCT IN-CAMERA INTEGRATION/);
+    expect(lock).toMatch(/follows the cylinder/);
+    expect(lock).toMatch(/contact shadow/);
+    expect(lock).not.toMatch(/razor-sharp/);
+    expect(lock).toMatch(/ordinary local guests/);
+    expect(lock).toMatch(/not a row of look-alike/);
+  });
+
+  it("holt bei Nur-Glas-Motiven keine Flasche ins Bild", () => {
+    expect(buildPhotoStyleLockFragment({ ...base, behaelter: "G" as const, glasTyp: "willibecher" as const })).not.toMatch(
+      /PRODUCT IN-CAMERA INTEGRATION/,
+    );
   });
 });

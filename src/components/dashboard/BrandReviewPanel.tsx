@@ -15,25 +15,184 @@ import {
   parseToneTags,
   reviewReferencePreviews,
 } from "./brand-review-utils";
-import type { BrandScanSuggestion } from "./BrandProfileSetupModal";
+import type { BrandScanSourceMeta, BrandScanSuggestion, BrandSuggestedBeer } from "./BrandProfileSetupModal";
 import { GETRANKEART_OPTIONS, sanitizeProduktKategorie } from "@/lib/dashboard/metadata";
+import {
+  FLASCHEN_NACH_KATEGORIE,
+  FLASCHEN_TYPEN,
+  flascheForKategorie,
+} from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
+import { formatDomain } from "@/lib/brand/brand-profile-display";
 
 type BrandReviewPanelProps = {
   review: BrandScanSuggestion;
-  sourceMeta: {
-    confidence?: string;
-    pageTitle?: string;
-    reviewHints?: string[];
-    crawlNote?: string | null;
-  } | null;
+  sourceMeta: BrandScanSourceMeta | null;
   busy: boolean;
   error?: string;
   onChange: (patch: Partial<BrandScanSuggestion>) => void;
   onBack: () => void;
   onActivate: () => void;
+  /** Neuer Scan mit vorgeschlagener Adresse (z. B. Brauerei statt Wirtshaus). */
+  onRescan?: (url: string) => void;
 };
 
-export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, onBack, onActivate }: BrandReviewPanelProps) {
+const BILD_STATUS_LABEL: Record<NonNullable<BrandSuggestedBeer["bildStatus"]>, string> = {
+  flasche: "",
+  etikett: "Nur Etikett gefunden",
+  ungeprueft: "Bild prüfen",
+  keins: "Kein Bild gefunden",
+};
+
+/** Eine erkannte Sorte im Prüfschritt: Bild wählen, Kategorie und Gebinde korrigieren. */
+function ReviewBeerRow({
+  beer,
+  busy,
+  onUpdate,
+  onRemove,
+}: {
+  beer: BrandSuggestedBeer;
+  busy: boolean;
+  onUpdate: (next: BrandSuggestedBeer) => void;
+  onRemove: () => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  const kategorie = sanitizeProduktKategorie(beer.produktKategorie);
+  const options = [beer.etikettUrl, ...(beer.bildAlternativen ?? [])].filter(
+    (url, index, list): url is string => Boolean(url) && !broken.has(url) && list.indexOf(url) === index,
+  );
+  const statusLabel = beer.bildStatus ? BILD_STATUS_LABEL[beer.bildStatus] : "";
+  const flaschen = FLASCHEN_NACH_KATEGORIE[kategorie] as readonly string[];
+  const markBroken = (url: string) => setBroken((current) => new Set(current).add(url));
+
+  const chooseImage = (url: string) => {
+    onUpdate({
+      ...beer,
+      etikettUrl: url,
+      bildAlternativen: [beer.etikettUrl, ...(beer.bildAlternativen ?? [])].filter((entry) => entry && entry !== url),
+      bildStatus: url ? "flasche" : "keins",
+    });
+    setPickerOpen(false);
+  };
+
+  const showImage = beer.etikettUrl && !broken.has(beer.etikettUrl);
+  return (
+    <div className="studio-brand-review-beer-item">
+      <div className="studio-brand-review-beer">
+        <button
+          type="button"
+          className="studio-brand-review-beer-thumb"
+          disabled={busy || options.length === 0}
+          onClick={() => setPickerOpen((open) => !open)}
+          aria-expanded={pickerOpen}
+          aria-label={options.length ? `Bild für ${beer.name} wählen` : `Kein Bild für ${beer.name}`}
+          title={options.length > 1 ? "Anderes Bild wählen" : undefined}
+        >
+          {showImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={beer.etikettUrl} alt="" className="studio-brand-review-ref" onError={() => markBroken(beer.etikettUrl)} />
+          ) : (
+            <div className="studio-brand-review-ref studio-brand-review-ref--empty">{beer.name.slice(0, 1)}</div>
+          )}
+          {options.length > 1 ? <span className="studio-brand-review-beer-thumb-count">{options.length}</span> : null}
+        </button>
+        <div className="studio-brand-review-beer-copy">
+          <div className="truncate" title={beer.name}>{beer.name}</div>
+          {statusLabel || beer.packagingNeedsReview ? (
+            <p className="studio-brand-review-beer-flag">
+              {[statusLabel, beer.packagingNeedsReview ? "Gebinde prüfen" : ""].filter(Boolean).join(" · ")}
+              {options.length > 1 && beer.bildStatus !== "flasche" ? " — Bild antippen zum Wechseln" : ""}
+            </p>
+          ) : null}
+          <div className="studio-brand-review-beer-fields">
+            <select
+              className="studio-field"
+              value={kategorie}
+              disabled={busy}
+              aria-label={`Kategorie für ${beer.name}`}
+              onChange={(e) => {
+                const produktKategorie = sanitizeProduktKategorie(e.target.value);
+                onUpdate({
+                  ...beer,
+                  produktKategorie,
+                  bierstil: produktKategorie === "bier" ? beer.bierstil : produktKategorie,
+                  flaschenTyp: flascheForKategorie(produktKategorie, beer.flaschenTyp),
+                });
+              }}
+            >
+              {GETRANKEART_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="studio-field"
+              value={flaschen.includes(beer.flaschenTyp) ? beer.flaschenTyp : flascheForKategorie(kategorie, beer.flaschenTyp)}
+              disabled={busy}
+              aria-label={`Gebinde für ${beer.name}`}
+              onChange={(e) => onUpdate({ ...beer, flaschenTyp: e.target.value, packagingNeedsReview: false })}
+            >
+              {flaschen.map((code) => (
+                <option key={code} value={code}>
+                  {FLASCHEN_TYPEN[code as keyof typeof FLASCHEN_TYPEN]?.label ?? code}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="studio-brand-review-beer-remove"
+          disabled={busy}
+          onClick={onRemove}
+          aria-label={`${beer.name} entfernen`}
+        >
+          <StudioIcon name="x" size={12} />
+        </button>
+      </div>
+      {pickerOpen ? (
+        <div className="studio-brand-review-beer-picker" role="listbox" aria-label={`Bilder für ${beer.name}`}>
+          {options.map((url) => (
+            <button
+              key={url}
+              type="button"
+              role="option"
+              aria-selected={url === beer.etikettUrl}
+              className={`studio-brand-review-beer-option${url === beer.etikettUrl ? " is-active" : ""}`}
+              disabled={busy}
+              onClick={() => chooseImage(url)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" onError={() => markBroken(url)} />
+            </button>
+          ))}
+          <button
+            type="button"
+            role="option"
+            aria-selected={!beer.etikettUrl}
+            className="studio-brand-review-beer-option studio-brand-review-beer-option--none"
+            disabled={busy}
+            onClick={() => chooseImage("")}
+          >
+            Kein Bild
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function BrandReviewPanel({
+  review,
+  sourceMeta,
+  busy,
+  error,
+  onChange,
+  onBack,
+  onActivate,
+  onRescan,
+}: BrandReviewPanelProps) {
   const [tones, setTones] = useState<string[]>(() => parseToneTags(review.brandTone));
   const [colors, setColors] = useState<string[]>(() => parseHexSwatches(review.brandColors));
   const [addingTone, setAddingTone] = useState(false);
@@ -115,6 +274,18 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
           </p>
         ) : null}
 
+        {sourceMeta?.suggestedUrl && onRescan ? (
+          <div className="studio-brand-review-site-hint">
+            <span>
+              {sourceMeta.siteKind === "gastro" ? "Das ist die Website eines Lokals." : "Das ist nicht die Hersteller-Website."}{" "}
+              Das Sortiment steht vermutlich auf {formatDomain(sourceMeta.suggestedUrl)}.
+            </span>
+            <StudioButton type="button" variant="ghost" size="sm" disabled={busy} onClick={() => onRescan(sourceMeta.suggestedUrl!)}>
+              {formatDomain(sourceMeta.suggestedUrl)} scannen
+            </StudioButton>
+          </div>
+        ) : null}
+
         {sourceMeta?.reviewHints && sourceMeta.reviewHints.length > 0 ? (
           <ul className="studio-modal-sub" style={{ marginTop: 8, paddingLeft: 18 }}>
             {sourceMeta.reviewHints.slice(0, 5).map((hint) => (
@@ -169,67 +340,27 @@ export function BrandReviewPanel({ review, sourceMeta, busy, error, onChange, on
             <StudioFieldLabel className="studio-brand-review-label">Sortiment</StudioFieldLabel>
             <p className="studio-modal-sub" style={{ marginTop: 8, marginBottom: 8 }}>
               {review.suggestedBeers.length
-                ? `${review.suggestedBeers.length} Sorten von der Website erkannt — Kategorie korrigieren oder Falschtreffer entfernen.`
+                ? `${review.suggestedBeers.length} Sorten von der Website erkannt — Bild antippen zum Wechseln, Kategorie und Gebinde korrigieren oder Falschtreffer entfernen.`
                 : "Keine Sorten übernommen — du kannst sie später im Dashboard anlegen."}
             </p>
             {review.suggestedBeers.length > 0 ? (
               <div className="studio-brand-review-beers">
                 {review.suggestedBeers.map((beer, index) => (
-                  <div key={`${beer.name}-${index}`} className="studio-brand-review-beer">
-                    {beer.etikettUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={beer.etikettUrl} alt="" className="studio-brand-review-ref" />
-                    ) : (
-                      <div className="studio-brand-review-ref studio-brand-review-ref--empty">{beer.name.slice(0, 1)}</div>
-                    )}
-                    <div className="studio-brand-review-beer-copy">
-                      <div className="truncate" title={beer.name}>{beer.name}</div>
-                      {beer.packagingNeedsReview ? (
-                        <p className="studio-modal-sub" style={{ margin: "2px 0 0", fontSize: 12 }}>
-                          Verpackung prüfen
-                        </p>
-                      ) : null}
-                      <select
-                        className="studio-field"
-                        value={sanitizeProduktKategorie(beer.produktKategorie)}
-                        disabled={busy}
-                        aria-label={`Kategorie für ${beer.name}`}
-                        onChange={(e) => {
-                          const produktKategorie = sanitizeProduktKategorie(e.target.value);
-                          onChange({
-                            suggestedBeers: review.suggestedBeers?.map((item, itemIndex) =>
-                              itemIndex === index
-                                ? {
-                                    ...item,
-                                    produktKategorie,
-                                    bierstil: produktKategorie === "bier" ? item.bierstil : produktKategorie,
-                                  }
-                                : item,
-                            ),
-                          });
-                        }}
-                      >
-                        {GETRANKEART_OPTIONS.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      className="studio-brand-review-beer-remove"
-                      disabled={busy}
-                      onClick={() =>
-                        onChange({
-                          suggestedBeers: review.suggestedBeers?.filter((_, itemIndex) => itemIndex !== index),
-                        })
-                      }
-                      aria-label={`${beer.name} entfernen`}
-                    >
-                      <StudioIcon name="x" size={12} />
-                    </button>
-                  </div>
+                  <ReviewBeerRow
+                    key={`${beer.name}-${index}`}
+                    beer={beer}
+                    busy={busy}
+                    onUpdate={(next) =>
+                      onChange({
+                        suggestedBeers: review.suggestedBeers?.map((item, itemIndex) => (itemIndex === index ? next : item)),
+                      })
+                    }
+                    onRemove={() =>
+                      onChange({
+                        suggestedBeers: review.suggestedBeers?.filter((_, itemIndex) => itemIndex !== index),
+                      })
+                    }
+                  />
                 ))}
               </div>
             ) : null}

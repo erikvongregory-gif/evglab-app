@@ -405,6 +405,9 @@ export const FLASCHEN_NACH_KATEGORIE = {
     "euro_longneck_330",
     "dose_330",
     "glas_500",
+    // Brauerei-Limos (Spezi, Kracherl, Cola-Mix) laufen oft in der Bier-Mehrwegflasche.
+    "nrw_500",
+    "vichy_500",
     "dose_500",
     "pet_500",
     "perle_700",

@@ -1,0 +1,28 @@
+name: Sortiments-Scan Prüfsatz
+# Scannt die Brauereien aus scripts/brand-catalog-golden.json mit der echten Pipeline (Claude + Vision)
+# und schlägt fehl, sobald Sorten, Kategorien oder Bildquote unter die Erwartung fallen —
+# z. B. weil eine Brauerei ihre Website umgebaut hat oder eine Prompt-Änderung etwas verschlechtert.
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Prüfsatz scannen
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          test -n "$ANTHROPIC_API_KEY"
+          npx --yes tsx scripts/test-brand-catalog.ts --golden scripts/brand-catalog-golden.json

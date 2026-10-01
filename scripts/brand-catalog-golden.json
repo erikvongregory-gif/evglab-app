@@ -1,0 +1,72 @@
+{
+  "$comment": "Fester Prüfsatz für den Sortiments-Scan. Neue Brauereien einfach ergänzen. name = Teilstring (Groß/Klein egal), kategorie = erwartete Getränkeart. Läuft nachts per GitHub Action (brand-catalog-nightly.yml).",
+  "sites": [
+    {
+      "url": "https://aktienbrauerei.de",
+      "minProducts": 18,
+      "minImageShare": 0.85,
+      "expect": [
+        { "name": "Kellerbier", "kategorie": "bier" },
+        { "name": "Pils", "kategorie": "bier" },
+        { "name": "Radler", "kategorie": "bier" },
+        { "name": "Weizen", "kategorie": "bier" }
+      ]
+    },
+    {
+      "url": "https://www.weihenstephaner.de",
+      "minProducts": 15,
+      "minImageShare": 0.9,
+      "expect": [
+        { "name": "Cola-Mix", "kategorie": "limonade" },
+        { "name": "Hefeweißbier", "kategorie": "bier" },
+        { "name": "Naturradler", "kategorie": "bier" },
+        { "name": "Korbinian", "kategorie": "bier" }
+      ]
+    },
+    {
+      "url": "https://www.langbraeu.de",
+      "minProducts": 12,
+      "minImageShare": 0.9,
+      "expect": [
+        { "name": "Kracherl", "kategorie": "limonade" },
+        { "name": "Cola-Mix", "kategorie": "limonade" },
+        { "name": "Tafelwasser", "kategorie": "tafelwasser" },
+        { "name": "Naturradler", "kategorie": "bier" }
+      ]
+    },
+    {
+      "url": "https://www.augustiner-braeu.de/brauerei/",
+      "minProducts": 8,
+      "minImageShare": 0.9,
+      "expect": [
+        { "name": "Edelstoff", "kategorie": "bier" },
+        { "name": "Maximator", "kategorie": "bier" }
+      ]
+    },
+    {
+      "url": "https://www.paulaner.de",
+      "minProducts": 16,
+      "minImageShare": 0.9,
+      "expect": [
+        { "name": "Spezi", "kategorie": "limonade" },
+        { "name": "Limo", "kategorie": "limonade" },
+        { "name": "Salvator", "kategorie": "bier" },
+        { "name": "Weißbier-Zitrone", "kategorie": "bier" }
+      ],
+      "forbid": ["FAQ", "Rezept", "Ratgeber"]
+    },
+    {
+      "url": "https://www.hacker-pschorr.de",
+      "minProducts": 8,
+      "minImageShare": 0.9,
+      "expect": [
+        { "name": "Münchner Hell", "kategorie": "bier" },
+        { "name": "Radler", "kategorie": "bier" }
+      ]
+    },
+    {
+      "url": "https://www.hofbraeuhaus.de",
+      "site": "gastro"
+    }
+  ]
+}

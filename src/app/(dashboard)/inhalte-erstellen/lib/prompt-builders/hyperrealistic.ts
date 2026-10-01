@@ -326,9 +326,11 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
   const istBuegel = !istDose && input.flaschenTyp.startsWith("buegel");
   const buegelNegative =
     istBuegel && behaelter !== "G"
-      ? "messy tangled dangling swing-top wire bail, chaotic floating porcelain stopper, swing-top mechanism hanging awkwardly across the bottle, deformed or bent wire clip, stopper covering the label, duplicated swing-top parts, "
+      ? "messy tangled dangling swing-top wire bail, double wire loop, two wire bails, chaotic floating porcelain stopper, stopper standing upright on the bottle mouth, swing-top mechanism hanging awkwardly across the bottle, deformed or bent wire clip, stopper covering the label, duplicated swing-top parts, "
       : "";
-  const closureNegative = `${closureBase}${toastNegative}${buegelNegative}`;
+  const handNegative =
+    behaelter !== "G" ? "fingers inside the bottle, hand visible through the bottle glass, thumb fused into the label, " : "";
+  const closureNegative = `${closureBase}${toastNegative}${buegelNegative}${handNegative}`;
 
   // Etikett-Negatives: bei "marke" Label-Verzerrung vermeiden; bei "generisch"
   // ein nacktes Gebinde verhindern (die KI soll ein Etikett designen).

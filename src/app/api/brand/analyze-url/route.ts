@@ -11,7 +11,7 @@ import { storeBrandReferenceImagesAsUrls } from "@/lib/brand/persist-reference-u
 import { createBrandIntakeSession } from "@/lib/brand/browser-intake";
 import { looksLikeBlockedGatePage } from "@/lib/brand/consent-gate-dismiss";
 import { isInstagramUrl, normalizeWebsiteUrl } from "@/lib/brand/url-intake";
-import { extractBeerVarietiesFromIntake } from "@/lib/brand/beer-catalog-intake";
+import { extractBeerVarietiesFromIntake, persistSuggestedBeerLabels } from "@/lib/brand/beer-catalog-intake";
 import {
   downloadCandidateImages,
   mergeBrandReferenceSelections,
@@ -21,15 +21,81 @@ import {
   pickImagesByIndices,
 } from "@/lib/brand/website-intake";
 import { ingestBrandFontFromHtml } from "@/lib/brand/extract-brand-fonts";
+import { crawlProductCatalog } from "@/lib/brand/product-catalog-crawl";
+import { detectCatalogWithAi } from "@/lib/brand/catalog-ai";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
+
+/** Sortiments-Crawl + KI inkl. Bild-Nachsuche — bleibt deutlich unter der 300-s-Grenze der Route. */
+const CATALOG_AI_TIMEOUT_MS = 150_000;
+/** Sortenbilder in den eigenen Storage kopieren (freigestellt) — Rest bleibt Fremd-URL und wird beim Aktivieren nachgeholt. */
+const LABEL_PERSIST_BUDGET_MS = 30_000;
+
+/**
+ * Fortschritt für den Client (NDJSON-Stream). Schritt-Index passt zur Checkliste im
+ * Markenprofil-Fenster: 0 Website · 1 Unterseiten · 2 Sortiment · 3 Marke · 4 Produktbilder · 5 Speichern · 6 Profil.
+ */
+type ProgressFn = (step: number, label: string) => void;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Zeitlimit ${ms} ms überschritten`)), ms);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 const bodySchema = z.object({
   websiteUrl: z.string().min(4).max(1200),
 });
 
 export async function POST(req: Request) {
+  const wantsStream = (req.headers.get("accept") ?? "").includes("application/x-ndjson");
+  if (!wantsStream) return analyzeBrandUrl(req, () => undefined);
+
+  // Stream statt einer stummen 1–2-Minuten-Anfrage: Nutzer sieht echten Fortschritt,
+  // und Proxys trennen die Verbindung nicht wegen Inaktivität (Ping alle 10 s).
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let closed = false;
+      const send = (event: Record<string, unknown>) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          closed = true;
+        }
+      };
+      const ping = setInterval(() => send({ type: "ping" }), 10_000);
+      try {
+        const response = await analyzeBrandUrl(req, (step, label) => send({ type: "progress", step, label }));
+        const body: unknown = await response.json().catch(() => ({ error: "Ungueltige Server-Antwort." }));
+        send({ type: "result", status: response.status, body });
+      } catch (error) {
+        send({ type: "result", status: 500, body: { error: error instanceof Error ? error.message : "Analyse fehlgeschlagen." } });
+      } finally {
+        clearInterval(ping);
+        closed = true;
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "content-type": "application/x-ndjson; charset=utf-8",
+      "cache-control": "no-store, no-transform",
+      "x-accel-buffering": "no",
+    },
+  });
+}
+
+async function analyzeBrandUrl(req: Request, progress: ProgressFn): Promise<NextResponse> {
   const session = createBrandIntakeSession();
   try {
     const rateError = await enforceRateLimitPersistent(req, {
@@ -79,6 +145,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY fehlt." }, { status: 500 });
     }
 
+    progress(0, "Website wird geladen…");
     let fetched;
     try {
       fetched = await session.fetchHtml(normalizedUrl);
@@ -109,8 +176,33 @@ export async function POST(req: Request) {
       }
     }
 
+    progress(1, "Unterseiten werden gelesen…");
     const { pages: subpages, rawHtmlByUrl, skipped } = await crawlCatalogPages(fetched, (url) => session.fetchHtml(url));
 
+    // Sortiment parallel zur Markenanalyse: gezielter Produktseiten-Crawl + KI-Zuordnung
+    // von Sorte, Getränkeart und Produktbild. Fällt bei Fehler/Zeitüberschreitung auf die Regeln zurück.
+    const homepageFetch = fetched;
+    const catalogPromise = withTimeout(
+      (async () => {
+        progress(2, "Sortiment wird gesucht…");
+        const catalog = await crawlProductCatalog(homepageFetch, rawHtmlByUrl, (url) => session.fetchHtml(url));
+        const allHtml = { ...rawHtmlByUrl, ...catalog.rawHtmlByUrl };
+        const ai = await detectCatalogWithAi({
+          apiKey,
+          websiteUrl: homepageFetch.finalUrl,
+          rawHtmlByUrl: allHtml,
+          fetchPage: (url) => session.fetchHtml(url),
+          onProgress: (message) => progress(/Bilder|Sorten erkannt/.test(message) ? 4 : 2, message),
+        });
+        return { ai, catalogHtml: catalog.rawHtmlByUrl };
+      })(),
+      CATALOG_AI_TIMEOUT_MS,
+    ).catch((error: unknown) => {
+      console.warn("[brand/analyze-url] KI-Sortiment fehlgeschlagen, Regel-Erkennung:", error);
+      return null;
+    });
+
+    progress(3, "Texte, Farben & Bildsprache werden erkannt…");
     const intake = mergeParsedWebsitePages([homepage, ...subpages]);
     const downloadedImages = await downloadCandidateImages(intake.imageCandidates);
 
@@ -184,13 +276,39 @@ export async function POST(req: Request) {
       }
     }
 
-    const suggestedBeers = extractBeerVarietiesFromIntake({
-      pages: [homepage, ...subpages],
-      downloadedImages,
-      imageCandidates: intake.imageCandidates,
-      breweryName: scan.breweryName,
-      rawHtmlByUrl,
-    });
+    progress(4, "Sortiment wird fertig geprüft…");
+    const catalogResult = await catalogPromise;
+    const aiBeers = catalogResult?.ai.beers ?? [];
+    const catalogMethod: "ai" | "rules" = aiBeers.length > 0 ? "ai" : "rules";
+    const detectedBeers =
+      catalogMethod === "ai"
+        ? aiBeers
+        : extractBeerVarietiesFromIntake({
+            pages: [
+              homepage,
+              ...subpages,
+              ...Object.entries(catalogResult?.catalogHtml ?? {}).map(([url, html]) => parseWebsiteHtml(html, url)),
+            ],
+            downloadedImages,
+            imageCandidates: intake.imageCandidates,
+            breweryName: scan.breweryName,
+            rawHtmlByUrl: { ...rawHtmlByUrl, ...(catalogResult?.catalogHtml ?? {}) },
+          });
+
+    // Sortenbilder sofort freistellen und in den eigenen Storage legen — Fremd-URLs brechen,
+    // sobald die Brauerei ihre Website umbaut; 404-Bilder fallen dabei raus statt kaputt angezeigt zu werden.
+    progress(5, `${detectedBeers.filter((beer) => beer.etikettUrl).length} Sortenbilder werden gespeichert…`);
+    let suggestedBeers = detectedBeers;
+    try {
+      suggestedBeers = (
+        await persistSuggestedBeerLabels(user.id, detectedBeers, { budgetMs: LABEL_PERSIST_BUDGET_MS })
+      ).map((beer) => (beer.etikettUrl ? beer : { ...beer, bildStatus: "keins" as const }));
+    } catch (persistError) {
+      console.warn("[brand/analyze-url] Sortenbilder konnten nicht gespeichert werden:", persistError);
+    }
+    progress(6, "Markenprofil wird erstellt…");
+    const siteKind = catalogResult?.ai.site ?? "hersteller";
+    const suggestedUrl = catalogResult?.ai.suggestedUrl ?? "";
 
     const assessment = assessBrandAnalysisFields({
       scan,
@@ -200,6 +318,17 @@ export async function POST(req: Request) {
       packshotCount: analysisPackshotCount,
       beersDetected: suggestedBeers.length,
     });
+    if (siteKind === "gastro" || siteKind === "handel") {
+      assessment.reviewHints.unshift(
+        `Das sieht nach der Website ${siteKind === "gastro" ? "eines Wirtshauses/Lokals" : "eines Händlers"} aus${
+          suggestedUrl ? ` — für das vollständige Sortiment besser ${suggestedUrl} scannen` : ""
+        }.`,
+      );
+    }
+    const imageReviewCount = suggestedBeers.filter((beer) => beer.bildStatus && beer.bildStatus !== "flasche").length;
+    if (imageReviewCount > 0) {
+      assessment.reviewHints.push(`${imageReviewCount} Sorte${imageReviewCount === 1 ? "" : "n"}: Bild prüfen`);
+    }
     const packagingReviewCount = suggestedBeers.filter((beer) => beer.packagingNeedsReview).length;
     if (packagingReviewCount > 0) {
       assessment.reviewHints.push(
@@ -263,6 +392,10 @@ export async function POST(req: Request) {
         pageTitle: intake.title,
         imageSelection,
         beersDetected: suggestedBeers.length,
+        beersWithImage: suggestedBeers.filter((beer) => beer.etikettUrl).length,
+        catalogMethod,
+        siteKind,
+        suggestedUrl,
         fontDetected: Boolean(brandHeadlineFontName),
         fontUploaded: Boolean(brandFontFileUrl),
       },

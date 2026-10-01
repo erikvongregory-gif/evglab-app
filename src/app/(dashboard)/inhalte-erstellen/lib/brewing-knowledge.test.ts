@@ -29,7 +29,7 @@ describe("poured glass vs bottle volume", () => {
     expect(FLASCHEN_NACH_KATEGORIE.limonade).toEqual(
       expect.arrayContaining(["euro_longneck_330", "pet_1000", "pet_1500", "perle_700"]),
     );
-    expect(FLASCHEN_NACH_KATEGORIE.limonade).not.toContain("nrw_500");
+    expect(FLASCHEN_NACH_KATEGORIE.limonade).toEqual(expect.arrayContaining(["nrw_500", "vichy_500"]));
     expect(FLASCHEN_NACH_KATEGORIE.limonade).not.toContain("brunnen_750");
     expect(FLASCHEN_NACH_KATEGORIE.mineralwasser).toEqual(
       expect.arrayContaining(["perle_700", "brunnen_750", "pet_1000"]),
@@ -41,7 +41,7 @@ describe("poured glass vs bottle volume", () => {
     for (const kategorie of ["bier", "limonade", "tafelwasser", "mineralwasser"] as const) {
       expect(FLASCHEN_NACH_KATEGORIE[kategorie]).toContain(DEFAULT_FLASCHE[kategorie]);
       expect(flascheForKategorie(kategorie, "nrw_500")).toBe(
-        kategorie === "bier" ? "nrw_500" : DEFAULT_FLASCHE[kategorie],
+        kategorie === "bier" || kategorie === "limonade" ? "nrw_500" : DEFAULT_FLASCHE[kategorie],
       );
     }
     expect(flaschenGruppen("mineralwasser").map((group) => group.volume)).toEqual([
