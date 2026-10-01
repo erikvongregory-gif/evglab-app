@@ -326,7 +326,7 @@ export function buildHyperrealisticPrompt(input: HyperrealisticInput, options?: 
   const istBuegel = !istDose && input.flaschenTyp.startsWith("buegel");
   const buegelNegative =
     istBuegel && behaelter !== "G"
-      ? "messy tangled dangling swing-top wire bail, double wire loop, two wire bails, chaotic floating porcelain stopper, stopper standing upright on the bottle mouth, swing-top mechanism hanging awkwardly across the bottle, deformed or bent wire clip, stopper covering the label, duplicated swing-top parts, "
+      ? "messy tangled dangling swing-top wire bail, double wire loop, two wire bails, chaotic floating porcelain stopper, stopper standing upright on the bottle mouth, swing-top mechanism hanging awkwardly across the bottle, deformed or bent wire clip, stopper covering the label, duplicated swing-top parts, two porcelain stoppers, second stopper in another color, "
       : "";
   const handNegative =
     behaelter !== "G" ? "fingers inside the bottle, hand visible through the bottle glass, thumb fused into the label, " : "";

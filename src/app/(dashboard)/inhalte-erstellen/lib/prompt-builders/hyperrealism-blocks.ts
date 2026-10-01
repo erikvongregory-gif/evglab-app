@@ -436,12 +436,21 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
       ? `EXACTLY ONE ${noun} of this product in the frame: the ${noun} being poured from (or standing open next to the glass) IS the product — never add a second, extra ${noun} beside it.`
       : "",
     `If a bottle-shape reference photo is attached, copy that silhouette, neck length, shoulder and proportions exactly.`,
+    `If the product photo shows several bottles/sizes side by side, the product here is ONLY the ${litres} L one — ignore the other sizes completely (their height, label and closure).`,
+    smallSizeCue(input.flaschenTyp, noun),
     `Label/artwork photos only supply printed graphics to apply onto this ${noun} — they must not replace the ${noun} with a different type.`,
     `Bottles, cans or glasses visible in LOOK/style references are NOT this product — never copy their shape, neck or shoulder.`,
     `Render the ${noun} at physically correct real-world scale so its ${litres} L size is unmistakable.`,
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+/** 0,33 l wird sonst fast immer als 0,5 l gerendert — Größe über Hand und Glas greifbar machen. */
+function smallSizeCue(flaschenTyp: string, noun: string): string {
+  const ml = flascheVolumeMl(flaschenTyp);
+  if (ml <= 0 || ml > 350) return "";
+  return `SMALL SIZE (${ml} ml): this is the small ${noun}, clearly shorter and slimmer than a standard 0.5 L ${noun} — an adult hand covers about half of its body height, and the poured glass is a small glass of about ${ml} ml, never a tall 0.5 L glass.`;
 }
 
 const GLASS_FORBIDDEN: Record<NonNullable<HyperrealisticInput["glasTyp"]>, string> = {
@@ -473,6 +482,8 @@ export function buildLabelLockFragment(input: HyperrealisticInput): string {
   return [
     `${LABEL_LOCK_MARKER}:`,
     product ? `The attached reference photo IS the product "${product}".` : "The attached reference photo IS this exact product.",
+    `If the reference shows more than one ${noun}, copy the artwork of only one of them — never blend two labels into one.`,
+    "Label text stays clean and correctly spelled exactly as on the reference; no warped, smeared, doubled or invented letters, no text running in a different direction than on the reference.",
     `Copy the printed ${noun} artwork 1:1 — same logo, same crest, same typography, same colors, same layout, same words.`,
     "Do not redesign, restyle, recolor, translate, abbreviate, or invent a variant (no new names, no extra badges, no swapped colorways).",
     "Every letter that is readable on the reference must appear the same on the generated label.",
@@ -581,7 +592,7 @@ export const CLOSURE_LOGIC_MARKER = "CLOSURE LOGIC (MANDATORY)";
 const SWING_TOP_OPEN = [
   "the swing-top OPEN, built exactly like a real German Bügelverschluss: ONE thin wire ring clamped around the neck just below the lip, TWO thin parallel wire arms hinged on that ring, and at their end ONE white porcelain stopper with its rubber gasket",
   "— in the open state the arms are swung back over the lip and the stopper hangs down against the side of the neck by gravity (on a tilted pouring bottle it dangles below the neck, beside the beer stream, never in it)",
-  "— the round bottle mouth is completely free; wires are smooth, symmetric and attached; NO second wire loop, NO extra stopper, NO twisted, tangled or doubled wire, NO stopper standing upright on top of the bottle, NOT covering the neck label",
+  "— count: exactly ONE stopper in ONE color (as on the reference), exactly ONE wire bail; the round bottle mouth is completely free; wires are smooth, symmetric and attached; NO second wire loop, NO extra stopper, NO two stoppers of different colors, NO twisted, tangled or doubled wire, NO stopper standing upright on top of the bottle, NOT covering the neck label",
 ].join(" ");
 
 /** Hand an Flasche: Finger liegen außen am Glas — nie durch das Glas sichtbar oder im Etikett „versunken“. */

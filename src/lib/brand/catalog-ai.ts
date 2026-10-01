@@ -901,6 +901,10 @@ export async function detectCatalogWithAi(params: {
     // Mehrere Gebinde (z. B. Bügel 0,5 l + 0,33 l) = eigene Sorten — jede mit eigenem Flaschentyp.
     if (gebinde.length > 1) {
       variants += gebinde.length - 1;
+      // Zeigt das Foto alle Glasflaschen nebeneinander, bekommt jede Variante nur ihre Flasche
+      // (kleinste Füllmenge = niedrigste Flasche) — sonst kopiert die Generierung die falsche Größe.
+      const allGlass = verdict?.kind !== "etikett" && gebinde.every((code) => !/^(?:dose|pet)_/.test(code));
+      const byVolume = [...gebinde].sort((a, b) => flascheVolumeMl(a) - flascheVolumeMl(b));
       for (const code of gebinde) {
         beers.push({
           ...base,
@@ -908,6 +912,7 @@ export async function detectCatalogWithAi(params: {
           flaschenTyp: code,
           flaschenfarbe: /^(?:dose|pet)_/.test(code) ? "klar" : base.flaschenfarbe,
           gebinde: [code],
+          bildTeil: allGlass && pick ? { rank: byVolume.indexOf(code), of: gebinde.length } : undefined,
         });
       }
     } else {

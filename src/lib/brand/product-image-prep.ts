@@ -68,8 +68,59 @@ async function flattenOnly(input: Buffer): Promise<PreparedProductImage> {
   return { buffer: data, mime: "image/jpeg", cutout: false, width: info.width, height: info.height };
 }
 
+/** Teilbild: rank = Position nach Flaschenhöhe (0 = kleinste), of = erwartete Anzahl Flaschen im Bild. */
+export type ProductImagePart = { rank: number; of: number };
+
+type Box = { minX: number; maxX: number; minY: number; maxY: number };
+
+/**
+ * Nebeneinander stehende Flaschen (z. B. Bügel 0,5 l + 0,33 l auf einem Packshot) über leere
+ * Spalten im Vordergrund trennen. Liefert Boxen nach Höhe sortiert, sonst [].
+ */
+export function splitForegroundColumns(background: Uint8Array, width: number, height: number): Box[] {
+  const minColumn = Math.max(1, Math.round(height * 0.005));
+  const filled: boolean[] = [];
+  for (let x = 0; x < width; x++) {
+    let count = 0;
+    for (let y = 0; y < height; y++) if (!background[y * width + x]) count++;
+    filled.push(count >= minColumn);
+  }
+  const runs: Array<[number, number]> = [];
+  const minGap = Math.max(2, Math.round(width * 0.01));
+  let start = -1;
+  for (let x = 0; x <= width; x++) {
+    if (x < width && filled[x]) {
+      if (start < 0) start = x;
+      continue;
+    }
+    if (start < 0) continue;
+    const last = runs[runs.length - 1];
+    if (last && start - last[1] - 1 < minGap) last[1] = x - 1;
+    else runs.push([start, x - 1]);
+    start = -1;
+  }
+  const boxes = runs
+    .filter(([a, b]) => b - a + 1 >= width * 0.05)
+    .map(([a, b]) => {
+      let minY = height;
+      let maxY = -1;
+      for (let y = 0; y < height; y++) {
+        for (let x = a; x <= b; x++) {
+          if (!background[y * width + x]) {
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            break;
+          }
+        }
+      }
+      return { minX: a, maxX: b, minY, maxY };
+    })
+    .filter((box) => box.maxY >= box.minY);
+  return boxes.sort((a, b) => a.maxY - a.minY - (b.maxY - b.minY));
+}
+
 /** Liefert null, wenn die Datei kein lesbares Bild ist. */
-export async function prepareProductImage(input: Buffer): Promise<PreparedProductImage | null> {
+export async function prepareProductImage(input: Buffer, part?: ProductImagePart): Promise<PreparedProductImage | null> {
   let raw: { data: Buffer; info: { width: number; height: number; channels: number } };
   try {
     raw = await sharp(input, { failOn: "none" })
@@ -157,6 +208,18 @@ export async function prepareProductImage(input: Buffer): Promise<PreparedProduc
     }
   }
   if (maxX < minX || maxY < minY) return flattenOnly(input).catch(() => null);
+
+  // Mehrere Gebinde auf einem Foto: nur die Flasche dieser Variante behalten.
+  if (part && part.of > 1) {
+    const boxes = splitForegroundColumns(background, width, height);
+    const box = boxes.length === part.of ? boxes[part.rank] : undefined;
+    if (box) {
+      minX = box.minX;
+      maxX = box.maxX;
+      minY = box.minY;
+      maxY = box.maxY;
+    }
+  }
 
   const boxWidth = maxX - minX + 1;
   const boxHeight = maxY - minY + 1;

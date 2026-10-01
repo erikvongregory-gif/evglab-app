@@ -3,7 +3,7 @@ import { buildCampaignTextPrompt } from "./campaign-text";
 import { buildHyperrealisticPrompt, buildProductPlacementPrompt, applyClientIntentOverrides } from "./hyperrealistic";
 import { buildProductIsolatePrompt } from "./product-isolate";
 import { DEFAULT_GLAS_BY_STIL, buildProductStudioPrompt, resolveStudioGlas } from "./product-studio";
-import { buildClosureLogicFragment, buildPhotoStyleLockFragment } from "./hyperrealism-blocks";
+import { buildBottleShapeLockFragment, buildClosureLogicFragment, buildPhotoStyleLockFragment } from "./hyperrealism-blocks";
 import { campaignTextSchema, hyperrealisticSchema, productIsolateSchema, productStudioSchema } from "../schemas";
 import { applyContentPresetPrompt } from "@/lib/image-types/policy";
 
@@ -669,6 +669,17 @@ describe("Bügelverschluss und Hand an der Flasche", () => {
 
   it("verbietet Finger in oder hinter der Flasche", () => {
     expect(buildClosureLogicFragment(pour)).toMatch(/never inside the bottle|ever inside the bottle/);
+  });
+
+  it("zählt genau einen Stopfen", () => {
+    expect(buildClosureLogicFragment(pour)).toMatch(/exactly ONE stopper/);
+  });
+
+  it("macht 0,33 l sichtbar klein und ignoriert andere Größen auf dem Produktfoto", () => {
+    const small = buildBottleShapeLockFragment({ ...pour, flaschenTyp: "buegel_330" as const });
+    expect(small).toContain("SMALL SIZE (330 ml)");
+    expect(small).toContain("ONLY the 0.33 L one");
+    expect(buildBottleShapeLockFragment(pour)).not.toMatch(/SMALL SIZE/);
   });
 });
 

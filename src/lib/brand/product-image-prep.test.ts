@@ -46,6 +46,26 @@ describe("prepareProductImage", () => {
     expect(prepared?.width).toBe(300);
   });
 
+  it("schneidet bei zwei Flaschen auf einem Foto die passende Größe aus", async () => {
+    const brown = { r: 90, g: 50, b: 20, alpha: 1 };
+    const tall = await sharp({ create: { width: 60, height: 260, channels: 4, background: brown } }).png().toBuffer();
+    const small = await sharp({ create: { width: 50, height: 180, channels: 4, background: brown } }).png().toBuffer();
+    const photo = await sharp({ create: { width: 400, height: 400, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } })
+      .composite([
+        { input: tall, left: 80, top: 70 },
+        { input: small, left: 240, top: 150 },
+      ])
+      .png()
+      .toBuffer();
+    const smallCut = await prepareProductImage(photo, { rank: 0, of: 2 });
+    const tallCut = await prepareProductImage(photo, { rank: 1, of: 2 });
+    expect(smallCut!.height).toBeLessThan(220);
+    expect(smallCut!.width).toBeLessThan(80);
+    expect(tallCut!.height).toBeGreaterThan(260);
+    // Erwartet 3 Flaschen, Foto zeigt 2 → ganzes Bild behalten.
+    expect((await prepareProductImage(photo, { rank: 0, of: 3 }))!.width).toBeGreaterThan(200);
+  });
+
   it("liefert null für Dateien, die kein Bild sind", async () => {
     expect(await prepareProductImage(Buffer.from("<html>404</html>"))).toBeNull();
   });

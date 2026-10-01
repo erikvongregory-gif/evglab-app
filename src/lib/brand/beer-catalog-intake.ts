@@ -12,7 +12,7 @@ import {
 import { uploadUserImageToStorage } from "@/lib/supabase/storage";
 import { assertSafePublicUrl, BROWSER_USER_AGENT, URL_FETCH_TIMEOUT_MS } from "@/lib/brand/url-intake";
 import { publicFetch } from "@/lib/security/public-fetch";
-import { prepareProductImage } from "@/lib/brand/product-image-prep";
+import { prepareProductImage, type ProductImagePart } from "@/lib/brand/product-image-prep";
 import {
   type DownloadedImage,
   type ImageCandidate,
@@ -35,6 +35,8 @@ export type SuggestedBeerVariety = {
   bildAlternativen?: string[];
   /** Wie sicher das Sortenbild ist: Flasche bestätigt, nur Etikett, ungeprüft oder keins. */
   bildStatus?: "flasche" | "etikett" | "ungeprueft" | "keins";
+  /** Gebinde-Variante mit gemeinsamem Foto mehrerer Flaschen: welche Flasche (nach Höhe) ausgeschnitten wird. */
+  bildTeil?: ProductImagePart;
 };
 
 export type PackagingGuess = {
@@ -483,7 +485,7 @@ function isAlreadyPersistedLabelUrl(url: string): boolean {
  * in Supabase Storage. Fremd-URLs brechen, sobald die Brauerei ihre Website umbaut.
  * Rueckgabe "" = Bild existiert nicht (404) — besser kein Bild als ein kaputtes.
  */
-export async function persistBeerLabelFromUrl(userId: string, sourceUrl: string): Promise<string> {
+export async function persistBeerLabelFromUrl(userId: string, sourceUrl: string, part?: ProductImagePart): Promise<string> {
   const trimmed = sourceUrl.trim();
   if (!trimmed) return "";
   if (isAlreadyPersistedLabelUrl(trimmed)) return trimmed;
@@ -509,7 +511,7 @@ export async function persistBeerLabelFromUrl(userId: string, sourceUrl: string)
     if (buffer.byteLength < 32 || buffer.byteLength > MAX_LABEL_BYTES) return trimmed;
 
     // sharp liest auch AVIF/GIF/falsch deklarierte Dateien; kein Bild → kein Etikett.
-    const prepared = await prepareProductImage(buffer);
+    const prepared = await prepareProductImage(buffer, part);
     if (!prepared) return "";
 
     return await uploadUserImageToStorage({
@@ -542,7 +544,7 @@ export async function persistSuggestedBeerLabels(
   }));
 
   const pending = out
-    .map((beer, index) => ({ index, url: beer.etikettUrl }))
+    .map((beer, index) => ({ index, url: beer.etikettUrl, part: beer.bildTeil }))
     .filter((item) => item.url && !isAlreadyPersistedLabelUrl(item.url));
 
   // Gebinde-Varianten teilen sich ein Bild — nur einmal laden und hochladen.
@@ -553,8 +555,9 @@ export async function persistSuggestedBeerLabels(
       if (Date.now() >= deadline) return;
       const current = pending[cursor++];
       if (!current) return;
-      if (!byUrl.has(current.url)) byUrl.set(current.url, persistBeerLabelFromUrl(userId, current.url));
-      const persisted = await byUrl.get(current.url)!;
+      const key = current.part ? `${current.url}#${current.part.rank}/${current.part.of}` : current.url;
+      if (!byUrl.has(key)) byUrl.set(key, persistBeerLabelFromUrl(userId, current.url, current.part));
+      const persisted = await byUrl.get(key)!;
       out[current.index] = {
         ...out[current.index]!,
         etikettUrl: persisted.slice(0, 1200),
