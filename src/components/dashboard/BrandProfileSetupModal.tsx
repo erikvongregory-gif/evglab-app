@@ -242,6 +242,19 @@ async function verifyBrandProfileSaved(
     };
     if (!data.saved) return null;
 
+    // Profil gespeichert heißt nicht Sorten gespeichert — sonst meldet das Fenster Erfolg,
+    // obwohl das Sortiment fehlt (z. B. Server-Fehler nach dem Profil-Update).
+    if (expected.suggestedBeers?.length) {
+      const beersRes = await fetch("/api/dashboard/my-beers", { cache: "no-store", credentials: "include" });
+      if (!beersRes.ok) return null;
+      const beersData = (await beersRes.json()) as { beers?: Array<{ name?: string }> };
+      const savedNames = new Set(
+        (beersData.beers ?? []).map((beer) => (beer.name ?? "").trim().toLowerCase()).filter(Boolean),
+      );
+      const allSaved = expected.suggestedBeers.every((beer) => savedNames.has(beer.name.trim().toLowerCase()));
+      if (!allSaved) return null;
+    }
+
     return {
       ...expected,
       referenceImageUrls:

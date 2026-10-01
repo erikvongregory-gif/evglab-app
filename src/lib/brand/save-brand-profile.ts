@@ -230,8 +230,9 @@ export async function persistBrandProfileForUser(params: {
     const withLabels = await persistSuggestedBeerLabels(params.userId, params.input.suggestedBeers);
     // Beim Aktivieren ist der Scan die Quelle der Wahrheit — fremde Sorten fliegen raus.
     myBeers = replaceSuggestedBeers(existingBeers, withLabels);
-  } else if (brandChanged || params.input.brandProfileSource === "url") {
-    // Neue Marke / URL-Scan ohne Treffer: altes Sortiment nicht stehen lassen.
+  } else if (brandChanged) {
+    // Neue Marke ohne Scan-Treffer: altes Sortiment der vorherigen Marke nicht stehen lassen.
+    // Gleiche Marke ohne Treffer (z. B. Sorten im Review entfernt/Scan leer): Sortiment behalten.
     myBeers = [];
   }
 
