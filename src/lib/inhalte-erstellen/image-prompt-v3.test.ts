@@ -42,6 +42,11 @@ describe("independent V3 image direction", () => {
     expect(text).toContain("small hard shadows");
     expect(text).toContain("darker ambient background");
     expect(text).not.toContain("flash balanced with ambient light");
+    expect(text).toContain("35mm point-and-shoot");
+    expect(text).toContain("off-centre framing");
+    expect(text).toContain("mid-action, mid-laugh or mid-sentence");
+    expect(text).toContain("not an isolated hero product");
+    expect(text).not.toContain("clean and professional across the entire frame");
   });
 
   it.each(["dunkel", "Dunkel", "Dunkles Bier", "Dunkel-Lager"])("preserves %s color under flash instead of falling back to pale lager", (bierstil) => {
