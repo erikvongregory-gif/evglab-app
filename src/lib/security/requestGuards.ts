@@ -200,16 +200,14 @@ export function enforceSameOrigin(req: Request): NextResponse | null {
     } catch {
       return NextResponse.json({ error: "Ungültige Herkunft." }, { status: 403 });
     }
+    return NextResponse.json({ error: "Ungültige Herkunft." }, { status: 403 });
   }
 
-  const forwardedHost = req.headers.get("x-forwarded-host");
-  if (forwardedHost) {
-    const forwardedProto = req.headers.get("x-forwarded-proto") ?? "https";
-    if (`${forwardedProto}://${forwardedHost}` === targetOrigin) return null;
-  }
-
+  // Proxy headers describe the destination, never the page that initiated a request.
+  // A sibling subdomain is not automatically trusted either.
   const fetchSite = req.headers.get("sec-fetch-site");
-  if (fetchSite === "same-origin" || fetchSite === "same-site" || fetchSite === "none") {
+  if (fetchSite === "same-origin" ||
+      (fetchSite === "none" && ["GET", "HEAD"].includes(req.method))) {
     return null;
   }
 

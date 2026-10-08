@@ -100,6 +100,8 @@ export async function GET(req: Request) {
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": contentType,
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+        "X-Content-Type-Options": "nosniff",
         "Content-Disposition": download
           ? `attachment; filename="brewai-${taskId}.${extension}"`
           : `inline; filename="brewai-${taskId}.${extension}"`,

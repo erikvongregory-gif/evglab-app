@@ -245,6 +245,8 @@ export function readBrandReferenceImageBuffer(
 ): { buffer: Buffer; mime: string } | null {
   const entry = getBrandReferenceStore(userMetadata)[id];
   if (!entry) return null;
+  // Auth user_metadata is user-editable: never serve HTML or active SVG as an app document.
+  if (!["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"].includes(entry.mime)) return null;
   return { buffer: Buffer.from(entry.base64, "base64"), mime: entry.mime };
 }
 

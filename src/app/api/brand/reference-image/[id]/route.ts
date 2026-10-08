@@ -32,6 +32,8 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
   return new NextResponse(new Uint8Array(image.buffer), {
     headers: {
       "Content-Type": image.mime,
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+      "X-Content-Type-Options": "nosniff",
       "Cache-Control": "private, max-age=86400",
     },
   });

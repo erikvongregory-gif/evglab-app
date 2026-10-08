@@ -4,9 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getOrCreateRequestId } from "@/lib/security/authObservability";
 import { withRequestIdJson } from "@/lib/security/authResponses";
+import { enforceSameOrigin } from "@/lib/security/requestGuards";
 
 export async function POST(request: Request) {
   const requestId = getOrCreateRequestId(request);
+  const originError = enforceSameOrigin(request);
+  if (originError) return originError;
   if (!isSupabaseConfigured()) {
     return withRequestIdJson({ ok: false, reason: "config" }, requestId, { status: 503 });
   }
