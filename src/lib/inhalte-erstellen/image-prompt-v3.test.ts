@@ -13,6 +13,16 @@ function prompt(overrides: Record<string, unknown> = {}) {
 }
 
 describe("independent V3 image direction", () => {
+  it("gives premium individual unretouched skin without changing selected identities", () => {
+    const text = prompt({ photoStyle: "premium" });
+    expect(text).toContain("visible pores in the focal plane");
+    expect(text).toContain("freckles or small moles");
+    expect(text).toContain("vary these details between individuals");
+    expect(text).toContain("do not invent new moles, scars or freckles that change that identity");
+    expect(text).toContain("without beauty retouching, skin smoothing, airbrushing");
+    expect(V3_PHOTO_PRESETS.reportage).not.toContain("freckles or small moles");
+    expect(V3_PHOTO_PRESETS.campaign).not.toContain("freckles or small moles");
+  });
   it("keeps the Radler prompt consistent with the database color and citrus haze", () => {
     const input = hyperrealisticSchema.parse({ etikettBild: "https://example.com/product.png", flaschenTyp: "nrw_500", bierstil: "radler", szene: "biergarten_sommer", behaelter: "B" });
     const text = buildImagePromptV3({ input, references: [], beerAppearance: { ...BEER_PHYSICS.radler, hex: "#DDE055" } });
