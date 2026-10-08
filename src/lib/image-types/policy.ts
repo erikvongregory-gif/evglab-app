@@ -134,12 +134,12 @@ export function applyContentPresetPrompt(basePrompt: string, preset: ContentCrea
       "- This is a realism and material-physics layer. Preserve the selected photo style (reportage, premium photography, or campaign motif) and its distinct composition.",
       "- Render the chosen direction as a real photograph captured with physical camera equipment; never homogenize every style into the same premium advertising setup.",
       "- Define the product precisely: exact beer-glass shape, beer color, liquid fill level, irregular foam height, bottle or can geometry, and label position.",
-      "- Beverage physics: transparent liquid, physically correct refraction through the glass, small varied CO2 bubbles, irregular natural foam, and condensation droplets of different sizes.",
+      "- Beverage physics: liquid clarity exactly as specified (filtered or naturtrüb), physically correct refraction through the glass, small varied CO2 bubbles, irregular natural foam, and condensation droplets of different sizes only on a cold drink.",
       "- Camera and composition must follow the selected photo-style lock; use physically plausible optics and keep the product identity readable.",
       "- Lighting must follow the selected photo-style lock while preserving natural reflections, correct light transport through liquid and glass, and physically plausible shadows.",
       "- Preserve realistic imperfections: slight variation in droplet size, subtly uneven foam, natural highlights, reflections, and contact shadows.",
       "- Human anatomy and skin detail must be fully realistic (no beauty-filter skin, no uncanny face/hands artifacts).",
-      "- Strictly forbid illustration, cartoon, painting, CGI, 3D render, HDR look, plastic textures, exaggerated bokeh, artificial glow, film grain, or stylized AI-art look.",
+      "- Strictly forbid illustration, cartoon, painting, CGI, 3D render, HDR look, plastic textures, fake uniform bokeh circles, artificial glow, or stylized AI-art look. Natural optical bokeh and mild camera grain are fine when the photo style calls for them.",
     ].join("\n");
   }
   if (preset === "campaign_social") {

@@ -318,48 +318,87 @@ export function getBottleCatalogEntry(flaschenTyp: keyof typeof FLASCHEN_TYPEN) 
   return FLASCHEN_TYPEN[flaschenTyp];
 }
 
+/**
+ * Servier-Gläser. Schaumhöhe kommt NICHT aus dem Glas, sondern aus der Sorte (BEER_PHYSICS.head).
+ * `eichstrich`: deutsches Schankglas mit Füllstrich und Volumenangabe.
+ */
 export const GLAS_TYPEN = {
   pils_tulpe: {
     label: "Pilstulpe",
     promptDescription:
-      "STEMMED German Pilstulpe: tall slender tulip bowl on a thin stem with a round foot (stem+foot MANDATORY), narrow opening, fine white foam ~2 cm — NEVER a stemless Willibecher tumbler, NEVER a conical beer tumbler without stem",
-    bierstile: ["pils", "helles_lager"],
+      "STEMMED German Pilstulpe: tall slender tulip bowl on a thin stem with a round foot (stem+foot MANDATORY), narrow opening — NEVER a stemless Willibecher tumbler, NEVER a conical beer tumbler without stem",
+    bierstile: ["pils", "helles_lager", "alkoholfrei_pilsner"],
+    eichstrich: true,
   },
   weizen: {
     label: "Weizenglas",
     promptDescription:
-      "tall curvy 0.5 L Weizen glass (vase silhouette), NO stem, thick foam crown 3-4 cm, hazy golden-amber color — NEVER a Willibecher tumbler, NEVER a stemmed Teku",
-    bierstile: ["hefeweizen", "kristallweizen", "dunkles_weizen"],
+      "tall curvy 0.5 L Weizen glass (vase silhouette, narrow waist above the base, widening toward the top), NO stem — NEVER a Willibecher tumbler, NEVER a stemmed Teku",
+    bierstile: ["hefeweizen", "kristallweizen", "dunkles_weizen", "weizenbock"],
+    eichstrich: true,
   },
   willibecher: {
     label: "Willibecher",
     promptDescription:
-      "classic German Willibecher: handle-less ~0.3–0.5 L slightly conical beer tumbler, clearly WIDER at the rim than at the thick sham bottom, short-to-medium height (not a tall highball), NO stem, NO foot, NO waist, NO vase curve, modest white foam cap — the everyday German serving tumbler, not an American pint",
-    bierstile: ["helles", "export", "kellerbier"],
+      "classic German Willibecher, the everyday German serving tumbler (~0.3–0.5 L): narrow thick sham base, walls widening upward in a straight cone, then a gentle rounded belly in the upper third that curves slightly back in toward the rim — NO stem, NO foot, NO handle, NOT a straight cylinder or highball, NOT an American shaker pint, NOT wider at the bottom",
+    bierstile: ["helles", "export", "radler"],
+    eichstrich: true,
+  },
+  seidel: {
+    label: "Seidel / Henkelglas",
+    promptDescription:
+      "German Seidel: heavy 0.5 L glass beer mug with ONE handle, thick base and straight or dimpled walls — NOT a 1 litre Maßkrug, NOT a handle-less tumbler",
+    bierstile: ["maerzen", "dunkel", "kellerbier", "rauchbier"],
+    eichstrich: true,
   },
   masskrug: {
     label: "Maßkrug",
     promptDescription:
       "1-liter glass Maßkrug beer mug with one handle and dimpled facets — NEVER a stemless Willibecher without handle",
-    bierstile: ["helles", "festbier", "maerzen"],
+    bierstile: ["festbier", "helles"],
+    eichstrich: true,
+  },
+  steinkrug: {
+    label: "Steinkrug",
+    promptDescription:
+      "German Steinkrug: grey or brown salt-glazed stoneware beer mug with ONE handle, opaque ceramic walls — the beer is visible only from above at the rim, never through the walls; NOT a glass mug",
+    bierstile: ["zwickel", "kellerbier"],
+    eichstrich: false,
+  },
+  pokal: {
+    label: "Bierpokal",
+    promptDescription:
+      "German Bierpokal: stemmed goblet with a short sturdy stem, round foot and a wide rounded bowl, about 0.3–0.4 L — NOT a slender Pilstulpe, NOT a snifter, NOT a stemless tumbler",
+    bierstile: ["bock", "maibock", "doppelbock", "schwarzbier"],
+    eichstrich: true,
   },
   ipa_teku: {
     label: "Teku / IPA Tulpe",
     promptDescription:
       "STEMMED Italian Teku tasting glass: thin stem and round foot are MANDATORY and clearly visible, bulbous bowl that flares then pinches to a narrow aroma rim — NEVER a stemless Willibecher, NEVER a conical tumbler without stem, NEVER a shaker pint",
     bierstile: ["ipa", "neipa", "double_ipa", "saison"],
+    eichstrich: false,
   },
   schwenker: {
     label: "Schwenker / Snifter",
     promptDescription:
       "STEMMED snifter glass: thin stem and round foot MANDATORY, wide bulbous bowl narrowing toward the rim — NEVER a stemless Willibecher tumbler",
-    bierstile: ["barley_wine", "imperial_stout", "doppelbock"],
+    bierstile: ["barley_wine", "imperial_stout"],
+    eichstrich: false,
+  },
+  nonic: {
+    label: "Nonic-Pint",
+    promptDescription:
+      "Nonic pint glass: tall straight 0.5 L pint with a characteristic bulge ring a few centimetres below the rim, NO stem, NO handle — NOT a conical Willibecher, NOT a Weizen vase",
+    bierstile: ["stout", "porter"],
+    eichstrich: true,
   },
   stange: {
     label: "Stange",
     promptDescription:
       "tall narrow cylindrical 0.2 L Kölsch/Alt Stange glass, NO stem — NEVER a wider Willibecher tumbler",
     bierstile: ["koelsch", "altbier"],
+    eichstrich: true,
   },
 } as const;
 
@@ -472,13 +511,20 @@ const GLAS_NOMINAL_ML: Record<GlasTyp, number> = {
   pils_tulpe: 300,
   weizen: 500,
   willibecher: 500,
+  seidel: 500,
   masskrug: 1000,
+  steinkrug: 500,
+  pokal: 300,
   ipa_teku: 300,
   schwenker: 250,
+  nonic: 500,
   stange: 200,
 };
 
-/** Bei Flasche+Glas: Glas fasst hoechstens eine Fuellung aus diesem Gebinde. Nur-Glas bleibt Nennvolumen. */
+/**
+ * Bei Flasche+Glas passt das Glas zum Gebinde: 0,5-l-Flasche → 0,5-l-Glas, 0,33 → 0,3.
+ * Nie ein 0,3er-Glas neben der Halben und nie eine Maß neben der 0,33. Nur-Glas bleibt Nennvolumen.
+ */
 export function pouredGlassFillMl(
   glasTyp: GlasTyp,
   flaschenTyp: string,
@@ -486,7 +532,7 @@ export function pouredGlassFillMl(
 ): number {
   const nominal = GLAS_NOMINAL_ML[glasTyp];
   if (behaelter === "G") return nominal;
-  return Math.min(nominal, flascheVolumeMl(flaschenTyp));
+  return flascheVolumeMl(flaschenTyp);
 }
 
 function litersLabel(ml: number): string {
@@ -501,8 +547,15 @@ function volumeForbidden(fillMl: number): string {
   if (fillMl < 500) {
     return "NOT a 0.5 litre Seidel or Willibecher, NOT a 0.5 litre dimpled mug, NOT a 1 litre Maßkrug";
   }
-  if (fillMl < 1000) return "NOT a 1 litre Maßkrug";
+  if (fillMl < 1000) {
+    return "The glass takes the whole half-litre bottle — NOT a small 0.2–0.3 litre glass, NOT a 1 litre Maßkrug";
+  }
   return "";
+}
+
+/** Deutsches Schankglas mit Füllstrich — das Bier steht am Strich, der Schaum darüber. */
+export function glassHasEichstrich(glasTyp: GlasTyp): boolean {
+  return GLAS_TYPEN[glasTyp].eichstrich;
 }
 
 /** Glasbeschreibung inkl. realer Fuellmenge neben der gewaehlten Flasche/Dose. */
@@ -515,12 +568,12 @@ export function glassPourPromptDescription(
   switch (glasTyp) {
     case "masskrug":
       if (fillMl >= 1000) return GLAS_TYPEN.masskrug.promptDescription;
-      return `a small ${litres} litre dimpled glass beer mug (Seidel) with one handle and modest foam — a single pour from the bottle beside it. ${tooBig}`;
+      return `a small ${litres} litre dimpled glass beer mug (Seidel) with one handle — a single pour from the bottle beside it. ${tooBig}`;
     case "willibecher":
-      return `classic German Willibecher: handle-less ${litres} litre slightly conical beer tumbler, WIDER at the rim than at the thick sham bottom, short-to-medium height (not a tall highball), NO stem, NO foot, NO waist, modest white foam cap — NOT an American shaker pint. ${tooBig}`;
+      return `classic German ${litres} litre Willibecher: narrow thick sham base, walls widening upward in a straight cone, then a gentle rounded belly in the upper third that curves slightly back in toward the rim — NO stem, NO foot, NO handle, NOT a straight cylinder or highball, NOT an American shaker pint, NOT wider at the bottom. ${tooBig}`;
     case "weizen":
       if (fillMl < 500) {
-        return `a smaller ${litres} litre wheat-beer tumbler, not the tall 0.5 L Weizen vase, modest foam. ${tooBig}`;
+        return `a smaller ${litres} litre wheat-beer glass, not the tall 0.5 L Weizen vase. ${tooBig}`;
       }
       return GLAS_TYPEN.weizen.promptDescription;
     default:

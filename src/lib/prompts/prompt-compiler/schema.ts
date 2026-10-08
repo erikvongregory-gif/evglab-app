@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { IMAGE_PROMPT_SECTIONS } from "../image-direction";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 
 export const referenceRoleSchema = z.enum(["product", "label", "mood", "shape", "glass", "liquid", "scene", "look"]);
@@ -37,20 +38,15 @@ export const compiledBriefSchema = z.object({
 
 export type CompiledBrief = z.infer<typeof compiledBriefSchema>;
 
-export const MASTER_PROMPT_SECTIONS = [
-  "AUFGABE UND VERWENDUNGSZWECK",
-  "HAUPTPRODUKT",
-  "REFERENZEN",
-  "SZENE UND KOMPOSITION",
-  "LICHT UND MATERIAL",
-  "MARKENWIRKUNG",
-  "TEXT UND ETIKETT",
-  "ZWINGEND BEIBEHALTEN",
-  "NICHT VERÄNDERN ODER HINZUFÜGEN",
-  "AUSGABE",
-] as const;
+export const MASTER_PROMPT_SECTIONS = IMAGE_PROMPT_SECTIONS;
 
 export function masterPromptHasRequiredSections(prompt: string): boolean {
   const upper = prompt.toUpperCase();
-  return MASTER_PROMPT_SECTIONS.every((section) => upper.includes(section.toUpperCase()));
+  let previous = -1;
+  return MASTER_PROMPT_SECTIONS.every((section) => {
+    const position = upper.indexOf(section.toUpperCase());
+    const ordered = position > previous;
+    previous = position;
+    return ordered;
+  });
 }

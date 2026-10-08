@@ -1,0 +1,41 @@
+begin;
+create table public.beer_style_appearance (
+  bierstil text primary key,
+  profile jsonb not null check (
+    jsonb_typeof(profile) = 'object'
+    and profile ?& array['hex','srm','liquid','foam','head','carbonation']
+    and (profile->>'hex') ~ '^#[0-9A-Fa-f]{6}$'
+  )
+);
+alter table public.beer_style_appearance enable row level security;
+revoke all on public.beer_style_appearance from public, anon, authenticated;
+grant all on public.beer_style_appearance to service_role;
+comment on table public.beer_style_appearance is 'Shared beverage appearance only. No scene, wardrobe, casting or photographic presets.';
+insert into public.beer_style_appearance (bierstil,profile) values
+('helles','{"srm":"3–5","hex":"#F8D975","liquid":"crystal-clear pale golden lager with warm glow-through when backlit","foam":"dense ivory-white foam with fine pores and delicate lacing on the glass walls","head":"about two fingers (2–3 cm) of foam","carbonation":"fine ascending pearl-like bubbles in steady streams"}'::jsonb),
+('export','{"srm":"4–6","hex":"#F2C94C","liquid":"clear golden Export lager, a touch deeper and fuller in color than a Helles","foam":"firm white foam with fine pores","head":"about two fingers (2–3 cm) of foam","carbonation":"steady fine carbonation"}'::jsonb),
+('festbier','{"srm":"4–7","hex":"#F0C040","liquid":"brilliant clear deep-golden Festbier (modern Wiesn style) — golden, not copper","foam":"firm dense white foam","head":"about two fingers (2–3 cm) of firm foam","carbonation":"lively fine carbonation"}'::jsonb),
+('pils','{"srm":"2–4","hex":"#F5E08A","liquid":"brilliant pale straw-gold Pilsner with crystal clarity and crisp brilliance","foam":"tight compact brilliant-white foam with micro-fine pores and clean lacing rings","head":"a firm fine-pored crown that rises slightly above the rim (Pilskrone), about 3 cm","carbonation":"lively fine carbonation with crisp ascending bubble trails"}'::jsonb),
+('hefeweizen','{"srm":"4–6","hex":"#F5A623","liquid":"hazy golden-orange wheat beer with natural yeast turbidity and warm glowing opacity","foam":"fluffy white foam with large irregular pores and spectacular retention, never a plastic dome","head":"a tall loose crown of 3–4 cm, the top slightly uneven","carbonation":"vigorous effervescent streams rising through the haze"}'::jsonb),
+('kristallweizen','{"srm":"3–5","hex":"#F0C850","liquid":"crystal-clear filtered golden wheat beer with brilliant clarity","foam":"firm white foam with a natural irregular edge","head":"about 3 cm of foam","carbonation":"steady medium-fine carbonation streams"}'::jsonb),
+('dunkles_weizen','{"srm":"14–23","hex":"#8B4A1F","liquid":"hazy chestnut-brown Dunkles Weißbier with yeast turbidity and warm amber edges","foam":"creamy beige foam with good retention","head":"a tall crown of 3–4 cm","carbonation":"lively streams rising through the haze"}'::jsonb),
+('weizenbock','{"srm":"12–25","hex":"#8A4A1C","liquid":"hazy dark amber to brown Weizenbock with yeast turbidity","foam":"dense off-white to beige foam","head":"about 3 cm of foam","carbonation":"lively but softer carbonation"}'::jsonb),
+('maerzen','{"srm":"9–14","hex":"#C87941","liquid":"warm burnished copper-amber Märzen with deep orange-copper glow and ruby edge in backlight","foam":"firm dense off-white foam with good retention","head":"about two fingers (2–3 cm) of foam","carbonation":"steady medium carbonation with natural bubble trails"}'::jsonb),
+('dunkel','{"srm":"17–25","hex":"#6B3A1E","liquid":"deep chestnut-brown Munich Dunkel, clear, with ruby-brown highlights when backlit","foam":"creamy light-tan foam","head":"about two fingers (2 cm) of foam","carbonation":"moderate fine carbonation"}'::jsonb),
+('schwarzbier','{"srm":"25–35","hex":"#2A1408","liquid":"very dark brown-black Schwarzbier, still clear with a ruby edge when backlit — not opaque like a stout","foam":"tight tan foam","head":"about 2 cm of foam","carbonation":"moderate fine carbonation"}'::jsonb),
+('kellerbier','{"srm":"8–12","hex":"#D4A850","liquid":"naturally cloudy hazy pale golden-amber Kellerbier with gentle yeast turbidity","foam":"soft off-white foam with rustic texture","head":"1–2 cm of soft creamy foam","carbonation":"low to moderate gentle carbonation"}'::jsonb),
+('zwickel','{"srm":"4–8","hex":"#E9B44C","liquid":"naturally cloudy golden Zwickelbier with soft yeast haze","foam":"soft white foam","head":"about 2 cm of foam","carbonation":"gentle carbonation"}'::jsonb),
+('rauchbier','{"srm":"15–22","hex":"#7A3B16","liquid":"dark copper-brown Rauchbier with garnet highlights when backlit","foam":"creamy tan foam","head":"about 2 cm of foam","carbonation":"moderate carbonation"}'::jsonb),
+('bock','{"srm":"14–22","hex":"#9B5523","liquid":"rich deep amber to dark copper-brown Bock with warm chestnut tones and ruby edge glow","foam":"dense off-white to cream foam, thick and persistent","head":"1–2 cm of creamy foam","carbonation":"moderate smooth carbonation"}'::jsonb),
+('maibock','{"srm":"6–9","hex":"#E8A33A","liquid":"clear deep-gold to light amber Maibock (Heller Bock)","foam":"dense white foam","head":"about 2 cm of foam","carbonation":"moderate carbonation"}'::jsonb),
+('doppelbock','{"srm":"17–30","hex":"#5A2A12","liquid":"deep mahogany-brown Doppelbock, clear, with a ruby glow when backlit","foam":"creamy tan foam","head":"1–2 cm of foam","carbonation":"soft moderate carbonation"}'::jsonb),
+('koelsch','{"srm":"3–5","hex":"#F8D975","liquid":"pale straw-gold Kölsch with brilliant clarity","foam":"delicate white foam, minimal lacing","head":"a thin one-finger cap (about 1 cm)","carbonation":"moderate fine carbonation, clean streams"}'::jsonb),
+('altbier','{"srm":"11–19","hex":"#9B4521","liquid":"deep amber to copper-brown Altbier with warm reddish-copper tones","foam":"tight compact tan-white foam","head":"1–2 cm of foam","carbonation":"moderate fine carbonation, clean streams"}'::jsonb),
+('ipa','{"srm":"8–14","hex":"#D4843A","liquid":"deep amber to copper IPA with slight haze and warm orange-amber clarity","foam":"off-white foam with medium pores and light sticky lacing","head":"1–2 cm of foam","carbonation":"moderate effervescence with scattered bubble trails"}'::jsonb),
+('neipa','{"srm":"4–7","hex":"#F5C842","liquid":"opaque pale citrus-yellow hazy NEIPA with dense unfiltered protein haze and juicy opacity","foam":"soft pillowy white foam with silky texture","head":"about 2 cm of foam","carbonation":"gentle lazy carbonation with soft bubble clusters visible through haze"}'::jsonb),
+('stout','{"srm":"35–40+","hex":"#160800","liquid":"opaque jet-black stout with absolutely no light transmission, velvety black body","foam":"thick velvety cream-colored foam with extremely fine texture","head":"a tight creamy tan cap of about 1 cm","carbonation":"minimal surface carbonation with occasional slow bubbles"}'::jsonb),
+('porter','{"srm":"25–30","hex":"#3D1105","liquid":"deep mahogany-brown porter with ruby-garnet edge translucency when backlit","foam":"tan-brown foam with medium pores","head":"about 1 cm of foam","carbonation":"gentle steady carbonation streams"}'::jsonb),
+('saison','{"srm":"5–14","hex":"#E0A030","liquid":"golden to amber saison with light rustic yeast haze and warm golden turbidity","foam":"dense fluffy white Belgian-style rocky foam with large pores","head":"a tall rocky head of 3–4 cm","carbonation":"vigorous fine streams, lively effervescence"}'::jsonb),
+('radler','{"srm":"2–5","hex":"#FAE86B","liquid":"hazy pale golden-lemon Radler with cloudy lemon-gold body and subtle citrus particles","foam":"light bubbly white foam, quickly fading","head":"a thin fast-fading cap under 1 cm","carbonation":"sparkling lively effervescence"}'::jsonb),
+('alkoholfrei_pilsner','{"srm":"3–4","hex":"#F8E080","liquid":"brilliant pale golden alcohol-free Pilsner, clean and fresh straw gold","foam":"light airy white foam","head":"about two fingers (2–3 cm) of foam","carbonation":"crisp lively micro-bubbles"}'::jsonb);
+commit;

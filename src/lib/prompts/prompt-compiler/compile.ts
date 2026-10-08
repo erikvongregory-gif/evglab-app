@@ -3,6 +3,7 @@ import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/li
 import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import { createAnthropicMessageWithModelFallback } from "@/lib/anthropic/modelCandidates";
 import type { VisionReferenceImage } from "@/lib/brand/reference-image-bytes";
+import { IMAGE_PROMPT_SECTIONS, IMAGE_PROMPT_WRITING_RULES } from "../image-direction";
 import { assembleMasterPrompt } from "./assemble-master-prompt";
 import {
   compiledBriefSchema,
@@ -102,20 +103,14 @@ Du antwortest NUR mit einem JSON-Objekt (kein Markdown außerhalb), Schema:
 }
 
 image_prompt MUSS diese Abschnitte in dieser Reihenfolge enthalten (Überschriften exakt):
-AUFGABE UND VERWENDUNGSZWECK
-HAUPTPRODUKT
-REFERENZEN
-SZENE UND KOMPOSITION
-LICHT UND MATERIAL
-MARKENWIRKUNG
-TEXT UND ETIKETT
-ZWINGEND BEIBEHALTEN
-NICHT VERÄNDERN ODER HINZUFÜGEN
-AUSGABE
+${IMAGE_PROMPT_SECTIONS.join("\n")}
+
+${IMAGE_PROMPT_WRITING_RULES}
 
 Regeln:
 - Kundenbrief (USER SCENE) ist verbindlich für Szene/Aktion.
-- ui_fields.photoStyle ist verbindlich: reportage = candid beobachteter Moment mit available light und natürlichen Unperfektheiten; premium = reales kontrolliertes Set, 85mm, präzise glaubhafte Materialien; campaign = bewusst inszenierte Realfotografie mit klarer Hierarchie und Copy-Space.
+- ui_fields.photoStyle ist verbindlich: reportage = roher Blitz-Schnappschuss aus dem echten Bierleben (Stammtisch, Biergarten, Fest, Sudhaus), direkter Kamerablitz auch tagsüber, schiefer Ausschnitt, Produkt nebenbei; premium = ruhige, hochwertige Fotografie an einem echten Ort, 85mm, weiches Licht, Bokeh; ein Mensch beim Genießen/Einschenken oder das Produkt als Motiv, Produkt immer scharf und erkennbar; campaign = inszeniertes Key Visual, Produkt dominiert den Frame.
+- Licht und Kamera: explizite Kundenangaben zuerst, sonst Fotostil und gewählte Tageszeit; nur eine konsistente Einstellung.
 - Bei Anstoßen/Prost/angestoßen: sichtbare Hände mit Gläsern — nie Flasche+Glas die allein „anstoßen“.
 - Referenzbild 1 = nur Produktidentität; Hintergrund der Referenz verwerfen.
 - Nutze referenceRoles als verbindliche Zuordnung. Vermische Produkt-, Form-, Glas-, Szenen- und Look-Referenzen nicht.

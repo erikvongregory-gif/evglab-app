@@ -30,6 +30,23 @@ const baseInput = {
 } satisfies HyperrealisticInput;
 
 describe("prompt-compiler", () => {
+  it("rejects complete but reordered master sections", () => {
+    expect(masterPromptHasRequiredSections([...MASTER_PROMPT_SECTIONS].reverse().join("\n"))).toBe(false);
+    expect(masterPromptHasRequiredSections(MASTER_PROMPT_SECTIONS.slice(1).join("\n"))).toBe(false);
+  });
+
+  it("keeps user direction above look references and provides one camera section", () => {
+    const prompt = assembleMasterPrompt({
+      input: baseInput,
+      hasProductPhoto: true,
+      hasShapeReference: true,
+      referenceRoles: [{ index: 1, role: "product" }, { index: 2, role: "look" }],
+    });
+    expect(prompt).toContain("never replace the requested action or location");
+    expect(prompt.indexOf(baseInput.zusatzWunsch)).toBeLessThan(prompt.indexOf("Image 1"));
+    expect(prompt.match(/KOMPOSITION UND KAMERA/g)).toHaveLength(1);
+    expect(prompt).toContain("Image 2 (look)");
+  });
   it.each([401, 800])("preserves a valid %i-character brief in the product-photo path", async (length) => {
     const brief = "Biergarten mit warmem Licht. ".repeat(40).slice(0, length - 5) + "ENDE.";
     const input = hyperrealisticSchema.parse({ ...baseInput, zusatzWunsch: brief });

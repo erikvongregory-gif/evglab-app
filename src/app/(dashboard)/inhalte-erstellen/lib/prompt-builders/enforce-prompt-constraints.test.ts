@@ -74,8 +74,8 @@ describe("enforceHyperrealisticPromptConstraints", () => {
       behaelter: "F",
       glasTyp: undefined,
     });
-    expect(out).not.toMatch(/already poured into a glass/i);
-    expect(out).toMatch(/untouched unopened product shot/i);
+    expect(out).not.toMatch(/OPEN SERVING/i);
+    expect(out).toMatch(/only correct when nobody drinks from it/i);
   });
 
   it("skips image reference for glass-only generation", () => {

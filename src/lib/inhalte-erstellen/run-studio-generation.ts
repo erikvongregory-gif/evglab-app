@@ -1,19 +1,9 @@
 import { after, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { requireImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
-import { applyClientIntentOverrides, buildProductPlacementPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
-import {
-  buildPhotoStyleLockFragment,
-  ensureClosureLogic,
-  ensureProductGeometryLocks,
-  inputProduktKategorie,
-  resolveBeerClarity,
-} from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
-import { enforceHyperrealisticPromptConstraints } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/enforce-prompt-constraints";
 import { hyperrealisticSchema, socialPostSchema, type HyperrealisticInput, type SocialPostInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
+import { readLabelText } from "@/lib/brand/label-text";
 import {
-  buildBrandProfilePromptContext,
   canUseCampaignWithTextProfile,
   getBrandProfileFromMetadata,
 } from "@/lib/dashboard/brandProfile";
@@ -24,34 +14,30 @@ import {
 } from "@/lib/billing/generationTokenCost";
 import { ensureBillingRow, getEffectiveBillingRow } from "@/lib/billing/store";
 import { requireActiveSubscription } from "@/lib/billing/access";
-import { compileBrief } from "@/lib/prompts/prompt-compiler";
-import { applyContentPresetPrompt } from "@/lib/image-types/policy";
-import { COPY_SPACE_DIRECTIVE } from "@/lib/social/copy-space-prompt";
+import { validateBriefForGeneration } from "@/lib/prompts/prompt-compiler/validate";
 import { composeSocialTextOverlay, parsePrimaryBrandColor } from "@/lib/social/text-overlay";
 import { applyAiWatermark } from "@/lib/openai/aiWatermark";
 import {
   cropImageBufferToAspectRatio,
   generateOpenAiImage,
   mapAspectRatioToOpenAiSize,
+  type OpenAiImageQuality,
   type OpenAiReferenceImage,
 } from "@/lib/openai/generateImage";
 import { aspectRatioToOutputDimensions } from "@/lib/openai/imageAspectRatio";
 import { loadBottleShapeReference } from "@/lib/openai/bottleShapeReference";
 import { loadGlassShapeReference } from "@/lib/openai/glassShapeReference";
-import { loadLiquidClarityReference } from "@/lib/openai/liquidClarityReference";
-import { loadCampaignStyleReferences } from "@/lib/openai/campaignStyleReferences";
-import { loadPremiumStyleReferences } from "@/lib/openai/premiumStyleReferences";
-import { loadReportageStyleReferences } from "@/lib/openai/reportageStyleReferences";
+import { buildBeerColorReference } from "@/lib/openai/beerColorReference";
+import { readBeerAppearance } from "@/lib/beverages/beer-appearance-store";
 import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
 import { uploadGeneratedImageToStorage, uploadGeneratedImageWithThumb } from "@/lib/supabase/storage";
 import { persistGeneratedMediaItems } from "@/lib/dashboard/persistGeneratedMedia";
 import {
   assembleGenerationReferences,
-  buildCharacterIdentityPrompt,
   cropBufferFaceSafe,
   generateCharacterIdentityImage,
 } from "@/lib/kie/nanoBananaCharacterGenerate";
-import { CUSTOMER_IMAGE_SAFETY_LOCK, withAdultSceneContext } from "@/lib/prompts/imageSceneContext";
+import { buildImagePromptV3, normalizeV3Input } from "@/lib/inhalte-erstellen/image-prompt-v3";
 import {
   ProviderError,
   isProviderError,
@@ -77,7 +63,6 @@ import {
 } from "@/lib/inhalte-erstellen/studio-config";
 import { buildStudioMediaTitle, buildStudioMediaPrompt } from "@/lib/inhalte-erstellen/media-title";
 
-const MAX_PROMPT_CHARS = 12_000;
 const OUTPUT_FORMAT = "png" as const;
 const DEFAULT_IMAGE_MODEL = "gpt-image-2.5-sunburst";
 const DEFAULT_VARIANT_COUNT = 3;
@@ -89,6 +74,8 @@ type PreparedGeneration = {
   snapshot: GenerationSnapshot;
   prompt: string;
   referenceImages: OpenAiReferenceImage[];
+  /** Product and explicit customer references for each variant. */
+  referenceSets: OpenAiReferenceImage[][];
   useCharacterIdentity: boolean;
   openAiKey: string;
   model: string;
@@ -96,7 +83,7 @@ type PreparedGeneration = {
   size: ReturnType<typeof mapAspectRatioToOpenAiSize>;
   outputDimensions: { width: number; height: number };
   billingResolution: "1K" | "2K" | "4K";
-  openAiQuality: "low" | "medium" | "high";
+  openAiQuality: OpenAiImageQuality;
   perVariantCost: number;
   variantsToCreate: number;
   headline?: string;
@@ -129,7 +116,7 @@ export async function handleStudioGenerationRequest(req: Request, mode: StudioMo
     }
 
     const raw = parsed.data as StudioInput;
-    const input = applyClientIntentOverrides(raw);
+    const input = normalizeV3Input(raw);
     const resumed = await resumeGenerationIfPresent(req, guard.userId, input);
     if (resumed) return resumed;
 
@@ -214,7 +201,8 @@ async function prepareStudioGeneration(args: {
   userMetadata: unknown;
   remainingTokens: number;
 }): Promise<PreparedGeneration | NextResponse> {
-  const { mode, input } = args;
+  const { mode } = args;
+  let input = args.input;
   const brandProfile = getBrandProfileFromMetadata(args.userMetadata);
   if (mode === "social" && !canUseCampaignWithTextProfile(brandProfile)) {
     return NextResponse.json(
@@ -228,8 +216,6 @@ async function prepareStudioGeneration(args: {
 
   const labelIntent = resolveLabelIntent(input);
   const wantsBrandLabel = labelIntent.keepLabel;
-  const applyBrandLook = labelIntent.applyBrandLook;
-  const brandProfileContext = applyBrandLook ? buildBrandProfilePromptContext(brandProfile) : "";
   const profileLabelUrl = brandProfile.brandLabelReferenceUrl.trim();
   let effectiveEtikettBild = input.etikettBild?.trim() ?? "";
   if (
@@ -256,6 +242,10 @@ async function prepareStudioGeneration(args: {
       );
     }
   }
+
+  // Etikett-Wörter parallel lesen — sie kommen wörtlich in den Prompt (OpenAI: Text immer zitieren).
+  const labelTextPromise =
+    visionReference && wantsBrandLabel ? readLabelText(visionReference) : Promise.resolve<string[]>([]);
 
   const extraRefs: OpenAiReferenceImage[] = [];
   for (const raw of input.extraReferenceImages ?? []) {
@@ -322,49 +312,37 @@ async function prepareStudioGeneration(args: {
     );
   }
 
+  const labelText = await labelTextPromise;
+  input = normalizeV3Input(input, labelText);
+  const beerAppearance = (input.produktKategorie ?? "bier") === "bier"
+    ? await readBeerAppearance(input.bierstil) : undefined;
   const hasProductPhoto = Boolean(visionReference) && input.behaelter !== "G";
   const shapeReference =
     input.behaelter === "G" || hasProductPhoto ? null : await loadBottleShapeReference(input.flaschenTyp);
   const hasShapeReference = Boolean(shapeReference);
   const glassReference =
     input.behaelter === "F" ? null : await loadGlassShapeReference(input.glasTyp);
-  const liquidReference =
-    inputProduktKategorie(input) === "bier" && resolveBeerClarity(input) === "trueb"
-      ? await loadLiquidClarityReference("trueb")
-      : null;
+  const liquidReference = useCharacterIdentity && characterRefs.length + (visionReference ? 1 : 0) >= 4
+    ? null : await buildBeerColorReference(input, beerAppearance);
 
-  // Look-Refs vor Extra-Uploads reservieren — sonst fallen Campaign/Reportage/Premium-Looks still weg.
-  // Charakter-Pfad bleibt bei 4 Slots (Gesicht + Produkt + Extras); Produktpfad darf 6 für Style-Looks.
+  // V3 sends product knowledge and customer uploads, never automatic wardrobe/scene looks.
   const REF_BUDGET = useCharacterIdentity ? 4 : 6;
   const coreReferenceCount = useCharacterIdentity
     ? characterRefs.length + (visionReference ? 1 : 0) + (liquidReference ? 1 : 0)
-    : (visionReference ? 1 : 0) +
-      (shapeReference ? 1 : 0) +
-      (glassReference ? 1 : 0) +
-      (liquidReference ? 1 : 0);
-  const styleLookLimit = Math.min(2, Math.max(0, REF_BUDGET - coreReferenceCount));
-  const styleLookReferences =
-    input.photoStyle === "campaign"
-      ? await loadCampaignStyleReferences(input, styleLookLimit)
-      : input.photoStyle === "reportage"
-        ? await loadReportageStyleReferences(input, styleLookLimit)
-        : input.photoStyle === "premium"
-          ? await loadPremiumStyleReferences(input, styleLookLimit)
-          : [];
-  const extraBudget = Math.max(0, REF_BUDGET - coreReferenceCount - styleLookReferences.length);
-  const cappedExtraRefs = extraRefs.slice(0, extraBudget);
-
+    : (visionReference ? 1 : 0) + (shapeReference ? 1 : 0) + (glassReference ? 1 : 0) + (liquidReference ? 1 : 0);
+  const cappedExtraRefs = extraRefs.slice(0, Math.max(0, REF_BUDGET - coreReferenceCount));
   const assembled = assembleGenerationReferences({
     useCharacterIdentity,
     characterRefs,
     visionReference,
     extraRefs: cappedExtraRefs,
     extraRefRoles: input.extraReferenceRoles,
-    campaignRefs: styleLookReferences,
     shapeReference,
     glassReference,
     liquidReference,
   });
+  const variantCount = input.variantCount ?? DEFAULT_VARIANT_COUNT;
+  const referenceSets: OpenAiReferenceImage[][] = Array.from({ length: variantCount }, () => assembled.references);
   const compilerReferenceRoles = assembled.roles.flatMap(({ index, role }) =>
     role === "character" ? [] : [{ index, role, note: "" }],
   );
@@ -379,85 +357,31 @@ async function prepareStudioGeneration(args: {
     );
   }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
-  const anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
-
-  const compiled = await compileBrief({
-    anthropic: hasProductPhoto ? null : anthropic,
+  const validation = validateBriefForGeneration({
     input,
-    breweryName: brandProfile.breweryName,
-    brandProfileContext,
     hasProductPhoto,
     hasShapeReference,
-    referenceImages: assembled.references,
-    referenceRoles: compilerReferenceRoles,
+    hasUsableBrief: true, // V3 can invent unspecified scene details; product identity remains validated.
   });
-
-  if (compiled.blocking_issues.length > 0) {
-    return NextResponse.json(
-      {
-        error: compiled.blocking_issues[0],
-        blocking_issues: compiled.blocking_issues,
-        missing_information: compiled.missing_information,
-        compiled: {
-          normalized_brief: compiled.normalized_brief,
-          reference_roles: compiled.reference_roles,
-        },
-      },
-      { status: 422 },
-    );
+  if (validation.blocking_issues.length > 0) {
+    return NextResponse.json({
+      error: validation.blocking_issues[0],
+      blocking_issues: validation.blocking_issues,
+      missing_information: validation.missing_information,
+      compiled: { normalized_brief: { scene: input.zusatzWunsch || "" }, reference_roles: compilerReferenceRoles },
+    }, { status: 422 });
   }
-
-  let prompt: string;
-  if (hasProductPhoto) {
-    const briefParts = [
-      compiled.normalized_brief.scene,
-      compiled.normalized_brief.action,
-      compiled.normalized_brief.people,
-      input.zusatzWunsch?.trim(),
-    ].filter((part, index, arr) => Boolean(part) && arr.indexOf(part) === index);
-    prompt = buildProductPlacementPrompt(
-      {
-        ...input,
-        zusatzWunsch: briefParts.join(". ").slice(0, 800) || input.zusatzWunsch,
-      },
-      { referenceRoles: compilerReferenceRoles },
-    );
-    if (brandProfileContext) prompt = `${prompt} ${brandProfileContext.replace(/\n+/g, " ")}`;
-    if (labelIntent.stiltreue === "hoch" && wantsBrandLabel) {
-      prompt = `${prompt} LABEL FIDELITY: Keep Image 1 label identical — every letter, logo, crest. Change only the environment.`;
-    }
-  } else {
-    prompt = compiled.image_prompt;
-  }
-
-  if (useCharacterIdentity) {
-    prompt = buildCharacterIdentityPrompt({
-      szene: input.szene,
-      zusatzWunsch: input.zusatzWunsch,
-      characterName: input.characterName,
-      characterRole: input.characterRole,
-      appearanceLock: input.characterAppearanceLock,
-      characterRefCount: characterRefs.length,
-      extraRefCount: assembled.extraRefCount + assembled.campaignRefCount,
-      brandContext: brandProfileContext || undefined,
-    });
-  }
-
-  if (input.hyperreal === true || input.contentPreset === "hyperreal") {
-    prompt = applyContentPresetPrompt(prompt, "hyperreal");
-  }
-  prompt = enforceHyperrealisticPromptConstraints(prompt, input, brandProfile.breweryName);
-  const photoStyleLock = buildPhotoStyleLockFragment(input);
-  const tail = [photoStyleLock, mode === "social" ? COPY_SPACE_DIRECTIVE : "", CUSTOMER_IMAGE_SAFETY_LOCK]
-    .filter(Boolean)
-    .join("\n\n");
-  // Style-, Copy- und Safety-Lock nach Truncation anhängen — sonst sterben sie am Prompt-Ende.
-  prompt = withAdultSceneContext(prompt, MAX_PROMPT_CHARS - tail.length - 2);
-  prompt = `${prompt}\n\n${tail}`;
-  // Geometrie + Verschluss VORN — Truncation darf Etikett/Glas/Naturtrüb nicht streichen.
-  prompt = ensureProductGeometryLocks(prompt, input);
-  prompt = ensureClosureLogic(prompt, input);
+  const prompt = buildImagePromptV3({
+    beerAppearance,
+    input: { ...input, aspectRatio: effectiveAspectRatio(input.aspectRatio as Aspect, useCharacterIdentity) },
+    references: assembled.roles,
+    breweryName: brandProfile.breweryName,
+    social: mode === "social",
+    character: useCharacterIdentity
+      ? { name: input.characterName, role: input.characterRole, appearanceLock: input.characterAppearanceLock }
+      : undefined,
+    labelText,
+  });
 
   const qualityEnv = process.env.OPENAI_IMAGE_QUALITY?.trim().toLowerCase();
   const requestedQuality =
@@ -467,20 +391,20 @@ async function prepareStudioGeneration(args: {
     qualityEnv,
     compiledOrRequestedQuality: requestedQuality,
   });
-  const openAiQuality: "low" | "medium" | "high" =
-    qualityEnv === "low" || qualityEnv === "medium" || qualityEnv === "high"
+  const hasStrictLabel = wantsBrandLabel && hasProductPhoto;
+    // Honor the customer's Ultra selection; explicit deployment overrides still take precedence.
+  const openAiQuality: OpenAiImageQuality =
+    qualityEnv === "low" || qualityEnv === "medium" || qualityEnv === "high" || qualityEnv === "xhigh" || qualityEnv === "max"
       ? qualityEnv
-      : billingResolution === "1K"
-        ? "medium"
-        : "high";
+        : input.quality === "ultra" ? "xhigh" : "high";
   const hasReferenceForBilling = assembled.references.length > 0;
-  const strictLabelMode = wantsBrandLabel && hasProductPhoto;
+  const strictLabelMode = hasStrictLabel;
   const perVariantCost = calculatePerVariantTokenCost({
     resolution: billingResolution,
     hasReferenceImage: hasReferenceForBilling,
     strictLabelMode,
   });
-  const variantsToCreate = input.variantCount ?? DEFAULT_VARIANT_COUNT;
+  const variantsToCreate = variantCount;
   const expectedTotalCost = calculateGenerationTokenCost({
     resolution: billingResolution,
     hasReferenceImage: hasReferenceForBilling,
@@ -495,7 +419,7 @@ async function prepareStudioGeneration(args: {
   }
 
   const hasCharacter = Boolean(input.characterName?.trim());
-  const compiledAspect = compiled.generation_settings.aspectRatio || input.aspectRatio;
+  const compiledAspect = input.aspectRatio;
   const aspectRatio = effectiveAspectRatio(compiledAspect as Aspect, hasCharacter);
   const social = mode === "social" ? (input as SocialPostInput) : null;
   const extraRoles = (input.extraReferenceImages ?? []).map((_, index) => ({
@@ -511,12 +435,14 @@ async function prepareStudioGeneration(args: {
     beerName: input.beerName,
     characterName: input.characterName,
   });
+  snapshot.outputDimensions = aspectRatioToOutputDimensions(aspectRatio, billingResolution);
 
   return {
     input,
     snapshot,
     prompt,
     referenceImages: assembled.references,
+    referenceSets,
     useCharacterIdentity,
     openAiKey,
     model: useCharacterIdentity
@@ -580,11 +506,21 @@ async function executeStudioGeneration(args: {
     });
   };
 
-  const renderOne = async (): Promise<void> => {
+  const renderOne = async (variant: number): Promise<void> => {
+    const references = prepared.referenceSets[variant] ?? prepared.referenceImages;
+    console.info("[studio-image-request]", {
+      jobId: job.id,
+      promptVersion: "v3",
+      model: prepared.model,
+      quality: prepared.useCharacterIdentity ? undefined : prepared.openAiQuality,
+      resolution: prepared.billingResolution,
+      size: prepared.size,
+      referenceCount: references.length,
+    });
     const rawBuffer = prepared.useCharacterIdentity
       ? await generateCharacterIdentityImage({
           prompt: prepared.prompt,
-          references: prepared.referenceImages,
+          references,
           aspectRatio: prepared.aspectRatio,
           resolution: prepared.billingResolution,
           onTaskId: async (taskId) => {
@@ -600,7 +536,7 @@ async function executeStudioGeneration(args: {
           size: prepared.size,
           outputFormat: OUTPUT_FORMAT,
           quality: prepared.openAiQuality,
-          referenceImages: prepared.referenceImages,
+          referenceImages: references,
         });
 
     const cropped = prepared.useCharacterIdentity
@@ -653,7 +589,7 @@ async function executeStudioGeneration(args: {
 
   for (let index = 0; index < prepared.variantsToCreate; index += 1) {
     try {
-      await renderOne();
+      await renderOne(index);
     } catch (reason) {
       if (isProviderError(reason)) {
         providerFailures.push(reason);

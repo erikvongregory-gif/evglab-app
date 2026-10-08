@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AuthTransition } from "@/components/ui/auth-transition";
 import { resolveAuthCallbackRedirect } from "@/lib/supabase/authEntryRedirect";
 import { createClient } from "@/lib/supabase/client";
 
@@ -30,7 +31,7 @@ export function AuthLandingRouter({
 }: {
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const [message, setMessage] = useState("Weiterleitung …");
+  const [message, setMessage] = useState("Deine Anmeldung wird vorbereitet …");
 
   useEffect(() => {
     let cancelled = false;
@@ -67,9 +68,5 @@ export function AuthLandingRouter({
     };
   }, [searchParams]);
 
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#131211] px-4">
-      <p className="text-sm text-[#c4bdb3]">{message}</p>
-    </main>
-  );
+  return <AuthTransition message={message} />;
 }

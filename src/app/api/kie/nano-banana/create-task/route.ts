@@ -1,3 +1,4 @@
+import { buildFreeformImagePromptV3 } from "@/lib/inhalte-erstellen/image-prompt-v3";
 import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { reserveGeneration, finishGeneration, linkProviderTask } from "@/lib/billing/generationJobs";
 import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
@@ -21,7 +22,6 @@ import { mapAspectRatioForGptImage2, normalizeResolutionForGptImage2 } from "@/l
 import {
   type ContentCreationPreset,
   MAX_REFERENCE_UPLOADS,
-  applyContentPresetPrompt,
   validateImageTypePolicy,
 } from "@/lib/image-types/policy";
 
@@ -63,7 +63,6 @@ const createTaskSchema = z.object({
   strictLabelMode: z.boolean().optional(),
 });
 
-const MAX_KIE_PROMPT_CHARS = 12_000;
 
 function extractTaskId(input: unknown): string | null {
   if (!input || typeof input !== "object") return null;
@@ -252,42 +251,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const strictLabelPromptPrefix = body.strictLabelMode
-      ? [
-          "Brand/label fidelity lock (MANDATORY):",
-          "- Preserve the exact original brand identity and label layout 1:1 for any branded bottles or packaging shown.",
-          "- Keep logo mark, typography, color blocks, crest placement, and bottle label geometry authentic and undistorted.",
-          "- Any visible label text must be sharp and readable; no gibberish, mirrored, stretched, or melted lettering.",
-          "- Do not invent substitute branding or alter the original product identity.",
-          "- Keep at least one bottle as a hero product in sharp focus with tack-sharp label readability.",
-          "- Avoid blur specifically on the label/logo area (no motion blur, no depth-of-field blur on primary brand text).",
-          "- If depth-of-field is used, keep branded bottle text plane inside the focal plane.",
-        ].join("\n")
-      : "";
-    const negativePromptBlock = [
-      "Negative prompt constraints (MANDATORY):",
-      "- no waxy/plastic skin, no uncanny facial geometry",
-      "- no extra/fused fingers, malformed hands, duplicate limbs",
-      "- no distorted teeth/lips/eyes, no asymmetrical face glitches",
-      "- no CGI/3D-render look",
-      "- no gibberish or mirrored label text, no stretched/melted typography",
-      "- no fake substitute branding",
-    ].join("\n");
-    const policyPrompt = applyContentPresetPrompt(body.prompt.trim(), body.imageType ?? "hyperreal");
-    const promptWithLabelLock = strictLabelPromptPrefix
-      ? `${strictLabelPromptPrefix}\n\n${policyPrompt}\n\n${negativePromptBlock}`
-      : `${policyPrompt}\n\n${negativePromptBlock}`;
-    const promptWithBrandContextRaw = [
-      promptWithLabelLock,
-      "",
-      bodyBrandProfileContext,
-    ]
-      .filter(Boolean)
-      .join("\n");
-    const promptWithBrandContext =
-      promptWithBrandContextRaw.length > MAX_KIE_PROMPT_CHARS
-        ? promptWithBrandContextRaw.slice(0, MAX_KIE_PROMPT_CHARS)
-        : promptWithBrandContextRaw;
+    const promptWithBrandContext = buildFreeformImagePromptV3({ scene: body.prompt.trim(), imageType: body.imageType ?? "hyperreal", aspectRatio: body.aspectRatio, referenceCount: body.referenceImageUrls?.length, brandContext: bodyBrandProfileContext, strictLabel: body.strictLabelMode });
 
     const uploadedReferenceUrls = hasReferenceImages
       ? await uploadReferenceImagesToKie(apiKey, body.referenceImageUrls)

@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/beverages/beer-appearance-store", async () => {
+  const { BEER_PHYSICS } = await import("@/lib/beverages/beer-appearance");
+  return { readBeerAppearance: vi.fn(async (style: string) => BEER_PHYSICS[style]) };
+});
+
 const mocks = vi.hoisted(() => ({
   reserve: vi.fn(),
   resume: vi.fn(),
   finish: vi.fn(),
   render: vi.fn(),
   persist: vi.fn(),
+  automaticLooks: vi.fn(() => { throw new Error("V3 must not load automatic style images"); }),
+  labelWords: vi.fn<() => Promise<string[]>>(),
 }));
 
 vi.mock("@/app/(dashboard)/inhalte-erstellen/lib/api-guards", () => ({
@@ -26,11 +33,13 @@ vi.mock("@/lib/billing/generationJobs", () => ({
   getGenerationJobForUser: async () => ({ id: "job", user_id: "user", result: {} }),
 }));
 vi.mock("@/lib/openai/imageApiKey", () => ({ requireOpenAiImageApiKey: () => "test-key" }));
+vi.mock("@/lib/brand/label-text", () => ({ readLabelText: mocks.labelWords }));
 vi.mock("@/lib/brand/reference-image-bytes", () => ({
   resolveReferenceImageForVision: async (raw: string) => ({ mime: "image/png", base64: raw.slice(-8) }),
 }));
 vi.mock("@/lib/openai/bottleShapeReference", () => ({ loadBottleShapeReference: async () => null }));
 vi.mock("@/lib/openai/glassShapeReference", () => ({ loadGlassShapeReference: async () => null }));
+vi.mock("@/lib/openai/styleLookReferences", () => ({ loadStyleLookReferences: mocks.automaticLooks }));
 vi.mock("@/lib/dashboard/brandProfile", () => ({
   getBrandProfileFromMetadata: () => ({
     breweryName: "Test",
@@ -81,6 +90,7 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 import { POST as product } from "@/app/api/inhalte-erstellen/create-task/route";
+import { POST as social } from "@/app/api/inhalte-erstellen/social-post/route";
 
 const characterPayload = {
   etikettBild: "https://cdn.example/beer.png",
@@ -104,6 +114,7 @@ const characterPayload = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.labelWords.mockResolvedValue([]);
   vi.stubEnv("KIE_API_KEY", "test-kie");
   mocks.resume.mockResolvedValue(null);
   mocks.reserve.mockResolvedValue({ id: "job", user_id: "user" });
@@ -113,6 +124,59 @@ beforeEach(() => {
 });
 
 describe("studio generation contract", () => {
+  it.each([['high', 'high'], ['ultra', 'xhigh']])("honors %s render quality and reports actual output dimensions", async (quality, expected) => {
+    vi.stubEnv("OPENAI_IMAGE_QUALITY", "");
+    const response = await product(new Request("https://app.example/api/inhalte-erstellen/create-task", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...characterPayload, characterName: undefined, characterReferenceImages: [], extraReferenceImages: [], quality, aspectRatio: "16:9" }),
+    }));
+    expect(response.status).toBe(202);
+    const request = mocks.render.mock.calls[0][0];
+    expect(request.quality).toBe(expected);
+    const body = await response.json();
+    expect(body.snapshot.outputDimensions).toEqual(body.outputDimensions);
+    if (quality === "ultra") expect(body.outputDimensions.width).toBeGreaterThan(3000);
+    vi.unstubAllEnvs();
+  });
+  it("sends a Dunkel liquid swatch and matching prompt for a locked Dunkel label", async () => {
+    mocks.labelWords.mockResolvedValue(["ABK", "DUNKEL"]);
+    const response = await product(new Request("https://app.example/api/inhalte-erstellen/create-task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...characterPayload, characterName: undefined, characterReferenceImages: [], extraReferenceImages: [], photoStyle: "reportage", behaelter: "B", bierstil: "helles", glasTyp: "willibecher", zusatzWunsch: "Zwei Freunde stoßen mit Gläsern an" }),
+    }));
+    expect(response.status).toBe(202);
+    const request = mocks.render.mock.calls[0][0];
+    expect(request.prompt).toContain("SELECTED BEER IN EVERY GLASS: dunkel");
+    expect(request.prompt).toContain("Image 2: selected beer color swatch only");
+    expect(request.prompt).toContain("Candid snapshot photography");
+    expect(request.referenceImages).toHaveLength(2);
+    expect(request.referenceImages[1].mime).toBe("image/png");
+  });
+  it.each([
+    ["product", product, "reportage", "Candid snapshot photography"],
+    ["product", product, "premium", "Natural, high-quality editorial photography"],
+    ["product", product, "campaign", "Art-directed beverage advertising photography"],
+    ["social", social, "reportage", "Candid snapshot photography"],
+    ["social", social, "premium", "Natural, high-quality editorial photography"],
+    ["social", social, "campaign", "Art-directed beverage advertising photography"],
+  ] as const)("uses V3 without automatic looks or cultural wardrobe (%s)", async (_mode, route, style, treatment) => {
+    vi.stubEnv("IMAGE_PROMPT_VERSION", "v1");
+    const response = await route(new Request("https://app.example/api/inhalte-erstellen/create-task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...characterPayload, headline: "Unser Bier", characterName: undefined, characterReferenceImages: [], extraReferenceImages: [], photoStyle: style, zusatzWunsch: "Zwei Freunde in einer Küche", behaelter: "F" }),
+    }));
+    expect(response.status).toBe(202);
+    expect(mocks.automaticLooks).not.toHaveBeenCalled();
+    expect(mocks.render).toHaveBeenCalledTimes(1);
+    const request = mocks.render.mock.calls[0][0];
+    expect(request.prompt).toContain("CUSTOMER SCENE (authoritative): Zwei Freunde in einer Küche");
+    expect(request.prompt).toContain(treatment);
+    expect(request.prompt).not.toMatch(/tracht|dirndl|lederhosen|bavarian|beer garden/i);
+    expect(request.referenceImages).toHaveLength(1);
+    vi.unstubAllEnvs();
+  });
   it("rejects character plus too many extra refs before reserving tokens", async () => {
     const response = await product(
       new Request("https://app.example/api/inhalte-erstellen/create-task", {

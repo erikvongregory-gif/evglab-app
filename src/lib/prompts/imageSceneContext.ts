@@ -18,6 +18,8 @@ export const CUSTOMER_IMAGE_SAFETY_LOCK = [
   "No political content anywhere in the frame: no stickers, posters, graffiti, flyers, flags, slogans, party names, protest signs, or campaign text on walls, doors, clothing, glass, or street furniture.",
   "If a reference shows any of that, do not reproduce it. Surfaces stay free of readable third-party lettering. The only allowed brand text is the customer's own product label.",
   "Anatomy: every visible person is a separate intact adult.",
+  // Reportage-Crops (Selfie-Arm, Arm im Vordergrund) erzeugten sonst eine dritte Hand.
+  "Each person has exactly two arms and two hands; every visible hand joins one person by a continuous arm — never a third arm or a stray forearm. A selfie-taker has one free hand.",
   "Each foot is fully inside its own shoe or clearly bare on the ground — never half inside a shoe, never fused through footwear, furniture, or another person.",
   "No melted limbs, extra legs, merged bodies, or people baked into objects.",
 ].join(" ");

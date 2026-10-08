@@ -9,15 +9,28 @@ const PREFIX = "glass-references";
 const cache = new Map<GlasTyp, OpenAiReferenceImage | null>();
 
 /**
- * Loads an optional neutral glass-shape reference. Teams can add assets at
- * `glass-references/<glasTyp>.png` in Storage or `assets/glass-references/`.
- * Missing assets are expected and fall back to the existing text geometry.
+ * Loads an optional neutral glass-shape reference. The versioned silhouettes in
+ * `assets/glass-references/` (scripts/generate-glass-references.mjs) win — an old copy in
+ * Storage must never override a corrected drawing. Storage `glass-references/<glasTyp>.png`
+ * is only a fallback for glass types without a bundled file.
  */
 export async function loadGlassShapeReference(
   glasTyp: GlasTyp | undefined,
 ): Promise<OpenAiReferenceImage | null> {
   if (!glasTyp) return null;
   if (cache.has(glasTyp)) return cache.get(glasTyp) ?? null;
+
+  try {
+    const file = path.join(process.cwd(), "assets", "glass-references", `${glasTyp}.png`);
+    const buffer = await readFile(file);
+    if (buffer.byteLength > 0) {
+      const reference = { base64: buffer.toString("base64"), mime: "image/png" };
+      cache.set(glasTyp, reference);
+      return reference;
+    }
+  } catch {
+    /* kein gebündeltes Bild — Storage versuchen */
+  }
 
   try {
     const admin = createAdminClient();
@@ -35,16 +48,6 @@ export async function loadGlassShapeReference(
     console.warn(`[glassShapeReference] storage error for ${glasTyp}:`, error);
   }
 
-  try {
-    const file = path.join(process.cwd(), "assets", "glass-references", `${glasTyp}.png`);
-    const buffer = await readFile(file);
-    const reference = buffer.byteLength
-      ? { base64: buffer.toString("base64"), mime: "image/png" }
-      : null;
-    cache.set(glasTyp, reference);
-    return reference;
-  } catch {
-    cache.set(glasTyp, null);
-    return null;
-  }
+  cache.set(glasTyp, null);
+  return null;
 }

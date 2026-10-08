@@ -30,10 +30,10 @@ function bottleOnlyLock(input: HyperrealisticInput): string {
 
 function bothLock(input: HyperrealisticInput): string {
   if (inputProduktKategorie(input) === "bier") {
-    return "CRITICAL COMPOSITION LOCK (MANDATORY): Composition MUST show BOTH bottle/can AND poured beer glass, side by side, realistic proportion, both fully visible.";
+    return "CRITICAL COMPOSITION LOCK (MANDATORY): The scene contains BOTH the bottle/can AND a glass poured from it, at realistic scale to each other — where they sit follows the scene (in hands, on the table), not a side-by-side packshot.";
   }
   const drink = beverageDrinkNoun(input);
-  return `CRITICAL COMPOSITION LOCK (MANDATORY): Composition MUST show BOTH bottle/can AND poured ${drink} glass, side by side, realistic proportion, both fully visible. No beer foam.`;
+  return `CRITICAL COMPOSITION LOCK (MANDATORY): The scene contains BOTH the bottle/can AND a glass of ${drink} poured from it, at realistic scale to each other — where they sit follows the scene, not a side-by-side packshot. No beer foam.`;
 }
 
 const PUBLIC_VIEWING_SCENE_LOCK =

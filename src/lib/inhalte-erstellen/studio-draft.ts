@@ -38,7 +38,7 @@ export function defaultStudioDraft(partial?: Partial<StudioDraft>): StudioDraft 
     aiWatermark: false,
     behaelter: "B" as const,
     szene: "biergarten_sommer" as const,
-    tageszeit: "goldene_stunde" as const,
+    tageszeit: "tageslicht" as const,
     personenModus: "A" as const,
     gruppenAnzahl: "3" as const,
     gruppenTyp: "gemischt" as const,

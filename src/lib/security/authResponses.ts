@@ -122,7 +122,7 @@ export function createHtmlRedirect(
   requestId: string,
   cookieSource?: NextResponse,
 ): NextResponse {
-  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Weiterleitung</title></head><body><p style="font-family:system-ui;color:#6b6560">Weiterleitung …</p><script>location.replace(${jsonForHtmlScript(url)})</script></body></html>`;
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>BrewAI · Anmeldung</title><style>html,body{margin:0;background:#131211}${authTransitionCss}</style></head><body>${authTransitionBody}<script>location.replace(${jsonForHtmlScript(url)})</script></body></html>`;
   const response = new NextResponse(html, {
     status: 200,
     headers: {

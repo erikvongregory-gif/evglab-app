@@ -3,7 +3,7 @@ import { hasPassedTwoFactor } from "@/lib/auth/twoFactorSession";
 import { NextResponse } from "next/server";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { aspectRatioToImageSize, generateCampaignImage, toOpenAiApiQuality } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
-import { buildCampaignTextPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/campaign-text";
+import { buildCampaignPromptV3 } from "@/lib/inhalte-erstellen/legacy-v3-adapters";
 import { campaignTextSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { createReferenceResolverFromMetadata, assertResolvableReferenceUrls, resolveReferenceUrlsForGeneration } from "@/lib/brand/resolve-reference-for-generation";
 import { createClient } from "@/lib/supabase/server";
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     const job = await reserveGeneration(req,guard.userId,perImageCost * 2,input);
     if(job instanceof NextResponse)return job;
 
-    const prompt = buildCampaignTextPrompt(input);
+    const prompt = buildCampaignPromptV3(input);
     const origin = new URL(req.url).origin;
     assertResolvableReferenceUrls(guard.userMetadata, origin, input.referenzBilder);
     const referenzBilder = resolveReferenceUrlsForGeneration(guard.userMetadata, origin, input.referenzBilder);

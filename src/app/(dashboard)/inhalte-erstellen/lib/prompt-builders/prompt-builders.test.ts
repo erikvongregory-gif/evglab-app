@@ -15,7 +15,9 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(prompt).toContain("Camera and composition must follow the selected photo-style lock");
     expect(prompt).toContain("physically correct refraction");
     expect(prompt).toContain("Strictly forbid illustration");
-    expect(prompt).toContain("film grain");
+    expect(prompt).toContain("filtered or naturtrüb");
+    expect(prompt).not.toContain("transparent liquid");
+    expect(prompt).not.toContain("film grain,");
   });
 
   it("keeps the three explicit photo-style locks visually distinct", () => {
@@ -37,9 +39,13 @@ describe("inhalte-erstellen prompt builders", () => {
     const premium = buildPhotoStyleLockFragment({ ...base, photoStyle: "premium" });
     const campaign = buildPhotoStyleLockFragment({ ...base, photoStyle: "campaign" });
 
-    expect(reportage).toMatch(/CANDID REPORTAGE|direct flash|Invent entirely new fictional adults|Never reuse a face/i);
-    expect(reportage).toMatch(/Forbidden: product thrust|repeating the same person/i);
-    expect(premium).toMatch(/PREMIUM HOSPITALITY|soft optical bokeh|razor-sharp/i);
+    expect(reportage).toMatch(/CANDID FLASH REPORTAGE/);
+    expect(reportage).toMatch(/fill flash in daylight/);
+    expect(reportage).toMatch(/never the polished hero/);
+    expect(reportage).toMatch(/cigarettes or smoking/);
+    expect(premium).toMatch(/QUIET PREMIUM PRODUCT PHOTOGRAPHY/);
+    expect(premium).toMatch(/never on a studio pedestal/);
+    expect(premium).toMatch(/People are optional and secondary/);
     expect(premium).toMatch(/Forbidden AI-gloss|beauty-retouched wax skin|on-camera direct flash|product thrust/i);
     expect(campaign).toMatch(/ART-DIRECTED CAMPAIGN MOTIF|product fills a large share|LOOK references' grammar/i);
     expect(campaign).toMatch(/Forbidden.*Premium|beer-garden table|Maßkrug postcard/i);
@@ -140,7 +146,7 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(prompt).not.toMatch(/ABK/);
     expect(prompt).not.toMatch(/EXACT TEXT/);
     expect(prompt).toMatch(/authentic real-camera photograph/i);
-    expect(prompt).toMatch(/full-frame camera/i);
+    expect(prompt).toMatch(/35mm point-and-shoot/i);
     expect(prompt).toMatch(/PRODUCT INTEGRATION — CRITICAL/);
     expect(prompt).toMatch(/never as a flat cutout, sticker, pasted layer, or composited object/);
     expect(prompt).toMatch(/Do NOT preserve the reference image's lighting/);
@@ -253,7 +259,7 @@ describe("inhalte-erstellen prompt builders", () => {
         ],
       },
     );
-    expect(prompt).toMatch(/Image 2 defines ONLY the exact glass silhouette/i);
+    expect(prompt).toMatch(/Image 2 defines ONLY the glass silhouette/i);
     expect(prompt).toMatch(/Image 3 is a LOOK reference(?: only| and PRIMARY style guide)/i);
   });
 
@@ -304,7 +310,7 @@ describe("inhalte-erstellen prompt builders", () => {
       variantCount: 1,
     });
     expect(prompt).toMatch(/candid snapshot framing with imperfect edges|28–35mm/i);
-    expect(prompt).toMatch(/candid flash or street-reportage photograph/i);
+    expect(prompt).toMatch(/candid flash snapshot from a real beer occasion/i);
     expect(prompt).not.toMatch(/low or forced perspective with the product dominant/i);
   });
 
@@ -327,7 +333,7 @@ describe("inhalte-erstellen prompt builders", () => {
       quality: "high",
       variantCount: 1,
     });
-    expect(prompt).toMatch(/85mm lens at f\/5\.6/i);
+    expect(prompt).toMatch(/85mm lens at f\/4/i);
     expect(prompt).toMatch(/premium hospitality photography|LOOK-reference hospitality light/i);
     expect(prompt).toMatch(/real hospitality photography|ordinary guests|not a glossy AI lifestyle/i);
   });
@@ -376,7 +382,8 @@ describe("inhalte-erstellen prompt builders", () => {
     expect(next.personenModus).toBe("E");
 
     const prompt = buildProductPlacementPrompt(next);
-    expect(prompt.startsWith("HYPERREALISM LOCK")).toBe(true);
+    expect(prompt.startsWith("USER SCENE")).toBe(true);
+    expect(prompt).toMatch(/HYPERREALISM LOCK/);
     expect(prompt).toMatch(/USER SCENE/);
     expect(prompt).toMatch(/auf dem berg anstoßen/);
     expect(prompt).toMatch(/COMPLETELY DISCARD Image 1's background/i);
@@ -706,8 +713,8 @@ describe("Produkt sitzt im Foto statt reinkopiert", () => {
     expect(lock).toMatch(/follows the cylinder/);
     expect(lock).toMatch(/contact shadow/);
     expect(lock).not.toMatch(/razor-sharp/);
-    expect(lock).toMatch(/ordinary local guests/);
-    expect(lock).toMatch(/not a row of look-alike/);
+    expect(lock).toMatch(/ordinary local adults, not models/);
+    expect(lock).toMatch(/never look-alike faces/);
   });
 
   it("holt bei Nur-Glas-Motiven keine Flasche ins Bild", () => {

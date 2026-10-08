@@ -1,3 +1,4 @@
+import { correctAlcoholFreeStyle } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
 import { sanitizeStudioOnboardingState, type StudioOnboardingState } from "@/lib/dashboard/onboarding";
 
 export type DashboardMediaItem = {
@@ -172,16 +173,24 @@ export function sanitizeDashboardBeers(value: unknown): DashboardBeer[] {
     const name = typeof item.name === "string" ? item.name.trim().slice(0, 80) : "";
     if (!id || !name) continue;
     const produktKategorie = sanitizeProduktKategorie(item.produktKategorie);
+    const storedStil =
+      typeof item.bierstil === "string" && item.bierstil.trim()
+        ? item.bierstil.trim().slice(0, 60)
+        : produktKategorie === "bier"
+          ? "helles"
+          : produktKategorie;
+    const storedGlas =
+      typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim().slice(0, 40) : undefined;
+    // Altbestand: „Hell Alkoholfrei“ war als Alkoholfrei-Pils mit Pilstulpe gespeichert.
+    const style =
+      produktKategorie === "bier"
+        ? correctAlcoholFreeStyle(storedStil, storedGlas, name)
+        : { bierstil: storedStil, glasTyp: storedGlas };
     out.push({
       id,
       name,
       produktKategorie,
-      bierstil:
-        typeof item.bierstil === "string" && item.bierstil.trim()
-          ? item.bierstil.trim().slice(0, 60)
-          : produktKategorie === "bier"
-            ? "helles"
-            : produktKategorie,
+      bierstil: style.bierstil,
       flaschenTyp:
         typeof item.flaschenTyp === "string" && item.flaschenTyp.trim() ? item.flaschenTyp.trim().slice(0, 60) : "nrw_500",
       flaschenfarbe:
@@ -190,8 +199,7 @@ export function sanitizeDashboardBeers(value: unknown): DashboardBeer[] {
           : produktKategorie === "bier"
             ? "braun"
             : "klar",
-      glasTyp:
-        typeof item.glasTyp === "string" && item.glasTyp.trim() ? item.glasTyp.trim().slice(0, 40) : undefined,
+      glasTyp: style.glasTyp,
       filtrierung:
         item.filtrierung === "unfiltriert" || item.filtrierung === "filtriert" ? item.filtrierung : undefined,
       etikettUrl: typeof item.etikettUrl === "string" ? item.etikettUrl.trim().slice(0, 1200) : "",

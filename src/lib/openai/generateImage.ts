@@ -9,7 +9,7 @@ import {
 
 export type { OpenAiImageSize } from "@/lib/openai/imageAspectRatio";
 export { aspectRatioToOutputDimensions, mapAspectRatioToOpenAiSize } from "@/lib/openai/imageAspectRatio";
-export type OpenAiImageQuality = "low" | "medium" | "high" | "auto";
+export type OpenAiImageQuality = "low" | "medium" | "high" | "xhigh" | "max" | "auto";
 
 export type OpenAiReferenceImage = { base64: string; mime: string };
 

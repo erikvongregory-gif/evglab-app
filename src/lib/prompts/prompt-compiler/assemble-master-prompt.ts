@@ -1,12 +1,14 @@
 import { FLASCHEN_TYPEN } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import type { HyperrealisticInput } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import {
+  buildCameraFragment,
   beverageContainerNoun,
   beverageDrinkNoun,
   inputProduktKategorie,
   isPouredGlassServing,
   resolvePhotoStyle,
 } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealism-blocks";
+import { IMAGE_DIRECTION_PRIORITY } from "../image-direction";
 import { MASTER_PROMPT_SECTIONS } from "./schema";
 
 const CLOSURE_LABEL: Record<string, string> = {
@@ -32,17 +34,6 @@ export type MasterPromptContext = {
     role: "product" | "label" | "mood" | "shape" | "glass" | "liquid" | "scene" | "look";
     note?: string;
   }>;
-};
-
-const SHOT_DESCRIPTION: Record<string, string> = {
-  A: "three-quarter product view with natural perspective",
-  B: "eye-level frontal view",
-  C: "slight low angle",
-  D: "top-down composition",
-  E: "close detail of label, liquid, foam, and condensation",
-  F: "wide environmental view",
-  G: "aerial top-down view",
-  H: "over-the-shoulder handheld view",
 };
 
 /** Deterministischer Master-Prompt in fester Sektionsreihenfolge. */
@@ -119,14 +110,14 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
       : []),
   ];
 
-  const sections: Record<(typeof MASTER_PROMPT_SECTIONS)[number], string> = {
+  const sections = {
     "AUFGABE UND VERWENDUNGSZWECK": [
       `Create a real-camera beverage image for ${channel}.`,
       resolvePhotoStyle(input) === "campaign"
-        ? "Use deliberate campaign art direction with a clear subject hierarchy and usable copy space."
+        ? "Use deliberate campaign art direction: the product dominates the frame with one clear subject hierarchy."
         : resolvePhotoStyle(input) === "premium"
-          ? "Use restrained premium product-photography art direction with precise, believable light and materials."
-          : "Use candid reportage art direction appropriate to the scene, with observed moments and natural imperfections.",
+          ? "Use quiet premium photography in a real place: soft light, natural bokeh; a person enjoying the beer or the product itself as the subject, the product always sharp and recognizable."
+          : "Use candid flash reportage: a raw snapshot of real beer life with direct flash and an imperfect crop.",
       "It must look physically photographed, with no CGI or pasted-product appearance.",
     ].join("\n"),
     HAUPTPRODUKT: [
@@ -162,10 +153,10 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
       `Mandatory scene: ${scene}`,
       action ? `Action: ${action}` : "",
       people ? `People: ${people}` : "People: only when required by the scene.",
-      `Mood: ${mood}`,
-      `Shot: ${SHOT_DESCRIPTION[input.shotType ?? "A"]}.`,
+
+
       closeDetail ? "A deliberate detail crop is allowed." : "Keep the hero product readable and avoid accidental cropping.",
-      "If toasting/Prost: visible adult hands holding glasses mid-clink — never floating bottle toasting floating glass.",
+      /toast|anst|prost/i.test(action + clientIntent) ? "Visible adult hands hold the glasses mid-clink." : "",
     ]
       .filter(Boolean)
       .join("\n"),
@@ -173,7 +164,7 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
       `Lighting must come from and match the scene (${input.tageszeit.replace(/_/g, " ")}).`,
       "Use natural glass reflections and sparse, irregular condensation only when physically plausible.",
       "Use physically believable depth of field for the selected shot.",
-      "Matched lighting so the product looks physically photographed in THIS scene.",
+
     ].join("\n"),
     MARKENWIRKUNG: [
       ctx.breweryName ? `Brand/brewery: ${ctx.breweryName}.` : "Brand: derive only from the product reference.",
@@ -184,7 +175,7 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
       ctx.hasProductPhoto && input.stiltreue !== "frei"
         ? "Preserve existing label text and logo from the product reference as accurately as possible."
         : "Do not claim exact label fidelity when no locked product artwork is supplied.",
-      "Add no extra copy, invented lettering, or additional trademarks.",
+
     ].join("\n"),
     "ZWINGEND BEIBEHALTEN": preserve.map((p) => `- ${p}`).join("\n"),
     "NICHT VERÄNDERN ODER HINZUFÜGEN": exclusions.map((e) => `- ${e}`).join("\n"),
@@ -195,7 +186,16 @@ export function assembleMasterPrompt(ctx: MasterPromptContext): string {
     ].join("\n"),
   };
 
-  return MASTER_PROMPT_SECTIONS.map((title) => `${title}\n\n${sections[title]}`).join("\n\n");
+  const grouped: Record<(typeof MASTER_PROMPT_SECTIONS)[number], string> = {
+    "ZWECK UND MEDIUM": sections["AUFGABE UND VERWENDUNGSZWECK"],
+    "SZENE UND HANDLUNG": sections["SZENE UND KOMPOSITION"],
+    "HAUPTMOTIV UND PRODUKTDETAILS": sections.HAUPTPRODUKT,
+    "KOMPOSITION UND KAMERA": buildCameraFragment(input.shotType, input.aspectRatio, input),
+    "LICHT FARBEN UND STIMMUNG": [sections["LICHT UND MATERIAL"], `Mood: ${mood}.`, sections.MARKENWIRKUNG].join("\n"),
+    "REFERENZEN UND BEIZUBEHALTENDE MERKMALE": [IMAGE_DIRECTION_PRIORITY, sections.REFERENZEN, sections["TEXT UND ETIKETT"], sections["ZWINGEND BEIBEHALTEN"]].join("\n"),
+    "FORMAT UND RELEVANTE AUSSCHLÜSSE": [sections.AUSGABE, sections["NICHT VERÄNDERN ODER HINZUFÜGEN"]].join("\n"),
+  };
+  return MASTER_PROMPT_SECTIONS.map((title) => `${title}\n\n${grouped[title]}`).join("\n\n");
 }
 
 function peopleFromInput(input: HyperrealisticInput): string {

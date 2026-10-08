@@ -18,10 +18,12 @@ const SZENE_LABELS: Record<HyperrealisticInput["szene"], string> = {
 };
 
 const TAGESZEIT_LABELS: Record<HyperrealisticInput["tageszeit"], string> = {
+  tageslicht: "Natürliches Tageslicht",
   goldene_stunde: "Goldene Stunde",
   mittag: "Mittagslicht",
   abend_warm: "Warmes Abendlicht",
   blaue_stunde: "Blaue Stunde",
+  nacht: "Nacht",
 };
 
 const STIMMUNG_TREND_LABELS: Record<NonNullable<HyperrealisticInput["stimmungTrend"]>, string> = {
@@ -334,13 +336,13 @@ export function buildHyperrealisticClaudeUserMessage(
   }
 
   lines.push(
-    "HYPERREALISM (PFLICHT): Das Bild muss wie eine echte Handheld-Kameraaufnahme wirken — keine CGI, keine Beauty-Retusche, keine cinematic orange grade, kein Werbe-Hero-Look.",
+    "Fotografische Regie: Kundenmotiv und gewaehlten Fotostil respektieren; Handheld, Blitz oder Hero-Komposition nur wenn passend. Eine konsistente Licht- und Kameraeinstellung.",
     inputProduktKategorie(input) === "bier"
       ? "Nutze SRM-Farbe + Hex aus der Farbtabelle, Schaumcharakteristik, Kondenswasser-Realismus und mindestens 3 konkrete Umgebungs-Mikrodetails."
       : `Getränk: ${beverageDrinkNoun(input)}. KEINE SRM-Bierfarbe, KEIN Hopfen, KEIN Bierschaum. Wasser farblos. Kondenswasser-Realismus und mindestens 3 konkrete Umgebungs-Mikrodetails.`,
     "Menschen: natuerliche Hauttextur (Poren, keine waxy plastic skin), korrekte Haende/Finger, keine Stock-Photo-Posen.",
     "Kamera: explizites Objektiv (35/50/85/100mm), Blende, Bildausschnitt und Tiefenschaerfe.",
-    "Negative am Ende: CGI, cartoon, plastic foam, sticker condensation, waxy skin, generic stock look.",
+    "Am Ende nur motivbezogene Ausschluesse; Produkt-, Form- und Verschlussregeln jeweils einmal formulieren statt erneut als Locks anzuhängen.",
     "Pruefe intern alle Qualitaetspunkte; gib aber NUR den englischen Prompt aus (inkl. Negative am Ende). Kein deutscher Text, kein Markdown, keine Erklaerung.",
     "",
     "Strukturiertes Briefing (JSON):",

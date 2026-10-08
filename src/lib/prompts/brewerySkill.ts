@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { IMAGE_PROMPT_WRITING_RULES } from "./image-direction";
 
 /** Kurzer Fallback, falls SKILL.md nicht geladen werden kann. */
 export const DEFAULT_BREWERY_IMAGE_SKILL_SYSTEM_PROMPT = `
@@ -19,7 +20,9 @@ Dashboard-API-Modus (ueberschreibt Schritt 5 Ausgabeformat):
 - Gib NUR den finalen englischen Bildprompt als reinen Fliesstext zurueck.
 - Kein Markdown, keine Ueberschriften, kein Deutsch, kein Konfigurationsblock.
 - Wende Schritte 2–4 intern an (Glas-Mapping, SRM-Farbe, Licht, Kamera, Negative als Prosa am Ende).
-- Bei GPT Image 2.5 Sunburst: strukturiere Scene → Subject → Composition → Lighting/Camera → Preserve/Change Constraints. Nutze SRM+Hex im Subject-Block.
+- Diese Struktur- und Prioritätsregeln überschreiben abweichende Reihenfolgen und pauschale Stilvorgaben im Skill:
+${IMAGE_PROMPT_WRITING_RULES}
+- Nutze SRM+Hex nur bei sichtbar eingeschenktem Bier im Subject-Block.
 - Waehle Kamera und Licht passend zum Auftrag. Erzwinge keinen Analogfilm-/Handheld-Look fuer Premium- oder Kampagnenmotive.
 - Benenne bei mehreren Bildern jedes Bild per Index und exklusiver Rolle (Produkt, Form, Glas, Szene oder Look).
 - Integriere nur motivbezogene Ausschluesse als kurze Prosa am Promptende.

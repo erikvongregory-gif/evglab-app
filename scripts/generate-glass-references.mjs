@@ -9,17 +9,18 @@ const glasses = {
   willibecher: `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
   <rect width="768" height="1024" fill="#f5f5f5"/>
   <g fill="none" stroke="#1a1a1a" stroke-width="12" stroke-linejoin="round">
-    <path d="M250 160 L220 760 Q220 860 384 860 Q548 860 548 760 L518 160 Z"/>
-    <path d="M250 160 L518 160"/>
-    <path d="M268 760 L500 760"/>
+    <path d="M300 880 L240 360 Q222 250 256 170 L512 170 Q546 250 528 360 L468 880 Z"/>
+    <path d="M256 170 L512 170"/>
+    <path d="M296 830 L472 830"/>
   </g>
 </svg>`,
   pils_tulpe: `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
   <rect width="768" height="1024" fill="#f5f5f5"/>
   <g fill="none" stroke="#1a1a1a" stroke-width="12" stroke-linejoin="round">
-    <ellipse cx="384" cy="900" rx="120" ry="26"/>
-    <path d="M384 874 L384 600"/>
-    <path d="M384 600 C290 600 235 500 235 390 C235 260 300 170 384 145 C468 170 533 260 533 390 C533 500 478 600 384 600"/>
+    <ellipse cx="384" cy="910" rx="104" ry="24"/>
+    <path d="M384 886 L384 640"/>
+    <path d="M282 110 C298 160 300 200 296 250 C284 370 258 480 298 565 Q336 640 384 640 Q432 640 470 565 C510 480 484 370 472 250 C468 200 470 160 486 110 Z"/>
+    <path d="M282 110 L486 110"/>
   </g>
 </svg>`,
   weizen: `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
@@ -61,6 +62,42 @@ const glasses = {
       C240 230 310 165 384 145
       C458 165 528 230 553 360
       C578 490 523 620 384 620 Z"/>
+  </g>
+</svg>`,
+  seidel: `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
+  <rect width="768" height="1024" fill="#f5f5f5"/>
+  <g fill="none" stroke="#1a1a1a" stroke-width="12" stroke-linejoin="round">
+    <path d="M230 230 L230 800 Q230 840 270 840 L470 840 Q510 840 510 800 L510 230 Z"/>
+    <path d="M230 800 L510 800"/>
+    <path d="M510 330 C610 330 630 420 630 500 C630 580 610 680 510 680"/>
+    <path d="M270 330 L270 760 M330 330 L330 760 M410 330 L410 760 M470 330 L470 760"/>
+  </g>
+</svg>`,
+  steinkrug: `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
+  <rect width="768" height="1024" fill="#f5f5f5"/>
+  <g fill="#9a958c" stroke="#1a1a1a" stroke-width="12" stroke-linejoin="round">
+    <path d="M240 220 C225 420 225 640 250 840 L490 840 C515 640 515 420 500 220 Z"/>
+    <path fill="none" d="M500 330 C610 330 630 430 630 520 C630 610 610 700 495 700"/>
+  </g>
+  <g fill="none" stroke="#1a1a1a" stroke-width="8">
+    <path d="M236 300 L504 300 M236 760 L504 760"/>
+  </g>
+</svg>`,
+  pokal: `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
+  <rect width="768" height="1024" fill="#f5f5f5"/>
+  <g fill="none" stroke="#1a1a1a" stroke-width="12" stroke-linejoin="round">
+    <ellipse cx="384" cy="900" rx="125" ry="26"/>
+    <path d="M384 874 L384 700"/>
+    <path d="M340 874 Q384 840 428 874"/>
+    <path d="M384 700 C250 700 215 560 215 420 C215 330 230 240 250 200 L518 200 C538 240 553 330 553 420 C553 560 518 700 384 700 Z"/>
+  </g>
+</svg>`,
+  nonic: `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">
+  <rect width="768" height="1024" fill="#f5f5f5"/>
+  <g fill="none" stroke="#1a1a1a" stroke-width="12" stroke-linejoin="round">
+    <path d="M262 140 L266 220 C232 240 232 290 270 310 L300 880 L468 880 L498 310 C536 290 536 240 502 220 L506 140 Z"/>
+    <path d="M262 140 L506 140"/>
+    <path d="M300 880 L468 880"/>
   </g>
 </svg>`,
   stange: `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1024" viewBox="0 0 768 1024">

@@ -19,12 +19,12 @@ export const DEFAULT_GLAS_BY_STIL: Record<Bierstil, GlasTyp> = {
   helles: "willibecher",
   ipa: "ipa_teku",
   neipa: "ipa_teku",
-  stout: "schwenker",
-  porter: "schwenker",
-  bock: "schwenker",
+  stout: "nonic",
+  porter: "nonic",
+  bock: "pokal",
   saison: "ipa_teku",
-  kellerbier: "willibecher",
-  rauchbier: "willibecher",
+  kellerbier: "seidel",
+  rauchbier: "seidel",
 };
 
 export function resolveStudioGlas(input: Pick<ProductStudioInput, "bierstil" | "glasTyp">): GlasTyp {

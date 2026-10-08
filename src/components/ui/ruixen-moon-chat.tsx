@@ -63,19 +63,19 @@ const PHOTO_STYLE_OPTIONS: Array<{ value: PhotoStyle; label: string; fullLabel: 
     value: "reportage",
     label: "Reportage",
     fullLabel: "Reportage",
-    hint: "Candid und roh: Blitz oder hartes Available Light, unperfekter Crop, Flasche nur nebenbei — wie ein echtes Snapshot vom Abend.",
+    hint: "Candid und roh: direkter Blitz (auch tagsüber), unperfekter Crop, Flasche nebenbei — wie ein echter Schnappschuss vom Stammtisch, Fest oder Biergarten.",
   },
   {
     value: "premium",
     label: "Premium",
     fullLabel: "Premium-Fotografie",
-    hint: "Ruhige Hospitality-Fotografie: weiches Licht, optisches Bokeh, Flasche lesbar im Vordergrund, Menschen sekundär — Biergarten oder Dining.",
+    hint: "Professionelles Fotoshooting wie für die eigene Imagekampagne: Menschen in Tracht oder im Biergarten posieren natürlich für den Fotografen, Porträtlook mit weichem Hintergrund, echte Farben. Das Etikett bleibt erkennbar.",
   },
   {
     value: "campaign",
     label: "Kampagne",
     fullLabel: "Kampagnenmotiv",
-    hint: "Art-directed Key Visual: Produkt füllt den Frame, enger Crop, Hände reichen oder toasten — keine Biergarten-Stillleben-Postkarte.",
+    hint: "Inszeniertes Key Visual: Produkt dominiert den Frame, Hände reichen oder stoßen an, Untersicht oder Himmel. Im Feed bleibt oben Platz für die Headline.",
   },
 ];
 
@@ -171,7 +171,6 @@ export default function RuixenMoonChat() {
   const [genBusy, setGenBusy] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [photoStyle, setPhotoStyle] = useState<PhotoStyle>("reportage");
-  const [hyperreal, setHyperreal] = useState(false);
   const [aiWatermark, setAiWatermark] = useState(false);
   const [runs, setRuns] = useState<CreateRun[]>([]);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -453,7 +452,7 @@ export default function RuixenMoonChat() {
           ? beer.filtrierung
           : undefined,
       szene,
-      tageszeit: preset?.tageszeit ?? "goldene_stunde",
+      tageszeit: preset?.tageszeit ?? "tageslicht",
       stimmungTrend: preset?.stimmungTrend,
       personenModus: preset?.personenModus,
       gruppenAnzahl: preset?.gruppenAnzahl,
@@ -466,7 +465,6 @@ export default function RuixenMoonChat() {
       stiltreue: usesProductPhoto ? ("hoch" as const) : ("frei" as const),
       keepLabel: usesProductPhoto,
       photoStyle,
-      hyperreal,
       aiWatermark,
       beerName: beer?.name?.trim() || undefined,
       zusatzWunsch: intentParts.join(". ").slice(0, 800),
@@ -492,7 +490,6 @@ export default function RuixenMoonChat() {
     aiWatermark,
     aspectRatio,
     genBusy,
-    hyperreal,
     launchRun,
     message,
     photoStyle,
@@ -1131,36 +1128,6 @@ export default function RuixenMoonChat() {
                   ))}
                 </div>
                 <div className="flex w-full items-center justify-between gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground dark:text-white">
-                      <Switch
-                        checked={hyperreal}
-                        onCheckedChange={setHyperreal}
-                        aria-label="Hyperreal"
-                        className="data-[state=checked]:!bg-emerald-600 dark:data-[state=checked]:!bg-emerald-600"
-                      />
-                      <span>Hyperreal</span>
-                    </label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label="Was ist Hyperreal?"
-                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-semibold leading-none text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          !
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        side="top"
-                        align="start"
-                        className="w-64 p-3 text-xs leading-relaxed text-muted-foreground"
-                      >
-                        Kein eigener Fotostil: verstärkt Flüssigkeit, Glas, Haut und Materialien im gewählten
-                        Stil (Reportage, Premium oder Kampagne).
-                      </PopoverContent>
-                    </Popover>
-                  </div>
                   <div className="flex items-center gap-1.5">
                     <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground dark:text-white">
                       <span>AI-Label</span>

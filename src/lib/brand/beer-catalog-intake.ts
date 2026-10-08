@@ -1,6 +1,6 @@
 import { catalogIdentity, catalogToken, readCatalogEvidence, readCatalogImages } from "./catalog-products";
 import { randomUUID } from "node:crypto";
-import { BEER_STYLE_OPTIONS, findBeerStyle } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
+import { findBeerStyle, inferBierstilFromName } from "@/app/(dashboard)/inhalte-erstellen/lib/beer-styles";
 import { flascheForKategorie } from "@/app/(dashboard)/inhalte-erstellen/lib/brewing-knowledge";
 import {
   MAX_MY_BEERS,
@@ -171,26 +171,6 @@ function imageFilename(url: string): string {
   }
 }
 
-const NAME_STYLE_HINTS: Array<{ pattern: RegExp; bierstil: string }> = [
-  { pattern: /alkoholfrei/, bierstil: "alkoholfrei_pilsner" },
-  { pattern: /kristallweizen/, bierstil: "kristallweizen" },
-  { pattern: /hefeweizen|weissbier|weizen/, bierstil: "hefeweizen" },
-  { pattern: /pils/, bierstil: "pils" },
-  { pattern: /koelsch|kölsch/, bierstil: "koelsch" },
-  { pattern: /altbier/, bierstil: "altbier" },
-  { pattern: /radler/, bierstil: "radler" },
-  { pattern: /bock|maximator|doppelbock/, bierstil: "bock" },
-  { pattern: /oktoberfest|festbier|maerzen|märzen/, bierstil: "maerzen" },
-  { pattern: /kellerbier|keller/, bierstil: "kellerbier" },
-  { pattern: /ipa|india pale/, bierstil: "ipa" },
-  { pattern: /neipa|hazy/, bierstil: "neipa" },
-  { pattern: /stout/, bierstil: "stout" },
-  { pattern: /porter/, bierstil: "porter" },
-  { pattern: /saison/, bierstil: "saison" },
-  { pattern: /dunkel/, bierstil: "helles" },
-  { pattern: /hell|edelstoff|lager/, bierstil: "helles" },
-];
-
 function normalizeToken(text: string): string {
   return text
     .toLowerCase()
@@ -210,19 +190,7 @@ function titleCaseWords(text: string): string {
     .join(" ");
 }
 
-export function inferBierstilFromName(name: string): string {
-  const normalized = name.toLowerCase();
-  for (const hint of NAME_STYLE_HINTS) {
-    if (hint.pattern.test(normalized)) return hint.bierstil;
-  }
-  for (const option of BEER_STYLE_OPTIONS) {
-    const label = option.label.toLowerCase();
-    if (normalized.includes(label) || normalized.includes(option.bierstil.replace(/_/g, " "))) {
-      return option.bierstil;
-    }
-  }
-  return "helles";
-}
+export { inferBierstilFromName };
 
 export function inferProduktBezeichnung(name: string, kategorie: ProduktKategorie): string {
   if (kategorie === "bier") return inferBierstilFromName(name);

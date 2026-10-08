@@ -1,139 +1,27 @@
-import { FLASCHEN_TYPEN, GLAS_TYPEN, containerMaterialPhrase, flascheVolumeMl, glassPourPromptDescription, isDoseTyp, pouredGlassFillMl } from "../brewing-knowledge";
+import { BEER_PHYSICS, type BeerPhysicsProfile } from "@/lib/beverages/beer-appearance";
+import {
+  FLASCHEN_TYPEN,
+  GLAS_TYPEN,
+  containerMaterialPhrase,
+  flascheVolumeMl,
+  glassHasEichstrich,
+  glassPourPromptDescription,
+  isDoseTyp,
+  pouredGlassFillMl,
+} from "../brewing-knowledge";
 import type { HyperrealisticInput } from "../schemas";
 import { sanitizeProduktKategorie, type ProduktKategorie } from "@/lib/dashboard/metadata";
 
-type BeerPhysicsProfile = {
-  srm: string;
-  hex: string;
-  liquid: string;
-  foam: string;
-  carbonation: string;
-};
-
-const BEER_PHYSICS: Record<string, BeerPhysicsProfile> = {
-  helles: {
-    srm: "3–5",
-    hex: "#F8D975",
-    liquid: "crystal-clear pale golden lager with warm glow-through when backlit",
-    foam: "dense ivory-white foam crown with fine uniform pores and delicate lacing on glass walls",
-    carbonation: "fine ascending pearl-like bubbles in steady streams",
-  },
-  pils: {
-    srm: "2–4",
-    hex: "#F5E08A",
-    liquid: "brilliant pale straw-gold Pilsner with crystal clarity and crisp brilliance",
-    foam: "tight compact brilliant-white foam cap with micro-fine pores and clean lacing rings",
-    carbonation: "lively fine carbonation with crisp ascending bubble trails",
-  },
-  hefeweizen: {
-    srm: "4–6",
-    hex: "#F5A623",
-    liquid: "hazy golden-orange wheat beer with natural yeast turbidity and warm glowing opacity",
-    foam: "towering fluffy white foam head with large irregular pores, spectacular retention, never plastic-dome shaped",
-    carbonation: "vigorous effervescent streams rising through the haze",
-  },
-  kristallweizen: {
-    srm: "3–5",
-    hex: "#F0C850",
-    liquid: "crystal-clear filtered golden wheat beer with brilliant clarity",
-    foam: "firm white foam cap with moderate retention and natural irregular edge",
-    carbonation: "steady medium-fine carbonation streams",
-  },
-  maerzen: {
-    srm: "9–14",
-    hex: "#C87941",
-    liquid: "warm burnished copper-amber Märzen with deep orange-copper glow and ruby edge in backlight",
-    foam: "firm dense white foam crown with good retention, traditional Bavarian head",
-    carbonation: "steady medium carbonation with natural bubble trails",
-  },
-  kellerbier: {
-    srm: "8–12",
-    hex: "#D4A850",
-    liquid: "naturally cloudy hazy pale golden-amber Kellerbier with gentle yeast turbidity",
-    foam: "soft hazy off-white foam with rustic texture and moderate retention",
-    carbonation: "low to moderate gentle carbonation bubbles",
-  },
-  bock: {
-    srm: "14–22",
-    hex: "#9B5523",
-    liquid: "rich deep amber to dark copper-brown Bock with warm chestnut tones and ruby edge glow",
-    foam: "moderate dense off-white to cream foam, thick and persistent",
-    carbonation: "moderate smooth carbonation streams",
-  },
-  koelsch: {
-    srm: "3–5",
-    hex: "#F8D975",
-    liquid: "pale straw-gold Kölsch with brilliant clarity",
-    foam: "delicate thin white foam cap, quickly dissipating, minimal lacing",
-    carbonation: "moderate fine carbonation, clean streams",
-  },
-  altbier: {
-    srm: "11–19",
-    hex: "#9B4521",
-    liquid: "deep amber to copper-brown Altbier with warm reddish-copper tones",
-    foam: "tight compact tan-white foam with moderate retention",
-    carbonation: "moderate fine carbonation, clean streams",
-  },
-  ipa: {
-    srm: "8–14",
-    hex: "#D4843A",
-    liquid: "deep amber to copper IPA with slight haze and warm orange-amber clarity",
-    foam: "moderate off-white foam with medium pores and light sticky lacing",
-    carbonation: "moderate effervescence with scattered bubble trails",
-  },
-  neipa: {
-    srm: "4–7",
-    hex: "#F5C842",
-    liquid: "opaque pale citrus-yellow hazy NEIPA with dense unfiltered protein haze and juicy opacity",
-    foam: "soft pillowy white foam with silky texture and moderate retention",
-    carbonation: "gentle lazy carbonation with soft bubble clusters visible through haze",
-  },
-  stout: {
-    srm: "35–40+",
-    hex: "#160800",
-    liquid: "opaque jet-black stout with absolutely no light transmission, velvety black body",
-    foam: "thick velvety cream-colored mousse-like nitrogen foam with extremely fine texture",
-    carbonation: "minimal surface carbonation with occasional slow bubbles, nitrogen cascade feel",
-  },
-  porter: {
-    srm: "25–30",
-    hex: "#3D1105",
-    liquid: "deep mahogany-brown porter with ruby-garnet edge translucency when backlit",
-    foam: "thin tan-brown foam layer with medium pores",
-    carbonation: "gentle steady carbonation streams",
-  },
-  saison: {
-    srm: "5–14",
-    hex: "#E0A030",
-    liquid: "golden to amber saison with light rustic yeast haze and warm golden turbidity",
-    foam: "dense fluffy white foam with large pores, very high retention, Belgian-style rocky head",
-    carbonation: "vigorous fine streams, lively effervescence",
-  },
-  radler: {
-    srm: "2–5",
-    hex: "#FAE86B",
-    liquid: "hazy pale golden-lemon Radler with cloudy lemon-gold body and subtle citrus particles",
-    foam: "light bubbly white foam, quickly fading",
-    carbonation: "sparkling lively effervescence",
-  },
-  alkoholfrei_pilsner: {
-    srm: "3–4",
-    hex: "#F8E080",
-    liquid: "brilliant pale golden alcohol-free Pilsner, clean and fresh straw gold",
-    foam: "light airy white foam with moderate retention",
-    carbonation: "crisp lively micro-bubbles",
-  },
-};
-
-const CAMERA_BY_SHOT: Record<NonNullable<HyperrealisticInput["shotType"]>, string> = {
-  A: "Handheld Canon EOS R6, 50mm at f/4, slight 45° angle, available light, product sharp, background naturally falling off — not cinematic bokeh",
-  B: "Handheld Canon EOS R6, 50mm at f/4, eye-level, natural perspective, label fully sharp",
-  C: "Handheld Canon EOS R6, 35mm at f/4, slight low angle, physically plausible perspective, no superhero tilt",
-  D: "Handheld Canon EOS R6, 50mm at f/5.6, top-down, natural shadow falloff",
-  E: "Handheld Canon EOS R6, 85mm at f/4, close-up of glass, condensation and label texture, thin but honest focal plane",
-  F: "Handheld Canon EOS R6, 35mm at f/5.6, wide environmental framing, authentic venue scale",
-  G: "Aerial drone perspective at moderate altitude, 24mm equivalent, realistic geometry",
-  H: "Over-shoulder handheld, 35mm at f/2.8, first-person, believable hand scale, slight motion of a real hold",
+/** Nur Blickwinkel und Ausschnitt — Kamera und Objektiv kommen ausschließlich aus dem Fotostil. */
+export const CAMERA_BY_SHOT: Record<NonNullable<HyperrealisticInput["shotType"]>, string> = {
+  A: "Angle: slight 45° three-quarter view, product sharp",
+  B: "Angle: eye-level, natural perspective, label fully sharp",
+  C: "Angle: slight low angle, physically plausible, no superhero tilt",
+  D: "Angle: top-down, natural shadow falloff",
+  E: "Angle: close-up of glass, foam, condensation and label texture, thin but honest focal plane",
+  F: "Angle: wide environmental framing at authentic venue scale",
+  G: "Angle: aerial view from moderate height, realistic geometry",
+  H: "Angle: over-the-shoulder first-person hold, believable hand scale",
 };
 
 const SCENE_TEXTURE_ANCHORS: Record<HyperrealisticInput["szene"], string> = {
@@ -168,9 +56,24 @@ export function resolveBeerPhysics(bierstil: string): BeerPhysicsProfile {
       hex: "#E8B050",
       liquid: "authentic craft beer color with natural clarity and physically plausible translucency",
       foam: "natural white foam with irregular pores and believable retention, never stiff or plastic",
+      head: "about two fingers (2–3 cm) of foam",
       carbonation: "natural carbonation bubbles with varied size and spacing",
     }
   );
+}
+
+/** Automatisch in den Freitext gespiegelte Klarheits-Notizen (applyClientIntentOverrides). */
+export const CLARITY_NOTE_TRUEB = "Bier naturtrüb unfiltriert mit Hefetrübung";
+export const CLARITY_NOTE_KLAR = "Bier filtriert klar";
+
+/** Freitext ohne die automatisch angehängten Klarheits-Notizen — also nur, was der Kunde geschrieben hat. */
+export function customerSceneText(zusatzWunsch?: string | null): string {
+  return (zusatzWunsch ?? "")
+    .split(CLARITY_NOTE_TRUEB)
+    .join("")
+    .split(CLARITY_NOTE_KLAR)
+    .join("")
+    .replace(/^[\s.]+|[\s.]+$/g, "");
 }
 
 /** Freitext verlangt naturtrübes / unfiltriertes Bier. */
@@ -199,7 +102,7 @@ export function resolveBeerClarity(
   if (input.filtrierung === "unfiltriert") return "trueb";
   if (input.filtrierung === "filtriert") return "klar";
   const stil = input.bierstil.trim().toLowerCase().replace(/\s+/g, "_");
-  if (/hefeweizen|kellerbier|neipa|zwickel|rauchbier/.test(stil)) return "trueb";
+  if (/hefeweizen|dunkles_weizen|weizenbock|kellerbier|neipa|zwickel|rauchbier|radler/.test(stil)) return "trueb";
   return "klar";
 }
 
@@ -213,6 +116,14 @@ export function wantsUnfilteredBeer(
   return wantsUnfilteredFromText(zusatzWunsch);
 }
 
+/** Weißbier wird anders eingeschenkt: Rest aufschwenken, Hefe ins Glas. */
+export function weizenPourNote(bierstil: string, behaelter: NonNullable<HyperrealisticInput["behaelter"]>): string {
+  if (behaelter !== "B") return "";
+  const stil = bierstil.trim().toLowerCase().replace(/\s+/g, "_");
+  if (!/hefeweizen|dunkles_weizen|weizenbock/.test(stil)) return "";
+  return "Weißbier serving: the bottle is almost empty — poured slowly into the tilted glass, the last few centimetres swirled to rouse the yeast; at most a thin yeast film remains at the bottle bottom.";
+}
+
 export function buildBeerPhysicsFragment(
   bierstil: string,
   behaelter: NonNullable<HyperrealisticInput["behaelter"]>,
@@ -223,7 +134,7 @@ export function buildBeerPhysicsFragment(
   // Bei trüb KEINE Stil-Wörter wie „crystal-clear Helles“ stehen lassen — die ziehen das Modell zurück.
   const liquid =
     clarity === "trueb"
-      ? `visibly NATURTRÜB / UNFILTERED beer in ${profile.hex} gold — dense soft yeast haze, milky-cloudy opacity like Kellerbier or Hefeweizen, light scatters in the body so you cannot see sharp detail through the liquid, NEVER crystal-clear filtered lager`
+      ? `visibly NATURTRÜB / UNFILTERED beer in its own style color (approx. ${profile.hex}) — dense soft yeast haze, milky-cloudy opacity, light scatters in the body so you cannot see sharp detail through the liquid, NEVER crystal-clear`
       : /hazy|cloudy|turbid|opaque|yeast/i.test(profile.liquid)
         ? "crystal-clear filtered beer matching the style color — brilliant see-through body, NO yeast haze, NO naturtrüb cloudiness"
         : profile.liquid;
@@ -237,12 +148,15 @@ export function buildBeerPhysicsFragment(
     `LIQUID PHYSICS (${vessel}):`,
     `Clarity: ${clarity === "trueb" ? "UNFILTERED / naturtrüb (MANDATORY)" : "FILTERED / crystal-clear (MANDATORY)"}.`,
     `Color SRM ${profile.srm}, approx. hex ${profile.hex} — ${liquid}.`,
-    `Foam: ${profile.foam}.`,
+    `Foam: ${profile.foam}. Head height: ${profile.head} — match this exactly, it is how a brewer serves this style.`,
+    weizenPourNote(bierstil, behaelter),
     `Carbonation: ${profile.carbonation}.`,
     "Glass: ordinary real glass. Highlights come from this room (window, sky, lamps), not a studio HDRI. Reflections show the actual setting. Condensation only if the drink is cold — sparse, irregular, some droplets already slid.",
     "Condensation: fine irregular perspiration droplets with varied size and spacing slowly sliding down chilled glass — never uniform sticker dots.",
     "Avoid unnaturally stiff, plastic-looking, or perfectly symmetrical foam domes.",
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function inputProduktKategorie(input: Pick<HyperrealisticInput, "produktKategorie">): ProduktKategorie {
@@ -294,7 +208,7 @@ export function bottleGeometryPrompt(
   return promptDescription.replace(/beer bottle/gi, beverageContainerNoun(input));
 }
 
-function lemonadeColorFromName(bierstil: string): string {
+export function lemonadeColorFromName(bierstil: string): string {
   const key = bierstil.trim().toLowerCase();
   if (/\bspezi\b/.test(key)) return "cola-orange Spezi color matching the product label/photo";
   if (/\bcola\b/.test(key)) return "dark cola-brown matching the product label/photo";
@@ -303,7 +217,7 @@ function lemonadeColorFromName(bierstil: string): string {
   return "lemonade color taken only from the product label/photo — do not invent beer amber or hops";
 }
 
-function waterCarbonationFromName(input: HyperrealisticInput): string {
+export function waterCarbonationFromName(input: HyperrealisticInput): string {
   const key = `${input.bierstil} ${input.beerName ?? ""}`.toLowerCase();
   if (/\b(?:still|naturell|ohne kohlensaeure|ohne kohlensäure)\b/.test(key)) {
     return "still water, no bubbles, no foam";
@@ -365,10 +279,10 @@ export function buildCameraFragment(
   const style = input ? resolvePhotoStyle(input) : "reportage";
   const camera =
     style === "campaign"
-      ? "Full-frame camera, 24–35mm lens at f/5.6, ISO 100, low or forced perspective with the product dominant in frame"
+      ? "Camera: full-frame, 24–35mm lens at f/5.6, ISO 100, low or forced perspective with the product dominant in frame"
       : style === "premium"
-        ? "Full-frame camera, 85mm lens at f/5.6, ISO 100, controlled product focus with natural optical falloff"
-        : "Handheld compact or full-frame camera, 28–35mm lens at f/2.8–f/5.6, ISO 400–1600, candid snapshot framing with imperfect edges";
+        ? "Camera: full-frame on a steady hold, 85mm lens at f/4, ISO 100–400, product in focus with natural optical falloff"
+        : "Camera: handheld 35mm point-and-shoot look, 28–35mm lens, on-camera direct flash, candid framing with imperfect edges";
   return `${CAMERA_BY_SHOT[shot]}. ${camera}. Final composition framed for ${aspectRatioFormatLabel(aspectRatio)} format. Neutral white balance and believable dynamic range; no HDR.`;
 }
 
@@ -403,8 +317,7 @@ export function isPouredGlassServing(input: HyperrealisticInput): boolean {
 /**
  * Erzwingt exakt den vom Nutzer gewählten Flaschentyp (Form + Volumen) und
  * verbietet typische Verwechslungen (z. B. NRW-0,5-l vs. Stubbi-0,33-l).
- * Wird bewusst spät im Prompt platziert, da gpt-image-2 spätere Anweisungen
- * stärker gewichtet — und überlebt so auch den Claude-Rewrite.
+ * Die Endmontage (final-prompt.ts) stellt ihn vor die Szene, damit Kürzung ihn nie trifft.
  */
 export function buildBottleShapeLockFragment(input: HyperrealisticInput): string {
   const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
@@ -412,35 +325,23 @@ export function buildBottleShapeLockFragment(input: HyperrealisticInput): string
   const flasche = FLASCHEN_TYPEN[input.flaschenTyp];
   if (!flasche) return "";
   const istDose = isDoseTyp(input.flaschenTyp);
-  const istSchraub = flasche.closure === "schraub";
   const noun = istDose ? "aluminium beverage can" : "bottle";
   const nounCap = istDose ? "Can" : "Bottle";
   const colorClause = istDose ? "" : `, made of ${containerMaterialPhrase(input.flaschenTyp, input.flaschenfarbe)}`;
   const poured = isPouredGlassServing(input);
-  const drink = beverageDrinkNoun(input);
-  const isBeer = inputProduktKategorie(input) === "bier";
   const litres = flascheVolumeMl(input.flaschenTyp) / 1000;
-  const openServing = poured
-    ? istDose
-      ? `OPEN SERVING (overrides any catalog 'sealed' wording): ${isBeer ? "beer" : drink} is already poured, so the can MUST be opened with the stay-tab pulled — never an unopened sealed can next to a full glass.`
-      : istSchraub
-        ? `OPEN SERVING (overrides any catalog 'sealed' wording): ${isBeer ? "beer" : drink} is already poured into a glass, so the bottle mouth MUST be uncapped — no screw cap on the mouth. The screw cap may rest on the table, never on the bottle.`
-        : `OPEN SERVING (overrides any catalog 'sealed with crown cap' wording): ${isBeer ? "beer" : drink} is already poured into a glass, so the bottle mouth MUST be uncapped — no crown cap, no cork, no foil on the mouth. The crown cap may rest on the table, never on the bottle.`
-    : "";
   return [
     `${BOTTLE_SHAPE_LOCK_MARKER}:`,
     `The ${noun} MUST be ${bottleGeometryPrompt(input, flasche.promptDescription)}${colorClause}.`,
     `${nounCap} shape and size are defined by this specification — ${flasche.forbidden}.`,
-    openServing,
     poured
-      ? `EXACTLY ONE ${noun} of this product in the frame: the ${noun} being poured from (or standing open next to the glass) IS the product — never add a second, extra ${noun} beside it.`
+      ? `EXACTLY ONE ${noun} of this product in the frame — the one poured from or standing open next to the glass; never a second ${noun} beside it.`
       : "",
-    `If a bottle-shape reference photo is attached, copy that silhouette, neck length, shoulder and proportions exactly.`,
-    `If the product photo shows several bottles/sizes side by side, the product here is ONLY the ${litres} L one — ignore the other sizes completely (their height, label and closure).`,
+    `If a bottle-shape reference photo is attached, copy its silhouette, neck and shoulder exactly.`,
+    `If the product photo shows several sizes, the product is ONLY the ${litres} L one — ignore the others.`,
     smallSizeCue(input.flaschenTyp, noun),
-    `Label/artwork photos only supply printed graphics to apply onto this ${noun} — they must not replace the ${noun} with a different type.`,
-    `Bottles, cans or glasses visible in LOOK/style references are NOT this product — never copy their shape, neck or shoulder.`,
-    `Render the ${noun} at physically correct real-world scale so its ${litres} L size is unmistakable.`,
+    `Label photos only supply the printed artwork for this ${noun}; containers in LOOK/style references are NOT this product.`,
+    `Physically correct real-world scale so the ${litres} L size is unmistakable.`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -453,13 +354,17 @@ function smallSizeCue(flaschenTyp: string, noun: string): string {
   return `SMALL SIZE (${ml} ml): this is the small ${noun}, clearly shorter and slimmer than a standard 0.5 L ${noun} — an adult hand covers about half of its body height, and the poured glass is a small glass of about ${ml} ml, never a tall 0.5 L glass.`;
 }
 
-const GLASS_FORBIDDEN: Record<NonNullable<HyperrealisticInput["glasTyp"]>, string> = {
+export const GLASS_FORBIDDEN: Record<NonNullable<HyperrealisticInput["glasTyp"]>, string> = {
   willibecher:
     "NOT a stemmed Pilsner flute or tulip, NOT a curvy Weizen vase, NOT a Maßkrug with handle, NOT a Teku, NOT a Kölsch Stange, NOT an American shaker pint, NOT a straight highball/water tumbler",
   pils_tulpe:
     "NOT a stemless Willibecher tumbler, NOT a Weizen vase, NOT a Maßkrug, NOT a Teku, NOT a shaker pint, NOT a cylindrical water glass",
   weizen: "NOT a Willibecher tumbler, NOT a stemmed Pilsner flute, NOT a Maßkrug, NOT a Stange, NOT a shaker pint",
   masskrug: "NOT a Willibecher, NOT a Pilsner flute, NOT a Weizen vase, NOT a stemless tumbler without handle",
+  seidel: "NOT a 1 litre Maßkrug, NOT a handle-less Willibecher, NOT a stoneware Steinkrug, NOT a Weizen vase",
+  steinkrug: "NOT a glass mug, NOT a transparent Maßkrug, NOT a Willibecher, NOT a stemmed glass",
+  pokal: "NOT a slender Pilstulpe, NOT a snifter, NOT a Teku, NOT a stemless Willibecher, NOT a Maßkrug",
+  nonic: "NOT a conical Willibecher, NOT a Weizen vase, NOT a stemmed glass, NOT a Maßkrug with handle",
   ipa_teku: "NOT a Willibecher, NOT a Weizen vase, NOT a Maßkrug, NOT a Pilsner flute, NOT a shaker pint",
   schwenker: "NOT a Willibecher, NOT a Weizen vase, NOT a Maßkrug, NOT a Pilsner flute, NOT a shaker pint",
   stange: "NOT a Willibecher (too wide), NOT a Pilsner flute, NOT a Weizen vase, NOT a Maßkrug, NOT a shaker pint",
@@ -473,7 +378,7 @@ export const LABEL_LOCK_MARKER = "LABEL LOCK 1:1 (MANDATORY)";
  * Vorn anhängen (siehe ensureProductGeometryLocks), sonst wird der Lock bei langen Prompts abgeschnitten.
  */
 export const LABEL_ORIENTATION_LOCK =
-  "LABEL ORIENTATION (PHYSICAL, MANDATORY — INVALID IF VIOLATED): Treat the label as already glued on the real bottle from Image 1. Anchor A = the label edge that faces the NECK/shoulder on the reference; Anchor B = the label edge that faces the HEEL/base on the reference. In EVERY pose (standing, tilted, pouring) Anchor A stays toward the neck and Anchor B toward the base — the printed artwork rotates with the glass body, never independently. During pouring the brand text MAY appear upside-down or sideways to the camera; that is REQUIRED and correct. FORBIDDEN: flipping/rotating the label so text reads upright to the camera while the bottle is tilted; upside-down label relative to the bottle base; mirrored label. Prefer a pour tilt of about 45–70° from upright (not a full base-to-sky invert) so orientation stays unambiguous.";
+  "LABEL ORIENTATION (PHYSICAL, MANDATORY): the label is glued to the bottle — its top edge (Anchor A) always faces the NECK/shoulder and its bottom edge the base, exactly as on the reference. When the bottle tilts or pours, the artwork rotates with the glass, so text may read sideways or upside-down to the camera; that is correct. FORBIDDEN: label re-rotated to read upright on a tilted bottle, label upside-down relative to the base, mirrored label. Pour tilt about 45–70°.";
 
 export function buildLabelLockFragment(input: HyperrealisticInput): string {
   if ((input.etikettModus ?? "marke") !== "marke") return "";
@@ -481,16 +386,11 @@ export function buildLabelLockFragment(input: HyperrealisticInput): string {
   const noun = isDoseTyp(input.flaschenTyp) ? "can" : "bottle";
   return [
     `${LABEL_LOCK_MARKER}:`,
-    product ? `The attached reference photo IS the product "${product}".` : "The attached reference photo IS this exact product.",
-    `If the reference shows more than one ${noun}, copy the artwork of only one of them — never blend two labels into one.`,
-    "Label text stays clean and correctly spelled exactly as on the reference; no warped, smeared, doubled or invented letters, no text running in a different direction than on the reference.",
-    `Copy the printed ${noun} artwork 1:1 — same logo, same crest, same typography, same colors, same layout, same words.`,
-    "Do not redesign, restyle, recolor, translate, abbreviate, or invent a variant (no new names, no extra badges, no swapped colorways).",
-    "Every letter that is readable on the reference must appear the same on the generated label.",
+    product ? `The product reference photo IS "${product}".` : "The product reference photo IS this exact product.",
+    `Copy the printed ${noun} artwork 1:1 — same logo, crest, typography, colors, layout and words; every readable letter spelled exactly as on the reference.`,
+    `No redesign, recolor, translation, invented variant, extra badge or warped letters; if the reference shows several ${noun}s, copy only one label, never a blend.`,
     isDoseTyp(input.flaschenTyp) ? "" : LABEL_ORIENTATION_LOCK,
-    inputProduktKategorie(input) === "bier"
-      ? "The result is a new photograph of that same physical product in a new scene — not a collage and not a different beer."
-      : "The result is a new photograph of that same physical product in a new scene — not a collage and not a different drink.",
+    `A new photograph of that same physical product — not a collage and not a different ${inputProduktKategorie(input) === "bier" ? "beer" : "drink"}.`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -509,20 +409,23 @@ export function buildGlassShapeLockFragment(input: HyperrealisticInput): string 
   const drink = beverageDrinkNoun(input);
   const volumeLock =
     behaelter === "B"
-      ? `POUR VOLUME: the glass is a single pour from this ${bottleMl / 1000} L bottle/can (${fillMl} ml). It must look like it was filled from that one container — never a larger mug.`
+      ? `POUR VOLUME: a single pour from this ${bottleMl / 1000} L bottle/can (${fillMl} ml) — never a larger mug.`
       : "";
   return [
-    `${GLASS_SHAPE_LOCK_MARKER} — INVALID IF WRONG GLASS:`,
-    `Selected glass type code: ${input.glasTyp} (${glas.label}).`,
+    `${GLASS_SHAPE_LOCK_MARKER} — INVALID IF WRONG GLASS (${glas.label}):`,
     isBeer
       ? `Every beer glass in frame MUST be exactly ${pour}.`
       : `Every glass in frame MUST be exactly ${withoutBeerFoam(pour)}. Liquid is ${drink}; do not render beer foam or hop haze.`,
     `${GLASS_FORBIDDEN[input.glasTyp]}.`,
-    input.glasTyp !== "willibecher"
-      ? "ANTI-DEFAULT: Models often fall back to a German Willibecher / conical tumbler for beer pours — that is FORBIDDEN here. Match the selected glass silhouette instead."
+    input.glasTyp !== "willibecher" ? "Do not fall back to a Willibecher / conical tumbler." : "",
+    input.glasTyp === "steinkrug" && isBeer
+      ? "Stoneware is opaque: show the beer and foam only from above at the rim; no liquid is visible through the walls."
+      : "",
+    isBeer && glassHasEichstrich(input.glasTyp)
+      ? "German serving glass: a small printed fill line with its volume mark near the rim (Eichstrich); the beer reaches that line and the foam sits above it. The mark stays small and secondary."
       : "",
     volumeLock,
-    "If a glass-shape reference image is attached, copy that silhouette and proportions exactly (stem, foot, bowl, height). Do not substitute any other glass type.",
+    "If a glass-shape reference image is attached, copy its silhouette and proportions exactly.",
   ]
     .filter(Boolean)
     .join(" ");
@@ -536,20 +439,14 @@ export function buildUnfilteredLiquidLockFragment(input: HyperrealisticInput): s
   if (clarity === "trueb") {
     return [
       `${UNFILTERED_LIQUID_LOCK_MARKER} — INVALID IF CLEAR:`,
-      "Sorten-Filtrierung = unfiltriert. Every poured beer in frame MUST be densely NATURTRÜB.",
-      "Look: cloudy Kellerbier / Zwickelbier — milky-golden yeast haze, soft turbidity, nearly opaque body like unfiltered wheat beer.",
-      "Light scatters inside the liquid; the far glass wall and background must NOT read sharply through the beer.",
-      "IMAGE-1 LIQUID OVERRIDE (MANDATORY): The product photo may show clear beer through bottle glass — IGNORE that completely.",
-      "Do NOT copy Image 1 bottle-liquid clarity, transparency, or filtered-lager look into the poured glass.",
-      "Poured beer clarity is locked by this text (and by any LIQUID reference image), never by Image 1.",
-      "Style words like Helles/Lager must NOT make the pour crystal-clear — this pour is unfiltered and cloudy.",
-      "FORBIDDEN: crystal-clear filtered lager, water-like transparency, brilliant see-through gold, Pils clarity, reading bubbles as sharp dots through the full glass depth.",
+      "Every poured beer is densely NATURTRÜB like a Kellerbier or Zwickel: milky yeast haze in the beer's own color, nearly opaque; the far glass wall and background do NOT read sharply through the beer.",
+      "IMAGE-1 LIQUID OVERRIDE: ignore any clear beer visible through the bottle in Image 1 — clarity comes from this text and any LIQUID reference, never from Image 1 or from style words like Helles/Lager.",
+      "FORBIDDEN: crystal-clear filtered lager, water-like transparency, Pils clarity.",
     ].join(" ");
   }
   return [
     `${UNFILTERED_LIQUID_LOCK_MARKER} — INVALID IF CLOUDY:`,
-    "Sorten-Filtrierung = filtriert. The poured beer MUST look crystal-clear and filtered.",
-    "FORBIDDEN: naturtrüb cloudiness, milky opacity, unfiltered haze.",
+    "The poured beer is filtered and crystal-clear. FORBIDDEN: naturtrüb cloudiness, milky opacity, yeast haze.",
   ].join(" ");
 }
 
@@ -589,15 +486,15 @@ export const CLOSURE_LOGIC_MARKER = "CLOSURE LOGIC (MANDATORY)";
  * Offener Bügelverschluss als echte Mechanik beschreiben — vage Angaben („flipped back“) führten zu
  * doppelten, verknoteten Drahtbügeln und schwebenden Porzellanköpfen.
  */
-const SWING_TOP_OPEN = [
-  "the swing-top OPEN, built exactly like a real German Bügelverschluss: ONE thin wire ring clamped around the neck just below the lip, TWO thin parallel wire arms hinged on that ring, and at their end ONE white porcelain stopper with its rubber gasket",
-  "— in the open state the arms are swung back over the lip and the stopper hangs down against the side of the neck by gravity (on a tilted pouring bottle it dangles below the neck, beside the beer stream, never in it)",
-  "— count: exactly ONE stopper in ONE color (as on the reference), exactly ONE wire bail; the round bottle mouth is completely free; wires are smooth, symmetric and attached; NO second wire loop, NO extra stopper, NO two stoppers of different colors, NO twisted, tangled or doubled wire, NO stopper standing upright on top of the bottle, NOT covering the neck label",
+export const SWING_TOP_OPEN = [
+  "the swing-top OPEN like a real German Bügelverschluss: ONE thin wire ring around the neck below the lip, TWO parallel wire arms hinged on it, ONE porcelain stopper with rubber gasket at their end",
+  "— the arms are swung back and the stopper hangs down against the side of the neck by gravity (on a pouring bottle it dangles below the neck, beside the stream, never in it)",
+  "— exactly ONE stopper in ONE color as on the reference, ONE wire bail, bottle mouth free; NO second wire loop, NO tangled wire, NO stopper upright on the mouth, NOT covering the neck label",
 ].join(" ");
 
 /** Hand an Flasche: Finger liegen außen am Glas — nie durch das Glas sichtbar oder im Etikett „versunken“. */
 export const HAND_BOTTLE_CONTACT =
-  "HAND–BOTTLE CONTACT: any hand holding the bottle wraps its fingers and thumb around the OUTSIDE of the bottle body and rests on the glass surface, in front of or beside the label. The bottle glass is solid and opaque to the hand: no finger, thumb or part of a hand is ever inside the bottle or seen through the glass, nothing merges or fuses into the bottle, and the label is never printed over, under or through a finger. Natural five-finger pouring grip with contact shadows.";
+  "HAND–BOTTLE CONTACT: fingers and thumb wrap around the OUTSIDE of the bottle with contact shadows; no part of a hand is ever inside the bottle or seen through its glass, nothing fuses into it, and the label is never printed over a finger.";
 
 export function buildClosureLogicFragment(input: HyperrealisticInput): string {
   const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
@@ -620,40 +517,33 @@ export function buildClosureLogicFragment(input: HyperrealisticInput): string {
       : istSchraub
         ? "the screw cap removed — no cap on the bottle mouth"
         : "the crown cap removed — no cap on the bottle mouth";
-  const capNever = istSchraub
-    ? "a screw cap must NEVER sit on the bottle mouth — not even copied from a sealed product photo. The screw cap may lie on the table beside the bottle; the bottle lip is open and empty."
-    : "a crown cap must NEVER sit on the bottle mouth — not even copied from a sealed product photo. The metal crown cap may lie on the table beside the bottle; the bottle lip is open and empty.";
+  const capNever = istDose
+    ? "the stay-tab must be popped open — never an unopened can next to a full glass."
+    : istBuegel
+      ? "the porcelain stopper must NEVER sit clamped on the bottle mouth."
+      : istSchraub
+        ? "a screw cap must NEVER sit on the bottle mouth, even if the product photo shows it sealed; the cap may lie on the table."
+        : "a crown cap must NEVER sit on the bottle mouth, even if the product photo shows it sealed; the cap may lie on the table.";
 
   const modus = input.personenModus ?? (input.personImBild ? "D" : "A");
-  const pluralNoun = istDose ? "cans" : "bottles";
-  const lines: string[] = [`${CLOSURE_LOGIC_MARKER}, physical drinking consistency:`];
-  // Auch ohne gewählten Personen-Modus: Freitext-Szenen („jemand schenkt ein“) bringen Hände mit.
-  lines.push(HAND_BOTTLE_CONTACT);
-
-  // Glas eingeschenkt + Flasche → Gebinde wurde bereits geöffnet.
-  if (behaelter === "B") {
-    const drink = beverageDrinkNoun(input);
-    const isBeer = inputProduktKategorie(input) === "bier";
+  // Freitext-Szenen („jemand schenkt ein“) können Hände mitbringen, auch ohne Personen-Modus.
+  const peoplePossible = modus !== "A" || Boolean(customerSceneText(input.zusatzWunsch));
+  const poured = behaelter === "B";
+  const lines: string[] = [`${CLOSURE_LOGIC_MARKER}:`];
+  if (peoplePossible) lines.push(HAND_BOTTLE_CONTACT);
+  if (poured || peoplePossible) lines.push(`OPEN STATE: ${openState}.`);
+  if (poured) {
+    const drink = inputProduktKategorie(input) === "bier" ? "beer" : beverageDrinkNoun(input);
+    lines.push(`OPEN SERVING: a glass is already poured, so the ${noun} is OPEN. HARD RULE: once ${drink} is poured, ${capNever}`);
+  }
+  if (peoplePossible) {
     lines.push(
-      isBeer
-        ? `The adjacent beer glass is already poured, therefore the ${noun} MUST be shown ALREADY OPENED with ${openState}.`
-        : `The adjacent glass is already poured, therefore the ${noun} MUST be shown ALREADY OPENED with ${openState}.`,
-      `HARD RULE: once ${isBeer ? "beer" : drink} has been poured into a glass, ${capNever}`,
-      `Never show a sealed ${noun} (${closureWord}) standing next to a full poured glass.`,
+      `Anyone drinking from, raising, clinking or toasting (Prost) a ${noun} holds an OPEN one; doing that with a sealed ${noun} (${closureWord}) is FORBIDDEN.`,
     );
   }
-
-  // Gruppe, die anstößt/prostet → alle hochgehaltenen Gebinde sind offen.
-  if (modus === "E") {
-    lines.push(
-      `When people raise, clink or toast (Anstoßen / Prost / cheers) the ${pluralNoun} together, EVERY raised and clinked ${noun} MUST be OPEN — show ${openState}. Toasting or clinking with sealed, unopened ${pluralNoun} (${closureWord}) is physically wrong and FORBIDDEN.`,
-    );
+  if (!poured) {
+    lines.push(`A sealed ${noun} (${closureWord}) is only correct when nobody drinks from it and no glass is poured.`);
   }
-
-  lines.push(
-    `If a person is drinking from, lifting, raising, clinking or toasting the ${noun} toward their lips or with others, the ${noun} MUST already be OPEN — show ${openState}. Drinking from, or toasting/clinking with, a still-sealed ${noun} (${closureWord}) is physically impossible and FORBIDDEN.`,
-    `Only show a fully sealed/closed ${noun} for an untouched unopened product shot where nobody is drinking, raising or clinking and no poured glass is present.`,
-  );
 
   return lines.join(" ");
 }
@@ -678,6 +568,36 @@ export function resolvePhotoStyle(
 
 export const PHOTO_STYLE_LOCK_MARKER = "PHOTO STYLE LOCK (NON-NEGOTIABLE)";
 
+export const REALISM_BASE_MARKER = "REALISM BASE (ALWAYS ON)";
+
+/**
+ * Immer aktive Realismus-Schicht (ersetzt den früheren Hyperreal-Schalter). Stilneutral:
+ * Kamera, Licht, Bokeh und Körnung bestimmt allein der PHOTO STYLE LOCK.
+ */
+export function buildRealismBaseFragment(input: HyperrealisticInput): string {
+  const isBeer = inputProduktKategorie(input) === "bier";
+  const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
+  const poured = isBeer && behaelter !== "F";
+  return [
+    `${REALISM_BASE_MARKER}: a real photograph from a physical camera — never CGI, 3D render, illustration or AI-art gloss.`,
+    isBeer
+      ? "Beer physics: correct refraction through glass and liquid, clarity exactly as locked above, small CO2 bubbles of varied size, irregular foam with real pores and a slightly uneven top, lacing where the beer has dropped."
+      : "Drink physics: correct refraction through glass and liquid, bubbles only where the product has them, no beer foam.",
+    // Schaumhöhe gehört hierher (nie gekürzt) — sie ist der stärkste Hebel gegen den KI-Look.
+    poured ? `Head height as a brewer serves this style: ${resolveBeerPhysics(input.bierstil).head}.` : "",
+    poured ? weizenPourNote(input.bierstil, behaelter) : "",
+    "Condensation only on a cold drink: droplets of varied size, some already run down — never a uniform droplet grid.",
+    // Früher nur mit Hyperreal-Schalter — ohne diese Zeilen fallen Gesichter sofort in glatte KI-Haut zurück.
+    "HUMAN REALISM (every visible face and hand): unretouched skin with visible pores, fine lines, small blemishes, freckles or moles, uneven redness, under-eye texture, slight shine on nose and forehead; stray and flyaway hairs, real stubble; natural imperfect teeth; asymmetric mid-moment expressions.",
+    "Hands: knuckle creases, veins, nail detail, correct finger count, believable grip pressure. Ordinary everyday people, not models — no symmetric model faces, no perfect white teeth, no airbrushed or doll-like skin.",
+    "Real surfaces carry wear: scratched wood grain, rings from glasses, crumbs, creased fabric, scuffed floors — never sterile CGI-clean.",
+    "Neutral color and believable dynamic range; mild camera noise and real optical softness are fine.",
+    "Forbidden: beauty retouch, smooth wax or plastic skin, skin-smoothing filter, HDR, teal-orange grade, lens-flare glow, plastic foam dome, sticker-like label.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /**
  * Später, kurzer Stil-Lock für das Bildmodell. Er darf nicht vom allgemeinen
  * Hyperreal-Layer oder einem vorgelagerten Prompt-Rewrite nivelliert werden.
@@ -686,59 +606,85 @@ export const PHOTO_STYLE_LOCK_MARKER = "PHOTO STYLE LOCK (NON-NEGOTIABLE)";
  * Gegen den „reinkopiert“-Look (Flasche wie ein Sticker auf dem Foto): konkrete optische Merkmale,
  * an denen man ein echt fotografiertes Produkt erkennt. „Not a cutout“ allein reicht dem Modell nicht.
  */
+/** Freitext spielt in oder an einem Fahrzeug (Auto, Bulli, Traktor, Bus …). */
+export function isVehicleScene(raw: string | undefined): boolean {
+  if (!raw) return false;
+  return /(?:^|[^a-zäöüß])(?:auto|autos|pkw|wagen|cabrio|bulli|camper|wohnmobil|roadtrip|beifahrer(?:in)?|fahrer(?:in)?|lenkrad|traktor|bulldog|fahren|f[aä]hrt|autofahrt|car|driving|driver)(?![a-zäöüß])/i.test(raw);
+}
+
+/**
+ * Werberegeln + Brauerlogik im Fahrzeug: Der Fahrer trinkt nie und hält nichts — auch bei Alkoholfrei,
+ * weil das Etikett die Marke des normalen Biers trägt. Im Fahrzeug wird nicht aus dem Glas getrunken.
+ */
+export const VEHICLE_RULE =
+  "VEHICLE RULE (MANDATORY): The driver never holds, drinks from or touches any bottle, can or glass — both hands on the steering wheel, eyes on the road. Only passengers hold the product.";
+const VEHICLE_NO_GLASS = "Inside a vehicle there is no poured glass; passengers drink from the bottle or can.";
+
+export function buildVehicleRuleFragment(input: HyperrealisticInput): string {
+  if (!isVehicleScene(input.zusatzWunsch)) return "";
+  // Ein Glas im Auto nur, wenn der Kunde es ausdrücklich verlangt (dann steht behaelter auf B).
+  return input.behaelter === "B" ? VEHICLE_RULE : `${VEHICLE_RULE} ${VEHICLE_NO_GLASS}`;
+}
+
 export const PRODUCT_INTEGRATION_LOCK = [
   "PRODUCT IN-CAMERA INTEGRATION (MANDATORY): the bottle/can was physically in this scene when the photo was taken.",
   "Same light as the scene: identical sun/key-light direction, color temperature and contrast on the product as on the people and table — the product is never brighter, cleaner or more saturated than its surroundings and never evenly front-lit.",
   "The label is printed paper wrapped around a curved body: it follows the cylinder, text lines bend slightly with perspective, and the label darkens and compresses toward the left and right edges; label colors take on the scene's light and shade.",
   "Glass shows the environment: soft highlight streak matching the light direction, darker edges, faint reflections of the surroundings, the liquid level visible through the glass.",
-  "Grounded: soft contact shadow and slight reflection where it stands on the surface; condensation drops also sit on top of the label.",
+  "Grounded: soft contact shadow and slight reflection where it stands on the surface; on a cold bottle, condensation also sits on the label.",
   "Same lens, focus falloff, grain and white balance as the rest of the frame — no extra-crisp product on a soft background, no hard mask edge or halo, no flat sticker, no collage.",
 ].join(" ");
 
-export function buildPhotoStyleLockFragment(input: HyperrealisticInput): string {
+export function buildPhotoStyleLockFragment(input: HyperrealisticInput, options?: { social?: boolean }): string {
   // Nur-Glas-Motive haben keine Flasche — der Block würde sonst eine ins Bild holen.
   const behaelter = input.behaelter ?? (input.glasTyp ? "B" : "F");
-  return behaelter === "G" ? buildPhotoStyleCore(input) : `${buildPhotoStyleCore(input)} ${PRODUCT_INTEGRATION_LOCK}`;
+  const core = buildPhotoStyleCore(input, Boolean(options?.social));
+  return behaelter === "G" ? core : `${core} ${PRODUCT_INTEGRATION_LOCK}`;
 }
 
-function buildPhotoStyleCore(input: HyperrealisticInput): string {
+const LOOK_GRAMMAR_RULE =
+  "LOOK references own the photographic grammar (crop, light, scale); USER SCENE only adds people, place and action inside it.";
+
+const LOCAL_PEOPLE =
+  "People are ordinary local adults, not models: mixed ages (20s to 60s), different body types, real skin with pores and wrinkles, everyday clothes with creases, mid-conversation expressions — never everyone smiling into the lens, never look-alike faces.";
+
+function buildPhotoStyleCore(input: HyperrealisticInput, social: boolean): string {
   const style = resolvePhotoStyle(input);
   if (style === "premium") {
     return [
-      `${PHOTO_STYLE_LOCK_MARKER}: PREMIUM HOSPITALITY PHOTOGRAPHY.`,
-      "LOOK references own the photographic grammar. Freitext only adds people/action — never override LOOK crop, light, or product scale.",
-      "Shoot a quiet premium lifestyle frame in a real beer garden or hospitality setting — natural available light, soft optical bokeh, ordered calm.",
-      "Keep the customer's product label in focus and readable — photographed with the same lens and light as the scene, not pasted on top; people may share the frame but stay secondary to the drink.",
-      "Use an 85–100mm perspective, stable camera, restrained props, and an orderly visual hierarchy — no clutter, no flash snapshot energy.",
-      "LOOK references set only this grammar: soft bokeh, warm daylight, hospitality social calm, crisp glass/bottle materials. Invent new adults. Never reproduce a face, hair, age, or outfit from a LOOK reference, and never copy their brands, logos, or lettering.",
-      "Match LOOK light as photographed — not an HDR golden-hour stock glow or beauty rim light on hair.",
-      "PEOPLE IN PREMIUM are ordinary local guests photographed candidly, not models: mixed ages (20s to 60s), different body types, faces and hair; real skin with pores, wrinkles, redness, uneven beard growth and stray hairs; everyday clothes with creases; relaxed mid-conversation expressions — a half smile, a glance away, mouth mid-word — never everyone laughing open-mouthed at once.",
-      "Out-of-focus people still keep real optical blur of real faces and fabric — not smooth painted smudges, not a row of look-alike handsome bearded men.",
-      "Forbidden AI-gloss: beauty-retouched wax skin, melted pretzel props, uniform sticker condensation, teal-orange grade, lens-flare bloom, plastic foam, perfect stock-model smiles, symmetrical model faces, identical faces, glowing skin.",
-      "Forbidden: on-camera direct flash, imperfect street crop, product thrust toward the lens, saturated flat campaign color fields, studio packshot on a pedestal.",
+      `${PHOTO_STYLE_LOCK_MARKER}: QUIET PREMIUM PRODUCT PHOTOGRAPHY.`,
+      LOOK_GRAMMAR_RULE,
+      "The customer's product is the clear subject: sharp, label readable, in the foreground or on a real surface — photographed in a real place (beer garden, Wirtshaus, dark wood table, vaulted cellar, brewhouse), never on a studio pedestal.",
+      "Calm order: few restrained props that belong to the place, one clear visual hierarchy, natural optical bokeh behind the product. 85mm perspective, steady camera, soft available light with true falloff.",
+      "People are optional and secondary — soft in the background or a hand at the edge of frame, never the subject.",
+      LOCAL_PEOPLE,
+      "LOOK references set only calm, bokeh and light. Never reproduce a face, hair, outfit, brand, logo or lettering from them.",
+      "Forbidden: direct flash, snapshot crop, product thrust toward the lens, saturated campaign color fields, studio packshot on a pedestal, beauty rim light on hair, wax skin, melted pretzel props, stock-model smiles.",
     ].join(" ");
   }
   if (style === "campaign") {
     return [
       `${PHOTO_STYLE_LOCK_MARKER}: ART-DIRECTED CAMPAIGN MOTIF.`,
-      "LOOK references own the photographic grammar. Freitext only adds people/action — never override LOOK crop, light, or product scale with a beer-garden toast postcard.",
-      "Match the LOOK references' grammar exactly: product fills a large share of the frame — handoff, can/bottle toast, low-angle hero, or overhead sky toast.",
-      "Copy LOOK light character and contrast as photographed — not an HDR/golden-hour CGI glow. Tight crop on hands and product; faces may be cropped out.",
-      "The customer's labeled product is the only brand in frame and must dominate the silhouette.",
-      "LOOK references: copy only scale, angle, light, gesture, and material honesty. Never copy their people, packages, logos, or lettering.",
-      "Forbidden AI-gloss: beauty-retouched skin, wax-smooth faces/hands, uniform sticker condensation, teal-orange grade, lens bloom, oversaturated sky, plastic foam.",
-      "Forbidden (this is Premium, not Campaign): quiet bottle standing on a wooden beer-garden table, soft-focus toasting couple in the background, pretzel/radish still life, Maßkrug postcard, church-tower hospitality bokeh.",
+      LOOK_GRAMMAR_RULE,
+      "A staged campaign still with one bold idea: the product dominates the frame — handoff between hands, bottles mid-toast, low-angle hero against the sky, or overhead on grass.",
+      social
+        ? "FEED LAYOUT: keep product and hands in the lower 62% of the frame; the upper part stays calm (sky, wall, grass) for the headline. The product is still large and dominant inside its zone."
+        : "Tight crop on hands and product; faces may be cropped out.",
+      "Clear, strong light as in the LOOK references — not a cinematic sunset wash or HDR glow.",
+      "The customer's labeled product is the only brand in frame. LOOK references give only scale, angle, light, gesture and material honesty — never their people, packages, logos or lettering, and never turn a bottle into a can.",
+      "Forbidden: quiet bottle standing on a wooden beer-garden table, soft-focus toasting couple, pretzel/radish still life, Maßkrug postcard, beauty-retouched or wax-smooth hands, uniform sticker condensation.",
     ].join(" ");
   }
   return [
-    `${PHOTO_STYLE_LOCK_MARKER}: CANDID REPORTAGE.`,
-    "LOOK references own the photographic grammar. Freitext only adds people/action — never override LOOK flash character or imperfect crop with soft hospitality bokeh.",
-    "Shoot a raw observed nightlife or street-life moment: friends in motion, imperfect crop, someone mid-laugh or mid-stride — not a staged ad.",
-    "Prefer on-camera direct flash or harsh available neon/street light with deep falloff; hard shadows and slight overexposure on faces are welcome.",
-    "The customer's product appears casually in hand, on a messy table, or in the crowd — embedded in the event, never the polished hero of the frame.",
-    "LOOK references set only flash character, candid energy, and imperfect framing. Invent entirely new fictional adults every time — vary age, gender presentation, and appearance.",
-    "Never reuse a face, skin tone, hair, baseball cap, neck tattoo, jewelry, or outfit from LOOK references.",
-    "Forbidden: product thrust toward the lens, saturated flat campaign color fields, quiet catalogue packshot, beauty-retouched skin, controlled studio set, repeating the same person across images.",
+    `${PHOTO_STYLE_LOCK_MARKER}: CANDID FLASH REPORTAGE.`,
+    LOOK_GRAMMAR_RULE,
+    "A raw snapshot from a real beer occasion — Stammtisch, Wirtshaus, beer garden, village fest, keg tapping, garage party, brewhouse after work: friends in motion, mid-laugh, mid-sentence, looking away. Not a staged ad.",
+    "Shot like a 35mm point-and-shoot with on-camera direct flash — also as fill flash in daylight: hard light on the nearest people, quick falloff into a darker background, small hard shadows, slightly blown highlights, film-snapshot color and grain.",
+    "Imperfect crop: tilted frame, someone cut off at the edge, the blurred shoulder or back of another guest in the foreground, people overlapping — every limb clearly belongs to one person.",
+    "The customer's product is casually part of the moment, placed or held as the user scene requires — embedded in the scene, never the polished hero and never thrust toward the lens. No additional standing bottle or table arrangement is required.",
+    LOCAL_PEOPLE,
+    "Invent new people every time — never reuse a face, hair, cap, tattoo, jewelry or outfit from LOOK references.",
+    "Forbidden: posed smiles into the lens, studio light, soft hospitality bokeh, saturated flat campaign color fields, catalogue packshot, beauty-retouched skin, cigarettes or smoking.",
   ].join(" ");
 }
 
@@ -750,7 +696,7 @@ export function buildHyperrealismLockFragment(
     ? "Output must look like a real photographed brand campaign on a physical set — art-directed but shot on camera, never CGI."
     : style === "premium"
       ? "Output must look like premium hospitality photography in a real beer garden or dining setting, with soft natural light, restrained precision, and no CGI rendering."
-      : "Output must look like a candid flash or street-reportage photograph from a real night out, with imperfect framing and no CGI rendering.";
+      : "Output must look like a candid flash snapshot from a real beer occasion — raw, imperfectly framed, no CGI rendering.";
   if (style === "campaign") {
     return [
       "HYPERREALISM LOCK:",
@@ -801,13 +747,13 @@ export function buildAuthenticityFragment(input: HyperrealisticInput): string {
       ? "This must read as a real camera campaign still from a brand shoot: product-forward and staged, but with ordinary photographic texture — not a glossy AI key visual."
       : premiumProduct
         ? "This must read as real hospitality photography from a beer garden or dining set: calm, soft optical bokeh, readable drink — not a glossy AI lifestyle ad."
-        : "This must read as a candid snapshot or street-reportage frame: raw, social, slightly imperfect, and unposed.",
+        : "This must read as a candid flash snapshot: raw, social, slightly imperfect, and unposed.",
     "Neutral color response and believable dynamic range — never a warm amber wash, teal-orange grading, HDR, golden-hour bloom, or beauty-retouched skin.",
     campaign
       ? "Lighting follows the LOOK references' real light (sun angle, contrast, color temperature) — not a cinematic sunset wash or beauty-dish glow. Mild highlight clip is fine; lens flare bloom is not."
       : premiumProduct
         ? "Lighting follows LOOK-reference hospitality light (window, overcast, soft evening practicals) with true falloff and some shadow. No beauty dish, no rim-light hero glow on hair, no cinematic sunset wash."
-        : "Lighting is on-camera direct flash or harsh available street/neon/practical light with deep background falloff. Hard shadows and slight flash hotspots are correct. No soft catalogue beauty dish.",
+        : "Lighting is on-camera direct flash over the light of the place (fill flash by day): hard shadows, quick background falloff, slight flash hotspots are correct. No soft catalogue beauty dish.",
     campaign
       ? "The customer's product dominates the foreground — held toward the camera or filling the lower/center frame. Condensation must be sparse and irregular, never a perfect droplet grid. Not a quiet bottle standing alone on a beer-garden table."
       : premiumProduct
@@ -828,7 +774,7 @@ export function buildAuthenticityFragment(input: HyperrealisticInput): string {
     lines.push(
       premiumProduct
         ? "People are ordinary guests, not models: visible pores, slight skin unevenness, stray hairs, natural imperfect teeth, asymmetric mid-moment expressions. Soft hospitality light is fine — beauty-filter wax skin and perfect stock smiles are not."
-        : "People look like friends on a night out: uneven flash-lit skin, stray hairs, mid-gesture faces, someone looking away or half out of frame. No beauty-filter, no posed stock-photo smile toward the lens.",
+        : "People look like friends caught mid-moment: uneven flash-lit skin, stray hairs, mid-gesture faces, someone looking away or half out of frame. No beauty-filter, no posed stock-photo smile toward the lens.",
     );
   }
   if (campaign && (modus === "B" || modus === "C" || modus === "D" || modus === "E")) {

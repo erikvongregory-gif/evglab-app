@@ -32,7 +32,19 @@ export const flaschenTypSchema = z.enum([
   "pet_1500",
 ]);
 
-export const glasTypSchema = z.enum(["pils_tulpe", "weizen", "willibecher", "masskrug", "ipa_teku", "schwenker", "stange"]);
+export const glasTypSchema = z.enum([
+  "pils_tulpe",
+  "weizen",
+  "willibecher",
+  "seidel",
+  "masskrug",
+  "steinkrug",
+  "pokal",
+  "ipa_teku",
+  "schwenker",
+  "nonic",
+  "stange",
+]);
 
 export const bierstilSchema = z.enum([
   "hefeweizen",
@@ -142,7 +154,7 @@ export const hyperrealisticSchema = z.object({
   gruppenSetting: gruppenSettingSchema.optional(),
   /** Skill Frage 1b [G/F/B]. */
   behaelter: behaelterSchema.optional(),
-  tageszeit: z.enum(["goldene_stunde", "mittag", "abend_warm", "blaue_stunde"]).default("goldene_stunde"),
+  tageszeit: z.enum(["tageslicht", "goldene_stunde", "mittag", "abend_warm", "blaue_stunde", "nacht"]).default("tageslicht"),
   /** Trend-Stimmung aus Skill — bevorzugt vor Legacy stimmung-Begriffen. */
   stimmungTrend: stimmungSchema.optional(),
   /** Legacy. */

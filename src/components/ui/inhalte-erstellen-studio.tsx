@@ -58,17 +58,17 @@ const PHOTO_STYLE_OPTIONS: Array<{ id: PhotoStyle; label: string; hint: string }
   {
     id: "reportage",
     label: "Reportage",
-    hint: "Candid und roh: Blitz oder hartes Available Light, unperfekter Crop, Flasche nur nebenbei — wie ein echtes Snapshot vom Abend.",
+    hint: "Candid und roh: direkter Blitz (auch tagsüber), unperfekter Crop, Flasche nebenbei — wie ein echter Schnappschuss vom Stammtisch, Fest oder Biergarten.",
   },
   {
     id: "premium",
     label: "Premium-Fotografie",
-    hint: "Ruhige Hospitality-Fotografie: weiches Licht, optisches Bokeh, Flasche lesbar im Vordergrund, Menschen sekundär — Biergarten oder Dining.",
+    hint: "Professionelles Fotoshooting wie für die eigene Imagekampagne: Menschen in Tracht oder im Biergarten posieren natürlich für den Fotografen, Porträtlook mit weichem Hintergrund, echte Farben. Das Etikett bleibt erkennbar.",
   },
   {
     id: "campaign",
     label: "Kampagnenmotiv",
-    hint: "Art-directed Key Visual: Produkt füllt den Frame, enger Crop, Hände reichen oder toasten — keine Biergarten-Stillleben-Postkarte.",
+    hint: "Inszeniertes Key Visual: Produkt dominiert den Frame, Hände reichen oder stoßen an, Untersicht oder Himmel. Im Feed bleibt oben Platz für die Headline.",
   },
 ];
 
@@ -146,11 +146,10 @@ export function InhalteErstellenStudio({
   const [requestQuality, setRequestQuality] = useState<"medium" | "high" | "ultra">("medium");
   const [aiWatermark, setAiWatermark] = useState(false);
   const [photoStyle, setPhotoStyle] = useState<PhotoStyle>("reportage");
-  const [hyperreal, setHyperreal] = useState(false);
 
   const [was, setWas] = useState(BEER_STYLE_OPTIONS[0]);
   const [wo, setWo] = useState(WO_OPTIONS[0]);
-  const [wie, setWie] = useState<HyperrealisticInput["tageszeit"]>("goldene_stunde");
+  const [wie, setWie] = useState<HyperrealisticInput["tageszeit"]>("tageslicht");
   const [behaelter, setBehaelter] = useState<NonNullable<HyperrealisticInput["behaelter"]>>("B");
   const [flaschenTyp, setFlaschenTyp] = useState<HyperrealisticInput["flaschenTyp"]>("nrw_500");
   const [flaschenfarbe, setFlaschenfarbe] = useState<HyperrealisticInput["flaschenfarbe"]>("braun");
@@ -468,7 +467,7 @@ export function InhalteErstellenStudio({
     setStimmungTrend("nachhaltig");
     setBehaelter("B");
     setWo(WO_OPTIONS[0]);
-    setWie("goldene_stunde");
+    setWie("tageslicht");
     setAspectRatio("4:5");
   }, []);
 
@@ -699,7 +698,8 @@ export function InhalteErstellenStudio({
             ? selectedBeer.filtrierung
             : undefined,
         szene: wo.szene,
-        behaelter,
+        // Ohne Vorlage entscheidet der Server aus dem Motivtext, ob ein Glas ins Bild gehört.
+        behaelter: activePreset ? behaelter : undefined,
         personImBild: personenModus === "D" || personenModus === "E",
         personenModus,
         gruppenAnzahl: personenModus === "E" ? gruppenAnzahl : undefined,
@@ -714,7 +714,6 @@ export function InhalteErstellenStudio({
         stiltreue,
         contentPreset: "campaign_social" as const,
         photoStyle,
-        hyperreal,
         beerName: selectedBeer?.name?.trim() || undefined,
         zusatzWunsch,
         extraReferenceImages: extraReferences.map((r) => r.dataUrl).slice(0, 3),
@@ -881,7 +880,7 @@ export function InhalteErstellenStudio({
             ? selectedBeer.filtrierung
             : undefined,
         szene: wo.szene,
-        behaelter,
+        behaelter: activePreset ? behaelter : undefined,
         personImBild: personenModus === "D" || personenModus === "E",
         personenModus,
         gruppenAnzahl: personenModus === "E" ? gruppenAnzahl : undefined,
@@ -895,7 +894,6 @@ export function InhalteErstellenStudio({
         etikettModus,
         stiltreue,
         photoStyle,
-        hyperreal,
         beerName: selectedBeer?.name?.trim() || undefined,
         zusatzWunsch,
         extraReferenceImages: extraReferences.map((r) => r.dataUrl).slice(0, 3),
@@ -1823,17 +1821,6 @@ export function InhalteErstellenStudio({
 
           <div className="studio-create-field studio-create-field--switch">
             <StudioUiSwitch
-              checked={hyperreal}
-              onCheckedChange={setHyperreal}
-              label="Hyperreal"
-            />
-            <span className="studio-create-field__hint">
-              Kein eigener Stil: verstärkt Flüssigkeit, Glas, Haut und Materialien im gewählten Fotostil — auch bei Kampagne sinnvoll.
-            </span>
-          </div>
-
-          <div className="studio-create-field studio-create-field--switch">
-            <StudioUiSwitch
               checked={aiWatermark}
               onCheckedChange={setAiWatermark}
               label="AI-Kennzeichnung"
@@ -1850,7 +1837,6 @@ export function InhalteErstellenStudio({
             <div>
               Format {aspectRatio} · Markenprofil {etikettModus === "marke" ? "aktiv" : "frei"}
               {` · ${PHOTO_STYLE_OPTIONS.find((option) => option.id === photoStyle)?.label ?? "Reportage"}`}
-              {hyperreal ? " · Hyperreal" : ""}
               {aiWatermark ? " · AI-Label" : ""}
             </div>
             <div className="studio-create-summary__cost">

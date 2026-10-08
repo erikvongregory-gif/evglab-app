@@ -1,19 +1,12 @@
 import { reserveGeneration } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { aspectRatioToImageSize, generateHyperrealistic, toOpenAiApiQuality } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
-import { buildHyperrealisticPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/hyperrealistic";
+import { buildImagePromptV3, normalizeV3Input } from "@/lib/inhalte-erstellen/image-prompt-v3";
 import { hyperrealisticSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { resolveReferenceImageForVision } from "@/lib/brand/reference-image-bytes";
 import { createReferenceResolverFromMetadata, assertResolvableReferenceUrls, resolveReferenceUrlsForGeneration } from "@/lib/brand/resolve-reference-for-generation";
-import { buildBrandProfilePromptContext, getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
-import { buildHyperrealisticClaudeUserMessage } from "@/lib/prompts/brauerei-bild/map-hyperrealistic-brief";
-import { generateBrauereiBildPrompt } from "@/lib/prompts/brauerei-bild/generate-prompt";
-import { applyContentPresetPrompt } from "@/lib/image-types/policy";
-import {
-  enforceHyperrealisticPromptConstraints,
-} from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/enforce-prompt-constraints";
+import { getBrandProfileFromMetadata } from "@/lib/dashboard/brandProfile";
 import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
 import { calculatePerVariantTokenCost, resolveImageBillingResolution } from "@/lib/billing/generationTokenCost";
 
@@ -32,7 +25,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Ungültige Anfrage. ${detail}` }, { status: 400 });
     }
 
-    const input = parsed.data;
+    const input = normalizeV3Input(parsed.data);
     const hasReferenceImage = input.etikettModus !== "generisch" && Boolean(input.etikettBild);
     const perImageCost = calculatePerVariantTokenCost({
       resolution: resolveImageBillingResolution({
@@ -52,7 +45,6 @@ export async function POST(req: Request) {
     const etikettUrl = resolveReferenceUrlsForGeneration(guard.userMetadata, origin, [input.etikettBild])[0] ?? input.etikettBild;
 
     const brandProfile = getBrandProfileFromMetadata(guard.userMetadata);
-    const brandProfileContext = buildBrandProfilePromptContext(brandProfile);
 
     // Referenzbild als Vision-Input fuer Claude vorbereiten (Skill-Schritt A–D).
     let visionReference = null as Awaited<ReturnType<typeof resolveReferenceImageForVision>>;
@@ -64,29 +56,7 @@ export async function POST(req: Request) {
       }
     }
 
-    let prompt = buildHyperrealisticPrompt(input);
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-    if (apiKey) {
-      try {
-        const anthropic = new Anthropic({ apiKey });
-        prompt = await generateBrauereiBildPrompt({
-          anthropic,
-          userMessage: buildHyperrealisticClaudeUserMessage(input, {
-            breweryName: brandProfile.breweryName,
-            hasReferenceImage: Boolean(visionReference),
-          }),
-          brandProfileContext,
-          maxTokens: 1400,
-          temperature: 0.35,
-          referenceImages: visionReference ? [visionReference] : undefined,
-        });
-      } catch (skillError) {
-        console.warn("[generate-hyperrealistic] brauerei-bild skill fallback:", skillError);
-      }
-    }
-
-    prompt = enforceHyperrealisticPromptConstraints(prompt, input, brandProfile.breweryName);
-    prompt = applyContentPresetPrompt(prompt, "hyperreal");
+    const prompt = buildImagePromptV3({ input, references: visionReference ? [{ index: 1, role: "product" }] : [], breweryName: brandProfile.breweryName });
 
     const images = await generateHyperrealistic({
       prompt,

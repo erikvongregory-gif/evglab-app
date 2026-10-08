@@ -2,7 +2,7 @@ import { reserveGeneration } from "@/lib/billing/generationJobs";
 import { NextResponse } from "next/server";
 import { requireBillableImageGenerationUser } from "@/app/(dashboard)/inhalte-erstellen/lib/api-guards";
 import { aspectRatioToImageSize, generateProductStudio, toOpenAiApiQuality } from "@/app/(dashboard)/inhalte-erstellen/lib/image-clients/openai-image";
-import { buildProductStudioPrompt } from "@/app/(dashboard)/inhalte-erstellen/lib/prompt-builders/product-studio";
+import { buildStudioPromptV3 } from "@/lib/inhalte-erstellen/legacy-v3-adapters";
 import { productStudioSchema } from "@/app/(dashboard)/inhalte-erstellen/lib/schemas";
 import { createReferenceResolverFromMetadata, assertResolvableReferenceUrls, resolveReferenceUrlsForGeneration } from "@/lib/brand/resolve-reference-for-generation";
 import { chargeGeneratedTokens, requireTokenBudget } from "@/lib/billing/generationBilling";
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const job = await reserveGeneration(req,guard.userId,perImageCost * 2,input);
     if(job instanceof NextResponse)return job;
 
-    const prompt = buildProductStudioPrompt(input);
+    const prompt = buildStudioPromptV3(input);
     const origin = new URL(req.url).origin;
     assertResolvableReferenceUrls(guard.userMetadata, origin, [input.referenzBild]);
     const referenzBildUrl = resolveReferenceUrlsForGeneration(guard.userMetadata, origin, [input.referenzBild])[0] ?? input.referenzBild;

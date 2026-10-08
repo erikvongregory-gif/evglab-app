@@ -22,7 +22,7 @@ vi.mock("@/lib/billing/generationJobs", () => ({
 }));
 vi.mock("@/lib/openai/imageApiKey", () => ({ requireOpenAiImageApiKey: () => "test-key" }));
 vi.mock("@/lib/brand/reference-image-bytes", () => ({ resolveReferenceImageForVision: async () => null }));
-vi.mock("@/lib/openai/bottleShapeReference", () => ({ loadBottleShapeReference: async () => null }));
+vi.mock("@/lib/openai/bottleShapeReference", () => ({ loadBottleShapeReference: async () => ({ mime: "image/png", base64: "c2hhcGU=" }) }));
 vi.mock("@/lib/dashboard/brandProfile", () => ({
   getBrandProfileFromMetadata: () => ({
     breweryName: "Test", brandLabelReferenceUrl: "", brandHeadlineFontName: "",
@@ -83,10 +83,9 @@ describe.each([["product", product], ["social", social]] as const)("%s image rej
     expect(settled?.error).toContain("keine Tokens berechnet");
     expect(mocks.render).toHaveBeenCalledTimes(1);
     const sentPrompt = mocks.render.mock.calls[0][0].prompt as string;
-    expect(sentPrompt).toContain("aged 25 or older");
-    expect(sentPrompt.endsWith("people baked into objects.")).toBe(true);
-    expect(sentPrompt).toContain("No political content");
-    expect(sentPrompt).toContain("fully inside its own shoe");
+    expect(sentPrompt).toContain("CUSTOMER SCENE (authoritative)");
+    expect(sentPrompt).toContain("Alcohol is held or consumed only by adults.");
+    expect(sentPrompt).toContain(post === social ? "No generated headline." : "No added text beyond requested product artwork.");
     expect(mocks.finish).toHaveBeenCalledWith(
       expect.objectContaining({ id: "job" }), 0,
       expect.objectContaining({ error: settled.error, images: [], billing: { consumed: 0 } }),

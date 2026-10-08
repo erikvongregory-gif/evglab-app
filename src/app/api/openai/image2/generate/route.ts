@@ -1,3 +1,4 @@
+import { buildFreeformImagePromptV3 } from "@/lib/inhalte-erstellen/image-prompt-v3";
 import { uploadGeneratedImageToStorage } from "@/lib/supabase/storage";
 import { workspaceResourceUser } from "@/lib/dashboard/workspace";
 import { reserveGeneration, finishGeneration } from "@/lib/billing/generationJobs";
@@ -26,7 +27,6 @@ import {
 import {
   type ContentCreationPreset,
   MAX_REFERENCE_UPLOADS,
-  applyContentPresetPrompt,
   validateImageTypePolicy,
 } from "@/lib/image-types/policy";
 import { requireOpenAiImageApiKey } from "@/lib/openai/imageApiKey";
@@ -63,7 +63,6 @@ const schema = z.object({
   cta: z.string().trim().max(400).optional(),
 });
 
-const MAX_OPENAI_PROMPT_CHARS = 12_000;
 
 function mapAspectRatioToOpenAiSize(aspectRatio: string | undefined): "1024x1024" | "1024x1536" | "1536x1024" {
   if (!aspectRatio) return "1024x1024";
@@ -217,9 +216,7 @@ export async function POST(req: Request) {
           ? buildCampaignCreativeFromReferencesPrompt(scenePrompt)
           : buildCampaignCreativePrompt(scenePrompt, headline, subTrim, ctaTrim)
         : scenePrompt;
-    const policyPrompt = applyContentPresetPrompt(creativeCore, body.imageType ?? "hyperreal");
-    const promptRaw = [policyPrompt, "", brandContext].filter(Boolean).join("\n");
-    const prompt = promptRaw.length > MAX_OPENAI_PROMPT_CHARS ? promptRaw.slice(0, MAX_OPENAI_PROMPT_CHARS) : promptRaw;
+    const prompt = buildFreeformImagePromptV3({ scene: creativeCore, imageType: body.imageType ?? "hyperreal", aspectRatio: body.aspectRatio, referenceCount: body.referenceImageUrls?.length, brandContext, strictLabel: body.strictLabelMode });
     const job = await reserveGeneration(req, userId, tokenCost, body);
     if (job instanceof NextResponse) return job;
     const openAiRes = hasReferenceImage

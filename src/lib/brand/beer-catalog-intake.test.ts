@@ -178,6 +178,28 @@ describe("beer-catalog-intake", () => {
     expect(inferBierstilFromName("Alkoholfrei")).toBe("alkoholfrei_pilsner");
   });
 
+  it("treats alkoholfrei as a property, not a style — Hell Alkoholfrei stays a Helles", () => {
+    expect(inferBierstilFromName("ABK Hell Alkoholfrei")).toBe("helles");
+    expect(inferBierstilFromName("Weißbier Alkoholfrei")).toBe("hefeweizen");
+    expect(inferBierstilFromName("Radler alkoholfrei")).toBe("radler");
+    expect(inferBierstilFromName("Pils 0,0")).toBe("pils");
+  });
+
+  it("keeps dark and festive German styles apart instead of rendering them as Helles or Märzen", () => {
+    expect(inferBierstilFromName("Münchner Dunkel")).toBe("dunkel");
+    expect(inferBierstilFromName("Dunkles Hefeweizen")).toBe("dunkles_weizen");
+    expect(inferBierstilFromName("Weissbier Dunkel")).toBe("dunkles_weizen");
+    expect(inferBierstilFromName("Aventinus Weizenbock")).toBe("weizenbock");
+    expect(inferBierstilFromName("Salvator")).toBe("doppelbock");
+    expect(inferBierstilFromName("Maibock")).toBe("maibock");
+    expect(inferBierstilFromName("Oktoberfest Festbier")).toBe("festbier");
+    expect(inferBierstilFromName("Märzen")).toBe("maerzen");
+    expect(inferBierstilFromName("Köstritzer Schwarzbier")).toBe("schwarzbier");
+    expect(inferBierstilFromName("Zwickel")).toBe("zwickel");
+    expect(inferBierstilFromName("Moderator Pils")).toBe("pils");
+    expect(inferBierstilFromName("Export Hell")).toBe("export");
+  });
+
   it("humanizes product slugs with brewery prefix", () => {
     expect(humanizeBeerSlug("pils", "Augustiner-Bräu München")).toBe("Augustiner Pils");
   });
