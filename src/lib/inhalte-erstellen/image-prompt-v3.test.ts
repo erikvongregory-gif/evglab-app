@@ -13,6 +13,20 @@ function prompt(overrides: Record<string, unknown> = {}) {
 }
 
 describe("independent V3 image direction", () => {
+  it("gives premium coherent photographic optics and physical detail without forcing blur or clutter", () => {
+    const text = prompt({ photoStyle: "premium" });
+    expect(text).toContain("one credible photographic exposure from one camera position");
+    expect(text).toContain("rather than automatically maximizing background blur");
+    expect(text).toContain("contact shadows, occlusion and reflected color");
+    expect(text).toContain("plausible thickness, refraction, transparent overlaps");
+    expect(text).toContain("plausible posture, weight distribution, joints, fingers and grip");
+    expect(text).toContain("natural surface variation must not damage or rewrite labels");
+    expect(text).toContain("do not add noise, scratches, light leaks or lens defects");
+    expect(text).toContain("do not add subjects, props, blemishes on products or environmental clutter");
+    for (const photoStyle of ["reportage", "campaign"]) {
+      expect(prompt({ photoStyle })).not.toContain("one credible photographic exposure from one camera position");
+    }
+  });
   it("gives premium individual unretouched skin without changing selected identities", () => {
     const text = prompt({ photoStyle: "premium" });
     expect(text).toContain("visible pores in the focal plane");
@@ -57,6 +71,20 @@ describe("independent V3 image direction", () => {
     expect(text).toContain("mid-action, mid-laugh or mid-sentence");
     expect(text).toContain("not an isolated hero product");
     expect(text).not.toContain("clean and professional across the entire frame");
+  });
+
+  it("keeps reportage ground resolved naturally without adding scenery or portrait blur", () => {
+    const text = prompt({ photoStyle: "reportage", zusatzWunsch: "Eine Flasche auf einem Tisch im Innenraum" });
+    expect(text).toContain("resolve the subjects and the ground around their feet together");
+    expect(text).toContain("do not apply portrait-mode background blur to nearby ground");
+    expect(text).toContain("If grass is already present");
+    expect(text).toContain("If gravel or stone is already present");
+    expect(text).toContain("without localized soft patches, melted grass, smeared gravel");
+    expect(text).toContain("must not add grass, gravel or scenery to the customer scene");
+    expect(text).toContain("CUSTOMER SCENE (authoritative): Eine Flasche auf einem Tisch im Innenraum");
+    for (const photoStyle of ["premium", "campaign"]) {
+      expect(prompt({ photoStyle })).not.toContain("do not apply portrait-mode background blur to nearby ground");
+    }
   });
 
   it.each(["dunkel", "Dunkel", "Dunkles Bier", "Dunkel-Lager"])("preserves %s color under flash instead of falling back to pale lager", (bierstil) => {
